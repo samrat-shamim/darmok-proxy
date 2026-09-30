@@ -33,6 +33,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Lints
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Vendored connector lints
+        run: cargo clippy -p tokio-postgres --lib --locked -- -D warnings
       - name: Tests and doctests
         run: cargo test --workspace --exclude darmok-postgres-tests --all-features --locked
       - name: Default feature tests

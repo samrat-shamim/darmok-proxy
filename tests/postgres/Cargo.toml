@@ -35,3 +35,7 @@ path = "native_catalog.rs"
 [[test]]
 name = "native_statements"
 path = "native_statements.rs"
+
+[[test]]
+name = "backend_completion"
+path = "backend_completion.rs"

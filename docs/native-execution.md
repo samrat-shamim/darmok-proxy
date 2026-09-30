@@ -121,6 +121,10 @@ expose and verify the required completion and
 [ReadyForQuery state](https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-READYFORQUERY),
 rather than turn that outcome into a committed-write acknowledgement.
 
+The [backend completion component](backend-completion.md) exposes those native
+events. It supplies no connection ownership, expected-outcome policy or rollback
+scope; the executor integration and verification above remain pending.
+
 ## Rows, encoding and completion
 
 Prepare inside the scope, perform native parameter/result representation checks,
