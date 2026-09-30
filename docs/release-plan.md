@@ -195,8 +195,8 @@ complete release gate runs once on the final candidate.
 - The [frontend recovery contract](transaction-recovery.md) distinguishes
   statement-local, whole-transaction, implicit-commit and uncertain outcomes.
   Four ordinary stock lock cases on each of MySQL 8.4.11 and PostgreSQL
-  17.11/18.6 completed twelve groups with seventy-two normal child exits and
-  confirmed removal of all three disposable databases. Existing-engine MySQL
+  17.11/18.6 completed twelve groups with seventy-two normal SQL-client exits
+  and confirmed removal of all three disposable databases. Existing-engine MySQL
   savepoint recovery retains later row locks which native PostgreSQL releases;
   a savepoint before the first table operation is a separately observed variant.
   Failed initial expectations and runner setup attempts remain frozen. The

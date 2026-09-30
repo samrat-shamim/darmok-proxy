@@ -122,9 +122,11 @@ The new lock runner checks each expected CLI error against its exact physical SQ
 line, rejects other stderr, requires a unique completion marker, checks values,
 and records normal child exits. PostgreSQL uses psql `-f -` for line attribution;
 an earlier runner attempt without it is preserved as a format failure. The final
-lock run contains twelve stock groups and seventy-two child invocations, all
-exiting zero. All three newly created databases were removed and absence checked.
-No failed attempt is relabeled as passing.
+lock run contains twelve stock groups and seventy-two SQL-client invocations,
+all exiting zero. The helper separately asserts successful completion of six
+read-only Docker image/container inspection calls. All three newly created
+databases were removed and absence checked. No failed attempt is relabeled as
+passing.
 
 Exact source hashes, commands, errors, results, image identities and cleanup
 receipts are external evidence. No actual proxy, driver compatibility, schema-lock
