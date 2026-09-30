@@ -9,4 +9,3 @@ publish = false
 [dependencies]
 darmok-types = { workspace = true }
 sqlparser = { workspace = true }
-
