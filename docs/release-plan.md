@@ -161,6 +161,12 @@ complete release gate runs once on the final candidate.
   prepared rows/errors, local binding failures and queued request association.
   Connection ownership, rollback, semantic admission and catalog validity are
   still pending; this is connector component evidence, not an executor gate.
+- The [native control checker](native-controls.md) requires fixed internal
+  control tags and final states, distinguishing COMMIT-as-ROLLBACK, backend
+  commit errors and incomplete savepoint recovery from successful completion.
+  Nine required ordinary fixtures per backend exercise outcomes and table
+  effects. It consumes existing requests and owns no connection or rollback
+  scope; M2 and the execution/admission/catalog gates remain incomplete.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

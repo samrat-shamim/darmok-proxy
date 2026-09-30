@@ -12,3 +12,4 @@ bytes = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 tokio-postgres = { workspace = true, features = ["with-chrono-0_4"] }
+futures-util = { workspace = true }

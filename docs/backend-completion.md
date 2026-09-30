@@ -64,6 +64,10 @@ lookup: other requests can already be queued or executing on the same Client.
 The future owner must supply exclusivity and validate expected control outcomes.
 
 Both streams are fused after their ReadyForQuery event or terminal `Err`.
+`CommandEventStream::has_yielded()` records whether an event or terminal error
+has already been returned. A checker requiring the entire request can reject
+handoff of a partially consumed stream. Pending-only polling does not set the
+flag; it is not an execution, readiness or ownership observation.
 Dropping or stopping a stream supplies no confirmation and performs no owned
 rollback. Rows retain the prepared statement's cached description, not a new
 portal description or catalog freshness proof. Output may precede a later
