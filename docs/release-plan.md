@@ -159,14 +159,22 @@ complete release gate runs once on the final candidate.
   with exact command tags, backend errors and request-boundary transaction states.
   Eight required ordinary fixtures per backend cover control/commit outcomes,
   prepared rows/errors, local binding failures and queued request association.
-  Connection ownership, rollback, semantic admission and catalog validity are
-  still pending; this is connector component evidence, not an executor gate.
+  Admitted rollback through output validation, semantic admission and catalog
+  validity remain pending; this is connector component evidence, not an executor gate.
 - The [native control checker](native-controls.md) requires fixed internal
   control tags and final states, distinguishing COMMIT-as-ROLLBACK, backend
   commit errors and incomplete savepoint recovery from successful completion.
   Nine required ordinary fixtures per backend exercise outcomes and table
   effects. It consumes existing requests and owns no connection or rollback
   scope; M2 and the execution/admission/catalog gates remain incomplete.
+- The [exclusive native backend owner](native-backend.md) retains a fresh client
+  and its driver privately, observes idle before returning, and owns explicit
+  controls plus borrowed transaction/savepoint scopes. Dropped pending controls
+  or scopes cannot restore Ready; unconfirmed cleanup requires disposal.
+  Nine private database unit fixtures are required separately on PostgreSQL
+  17/18, without exposing a public raw SQL execution escape. This implements
+  the control ownership boundary, not semantic admission, catalog validity,
+  rollback through output validation, wire execution or the M2 end-to-end gate.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

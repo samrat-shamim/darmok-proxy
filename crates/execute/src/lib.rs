@@ -1,13 +1,18 @@
-//! Native representations, prepared checks, borrowed bindings and observed
-//! control outcomes. Connection ownership, execution and wire metadata remain
-//! gates.
+//! Native representations, prepared checks, borrowed bindings, observed
+//! controls and exclusively owned transaction scopes. Semantically admitted
+//! statement execution and wire metadata remain gates.
 
+mod native_backend;
 mod native_control;
 mod native_param;
 mod native_statement;
 mod native_value;
 mod numeric;
 
+pub use native_backend::{
+    NativeBackend, NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError,
+    NativeBackendOperation, NativeBackendState, NativeScope, NativeScopeBoundary,
+};
 pub use native_control::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
     check_native_control,
