@@ -89,6 +89,8 @@ pub struct CatalogInvalidation {
 pub struct TranslatedPlan {
     /// PostgreSQL SQL with $1..$N placeholders.
     pub pg_sql: String,
+    /// Backend bind arity produced by the AST compiler, never rediscovered from SQL text.
+    pub parameter_count: u16,
     /// Optional sibling query used to emulate MySQL `FOUND_ROWS()`.
     pub found_rows_count_sql: Option<String>,
     /// Per-parameter coercion rules.
@@ -116,83 +118,6 @@ pub struct TranslatedPlan {
     pub auto_appended_returning: bool,
 }
 
-impl TranslatedPlan {
-    /// Count distinct PostgreSQL bind parameters referenced by this plan.
-    pub fn parameter_count(&self) -> u16 {
-        let bytes = self.pg_sql.as_bytes();
-        let mut index = 0usize;
-        let mut max_placeholder = 0u16;
-
-        while index < bytes.len() {
-            match bytes[index] {
-                b'\'' => {
-                    index += 1;
-                    while index < bytes.len() {
-                        if bytes[index] == b'\'' && bytes.get(index + 1).copied() == Some(b'\'') {
-                            index += 2;
-                            continue;
-                        }
-                        if bytes[index] == b'\'' {
-                            index += 1;
-                            break;
-                        }
-                        index += 1;
-                    }
-                }
-                b'"' => {
-                    index += 1;
-                    while index < bytes.len() {
-                        if bytes[index] == b'"' && bytes.get(index + 1).copied() == Some(b'"') {
-                            index += 2;
-                            continue;
-                        }
-                        if bytes[index] == b'"' {
-                            index += 1;
-                            break;
-                        }
-                        index += 1;
-                    }
-                }
-                b'-' if bytes.get(index + 1).copied() == Some(b'-') => {
-                    index += 2;
-                    while index < bytes.len() && !matches!(bytes[index], b'\n' | b'\r') {
-                        index += 1;
-                    }
-                }
-                b'/' if bytes.get(index + 1).copied() == Some(b'*') => {
-                    index += 2;
-                    while index + 1 < bytes.len() {
-                        if bytes[index] == b'*' && bytes[index + 1] == b'/' {
-                            index += 2;
-                            break;
-                        }
-                        index += 1;
-                    }
-                }
-                b'$' => {
-                    let start = index + 1;
-                    let mut end = start;
-                    while end < bytes.len() && bytes[end].is_ascii_digit() {
-                        end += 1;
-                    }
-
-                    if end > start {
-                        let placeholder =
-                            self.pg_sql[start..end].parse::<u16>().unwrap_or(u16::MAX);
-                        max_placeholder = max_placeholder.max(placeholder);
-                        index = end;
-                    } else {
-                        index += 1;
-                    }
-                }
-                _ => index += 1,
-            }
-        }
-
-        max_placeholder
-    }
-}
-
 /// Result of parameterizing a raw MySQL query.
 #[derive(Debug, Clone)]
 pub struct ParameterizedQuery {
@@ -208,39 +133,4 @@ pub struct ParameterizedQuery {
     /// — e.g. `TranslatedPlan::param_coercions` — must also be sized
     /// to `total_placeholders` rather than `params.len()`.
     pub total_placeholders: usize,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_plan(pg_sql: &str) -> TranslatedPlan {
-        TranslatedPlan {
-            pg_sql: pg_sql.to_owned(),
-            found_rows_count_sql: None,
-            param_coercions: Vec::new(),
-            projection: None,
-            sidecar: None,
-            plan_kind: PlanKind::Select,
-            post_statements: Vec::new(),
-            catalog_invalidations: Vec::new(),
-            dml_target_table: None,
-            warnings: Vec::new(),
-            flags: PlanFlags::empty(),
-            returning_column: None,
-            auto_appended_returning: false,
-        }
-    }
-
-    #[test]
-    fn parameter_count_tracks_highest_placeholder_index() {
-        let plan = sample_plan("SELECT $1, $3, $2, $3");
-        assert_eq!(plan.parameter_count(), 3);
-    }
-
-    #[test]
-    fn parameter_count_ignores_placeholders_in_strings_and_comments() {
-        let plan = sample_plan("SELECT '$9', $2 /* $7 */ -- $8\nFROM t WHERE note = '$1'");
-        assert_eq!(plan.parameter_count(), 2);
-    }
 }

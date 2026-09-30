@@ -1,3 +1,4 @@
+// Modified for Darmok: follow the explicit spanned-value visitor hook.
 // Modified for Darmok: neutral description and explicit alloc imports for no_std builds.
 // Original extension attribution is retained in NOTICE.
 // Licensed under Apache-2.0 (extension to sqlparser-rs)
@@ -235,7 +236,10 @@ impl Visitor for MetadataCollector {
         ControlFlow::Continue(())
     }
 
-    fn pre_visit_value(&mut self, value: &crate::ast::ValueWithSpan) -> ControlFlow<Self::Break> {
+    fn pre_visit_value_with_span(
+        &mut self,
+        value: &crate::ast::ValueWithSpan,
+    ) -> ControlFlow<Self::Break> {
         if matches!(value.value, Value::Placeholder(_)) {
             self.placeholder_count = self.placeholder_count.saturating_add(1);
         }

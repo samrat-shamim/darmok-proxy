@@ -1,3 +1,4 @@
+// Modified for Darmok: expose comment-hint preservation for semantic admission.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -872,6 +873,8 @@ pub struct Tokenizer<'a> {
     /// If true (the default), the tokenizer will un-escape literal
     /// SQL strings See [`Tokenizer::with_unescape`] for more details.
     unescape: bool,
+    /// Whether dialect comment hints are expanded into SQL tokens.
+    expand_comment_hints: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -896,7 +899,16 @@ impl<'a> Tokenizer<'a> {
             dialect,
             query,
             unescape: true,
+            expand_comment_hints: true,
         }
+    }
+
+    /// Preserve executable/hint comments instead of expanding their contents.
+    /// Consumers that enforce server-version or execution policy should set
+    /// this to false and inspect the resulting comment token themselves.
+    pub fn with_comment_hint_expansion(mut self, expand: bool) -> Self {
+        self.expand_comment_hints = expand;
+        self
     }
 
     /// Set unescape mode
@@ -976,7 +988,8 @@ impl<'a> Tokenizer<'a> {
             // Check if this is a multiline comment hint that should be expanded
             match &token {
                 Token::Whitespace(Whitespace::MultiLineComment(comment))
-                    if self.dialect.supports_multiline_comment_hints()
+                    if self.expand_comment_hints
+                        && self.dialect.supports_multiline_comment_hints()
                         && comment.starts_with('!') =>
                 {
                     // Re-tokenize the hints and add them to the buffer
@@ -3397,6 +3410,26 @@ mod tests {
             Token::Number("0".to_string(), false),
         ];
         compare(expected, tokens);
+    }
+
+    #[test]
+    fn mysql_executable_comments_can_be_preserved_for_admission() {
+        let dialect = MySqlDialect {};
+        let sql = "/*!99999 SELECT ? */";
+        let preserved = Tokenizer::new(&dialect, sql)
+            .with_comment_hint_expansion(false)
+            .tokenize()
+            .unwrap();
+        assert_eq!(
+            preserved,
+            vec![Token::Whitespace(Whitespace::MultiLineComment(
+                "!99999 SELECT ? ".into()
+            ))]
+        );
+        let expanded = Tokenizer::new(&dialect, sql).tokenize().unwrap();
+        assert!(expanded
+            .iter()
+            .any(|token| matches!(token, Token::Placeholder(_))));
     }
 
     #[test]

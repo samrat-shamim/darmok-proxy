@@ -1,4 +1,4 @@
-// Modified for Darmok: simplify equivalent match guards for the pinned toolchain.
+// Modified for Darmok: match guards, optional AST construction limits, recursive type/pattern guards.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -58,6 +58,8 @@ pub enum ParserError {
     ParserError(String),
     /// Raised when a recursion depth limit is exceeded.
     RecursionLimitExceeded,
+    /// Constructed AST exceeds its depth or total node limit.
+    AstLimitExceeded,
 }
 
 // Use `Parser::expected` instead, if possible
@@ -70,10 +72,12 @@ macro_rules! parser_err {
 mod alter;
 mod merge;
 
-#[cfg(feature = "std")]
-/// Implementation [`RecursionCounter`] if std is available
+/// Parser recursion accounting is enforced with or without std.
 mod recursion {
-    use std::cell::Cell;
+    #[cfg(not(feature = "std"))]
+    use alloc::rc::Rc;
+    use core::cell::Cell;
+    #[cfg(feature = "std")]
     use std::rc::Rc;
 
     use super::ParserError;
@@ -82,7 +86,7 @@ mod recursion {
     /// each call to [`RecursionCounter::try_decrease()`], when it reaches 0 an error will
     /// be returned.
     ///
-    /// Note: Uses an [`std::rc::Rc`] and [`std::cell::Cell`] in order to satisfy the Rust
+    /// Note: Uses reference counting and [`core::cell::Cell`] to satisfy the Rust
     /// borrow checker so the automatic [`DepthGuard`] decrement a
     /// reference to the counter.
     ///
@@ -137,27 +141,6 @@ mod recursion {
     }
 }
 
-#[cfg(not(feature = "std"))]
-mod recursion {
-    /// Implementation [`RecursionCounter`] if std is NOT available (and does not
-    /// guard against stack overflow).
-    ///
-    /// Has the same API as the std [`RecursionCounter`] implementation
-    /// but does not actually limit stack depth.
-    pub(crate) struct RecursionCounter {}
-
-    impl RecursionCounter {
-        pub fn new(_remaining_depth: usize) -> Self {
-            Self {}
-        }
-        pub fn try_decrease(&self) -> Result<DepthGuard, super::ParserError> {
-            Ok(DepthGuard {})
-        }
-    }
-
-    pub struct DepthGuard {}
-}
-
 #[derive(PartialEq, Eq)]
 /// Indicates whether a parser element is optional or mandatory.
 pub enum IsOptional {
@@ -200,6 +183,7 @@ impl fmt::Display for ParserError {
                 ParserError::TokenizerError(s) => s,
                 ParserError::ParserError(s) => s,
                 ParserError::RecursionLimitExceeded => "recursion limit exceeded",
+                ParserError::AstLimitExceeded => "AST depth or node limit exceeded",
             }
         )
     }
@@ -361,6 +345,8 @@ pub struct Parser<'a> {
     options: ParserOptions,
     /// Ensures the stack does not overflow by limiting recursion depth.
     recursion_counter: RecursionCounter,
+    #[cfg(feature = "visitor")]
+    ast_limits: Option<AstLimits>,
 }
 
 impl<'a> Parser<'a> {
@@ -386,6 +372,8 @@ impl<'a> Parser<'a> {
             state: ParserState::Normal,
             dialect,
             recursion_counter: RecursionCounter::new(DEFAULT_REMAINING_DEPTH),
+            #[cfg(feature = "visitor")]
+            ast_limits: None,
             options: ParserOptions::new().with_trailing_commas(dialect.supports_trailing_commas()),
         }
     }
@@ -415,6 +403,27 @@ impl<'a> Parser<'a> {
     pub fn with_recursion_limit(mut self, recursion_limit: usize) -> Self {
         self.recursion_counter = RecursionCounter::new(recursion_limit);
         self
+    }
+
+    /// Bound constructed ASTs, including flat operator chains that do not
+    /// increase parser call depth. Rejected trees are disposed iteratively.
+    #[cfg(feature = "visitor")]
+    pub fn with_ast_limits(mut self, limits: AstLimits) -> Self {
+        self.ast_limits = Some(limits);
+        self
+    }
+
+    #[cfg(feature = "visitor")]
+    fn check_ast<T: AstNode>(&self, node: T) -> Result<T, ParserError> {
+        if self
+            .ast_limits
+            .is_some_and(|limits| check_ast(&node, limits).is_err())
+        {
+            drop_ast(node);
+            Err(ParserError::AstLimitExceeded)
+        } else {
+            Ok(node)
+        }
     }
 
     /// Specify additional parser options
@@ -614,7 +623,13 @@ impl<'a> Parser<'a> {
     /// stopping before the statement separator, if any.
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         let _guard = self.recursion_counter.try_decrease()?;
+        let statement = self.parse_statement_inner()?;
+        #[cfg(feature = "visitor")]
+        let statement = self.check_ast(statement)?;
+        Ok(statement)
+    }
 
+    fn parse_statement_inner(&mut self) -> Result<Statement, ParserError> {
         // allow the dialect to override statement parsing
         if let Some(statement) = self.dialect.parse_statement(self) {
             return statement;
@@ -1419,6 +1434,10 @@ impl<'a> Parser<'a> {
         let mut expr = self.parse_prefix()?;
 
         expr = self.parse_compound_expr(expr, vec![])?;
+        #[cfg(feature = "visitor")]
+        {
+            expr = self.check_ast(expr)?;
+        }
 
         debug!("prefix: {expr:?}");
         loop {
@@ -1436,6 +1455,10 @@ impl<'a> Parser<'a> {
             }
 
             expr = self.parse_infix(expr, next_precedence)?;
+            #[cfg(feature = "visitor")]
+            {
+                expr = self.check_ast(expr)?;
+            }
         }
         Ok(expr)
     }
@@ -5049,7 +5072,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Run a parser method `f`, reverting back to the current position if unsuccessful.
-    /// Returns `ParserError::RecursionLimitExceeded` if `f` returns a `RecursionLimitExceeded`.
+    /// Propagates recursion and AST resource errors without speculative fallback.
     /// Returns `Ok(None)` if `f` returns any other error.
     pub fn maybe_parse<T, F>(&mut self, f: F) -> Result<Option<T>, ParserError>
     where
@@ -5058,6 +5081,7 @@ impl<'a> Parser<'a> {
         match self.try_parse(f) {
             Ok(t) => Ok(Some(t)),
             Err(ParserError::RecursionLimitExceeded) => Err(ParserError::RecursionLimitExceeded),
+            Err(ParserError::AstLimitExceeded) => Err(ParserError::AstLimitExceeded),
             _ => Ok(None),
         }
     }
@@ -12223,6 +12247,7 @@ impl<'a> Parser<'a> {
     fn parse_data_type_helper(
         &mut self,
     ) -> Result<(DataType, MatchedTrailingBracket), ParserError> {
+        let _guard = self.recursion_counter.try_decrease()?;
         let dialect = self.dialect;
         self.advance_token();
         let next_token = self.get_current_token();
@@ -12669,9 +12694,15 @@ impl<'a> Parser<'a> {
                 // Parse optional array data type size
                 let size = self.maybe_parse(|p| p.parse_literal_uint())?;
                 self.expect_token(&Token::RBracket)?;
-                data = DataType::Array(ArrayElemTypeDef::SquareBracket(Box::new(data), size))
+                data = DataType::Array(ArrayElemTypeDef::SquareBracket(Box::new(data), size));
+                #[cfg(feature = "visitor")]
+                {
+                    data = self.check_ast(data)?;
+                }
             }
         }
+        #[cfg(feature = "visitor")]
+        let data = self.check_ast(data)?;
         Ok((data, trailing_bracket))
     }
 
@@ -13946,6 +13977,13 @@ impl<'a> Parser<'a> {
     #[cfg_attr(feature = "recursive-protection", recursive::recursive)]
     pub fn parse_query(&mut self) -> Result<Box<Query>, ParserError> {
         let _guard = self.recursion_counter.try_decrease()?;
+        let query = self.parse_query_inner()?;
+        #[cfg(feature = "visitor")]
+        let query = self.check_ast(query)?;
+        Ok(query)
+    }
+
+    fn parse_query_inner(&mut self) -> Result<Box<Query>, ParserError> {
         let with = if self.parse_keyword(Keyword::WITH) {
             let with_token = self.get_current_token();
             Some(With {
@@ -14553,6 +14591,10 @@ impl<'a> Parser<'a> {
                 set_quantifier,
                 right: self.parse_query_body(next_precedence)?,
             };
+            #[cfg(feature = "visitor")]
+            {
+                expr = self.check_ast(expr)?;
+            }
         }
 
         Ok(expr.into())
@@ -15848,6 +15890,13 @@ impl<'a> Parser<'a> {
     #[cfg_attr(feature = "recursive-protection", recursive::recursive)]
     pub fn parse_table_factor(&mut self) -> Result<TableFactor, ParserError> {
         let _guard = self.recursion_counter.try_decrease()?;
+        let table = self.parse_table_factor_inner()?;
+        #[cfg(feature = "visitor")]
+        let table = self.check_ast(table)?;
+        Ok(table)
+    }
+
+    fn parse_table_factor_inner(&mut self) -> Result<TableFactor, ParserError> {
         if self.parse_keyword(Keyword::LATERAL) {
             // LATERAL must always be followed by a subquery or table function.
             if self.consume_token(&Token::LParen) {
@@ -15904,6 +15953,10 @@ impl<'a> Parser<'a> {
                         unexpected_keyword => return Err(ParserError::ParserError(
                             format!("Internal parser error: unexpected keyword `{unexpected_keyword}` in pivot/unpivot"),
                         )),
+                    };
+                    #[cfg(feature = "visitor")]
+                    {
+                        table = self.check_ast(table)?;
                     }
                 }
                 return Ok(table);
@@ -16168,6 +16221,10 @@ impl<'a> Parser<'a> {
                     unexpected_keyword => return Err(ParserError::ParserError(
                         format!("Internal parser error: unexpected keyword `{unexpected_keyword}` in pivot/unpivot"),
                     )),
+                };
+                #[cfg(feature = "visitor")]
+                {
+                    table = self.check_ast(table)?;
                 }
             }
 
@@ -16712,6 +16769,10 @@ impl<'a> Parser<'a> {
                 }
             };
             pattern = MatchRecognizePattern::Repetition(Box::new(pattern), quantifier);
+            #[cfg(feature = "visitor")]
+            {
+                pattern = self.check_ast(pattern)?;
+            }
         }
         Ok(pattern)
     }
@@ -16728,6 +16789,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_pattern(&mut self) -> Result<MatchRecognizePattern, ParserError> {
+        let _guard = self.recursion_counter.try_decrease()?;
         let pattern = self.parse_concat_pattern()?;
         if self.consume_token(&Token::Pipe) {
             match self.parse_pattern()? {
@@ -16794,6 +16856,14 @@ impl<'a> Parser<'a> {
     /// Parses MySQL's JSON_TABLE column definition.
     /// For example: `id INT EXISTS PATH '$' DEFAULT '0' ON EMPTY ERROR ON ERROR`
     pub fn parse_json_table_column_def(&mut self) -> Result<JsonTableColumn, ParserError> {
+        let _guard = self.recursion_counter.try_decrease()?;
+        let column = self.parse_json_table_column_def_inner()?;
+        #[cfg(feature = "visitor")]
+        let column = self.check_ast(column)?;
+        Ok(column)
+    }
+
+    fn parse_json_table_column_def_inner(&mut self) -> Result<JsonTableColumn, ParserError> {
         if self.parse_keyword(Keyword::NESTED) {
             let _has_path_keyword = self.parse_keyword(Keyword::PATH);
             let path = self.parse_value()?;
