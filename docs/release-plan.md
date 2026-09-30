@@ -192,6 +192,18 @@ complete release gate runs once on the final candidate.
   [completion contract](backend-completion.md) records the restriction and costs;
   the owner still exposes no raw SQL or Client. Catalog validity, admitted rows
   and M2 remain pending.
+- The [frontend recovery contract](transaction-recovery.md) distinguishes
+  statement-local, whole-transaction, implicit-commit and uncertain outcomes.
+  Four ordinary stock lock cases on each of MySQL 8.4.11 and PostgreSQL
+  17.11/18.6 completed twelve groups with seventy-two normal child exits and
+  confirmed removal of all three disposable databases. Existing-engine MySQL
+  savepoint recovery retains later row locks which native PostgreSQL releases;
+  a savepoint before the first table operation is a separately observed variant.
+  Failed initial expectations and runner setup attempts remain frozen. The
+  required lock mechanism is tracked in
+  [blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15). These are
+  stock reference observations, not proxy equivalence, driver, performance or
+  release certification. M2/M4 and the installation choice remain pending.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
