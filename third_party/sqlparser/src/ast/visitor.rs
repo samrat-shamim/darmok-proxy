@@ -1,4 +1,4 @@
-// Modified for Darmok: import allocated visitor types explicitly in no_std builds.
+// Modified for Darmok: import allocated visitor types explicitly in no_std builds; expose identifier, function-name and raw-value hooks.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -18,7 +18,9 @@
 
 //! Recursive visitors for ast Nodes. See [`Visitor`] for more details.
 
-use crate::ast::{Expr, ObjectName, Query, Select, Statement, TableFactor, ValueWithSpan};
+use crate::ast::{
+    Expr, Ident, ObjectName, Query, Select, Statement, TableFactor, Value, ValueWithSpan,
+};
 use core::ops::ControlFlow;
 
 #[cfg(not(feature = "std"))]
@@ -261,13 +263,43 @@ pub trait Visitor {
         ControlFlow::Continue(())
     }
 
+    /// Invoked before visiting an identifier's children.
+    fn pre_visit_ident(&mut self, _ident: &Ident) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after visiting an identifier's children.
+    fn post_visit_ident(&mut self, _ident: &Ident) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked before visiting any raw value, including values without spans.
+    fn pre_visit_value(&mut self, _value: &Value) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after visiting any raw value.
+    fn post_visit_value(&mut self, _value: &Value) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked before traversing a function call's name, excluding arguments.
+    fn pre_visit_function_name(&mut self, _name: &ObjectName) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after traversing a function call's name, before its arguments.
+    fn post_visit_function_name(&mut self, _name: &ObjectName) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
     /// Invoked for any Value that appear in the AST before visiting children
-    fn pre_visit_value(&mut self, _value: &ValueWithSpan) -> ControlFlow<Self::Break> {
+    fn pre_visit_value_with_span(&mut self, _value: &ValueWithSpan) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
 
     /// Invoked for any Value that appear in the AST after visiting children
-    fn post_visit_value(&mut self, _value: &ValueWithSpan) -> ControlFlow<Self::Break> {
+    fn post_visit_value_with_span(&mut self, _value: &ValueWithSpan) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
 }
@@ -389,13 +421,49 @@ pub trait VisitorMut {
         ControlFlow::Continue(())
     }
 
+    /// Invoked before visiting an identifier's children.
+    fn pre_visit_ident(&mut self, _ident: &mut Ident) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after visiting an identifier's children.
+    fn post_visit_ident(&mut self, _ident: &mut Ident) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked before visiting any raw value, including values without spans.
+    fn pre_visit_value(&mut self, _value: &mut Value) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after visiting any raw value.
+    fn post_visit_value(&mut self, _value: &mut Value) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked before traversing a function call's name, excluding arguments.
+    fn pre_visit_function_name(&mut self, _name: &mut ObjectName) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    /// Invoked after traversing a function call's name, before its arguments.
+    fn post_visit_function_name(&mut self, _name: &mut ObjectName) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
     /// Invoked for any value that appear in the AST before visiting children
-    fn pre_visit_value(&mut self, _value: &mut ValueWithSpan) -> ControlFlow<Self::Break> {
+    fn pre_visit_value_with_span(
+        &mut self,
+        _value: &mut ValueWithSpan,
+    ) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
 
     /// Invoked for any statements that appear in the AST after visiting children
-    fn post_visit_value(&mut self, _value: &mut ValueWithSpan) -> ControlFlow<Self::Break> {
+    fn post_visit_value_with_span(
+        &mut self,
+        _value: &mut ValueWithSpan,
+    ) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
 }
@@ -1033,13 +1101,19 @@ mod visit_mut_tests {
     impl VisitorMut for MutatorVisitor {
         type Break = ();
 
-        fn pre_visit_value(&mut self, value: &mut ValueWithSpan) -> ControlFlow<Self::Break> {
+        fn pre_visit_value_with_span(
+            &mut self,
+            value: &mut ValueWithSpan,
+        ) -> ControlFlow<Self::Break> {
             self.index += 1;
             value.value = Value::SingleQuotedString(format!("REDACTED_{}", self.index));
             ControlFlow::Continue(())
         }
 
-        fn post_visit_value(&mut self, _value: &mut ValueWithSpan) -> ControlFlow<Self::Break> {
+        fn post_visit_value_with_span(
+            &mut self,
+            _value: &mut ValueWithSpan,
+        ) -> ControlFlow<Self::Break> {
             ControlFlow::Continue(())
         }
     }

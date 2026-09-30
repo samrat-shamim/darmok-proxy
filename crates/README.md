@@ -9,6 +9,8 @@
   the 24:00:00 time endpoint.
 - `darmok-catalog`: fresh native relation and declared-type facts by
   database-local OID, including domain identities and raw column attributes.
+- `darmok-translate`: MySQL AST parsing, stable parameter identities and
+  PostgreSQL syntax emission; see [compiler boundaries](../docs/compiler.md).
 
 These libraries are an extraction foundation. They do not form a runnable
 proxy yet. The [release plan](../docs/release-plan.md) remains authoritative for

@@ -1,16 +1,16 @@
-// Modified for Darmok: neutral description and alloc/core imports for no_std builds.
+// Modified for Darmok: structural identifier emission, explicit option rejection, owned emission, and no_std imports.
 // Original extension attribution is retained in NOTICE.
 // Licensed under Apache-2.0 (extension to sqlparser-rs)
 
 //! PG-targeted SQL emitter.
 //!
 //! The upstream sqlparser `Display` impl emits MySQL-flavored SQL.
-//! This module provides a `PgEmitter` that writes PostgreSQL-executable SQL:
+//! This module provides PostgreSQL syntax emission after semantic lowering:
 //! - Backtick identifiers → double-quoted
 //! - `?` placeholders → `$N`
 //! - `LIMIT offset, count` → `LIMIT count OFFSET offset`
 //! - MySQL double-quoted strings → single-quoted strings
-//! - Strips MySQL-only table options (ENGINE=, CHARSET=, COLLATE=)
+//! - Rejects residual MySQL-only table options (ENGINE=, CHARSET=, COLLATE=)
 //! - Rejects unsupported MySQL-only constructs (INSERT IGNORE, REPLACE INTO,
 //!   ON DUPLICATE KEY UPDATE)
 //!
@@ -19,9 +19,10 @@
 //! would corrupt escaped literals.
 
 use crate::ast::{
-    CreateTableOptions, Ident, LimitClause, Offset, OffsetRows, OnInsert, Query, SqlOption,
-    Statement, Value, ValueWithSpan, VisitMut, VisitorMut,
+    check_ast, drop_ast, AstLimits, CreateTableOptions, Ident, LimitClause, Offset, OffsetRows,
+    OnInsert, Query, SqlOption, Statement, Value, VisitMut, VisitorMut,
 };
+use crate::dialect::{Dialect, PostgreSqlDialect};
 use core::fmt;
 use core::ops::ControlFlow;
 
@@ -30,7 +31,6 @@ use alloc::{
     format,
     string::{String, ToString},
     vec,
-    vec::Vec,
 };
 
 /// Options controlling PG SQL emission.
@@ -38,15 +38,19 @@ use alloc::{
 pub struct EmitOptions {
     /// Starting parameter number (default 1).
     pub first_param_index: u32,
-    /// Whether to quote all identifiers.
-    pub always_quote_identifiers: bool,
 }
+
+// The compiler can impose tighter limits. Direct emitter callers receive the
+// same bounded recursive-processing contract before any clone or formatting.
+const EMIT_AST_LIMITS: AstLimits = AstLimits {
+    max_depth: 128,
+    max_nodes: 1_000_000,
+};
 
 impl Default for EmitOptions {
     fn default() -> Self {
         Self {
             first_param_index: 1,
-            always_quote_identifiers: false,
         }
     }
 }
@@ -135,59 +139,83 @@ impl SqlEmitter for PgEmitter {
         stmt: &Statement,
         out: &mut W,
     ) -> Result<(), EmitError> {
-        // 1. Validate: reject MySQL-only constructs that can't be translated.
-        validate_statement(stmt)?;
-
-        // 2. Clone the AST and apply transformations via VisitorMut.
-        let mut stmt = stmt.clone();
-
-        // Strip MySQL-only CREATE TABLE options.
-        strip_mysql_create_table_options(&mut stmt);
-
-        // Apply AST-level rewrites: backtick→double-quote identifiers,
-        // ?→$N placeholders, LIMIT offset,count→LIMIT count OFFSET offset,
-        // double-quoted strings→single-quoted strings.
-        let mut rewriter = PgRewriter { emitter: self };
-        let _ = stmt.visit(&mut rewriter);
-
-        // 3. Use the AST's Display impl for output — then fix up any
-        //    remaining backtick-quoted identifiers that the visitor couldn't
-        //    reach (column defs, non-expression aliases, etc.).
-        let sql = stmt.to_string();
-        let fixed = rewrite_backtick_to_double_quote(&sql);
-        out.write_str(&fixed)?;
-        Ok(())
+        check_ast(stmt, EMIT_AST_LIMITS)
+            .map_err(|_| EmitError::UnsupportedNode("AST resource limit exceeded".into()))?;
+        self.emit_statement_owned(stmt.clone(), out)
     }
 }
 
-// ---------------------------------------------------------------------------
-// Validation: reject MySQL-only constructs
-// ---------------------------------------------------------------------------
+impl PgEmitter {
+    /// Consume an already-owned AST without making another full copy. The
+    /// caller must perform semantic and catalog validation before execution.
+    pub fn emit_statement_owned<W: fmt::Write>(
+        &mut self,
+        mut stmt: Statement,
+        out: &mut W,
+    ) -> Result<(), EmitError> {
+        if check_ast(&stmt, EMIT_AST_LIMITS).is_err() {
+            drop_ast(stmt);
+            return Err(EmitError::UnsupportedNode(
+                "AST resource limit exceeded".into(),
+            ));
+        }
+        let mut rewriter = PgRewriter {
+            emitter: self,
+            in_function_name: false,
+        };
+        if let ControlFlow::Break(error) = stmt.visit(&mut rewriter) {
+            return Err(error);
+        }
+        write!(out, "{stmt}")?;
+        Ok(())
+    }
+}
 
 fn validate_statement(stmt: &Statement) -> Result<(), EmitError> {
     match stmt {
         Statement::Insert(insert) => {
             if insert.replace_into {
                 return Err(EmitError::UnsupportedNode(
-                    "REPLACE INTO is MySQL-only; use INSERT ... ON CONFLICT for PG".into(),
+                    "REPLACE INTO requires semantic lowering".into(),
                 ));
             }
             if insert.ignore {
                 return Err(EmitError::UnsupportedNode(
-                    "INSERT IGNORE is MySQL-only; use INSERT ... ON CONFLICT DO NOTHING for PG"
-                        .into(),
+                    "INSERT IGNORE requires semantic lowering".into(),
                 ));
             }
             if let Some(OnInsert::DuplicateKeyUpdate(_)) = &insert.on {
                 return Err(EmitError::UnsupportedNode(
-                    "ON DUPLICATE KEY UPDATE is MySQL-only; use ON CONFLICT ... DO UPDATE for PG"
-                        .into(),
+                    "ON DUPLICATE KEY UPDATE requires semantic lowering".into(),
                 ));
             }
-            Ok(())
         }
-        _ => Ok(()),
+        Statement::CreateTable(create) => {
+            let options = match &create.table_options {
+                CreateTableOptions::With(options)
+                | CreateTableOptions::Options(options)
+                | CreateTableOptions::Plain(options)
+                | CreateTableOptions::TableProperties(options) => options.as_slice(),
+                CreateTableOptions::None => &[],
+            };
+            for option in options {
+                let key = match option {
+                    SqlOption::Ident(ident) | SqlOption::KeyValue { key: ident, .. } => {
+                        Some(&ident.value)
+                    }
+                    SqlOption::NamedParenthesizedList(list) => Some(&list.key.value),
+                    _ => None,
+                };
+                if key.is_some_and(|key| is_mysql_table_option_key(&key.to_ascii_uppercase())) {
+                    return Err(EmitError::UnsupportedNode(
+                        "MySQL table options require semantic lowering".into(),
+                    ));
+                }
+            }
+        }
+        _ => {}
     }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -196,51 +224,73 @@ fn validate_statement(stmt: &Statement) -> Result<(), EmitError> {
 
 struct PgRewriter<'a> {
     emitter: &'a mut PgEmitter,
+    in_function_name: bool,
 }
 
 impl VisitorMut for PgRewriter<'_> {
-    type Break = ();
+    type Break = EmitError;
 
-    /// Rewrite identifiers: backtick → double-quote.
-    fn post_visit_relation(
+    fn pre_visit_statement(&mut self, statement: &mut Statement) -> ControlFlow<Self::Break> {
+        match validate_statement(statement) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => ControlFlow::Break(error),
+        }
+    }
+
+    fn pre_visit_function_name(
         &mut self,
-        relation: &mut crate::ast::ObjectName,
+        name: &mut crate::ast::ObjectName,
     ) -> ControlFlow<Self::Break> {
-        for part in relation.0.iter_mut() {
+        if name
+            .0
+            .iter()
+            .any(|part| !matches!(part, crate::ast::ObjectNamePart::Identifier(_)))
+        {
+            return ControlFlow::Break(EmitError::UnsupportedNode(
+                "dynamic function names require lowering".into(),
+            ));
+        }
+        let qualifier_count = name.0.len().saturating_sub(1);
+        for part in name.0.iter_mut().take(qualifier_count) {
             if let crate::ast::ObjectNamePart::Identifier(ident) = part {
-                rewrite_ident(ident);
+                ident.quote_style = Some('"');
             }
         }
+        self.in_function_name = true;
         ControlFlow::Continue(())
     }
 
-    /// Rewrite expressions: backtick idents, ?→$N placeholders.
-    fn post_visit_expr(&mut self, expr: &mut crate::ast::Expr) -> ControlFlow<Self::Break> {
-        match expr {
-            crate::ast::Expr::Identifier(ident) => {
-                rewrite_ident(ident);
-            }
-            crate::ast::Expr::CompoundIdentifier(idents) => {
-                for ident in idents.iter_mut() {
-                    rewrite_ident(ident);
-                }
-            }
-            _ => {}
+    fn post_visit_function_name(
+        &mut self,
+        _name: &mut crate::ast::ObjectName,
+    ) -> ControlFlow<Self::Break> {
+        self.in_function_name = false;
+        ControlFlow::Continue(())
+    }
+
+    /// Every identifier has a visitor hook, including column definitions,
+    /// aliases and constraint names. Quoting never rewrites serialized SQL.
+    fn pre_visit_ident(&mut self, ident: &mut Ident) -> ControlFlow<Self::Break> {
+        if ident.quote_style.is_some()
+            || !self.in_function_name
+            || !can_emit_unquoted_function(&ident.value)
+        {
+            ident.quote_style = Some('"');
         }
         ControlFlow::Continue(())
     }
 
     /// Rewrite values: ?→$N placeholders, double-quoted strings→single-quoted.
-    fn post_visit_value(&mut self, value: &mut ValueWithSpan) -> ControlFlow<Self::Break> {
-        match &value.value {
+    fn post_visit_value(&mut self, value: &mut Value) -> ControlFlow<Self::Break> {
+        match value {
             Value::Placeholder(p) if p == "?" => {
-                value.value = Value::Placeholder(self.emitter.next_placeholder());
+                *value = Value::Placeholder(self.emitter.next_placeholder());
             }
             Value::DoubleQuotedString(s) => {
                 // In MySQL without ANSI_QUOTES, double-quoted strings are string
                 // literals. In PG, double-quotes denote identifiers. Convert to
                 // single-quoted string.
-                value.value = Value::SingleQuotedString(s.clone());
+                *value = Value::SingleQuotedString(s.clone());
             }
             _ => {}
         }
@@ -264,164 +314,18 @@ impl VisitorMut for PgRewriter<'_> {
         };
         ControlFlow::Continue(())
     }
-
-    /// Rewrite select items that contain backtick-quoted aliases.
-    fn post_visit_select(&mut self, select: &mut crate::ast::Select) -> ControlFlow<Self::Break> {
-        for item in select.projection.iter_mut() {
-            if let crate::ast::SelectItem::ExprWithAlias { alias, .. } = item {
-                rewrite_ident(alias);
-            }
-        }
-        ControlFlow::Continue(())
-    }
 }
 
-/// Rewrite a single identifier: backtick quote style → double-quote.
-fn rewrite_ident(ident: &mut Ident) {
-    if ident.quote_style == Some('`') {
-        ident.quote_style = Some('"');
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Post-serialization backtick→double-quote rewrite
-// ---------------------------------------------------------------------------
-
-/// Replace backtick-quoted identifiers with double-quoted identifiers in SQL text.
-/// This is safe because backticks never appear inside SQL string literals
-/// (single-quoted or double-quoted), so we only need to handle the case where
-/// we're inside a backtick-delimited identifier.
-fn rewrite_backtick_to_double_quote(sql: &str) -> String {
-    let mut out = String::with_capacity(sql.len());
-    let mut chars = sql.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        match c {
-            // Skip over single-quoted strings (including '' escapes)
-            '\'' => {
-                out.push('\'');
-                loop {
-                    match chars.next() {
-                        Some('\'') => {
-                            // Check for escaped quote ''
-                            if chars.peek() == Some(&'\'') {
-                                out.push('\'');
-                                out.push('\'');
-                                chars.next();
-                            } else {
-                                out.push('\'');
-                                break;
-                            }
-                        }
-                        Some(ch) => out.push(ch),
-                        None => break,
-                    }
-                }
-            }
-            // Skip over double-quoted identifiers/strings
-            '"' => {
-                out.push('"');
-                loop {
-                    match chars.next() {
-                        Some('"') => {
-                            if chars.peek() == Some(&'"') {
-                                out.push('"');
-                                out.push('"');
-                                chars.next();
-                            } else {
-                                out.push('"');
-                                break;
-                            }
-                        }
-                        Some(ch) => out.push(ch),
-                        None => break,
-                    }
-                }
-            }
-            // Rewrite backtick-quoted identifiers
-            '`' => {
-                out.push('"');
-                loop {
-                    match chars.next() {
-                        Some('`') => {
-                            if chars.peek() == Some(&'`') {
-                                // Escaped backtick `` → escaped double-quote ""
-                                out.push('"');
-                                out.push('"');
-                                chars.next();
-                            } else {
-                                out.push('"');
-                                break;
-                            }
-                        }
-                        Some('"') => {
-                            // Literal double-quote inside backtick ident needs escaping
-                            out.push('"');
-                            out.push('"');
-                        }
-                        Some(ch) => out.push(ch),
-                        None => break,
-                    }
-                }
-            }
-            _ => out.push(c),
-        }
-    }
-
-    out
-}
-
-// ---------------------------------------------------------------------------
-// MySQL CREATE TABLE option stripping
-// ---------------------------------------------------------------------------
-
-fn strip_mysql_create_table_options(stmt: &mut Statement) {
-    let Statement::CreateTable(create) = stmt else {
-        return;
+fn can_emit_unquoted_function(value: &str) -> bool {
+    let dialect = PostgreSqlDialect {};
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return false;
     };
-
-    fn keep_option(option: &SqlOption) -> bool {
-        let uppercase = |ident: &Ident| ident.value.to_ascii_uppercase();
-        match option {
-            SqlOption::Ident(ident) => !is_mysql_table_option_key(&uppercase(ident)),
-            SqlOption::KeyValue { key, .. } => !is_mysql_table_option_key(&uppercase(key)),
-            SqlOption::NamedParenthesizedList(list) => {
-                !is_mysql_table_option_key(&list.key.value.to_ascii_uppercase())
-            }
-            _ => true,
-        }
+    if !dialect.is_identifier_start(first) || !characters.all(|ch| dialect.is_identifier_part(ch)) {
+        return false;
     }
-
-    create.table_options = match &create.table_options {
-        CreateTableOptions::With(options) => rebuild_create_table_options(
-            options.iter().filter(|o| keep_option(o)).cloned().collect(),
-            CreateTableOptions::With,
-        ),
-        CreateTableOptions::Options(options) => rebuild_create_table_options(
-            options.iter().filter(|o| keep_option(o)).cloned().collect(),
-            CreateTableOptions::Options,
-        ),
-        CreateTableOptions::Plain(options) => rebuild_create_table_options(
-            options.iter().filter(|o| keep_option(o)).cloned().collect(),
-            CreateTableOptions::Plain,
-        ),
-        CreateTableOptions::TableProperties(options) => rebuild_create_table_options(
-            options.iter().filter(|o| keep_option(o)).cloned().collect(),
-            CreateTableOptions::TableProperties,
-        ),
-        CreateTableOptions::None => CreateTableOptions::None,
-    };
-
-    fn rebuild_create_table_options(
-        filtered: Vec<SqlOption>,
-        builder: fn(Vec<SqlOption>) -> CreateTableOptions,
-    ) -> CreateTableOptions {
-        if filtered.is_empty() {
-            CreateTableOptions::None
-        } else {
-            builder(filtered)
-        }
-    }
+    true
 }
 
 fn is_mysql_table_option_key(key: &str) -> bool {
@@ -461,6 +365,29 @@ mod tests {
     fn rewrites_placeholders_and_backtick_identifiers() {
         let emitted = emit_sql(r#"SELECT `user`.`name`, ?, ? FROM `accounts`"#);
         assert_eq!(emitted, r#"SELECT "user"."name", $1, $2 FROM "accounts""#);
+    }
+
+    #[test]
+    fn preserves_identifier_contents_in_column_definitions_and_aliases() {
+        assert_eq!(
+            emit_sql("CREATE TABLE `a``b` (`c``d` INT, `e\"f` TEXT)"),
+            "CREATE TABLE \"a`b\" (\"c`d\" INT, \"e\"\"f\" TEXT)"
+        );
+        assert_eq!(
+            emit_sql("SELECT 'a`b' AS `c``d` FROM `records` AS `e\"f`"),
+            "SELECT 'a`b' AS \"c`d\" FROM \"records\" AS \"e\"\"f\""
+        );
+    }
+
+    #[test]
+    fn unquoted_object_names_are_quoted_structurally_without_case_folding() {
+        let statement = Parser::parse_sql(&MySqlDialect {}, "SELECT Id FROM Records AS R")
+            .unwrap()
+            .remove(0);
+        let mut emitter = PgEmitter::new(EmitOptions::postgres());
+        let mut sql = String::new();
+        emitter.emit_statement_owned(statement, &mut sql).unwrap();
+        assert_eq!(sql, "SELECT \"Id\" FROM \"Records\" AS \"R\"");
     }
 
     #[test]
@@ -510,11 +437,11 @@ mod tests {
     }
 
     #[test]
-    fn strips_mysql_create_table_options() {
-        let emitted = emit_sql(
+    fn rejects_unlowered_mysql_create_table_options() {
+        let error = emit_sql_err(
             "CREATE TABLE `users` (`id` INT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin",
         );
-        assert_eq!(emitted, r#"CREATE TABLE "users" ("id" INT)"#);
+        assert!(matches!(error, EmitError::UnsupportedNode(_)));
     }
 
     #[test]

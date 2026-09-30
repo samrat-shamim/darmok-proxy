@@ -12,6 +12,8 @@ darmok-execute = { workspace = true }
 darmok-catalog = { workspace = true }
 darmok-protocol = { workspace = true }
 bytes = { workspace = true }
+darmok-translate = { workspace = true }
+sqlparser = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 
@@ -30,3 +32,7 @@ path = "native_parameters.rs"
 [[test]]
 name = "native_catalog"
 path = "native_catalog.rs"
+
+[[test]]
+name = "bindings"
+path = "bindings.rs"

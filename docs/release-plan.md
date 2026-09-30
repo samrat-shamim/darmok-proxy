@@ -111,7 +111,10 @@ complete release gate runs once on the final candidate.
   removed and schemas preserve their exact names. This is component evidence,
   not certification of authentication or session semantics.
 - The [compiler draft](https://github.com/duotronic-ai/darmok-proxy/pull/4) carries
-  explicit AST binding layouts. It is not merged or certified for execution.
+  explicit AST binding layouts and is based on the merged native components.
+  [Compiler boundaries](compiler.md) records its contract. It is not merged or
+  certified for execution; semantic/catalog admission and deferred resource
+  verification remain pending.
 - [Native values PR #5](https://github.com/duotronic-ai/darmok-proxy/pull/5) is
   merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588 default
   tests/doctests with seven ignored upstream formatting cases. Six required
@@ -130,11 +133,14 @@ complete release gate runs once on the final candidate.
 - Row decoding follows the types reported by PostgreSQL. A native domain
   fixture documents that the backend reports domain base types/typmods; declared
   domain policy requires catalog metadata and is not supplied by row decoding.
-- Fresh native relation/type reads are implemented in `darmok-catalog`, with
-  their boundaries in [the catalog contract](native-catalog.md). The required
-  suite adds seven ordinary catalog fixtures per backend. Reusable catalog plans,
-  execution validity and MySQL wire metadata remain pending; reading native
-  definitions does not certify these gates.
+- [Native catalog PR #7](https://github.com/duotronic-ai/darmok-proxy/pull/7) is
+  merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588 default
+  tests/doctests with seven ignored upstream formatting cases. Nineteen required
+  fixtures passed on each backend, including seven catalog fixtures. Ordinary
+  functional review is complete. The [catalog contract](native-catalog.md)
+  records exact native relation/type facts and transaction snapshot behavior.
+  Reusable catalog plans, execution validity and MySQL wire metadata remain
+  pending; reading native definitions does not certify these gates.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.

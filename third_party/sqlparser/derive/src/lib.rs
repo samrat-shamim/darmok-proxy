@@ -1,3 +1,4 @@
+// Modified for Darmok: derive exhaustive iterative AST ownership traversal with Visit.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -25,6 +26,7 @@ use quote::quote;
 use syn::parse_macro_input;
 
 mod dialect;
+mod structure;
 mod visit;
 
 /// Implementation of `#[derive(VisitMut)]`
@@ -45,7 +47,8 @@ pub fn derive_visit_mut(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 #[proc_macro_derive(Visit, attributes(visit))]
 pub fn derive_visit_immutable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
-    visit::derive_visit(
+    let structure = structure::derive_structure(&input);
+    let visit: proc_macro2::TokenStream = visit::derive_visit(
         input,
         &visit::VisitType {
             visit_trait: quote!(Visit),
@@ -53,6 +56,8 @@ pub fn derive_visit_immutable(input: proc_macro::TokenStream) -> proc_macro::Tok
             modifier: None,
         },
     )
+    .into();
+    quote!(#visit #structure).into()
 }
 
 /// Procedural macro for deriving new SQL dialects.

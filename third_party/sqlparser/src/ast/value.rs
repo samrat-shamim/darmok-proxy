@@ -1,3 +1,4 @@
+// Modified for Darmok: distinguish raw-value and spanned-value visitor hooks.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -73,7 +74,7 @@ use sqlparser_derive::{Visit, VisitMut};
 #[cfg_attr(
     feature = "visitor",
     derive(Visit, VisitMut),
-    visit(with = "visit_value")
+    visit(with = "visit_value_with_span")
 )]
 pub struct ValueWithSpan {
     /// The wrapped `Value`.
@@ -135,7 +136,11 @@ impl DerefMut for ValueWithSpan {
 /// Primitive SQL values such as number and string
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+#[cfg_attr(
+    feature = "visitor",
+    derive(Visit, VisitMut),
+    visit(with = "visit_value")
+)]
 pub enum Value {
     /// Numeric literal
     #[cfg(not(feature = "bigdecimal"))]

@@ -1,3 +1,4 @@
+// Modified for Darmok: add identifier and function-name visitor hooks for structural SQL emission.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -16,6 +17,8 @@
 // under the License.
 
 //! SQL Abstract Syntax Tree (AST) types
+#[cfg(feature = "visitor")]
+mod structure;
 #[cfg(not(feature = "std"))]
 use alloc::{
     boxed::Box,
@@ -28,6 +31,8 @@ use helpers::{
     attached_token::AttachedToken,
     stmt_data_loading::{FileStagingCommand, StageLoadSelectItemKind},
 };
+#[cfg(feature = "visitor")]
+pub use structure::*;
 
 use core::cmp::Ordering;
 use core::ops::Deref;
@@ -203,7 +208,11 @@ fn format_statement_list(f: &mut fmt::Formatter, statements: &[Statement]) -> fm
 /// An identifier, decomposed into its value or character data and the quote style.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+#[cfg_attr(
+    feature = "visitor",
+    derive(Visit, VisitMut),
+    visit(with = "visit_ident")
+)]
 pub struct Ident {
     /// The value of the identifier without quotes.
     pub value: String,
@@ -7993,6 +8002,7 @@ impl fmt::Display for TypedString {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Function {
     /// The function name (may be qualified).
+    #[cfg_attr(feature = "visitor", visit(with = "visit_function_name"))]
     pub name: ObjectName,
     /// Flags whether this function call uses the [ODBC syntax].
     ///
