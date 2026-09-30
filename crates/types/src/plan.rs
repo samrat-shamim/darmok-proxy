@@ -24,7 +24,6 @@ pub enum ParamCoercion {
     BoolToInt,
     IntToBool,
     StringToTimestamp,
-    ZeroDateToSentinel,
     /// String parameter bound to a MySQL numeric column. MySQL accepts
     /// string values in numeric write contexts and coerces invalid or
     /// empty strings to 0; PostgreSQL rejects them before assignment.

@@ -42,8 +42,6 @@ pub enum ResultCoercion {
     JsonbNormalize,
     NumericToDecimal { scale: u8 },
     ByteaToBlob,
-    ZeroDateSentinelToMysql,
-    FallbackToText,
 }
 
 /// A single row of values.
@@ -122,8 +120,6 @@ mod tests {
                 ResultCoercion::NumericToDecimal { scale }
             }
             ResultCoercion::ByteaToBlob => ResultCoercion::ByteaToBlob,
-            ResultCoercion::ZeroDateSentinelToMysql => ResultCoercion::ZeroDateSentinelToMysql,
-            ResultCoercion::FallbackToText => ResultCoercion::FallbackToText,
         }
     }
 
@@ -149,8 +145,6 @@ mod tests {
             ResultCoercion::JsonbNormalize,
             ResultCoercion::NumericToDecimal { scale: 4 },
             ResultCoercion::ByteaToBlob,
-            ResultCoercion::ZeroDateSentinelToMysql,
-            ResultCoercion::FallbackToText,
         ];
 
         for coercion in cases {
@@ -175,7 +169,7 @@ mod tests {
 
         let projection = ProjectionMeta {
             columns: columns.clone(),
-            coercions: vec![ResultCoercion::None, ResultCoercion::FallbackToText],
+            coercions: vec![ResultCoercion::None, ResultCoercion::None],
         };
         let sidecar = SidecarMeta {
             nullable: vec![false, false],
@@ -191,7 +185,7 @@ mod tests {
         assert_eq!(projection.columns[1].table.as_deref(), Some("widgets"));
         assert!(projection.columns[0].source.is_none());
         assert_eq!(projection.coercions[0], ResultCoercion::None);
-        assert_eq!(projection.coercions[1], ResultCoercion::FallbackToText);
+        assert_eq!(projection.coercions[1], ResultCoercion::None);
 
         assert_eq!(sidecar.nullable, vec![false, false]);
         assert_eq!(

@@ -8,9 +8,16 @@ publish = false
 
 [dev-dependencies]
 darmok-types = { workspace = true }
+darmok-execute = { workspace = true }
+darmok-protocol = { workspace = true }
+bytes = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 
 [[test]]
 name = "schema_routing"
 path = "schema_routing.rs"
+
+[[test]]
+name = "native_values"
+path = "native_values.rs"

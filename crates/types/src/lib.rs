@@ -4,7 +4,6 @@ pub mod pg_const;
 pub mod plan;
 pub mod query;
 pub mod schema;
-pub mod temporal;
 pub mod value;
 
 pub use error::{ErrorKind, ExecutionError, ProtocolError, ProxyError, Result, TranslationError};
