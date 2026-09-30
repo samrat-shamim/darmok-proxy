@@ -60,8 +60,11 @@ This does not provide semantic admission, catalog freshness or rollback.
 
 The [native backend owner](../docs/native-backend.md) keeps the client and driver
 private and owns explicit controls and borrowed transaction/savepoint scopes.
-It exposes no arbitrary SQL method. Admitted row execution through decoding and
-encoding is still pending; a control receipt does not certify a statement.
+Recovery takes an explicit statement-local or whole-transaction choice and
+requires the corresponding native completion. It exposes no arbitrary SQL
+method. Frontend recovery policy and lock semantics remain separate work.
+Admitted row execution through decoding and encoding is still pending; a control
+receipt does not certify a statement.
 
 The [native catalog reader](../docs/native-catalog.md) batches relation IDs and
 preserves quoted names, domain declarations and type modifiers. It does not

@@ -70,12 +70,31 @@ the runtime state remains Scoped and rejects another control or scope. Dropping
 an unfinished scope marks the parent uncertain.
 
 `finish` commits an owned transaction or releases its owned savepoint.
-`recover` rolls back an owned transaction, or submits ROLLBACK TO followed by
-RELEASE of the same savepoint in one command request. Both tags and the final
-state are required for successful savepoint recovery. A partial recovery or
-missing savepoint preserves its native error and leaves the parent uncertain.
+`recover` requires an explicit `NativeRecovery` choice from the controller:
+
+| Native boundary | Requested recovery | Required control and final state |
+| --- | --- | --- |
+| Owned transaction | Statement or Transaction | ROLLBACK, idle |
+| Savepoint inside an outer transaction | Statement | ROLLBACK TO and RELEASE of the same owned identity, transaction |
+| Savepoint inside an outer transaction | Transaction | ROLLBACK, idle |
+
+There is no default recovery choice. Whole-transaction recovery discards earlier
+outer-transaction work and all client/internal savepoints in one request. It
+does not first attempt savepoint recovery and therefore does not depend on that
+savepoint still existing. A successful receipt identifies the actual control
+and confirmed native state; a request to recover alone is not confirmation.
+Both tags and the final state are required for statement-savepoint recovery.
+A partial recovery or missing savepoint preserves its native error and leaves
+the parent uncertain. Dropping either recovery future also leaves it uncertain,
+including an unpolled consuming future which drops its unfinished scope.
+
 The caller keeps any original statement error separately from the cleanup
-result; this control component does not invent a MySQL recovery policy.
+result. Error classification and frontend state changes remain controller work;
+this component does not invent a MySQL recovery policy. Native savepoint rollback
+also does not certify [MySQL lock retention](https://dev.mysql.com/doc/refman/8.4/en/savepoint.html):
+[PostgreSQL releases locks](https://www.postgresql.org/docs/18/explicit-locking.html)
+acquired after a rolled-back savepoint. Data effects and final native state alone
+are insufficient evidence for frontend transaction equivalence.
 
 No rows can currently be obtained through this scope. When the admitted row
 executor is integrated, it must hold the scope privately through decoding,
@@ -102,8 +121,10 @@ There is one driver task per connection and one initialization control round
 trip. BEGIN/COMMIT/ROLLBACK and savepoint creation/release each cost their own
 control request. Savepoint recovery combines two dependent commands into one
 request, with both outcomes checked. Savepoint SQL allocates a bounded string;
-the transaction path uses fixed static SQL. Control checking retains its fixed
-matched prefix and first error/mismatch, not an unbounded event history. There
+whole-transaction recovery from either boundary uses fixed static SQL and one
+control request. It avoids a savepoint-recovery request followed by a separate
+outer rollback, without claiming measured latency. Control checking retains its
+fixed matched prefix and first error/mismatch, not an unbounded event history. There
 is no row allocation, result buffering, cache, pipelining or performance claim
 in this component.
 
@@ -116,12 +137,17 @@ cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
 ```
 
 The command requires `DARMOK_TEST_DATABASE_URL` and fails if it is absent or
-unavailable. Nine ordinary fixtures on each supported backend cover successful
+unavailable. Thirteen ordinary fixtures on each supported backend cover successful
 transaction/scope effects; repeated rollback-and-release preserving earlier
 writes and a separate client savepoint; prepare and constraint errors followed
 by valid writes; deferred COMMIT and COMMIT-as-ROLLBACK failures; invalid parent
 controls; inert unpolled futures and abandoned pending controls; dropped scopes
 and finish futures; failed savepoint creation; and failed savepoint cleanup.
+The four whole-transaction recovery fixtures additionally cover earlier writes
+and all savepoint identities being removed; recovery after a native constraint
+error at either boundary followed by a valid scope; recovery after an earlier
+client rollback removed the internal savepoint; and abandoned unpolled/pending
+full recovery at either boundary.
 Fixture SQL uses private test access and is not an admitted statement path.
 No forced transport interruption, security review, adversarial inputs or
 resource stress is included. MySQL behavior and release gates remain pending.
