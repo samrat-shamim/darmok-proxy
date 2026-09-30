@@ -6,7 +6,7 @@
 - `darmok-session`: SQL session state and bounded prepared-statement storage.
 - `darmok-execute`: explicit native PostgreSQL scalar decoding and typed
   parameter encoding, including exact decimal scale, native year-one dates and
-  the 24:00:00 time endpoint.
+  the 24:00:00 time endpoint, with prepared description and binding arity checks.
 - `darmok-catalog`: fresh native relation and declared-type facts by
   database-local OID, including domain identities and raw column attributes.
 
@@ -51,6 +51,11 @@ They reject implicit string/number/date conversions and lossy real-number
 conversion. The [parameter contract](../docs/native-parameters.md) records the
 accepted representations and native PostgreSQL input semantics. MySQL coercion
 rules and frontend prepared-statement metadata require separate integration.
+
+The [native statement check](../docs/native-statements.md) rejects unsupported
+parameter/result types before execution, including empty result sets. Borrowed
+bindings retain backend arity; decoding checks driver description consistency.
+This does not provide semantic admission, catalog freshness or rollback.
 
 The [native catalog reader](../docs/native-catalog.md) batches relation IDs and
 preserves quoted names, domain declarations and type modifiers. It does not

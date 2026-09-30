@@ -14,6 +14,7 @@ darmok-protocol = { workspace = true }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
+futures-util = { workspace = true }
 
 [[test]]
 name = "schema_routing"
@@ -30,3 +31,7 @@ path = "native_parameters.rs"
 [[test]]
 name = "native_catalog"
 path = "native_catalog.rs"
+
+[[test]]
+name = "native_statements"
+path = "native_statements.rs"

@@ -135,6 +135,12 @@ complete release gate runs once on the final candidate.
   suite adds seven ordinary catalog fixtures per backend. Reusable catalog plans,
   execution validity and MySQL wire metadata remain pending; reading native
   definitions does not certify these gates.
+- Native prepared descriptions are checked before execution by
+  `darmok-execute::NativeStatementUtc`; the [statement contract](native-statements.md)
+  separates type/arity checks from semantic admission, value ranges and rollback.
+  Six required ordinary fixtures per backend exercise empty results, unsupported
+  write outputs, domain types, borrowed bindings and description/value errors.
+  This component does not supply a runnable executor or catalog coherence.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.
