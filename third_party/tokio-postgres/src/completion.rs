@@ -3,12 +3,14 @@
 use crate::client::{InnerClient, Responses};
 use crate::codec::FrontendMessage;
 use crate::connection::RequestMessages;
-use crate::types::BorrowToSql;
-use crate::{Error, Row, Statement, query};
+use crate::types::{BorrowToSql, Type};
+use crate::{Column, Error, Row, Statement, query};
+use fallible_iterator::FallibleIterator;
 use futures_util::{Stream, stream::FusedStream};
 use postgres_protocol::message::{backend::Message, frontend};
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
+use std::{error::Error as StdError, fmt};
 
 /// The transaction state carried by a backend ReadyForQuery message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +158,10 @@ impl FusedStream for CommandEventStream {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QueryPhase {
+    Parsing,
+    TypedBinding,
+    Parameters,
+    Description,
     Binding,
     Rows,
     Complete,
@@ -169,9 +175,72 @@ enum QueryPhase {
 /// Errors before BindComplete remain observable alongside their final backend
 /// transaction state. An `Err` item terminates without confirming completion.
 pub struct QueryEventStream {
-    statement: Statement,
+    inner: QueryEvents,
+}
+
+/// A result OID outside the built-in result description contract.
+///
+/// This is the source of a terminal stream error, after SQL was submitted.
+/// It does not establish backend completion or rollback.
+#[derive(Debug)]
+pub struct UnsupportedBuiltinResultType {
+    oid: u32,
+}
+
+impl UnsupportedBuiltinResultType {
+    /// The exact native result type OID which required a separate type lookup.
+    pub fn oid(&self) -> u32 {
+        self.oid
+    }
+}
+
+impl fmt::Display for UnsupportedBuiltinResultType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "result type OID {} is not a built-in PostgreSQL type",
+            self.oid
+        )
+    }
+}
+
+impl StdError for UnsupportedBuiltinResultType {}
+
+/// One-shot typed query outcomes with built-in result descriptions only.
+///
+/// Parse, Bind, Describe, Execute and Sync are submitted together. The result
+/// description is observed after submission, not checked before Execute. This
+/// primitive is intended for fixed internal queries with known built-in output;
+/// it is not semantic admission, catalog validity or frontend SQL execution.
+/// Unknown result OIDs fail explicitly without issuing another type query.
+///
+/// SQL errors remain events through ReadyForQuery; a terminal `Err` leaves
+/// completion unconfirmed. Stopping consumption supplies no cleanup receipt.
+pub struct BuiltinQueryEventStream {
+    inner: QueryEvents,
+}
+
+impl BuiltinQueryEventStream {
+    /// The observed description, including an empty description for NoData.
+    /// None means no result description was observed, not a zero-column result.
+    /// This is not a prepared statement or a pre-execution type-check receipt.
+    pub fn columns(&self) -> Option<&[Column]> {
+        self.inner.statement.as_ref().map(Statement::columns)
+    }
+
+    /// Whether an event or terminal error has already been returned.
+    /// Pending-only polling does not set this flag or establish readiness.
+    pub fn has_yielded(&self) -> bool {
+        self.inner.has_yielded
+    }
+}
+
+struct QueryEvents {
+    statement: Option<Statement>,
     responses: Responses,
     phase: QueryPhase,
+    parameter_count: usize,
+    has_yielded: bool,
 }
 
 pub(crate) fn query_events<P, I>(
@@ -186,17 +255,50 @@ where
 {
     let buf = query::encode(client, &statement, params)?;
     Ok(QueryEventStream {
-        statement,
-        responses: client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?,
-        phase: QueryPhase::Binding,
+        inner: QueryEvents {
+            statement: Some(statement),
+            responses: client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?,
+            phase: QueryPhase::Binding,
+            parameter_count: 0,
+            has_yielded: false,
+        },
     })
 }
 
-impl Stream for QueryEventStream {
-    type Item = Result<QueryEvent, Error>;
+pub(crate) fn query_typed_builtin_events<P, I>(
+    client: &InnerClient,
+    sql: &str,
+    params: I,
+) -> Result<BuiltinQueryEventStream, Error>
+where
+    P: BorrowToSql,
+    I: IntoIterator<Item = (P, Type)>,
+{
+    let params = params.into_iter().collect::<Vec<_>>();
+    let parameter_count = params.len();
+    let buf = client.with_buf(|buf| {
+        frontend::parse("", sql, params.iter().map(|(_, ty)| ty.oid()), buf)
+            .map_err(Error::encode)?;
+        query::encode_bind_raw("", params, "", buf)?;
+        frontend::describe(b'S', "", buf).map_err(Error::encode)?;
+        frontend::execute("", 0, buf).map_err(Error::encode)?;
+        frontend::sync(buf);
+        Ok(buf.split().freeze())
+    })?;
+    Ok(BuiltinQueryEventStream {
+        inner: QueryEvents {
+            statement: None,
+            responses: client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?,
+            phase: QueryPhase::Parsing,
+            parameter_count,
+            has_yielded: false,
+        },
+    })
+}
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
+impl QueryEvents {
+    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<QueryEvent, Error>>> {
+        let this = self;
         loop {
             if this.phase == QueryPhase::Done {
                 return Poll::Ready(None);
@@ -205,16 +307,54 @@ impl Stream for QueryEventStream {
                 Ok(message) => message,
                 Err(error) => {
                     this.phase = QueryPhase::Done;
+                    this.has_yielded = true;
                     return Poll::Ready(Some(Err(error)));
                 }
             };
             let event = match (this.phase, message) {
+                (QueryPhase::Parsing, Message::ParseComplete) => {
+                    this.phase = QueryPhase::TypedBinding;
+                    continue;
+                }
+                (QueryPhase::TypedBinding, Message::BindComplete) => {
+                    this.phase = QueryPhase::Parameters;
+                    continue;
+                }
+                (QueryPhase::Parameters, Message::ParameterDescription(body)) => {
+                    match body.parameters().count().map_err(Error::parse) {
+                        Ok(count) if count == this.parameter_count => {
+                            this.phase = QueryPhase::Description;
+                            continue;
+                        }
+                        Ok(_) => Err(Error::unexpected_message()),
+                        Err(error) => Err(error),
+                    }
+                }
+                (QueryPhase::Description, Message::RowDescription(body)) => {
+                    match builtin_columns(body) {
+                        Ok(columns) => {
+                            this.statement = Some(Statement::unnamed(vec![], columns));
+                            this.phase = QueryPhase::Rows;
+                            continue;
+                        }
+                        Err(error) => Err(error),
+                    }
+                }
+                (QueryPhase::Description, Message::NoData) => {
+                    this.statement = Some(Statement::unnamed(vec![], vec![]));
+                    this.phase = QueryPhase::Rows;
+                    continue;
+                }
                 (QueryPhase::Binding, Message::BindComplete) => {
                     this.phase = QueryPhase::Rows;
                     continue;
                 }
                 (QueryPhase::Rows, Message::DataRow(body)) => {
-                    Row::new(this.statement.clone(), body).map(QueryEvent::Row)
+                    let statement = this
+                        .statement
+                        .as_ref()
+                        .expect("Rows requires a description");
+                    Row::new(statement.clone(), body).map(QueryEvent::Row)
                 }
                 (QueryPhase::Rows, Message::CommandComplete(body)) => {
                     this.phase = QueryPhase::Complete;
@@ -231,7 +371,13 @@ impl Stream for QueryEventStream {
                     Ok(QueryEvent::PortalSuspended)
                 }
                 (
-                    QueryPhase::Binding | QueryPhase::Rows | QueryPhase::Complete,
+                    QueryPhase::Parsing
+                    | QueryPhase::TypedBinding
+                    | QueryPhase::Parameters
+                    | QueryPhase::Description
+                    | QueryPhase::Binding
+                    | QueryPhase::Rows
+                    | QueryPhase::Complete,
                     Message::ErrorResponse(body),
                 ) => {
                     // In autocommit, Sync can fail a deferred constraint after
@@ -253,13 +399,61 @@ impl Stream for QueryEventStream {
             if event.is_err() {
                 this.phase = QueryPhase::Done;
             }
+            this.has_yielded = true;
             return Poll::Ready(Some(event));
         }
     }
 }
 
+fn builtin_columns(
+    body: postgres_protocol::message::backend::RowDescriptionBody,
+) -> Result<Vec<Column>, Error> {
+    let mut columns = Vec::new();
+    let mut fields = body.fields();
+    while let Some(field) = fields.next().map_err(Error::parse)? {
+        let type_ = Type::from_oid(field.type_oid()).ok_or_else(|| {
+            Error::from_sql(
+                Box::new(UnsupportedBuiltinResultType {
+                    oid: field.type_oid(),
+                }),
+                columns.len(),
+            )
+        })?;
+        columns.push(Column {
+            name: field.name().to_owned(),
+            table_oid: Some(field.table_oid()).filter(|oid| *oid != 0),
+            column_id: Some(field.column_id()).filter(|id| *id != 0),
+            type_modifier: field.type_modifier(),
+            r#type: type_,
+        });
+    }
+    Ok(columns)
+}
+
+impl Stream for QueryEventStream {
+    type Item = Result<QueryEvent, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().inner.poll_next(cx)
+    }
+}
+
 impl FusedStream for QueryEventStream {
     fn is_terminated(&self) -> bool {
-        self.phase == QueryPhase::Done
+        self.inner.phase == QueryPhase::Done
+    }
+}
+
+impl Stream for BuiltinQueryEventStream {
+    type Item = Result<QueryEvent, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().inner.poll_next(cx)
+    }
+}
+
+impl FusedStream for BuiltinQueryEventStream {
+    fn is_terminated(&self) -> bool {
+        self.inner.phase == QueryPhase::Done
     }
 }

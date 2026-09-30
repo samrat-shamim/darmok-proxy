@@ -175,6 +175,15 @@ complete release gate runs once on the final candidate.
   17/18, without exposing a public raw SQL execution escape. This implements
   the control ownership boundary, not semantic admission, catalog validity,
   rollback through output validation, wire execution or the M2 end-to-end gate.
+- Built-in typed-query completion is implemented for fixed internal queries.
+  Parse/Bind/Describe/Execute/Sync share one request, retaining SQL errors,
+  exact tags and final state without hidden type lookups. Eight further ordinary
+  fixtures are required on each PostgreSQL version. Descriptions are observed
+  after submission, so this is not pre-execution admission. Custom result OIDs
+  fail explicitly without a completion receipt. The
+  [completion contract](backend-completion.md) records the restriction and costs;
+  the owner still exposes no raw SQL or Client. Catalog validity, admitted rows
+  and M2 remain pending.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

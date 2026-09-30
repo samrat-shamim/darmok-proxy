@@ -20,12 +20,18 @@ events from `src/client.rs` and `src/lib.rs`, and separate raw backend responses
 from upstream error conversion in `src/client.rs`. Existing query helpers keep
 their upstream behavior. The added event APIs preserve command tags, backend
 errors and ReadyForQuery transaction states without adding protocol exchanges.
-The command stream also records whether any item has been yielded, so a
-complete-request consumer can reject a previously consumed stream.
+The command and built-in typed-query streams also record whether any item has
+been yielded, so a complete-request consumer can reject a consumed stream.
+`query_typed_builtin_events` adds one-shot typed internal-query observation
+without extra protocol exchanges or hidden result-type lookups. It observes
+only built-in result OIDs; unknown result OIDs terminate explicitly after SQL
+submission. Prepared and typed streams share their row/completion state machine.
+`src/query.rs` adds a modified-file notice and makes its existing typed parameter
+encoder crate-visible for reuse, with no change to that encoder's behavior.
 They do not provide semantic admission, connection ownership or MySQL behavior.
 The generated `src/error/sqlstate.rs` map declaration has one trailing space
 removed, with no change to its constants.
 
 The [backend completion contract](../../docs/backend-completion.md) defines the
-new API and its ordinary functional verification. No other upstream source is
+new APIs and their ordinary functional verification. No other upstream source is
 modified.

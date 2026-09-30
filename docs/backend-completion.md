@@ -1,7 +1,7 @@
 # Observed backend completion
 
-The vendored `tokio-postgres` 0.7.18 library exposes exact command and prepared
-query events. This is a connector component, not an executor, semantic plan,
+The vendored `tokio-postgres` 0.7.18 library exposes exact command, prepared
+query and built-in typed-query events. This is a connector component, not an executor, semantic plan,
 connection owner, catalog validity lease or MySQL support claim. The
 [execution contract](native-execution.md) still requires those boundaries.
 
@@ -42,6 +42,34 @@ transaction. This API does not implicitly prepare SQL or certify its semantics.
 Checked native bindings can supply the iterator, and native result checks can
 decode its rows. Unsupported frontend cursors remain a separate capability.
 
+`Client::query_typed_builtin_events(sql, typed_parameters)` combines Parse,
+Bind, statement Describe, Execute and Sync in one request for fixed internal
+queries whose outputs have known built-in types. It retains preparation errors
+as well as execution and Sync errors through final ReadyForQuery. Each supplied
+parameter has its native type; encoding happens once before submission. A local
+encoding error queues no part of this request. The server's result description
+is observed after submission, including column labels, types, relation/attribute
+origins and typmods, even when no rows are returned. `columns()` returns None
+until a complete description is observed; NoData has a present empty description.
+
+This one-shot lane cannot supply frontend pre-execution admission or a native
+prepared-check receipt: Execute is already queued when the description arrives.
+An unknown result OID causes a terminal error whose source is
+`UnsupportedBuiltinResultType`, retaining the exact OID. It does not consult the
+connector type cache, issue a hidden lookup, invent a type or convert to text.
+This explicit restriction applies even to a zero-row result or a previously
+cached custom type. Declared native types can still be returned as OID/name
+catalog facts with built-in output representations; those facts remain separate
+from the result description. Parameters may use caller-supplied native types;
+this lane is restricted by result types, not an invented input-type fallback.
+
+A terminal description error occurs after SQL submission and can follow backend
+effects. It provides no ReadyForQuery, rollback or safe-reuse receipt. The owner
+must apply its unconfirmed-operation disposition. Only known fixed internal
+queries belong here; admitted frontend SQL retains its separate prepare/check
+and rollback requirements. NativeBackend exposes neither this raw SQL method
+nor a public Client.
+
 Backend SQL errors are `BackendError` events containing a database error, not
 successful command completions. Continue consuming to ReadyForQuery to observe
 the transaction state after that error. A stream `Err` instead means parsing,
@@ -63,8 +91,9 @@ belongs to this request's completion boundary. It is not a live global state
 lookup: other requests can already be queued or executing on the same Client.
 The future owner must supply exclusivity and validate expected control outcomes.
 
-Both streams are fused after their ReadyForQuery event or terminal `Err`.
-`CommandEventStream::has_yielded()` records whether an event or terminal error
+All three streams are fused after their ReadyForQuery event or terminal `Err`.
+`CommandEventStream::has_yielded()` and
+`BuiltinQueryEventStream::has_yielded()` record whether an event or terminal error
 has already been returned. A checker requiring the entire request can reject
 handoff of a partially consumed stream. Pending-only polling does not set the
 flag; it is not an execution, readiness or ownership observation.
@@ -80,7 +109,12 @@ These APIs reuse the existing request queues, parameter encoder and native Row
 construction. They add no SQL query, protocol exchange, per-row value encoding
 or whole-result buffer. One owned string retains each command tag. Prepared
 rows keep the existing statement reference-count operation; binding keeps the
-upstream format/parameter container allocations. There is no benchmark claim.
+upstream format/parameter container allocations. The one-shot typed lane
+collects parameter/type pairs once and shares the upstream format/bind encoder;
+it avoids a separate parameter-OID vector. One local unnamed description owns
+the column names/types and is shared by its rows, with no server statement-close
+request on Drop. The typed and prepared lanes share row/error/completion logic.
+These are structural costs, not a measured performance claim.
 
 Eight required fixtures on PostgreSQL 17/18 exercise:
 
@@ -100,6 +134,20 @@ Eight required fixtures on PostgreSQL 17/18 exercise:
 - Local parameter encoding/arity errors without a partial queued execution.
 - Queued requests whose command tags and reported states remain associated
   with their own completion boundaries.
+
+Eight further required typed-query fixtures on each PostgreSQL version cover:
+
+- Typed inputs encoded once, exact native column origins/typmods and zero-row
+  descriptions; empty SQL, NoData, zero-column rows and explicit zero counts.
+- Parse errors, domain input failure during Bind before a result description,
+  a row before execution failure, failed transactions and confirmed recovery
+  followed by a valid operation.
+- Deferred Sync errors after rows/CommandComplete, with and without RETURNING,
+  preserving the error and confirmed state rather than acknowledging a write.
+- Local input-type errors without a queued partial request; precise custom
+  result-OID rejection, including zero rows and a populated connector type cache.
+- Queued typed and prepared requests whose values, descriptions and states
+  remain associated with their own boundaries after later unnamed Parse calls.
 
 These fixtures do not implement or certify the executor, recovery after a
 stopped consumer, uncertain transport outcomes, pooling, MySQL transaction
