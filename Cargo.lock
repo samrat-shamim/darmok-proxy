@@ -225,6 +225,7 @@ dependencies = [
  "bytes",
  "chrono",
  "darmok-types",
+ "futures-util",
  "thiserror",
  "tokio-postgres",
 ]

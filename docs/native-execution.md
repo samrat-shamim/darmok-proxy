@@ -122,8 +122,10 @@ expose and verify the required completion and
 rather than turn that outcome into a committed-write acknowledgement.
 
 The [backend completion component](backend-completion.md) exposes those native
-events. It supplies no connection ownership, expected-outcome policy or rollback
-scope; the executor integration and verification above remain pending.
+events. The [native control checker](native-controls.md) verifies fixed internal
+control tag/state expectations and retains failure observations. Neither
+component supplies connection ownership or a rollback scope; the executor
+integration and verification above remain pending.
 
 ## Rows, encoding and completion
 
