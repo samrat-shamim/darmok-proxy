@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["third_party/sqlparser", "third_party/sqlparser/derive"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "Apache-2.0"
+repository = "https://github.com/duotronic-ai/darmok-proxy"
+
+[workspace.dependencies]
+sqlparser = { package = "darmok-sqlparser", path = "third_party/sqlparser", features = ["visitor"] }

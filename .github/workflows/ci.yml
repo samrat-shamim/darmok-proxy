@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workspace:
+    name: Workspace (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Check repository boundaries
+        run: python3 scripts/check_repository.py
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Tests and doctests
+        run: cargo test --workspace --all-features --locked
+      - name: Default feature tests
+        run: cargo test --workspace --locked
+      - name: Minimal parser feature combinations
+        run: |
+          cargo check -p darmok-sqlparser --no-default-features --locked
+          cargo check -p darmok-sqlparser --no-default-features --features std --locked
+          cargo check -p darmok-sqlparser --no-default-features --features visitor --locked
