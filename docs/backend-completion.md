@@ -110,8 +110,9 @@ construction. They add no SQL query, protocol exchange, per-row value encoding
 or whole-result buffer. One owned string retains each command tag. Prepared
 rows keep the existing statement reference-count operation; binding keeps the
 upstream format/parameter container allocations. The one-shot typed lane
-collects parameter/type pairs once and shares the upstream format/bind encoder;
-it avoids a separate parameter-OID vector. One local unnamed description owns
+collects the supplied pairs before Parse, then uses the upstream encoder's
+format and parameter containers for Bind; it avoids a separate parameter-OID
+vector. One local unnamed description owns
 the column names/types and is shared by its rows, with no server statement-close
 request on Drop. The typed and prepared lanes share row/error/completion logic.
 These are structural costs, not a measured performance claim.
