@@ -211,6 +211,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "darmok-catalog"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "darmok-execute"
 version = "0.1.0"
 dependencies = [
@@ -226,6 +234,7 @@ name = "darmok-postgres-tests"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "darmok-catalog",
  "darmok-execute",
  "darmok-protocol",
  "darmok-types",

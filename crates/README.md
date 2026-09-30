@@ -7,6 +7,8 @@
 - `darmok-execute`: explicit native PostgreSQL scalar decoding and typed
   parameter encoding, including exact decimal scale, native year-one dates and
   the 24:00:00 time endpoint.
+- `darmok-catalog`: fresh native relation and declared-type facts by
+  database-local OID, including domain identities and raw column attributes.
 
 These libraries are an extraction foundation. They do not form a runnable
 proxy yet. The [release plan](../docs/release-plan.md) remains authoritative for
@@ -49,6 +51,11 @@ They reject implicit string/number/date conversions and lossy real-number
 conversion. The [parameter contract](../docs/native-parameters.md) records the
 accepted representations and native PostgreSQL input semantics. MySQL coercion
 rules and frontend prepared-statement metadata require separate integration.
+
+The [native catalog reader](../docs/native-catalog.md) batches relation IDs and
+preserves quoted names, domain declarations and type modifiers. It does not
+infer projected nullability, MySQL collations or logical database aliases, and
+it does not supply a reusable catalog generation or execution validity lease.
 
 Session-variable, charset/collation, engine, temporal and transaction behavior
 still requires semantic certification. Inherited metadata must not become an
