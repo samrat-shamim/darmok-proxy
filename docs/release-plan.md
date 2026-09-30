@@ -121,10 +121,13 @@ complete release gate runs once on the final candidate.
   records the supported representations.
 - Native parameter encoding is implemented separately, with its conditions in
   [the parameter contract](native-parameters.md). The current required suite
-  passes eleven tests on each PostgreSQL version: one schema, five value and five
+  passes twelve tests on each PostgreSQL version: one schema, six value and five
   parameter fixtures. Input parameters use backend types with explicit UTC
   temporal semantics. Metadata, MySQL coercion and session integration remain
   separate gates.
+- Row decoding follows the types reported by PostgreSQL. A native domain
+  fixture documents that the backend reports domain base types/typmods; declared
+  domain policy requires catalog metadata and is not supplied by row decoding.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.

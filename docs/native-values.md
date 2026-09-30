@@ -22,10 +22,17 @@ end-to-end SQL compatibility claim. PostgreSQL 17 and 18 are its test matrix.
 | timestamp | DateTime | Years 1 through 9999, with exact microseconds |
 | timestamptz | DateTime | UTC representation, years 1 through 9999 |
 
-Unknown types, domains, arrays, enums, intervals and timetz have no implicit
-text conversion. An unsupported type fails even when its value is NULL. Finite
-native values outside the supported representation also fail. Infinity, NaN
-and dates outside the year range are not silently clamped or wrapped.
+Types reported by the backend outside this table have no implicit text
+conversion. An unsupported reported type fails even when its value is NULL.
+Arrays, enums, intervals and timetz are not supported scalar representations.
+Finite native values outside the supported representation also fail. Infinity,
+NaN and dates outside the year range are not silently clamped or wrapped.
+
+PostgreSQL's [row-description implementation](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/common/printtup.c)
+reports a domain's base type and typmod. The decoder therefore decodes that
+reported scalar exactly; it does not identify declared domains or enforce a
+schema-level domain support policy. Such decisions require catalog metadata
+before execution. This component never substitutes an arbitrary type with text.
 
 NUMERIC is decoded directly from PostgreSQL's binary base-10000 digits. It
 never passes through floating point. The decoder retains the backend display
