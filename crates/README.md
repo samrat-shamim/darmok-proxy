@@ -6,7 +6,8 @@
 - `darmok-session`: SQL session state and bounded prepared-statement storage.
 - `darmok-execute`: explicit native PostgreSQL scalar decoding and typed
   parameter encoding, including exact decimal scale, native year-one dates and
-  the 24:00:00 time endpoint, with prepared description and binding arity checks.
+  the 24:00:00 time endpoint, with prepared description/binding arity checks and
+  exclusive native connection ownership for transaction controls.
 - `darmok-catalog`: fresh native relation and declared-type facts by
   database-local OID, including domain identities and raw column attributes.
 
@@ -56,6 +57,11 @@ The [native statement check](../docs/native-statements.md) rejects unsupported
 parameter/result types before execution, including empty result sets. Borrowed
 bindings retain backend arity; decoding checks driver description consistency.
 This does not provide semantic admission, catalog freshness or rollback.
+
+The [native backend owner](../docs/native-backend.md) keeps the client and driver
+private and owns explicit controls and borrowed transaction/savepoint scopes.
+It exposes no arbitrary SQL method. Admitted row execution through decoding and
+encoding is still pending; a control receipt does not certify a statement.
 
 The [native catalog reader](../docs/native-catalog.md) batches relation IDs and
 preserves quoted names, domain declarations and type modifiers. It does not

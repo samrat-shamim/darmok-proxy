@@ -81,3 +81,5 @@ jobs:
         run: rustup show active-toolchain
       - name: Required PostgreSQL tests
         run: cargo test -p darmok-postgres-tests --locked
+      - name: Required native owner database unit fixtures
+        run: cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored

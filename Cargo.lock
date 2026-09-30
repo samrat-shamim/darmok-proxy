@@ -227,6 +227,7 @@ dependencies = [
  "darmok-types",
  "futures-util",
  "thiserror",
+ "tokio",
  "tokio-postgres",
 ]
 

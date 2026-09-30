@@ -1,10 +1,10 @@
 # Statement execution and rollback contract
 
-Status: **design for the next engine component; not implemented**. The native
-value and parameter codecs and [prepared representation checks](native-statements.md)
-are implemented. None of these
-components supplies semantic admission, connection ownership, statement
-rollback, result completion or a runnable proxy.
+Status: **statement execution design; not an implemented row executor**. The
+native value and parameter codecs, [prepared representation checks](native-statements.md),
+and [exclusive control owner and borrowed scopes](native-backend.md) are
+implemented components. Admitted statement execution, rollback through output
+validation and a runnable proxy remain pending.
 
 ## Why the executor needs its own boundary
 
@@ -124,8 +124,10 @@ rather than turn that outcome into a committed-write acknowledgement.
 The [backend completion component](backend-completion.md) exposes those native
 events. The [native control checker](native-controls.md) verifies fixed internal
 control tag/state expectations and retains failure observations. Neither
-component supplies connection ownership or a rollback scope; the executor
-integration and verification above remain pending.
+component alone supplies connection ownership or a rollback scope. The
+[exclusive owner](native-backend.md) now retains the connector lifecycle and
+checks its own controls under borrowed scopes. Admitted statement/stream
+integration and the verification above remain pending.
 
 ## Rows, encoding and completion
 
