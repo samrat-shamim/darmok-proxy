@@ -119,15 +119,22 @@ complete release gate runs once on the final candidate.
   no remaining decoder defect. Global temporal sentinels and implicit
   fallback-to-text coercion variants are removed. The [value contract](native-values.md)
   records the supported representations.
-- Native parameter encoding is implemented separately, with its conditions in
-  [the parameter contract](native-parameters.md). The current required suite
-  passes twelve tests on each PostgreSQL version: one schema, six value and five
-  parameter fixtures. Input parameters use backend types with explicit UTC
-  temporal semantics. Metadata, MySQL coercion and session integration remain
-  separate gates.
+- [Native parameters PR #6](https://github.com/duotronic-ai/darmok-proxy/pull/6)
+  is merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588
+  default tests/doctests with seven ignored upstream formatting cases. Twelve
+  required fixtures passed on each PostgreSQL version: one schema, six value
+  and five parameter fixtures. Ordinary functional review is complete. Input
+  parameters use backend types with explicit UTC temporal semantics; conditions
+  are recorded in [the parameter contract](native-parameters.md). MySQL coercion
+  and session integration remain separate gates.
 - Row decoding follows the types reported by PostgreSQL. A native domain
   fixture documents that the backend reports domain base types/typmods; declared
   domain policy requires catalog metadata and is not supplied by row decoding.
+- Fresh native relation/type reads are implemented in `darmok-catalog`, with
+  their boundaries in [the catalog contract](native-catalog.md). The required
+  suite adds seven ordinary catalog fixtures per backend. Reusable catalog plans,
+  execution validity and MySQL wire metadata remain pending; reading native
+  definitions does not certify these gates.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.

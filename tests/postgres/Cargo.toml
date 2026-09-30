@@ -9,6 +9,7 @@ publish = false
 [dev-dependencies]
 darmok-types = { workspace = true }
 darmok-execute = { workspace = true }
+darmok-catalog = { workspace = true }
 darmok-protocol = { workspace = true }
 bytes = { workspace = true }
 tokio = { workspace = true }
@@ -25,3 +26,7 @@ path = "native_values.rs"
 [[test]]
 name = "native_parameters"
 path = "native_parameters.rs"
+
+[[test]]
+name = "native_catalog"
+path = "native_catalog.rs"
