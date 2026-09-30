@@ -155,6 +155,12 @@ complete release gate runs once on the final candidate.
   explicit completion, and uncertainty disposition. It is a design, not an
   implemented executor; semantic admission and live catalog validity remain
   prerequisites. This does not complete M2 or any release gate.
+- A vendored connector addition exposes [backend completion events](backend-completion.md)
+  with exact command tags, backend errors and request-boundary transaction states.
+  Seven required ordinary fixtures per backend cover control/commit outcomes,
+  prepared rows/errors, local binding failures and queued request association.
+  Connection ownership, rollback, semantic admission and catalog validity are
+  still pending; this is connector component evidence, not an executor gate.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

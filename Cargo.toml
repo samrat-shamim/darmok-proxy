@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["third_party/tokio-postgres"]
 members = [
     "third_party/sqlparser",
     "third_party/sqlparser/derive",
@@ -32,6 +33,6 @@ byteorder = "1.5"
 tokio-util = { version = "0.7", features = ["codec"] }
 subtle = "2.6"
 tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
-tokio-postgres = "0.7"
+tokio-postgres = { version = "=0.7.18", path = "third_party/tokio-postgres" }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
