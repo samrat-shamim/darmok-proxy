@@ -2,6 +2,12 @@
 
 Status: **in progress; no release candidate exists**.
 
+Current scope adjustment: security-related work is deferred at the user's
+request. Authentication, TLS, authorization testing, security review and
+adversarial/resource stress verification remain pending. Continue generic
+extraction, SQL functionality, ordinary correctness tests, builds and
+documentation. Deferred gates cannot count as release certification.
+
 ## Decisions
 
 - Name: Darmok; repository: `darmok-proxy`; executable: `darmok`.
@@ -21,7 +27,7 @@ Status: **in progress; no release candidate exists**.
 | ID | Work | Exit gate | Status |
 | --- | --- | --- | --- |
 | M0 | Pin and inventory the starting implementation; establish baseline; write contracts | Reproducible source inventory and test results, documented inherited failures, architecture and scope contracts | Complete; baseline has one recorded failure |
-| M1 | Independent workspace, vendored parser, package names, licensing and CI | Fresh checkout builds and tests without another repository or private dependency; upstream notices preserved | In progress |
+| M1 | Independent workspace, vendored parser, package names, licensing and CI | Fresh checkout builds and tests without another repository or private dependency; upstream notices preserved | Complete |
 | M2 | Extract the generic translation and execution engine | All application assumptions and allocation/capture/control-plane dependencies removed; both minimal end-to-end examples pass | Pending |
 | M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | Pending |
 | M4 | SQL, types, metadata, transaction/session/prepared/cache correctness | Every advertised construct has executable evidence; external DDL and native schema tests pass | Pending |
@@ -97,9 +103,22 @@ complete release gate runs once on the final candidate.
   1,492 default-feature tests/doctests, seven explicitly ignored upstream
   formatting cases, strict Clippy, formatting, repository boundaries, and
   minimal/std-only/visitor-only feature builds. It is merged.
-- Generic types, wire protocol and session libraries are being extracted.
-  Domain allocation/trust state is removed, schemas preserve their exact
-  names, and prepared-statement storage has explicit resource limits.
+- [Generic libraries PR #3](https://github.com/duotronic-ai/darmok-proxy/pull/3)
+  is merged. The types, wire protocol and session libraries passed independent
+  review, Linux/macOS CI, 1,595 all-feature tests/doctests, 1,588 default-feature
+  tests/doctests, seven ignored upstream formatting cases, and one mandatory
+  schema fixture on each PostgreSQL version. Domain allocation/trust state is
+  removed and schemas preserve their exact names. This is component evidence,
+  not certification of authentication or session semantics.
+- The [compiler draft](https://github.com/duotronic-ai/darmok-proxy/pull/4) carries
+  explicit AST binding layouts. It is not merged or certified for execution.
+- Native scalar decoding is implemented independently; its contract is recorded
+  in [native values](native-values.md). Ordinary correctness review found no
+  remaining decoder defect. Global temporal sentinels and implicit
+  fallback-to-text coercion variants are removed. The current required suite
+  executes six tests on each PostgreSQL version: one schema fixture and five
+  native value fixtures. Metadata, parameters and session integration remain
+  separate gates.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.

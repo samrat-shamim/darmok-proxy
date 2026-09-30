@@ -4,6 +4,8 @@
   exact PostgreSQL schema identifiers.
 - `darmok-protocol`: packet encoding/decoding and authentication primitives.
 - `darmok-session`: SQL session state and bounded prepared-statement storage.
+- `darmok-execute`: explicit native PostgreSQL scalar decoding, including exact
+  decimal scale, native year-one dates and the 24:00:00 time endpoint.
 
 These libraries are an extraction foundation. They do not form a runnable
 proxy yet. The [release plan](../docs/release-plan.md) remains authoritative for
@@ -35,6 +37,11 @@ query text, parameters and client attributes.
 Required PostgreSQL 17/18 tests verify schema quoting, the target of unqualified
 object creation, built-in function precedence and temporary-table shadowing.
 Missing database configuration fails the test rather than skipping it.
+
+The native value decoder preserves PostgreSQL text and bytes as stored, with no
+global sentinel or escape interpretation. Its supported scalar representations
+are documented in [native values](../docs/native-values.md). Result metadata,
+session timezone integration and statement execution remain separate work.
 
 Session-variable, charset/collation, engine, temporal and transaction behavior
 still requires semantic certification. Inherited metadata must not become an
