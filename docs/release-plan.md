@@ -132,7 +132,7 @@ complete release gate runs once on the final candidate.
   domain policy requires catalog metadata and is not supplied by row decoding.
 - Fresh native relation/type reads are implemented in `darmok-catalog`, with
   their boundaries in [the catalog contract](native-catalog.md). The required
-  suite adds six ordinary catalog fixtures per backend. Reusable catalog plans,
+  suite adds seven ordinary catalog fixtures per backend. Reusable catalog plans,
   execution validity and MySQL wire metadata remain pending; reading native
   definitions does not certify these gates.
 - Inherited runtime semantic risks are tracked in

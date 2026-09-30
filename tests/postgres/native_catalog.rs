@@ -508,6 +508,62 @@ async fn zero_column_relations_and_empty_requests_are_distinct_from_missing_oids
 }
 
 #[tokio::test]
+async fn fresh_reads_honor_the_callers_repeatable_read_snapshot() {
+    let (mut client, connection) = database_client().await;
+    let (external, external_connection) = database_client().await;
+    let backend_pid: i32 = client
+        .query_one("SELECT pg_backend_pid()", &[])
+        .await
+        .unwrap()
+        .get(0);
+    let schema = format!("darmok_catalog_repeatable_{backend_pid}");
+    external
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; SET search_path TO {schema};
+             CREATE TABLE snapshot_table (original text);"
+        ))
+        .await
+        .unwrap();
+    let oid = relation_oid(&external, "snapshot_table").await;
+    let tx = client
+        .build_transaction()
+        .isolation_level(tokio_postgres::IsolationLevel::RepeatableRead)
+        .start()
+        .await
+        .unwrap();
+    let before = read_native_relations(&tx, &[oid]).await.unwrap();
+    assert_eq!(
+        column(&before, oid, "original").declared_type_oid,
+        Type::TEXT.oid()
+    );
+    external
+        .batch_execute(
+            "ALTER TABLE snapshot_table ALTER COLUMN original TYPE varchar(20);
+             ALTER TABLE snapshot_table RENAME COLUMN original TO changed;",
+        )
+        .await
+        .unwrap();
+    // There is no proxy cache, but native Repeatable Read still retains the
+    // transaction's earlier catalog snapshot after this committed change.
+    assert_eq!(read_native_relations(&tx, &[oid]).await.unwrap(), before);
+    tx.commit().await.unwrap();
+    let after = read_native_relations(&client, &[oid]).await.unwrap();
+    assert_eq!(
+        column(&after, oid, "changed").declared_type_oid,
+        Type::VARCHAR.oid()
+    );
+    assert_eq!(column(&after, oid, "changed").type_modifier, 20 + 4);
+    external
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    drop(client);
+    drop(external);
+    connection.await.unwrap().unwrap();
+    external_connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn constraints_and_projection_nullability_remain_separate_facts() {
     let (mut client, connection) = database_client().await;
     let tx = client.transaction().await.unwrap();

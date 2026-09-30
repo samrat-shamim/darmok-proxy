@@ -46,8 +46,12 @@ become a logical MySQL database alias without the route contract.
 ## Freshness and execution
 
 The read is one SQL statement over the native catalogs. It preserves a
-transaction's own catalog changes and PostgreSQL's statement snapshot behavior.
-It contains no result/plan cache, notification listener or generation token.
+transaction's own catalog changes and honors the caller's PostgreSQL isolation
+snapshot. Read Committed reads see catalog changes committed before each
+statement starts; Repeatable Read can retain older catalog facts until that
+transaction ends. "Fresh" means a new query, not a bypass of native snapshot
+rules. Those rules follow PostgreSQL's [transaction isolation](https://www.postgresql.org/docs/18/transaction-iso.html).
+The component contains no result/plan cache, notification listener or generation token.
 Reading through a transaction does not by itself lock all described relations
 against subsequent DDL. A caller must establish catalog validity and the owning
 connection before reusing facts for an execution plan. OIDs from another
@@ -71,6 +75,7 @@ and no extra lookup is issued per column. There is no benchmark claim yet.
 
 Required PostgreSQL 17/18 fixtures verify quoted names, native type/domain
 identity, column definitions, temporary objects, relation kinds, and fresh
-reads after ordinary transactional/external DDL. MySQL wire metadata and
+reads after ordinary transactional/external DDL and Repeatable Read snapshot
+behavior. MySQL wire metadata and
 catalog-dependent plan execution remain separate gates. Security-related work
 remains deferred at the user's request.
