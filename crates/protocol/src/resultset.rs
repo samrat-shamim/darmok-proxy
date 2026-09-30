@@ -99,6 +99,10 @@ pub fn encode_binary_row(
     let bitmap_start = dst.len();
     dst.resize(bitmap_start + (values.len() + 2).div_ceil(8), 0);
     for (index, (value, column)) in values.iter().zip(columns).enumerate() {
+        if !supported_binary_type(column.mysql_type) {
+            dst.truncate(start);
+            return Err(binary_type_error(column.mysql_type));
+        }
         if matches!(value, Value::Null) {
             let bit = index + 2;
             dst[bitmap_start + bit / 8] |= 1 << (bit % 8);
@@ -108,6 +112,33 @@ pub fn encode_binary_row(
         }
     }
     Ok(())
+}
+
+fn supported_binary_type(kind: u8) -> bool {
+    matches!(
+        kind,
+        field_type::TINY
+            | field_type::SHORT
+            | field_type::LONG
+            | field_type::INT24
+            | field_type::LONGLONG
+            | field_type::YEAR
+            | field_type::FLOAT
+            | field_type::DOUBLE
+            | field_type::DECIMAL
+            | field_type::NEWDECIMAL
+            | field_type::VAR_STRING
+            | field_type::STRING
+            | field_type::VARCHAR
+            | field_type::JSON
+            | field_type::BLOB
+            | field_type::BIT
+            | field_type::DATE
+            | field_type::DATETIME
+            | field_type::TIMESTAMP
+            | field_type::TIME
+            | field_type::NULL
+    )
 }
 
 fn encode_binary_value(value: &Value, column: &ColumnMeta, dst: &mut BytesMut) -> Result<()> {
@@ -288,6 +319,25 @@ pub fn encode_text_row(values: &[Option<&[u8]>], dst: &mut BytesMut) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn null_rows_cannot_hide_unsupported_column_metadata() {
+        let mut dst = BytesMut::from(b"prefix".as_slice());
+        assert!(encode_binary_row(&[Value::Null], &[column(0xff, false)], &mut dst).is_err());
+        assert_eq!(dst.as_ref(), b"prefix");
+        let mut dst = BytesMut::new();
+        encode_binary_row(&[Value::Null], &[column(field_type::NULL, false)], &mut dst).unwrap();
+        assert_eq!(dst.as_ref(), &[0, 4]);
+        assert!(
+            encode_binary_row(
+                &[Value::Int(0)],
+                &[column(field_type::NULL, false)],
+                &mut dst
+            )
+            .is_err()
+        );
+        assert_eq!(dst.as_ref(), &[0, 4]);
+    }
 
     fn column(mysql_type: u8, unsigned: bool) -> ColumnMeta {
         ColumnMeta {

@@ -2,6 +2,7 @@ use bytes::{Buf, Bytes};
 use darmok_types::error::Result;
 use darmok_types::mysql_const::{self, field_type};
 use darmok_types::value::{PreparedStatementParamType, Value};
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::capabilities::CapabilityFlags;
@@ -37,6 +38,7 @@ pub enum Command {
         auth_response: Vec<u8>,
         auth_plugin_name: Option<String>,
         charset_id: Option<u16>,
+        connect_attrs: HashMap<String, String>,
     },
     ResetConnection,
     SetOption {
@@ -201,43 +203,34 @@ fn decode_change_user(body: &[u8], capabilities: CapabilityFlags) -> Result<Comm
         "COM_CHANGE_USER username",
     )?;
 
-    let auth_response =
-        if capabilities.contains(CapabilityFlags::CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
-            read_lenenc_bytes(&mut cursor, "COM_CHANGE_USER auth response")?
-        } else if capabilities.contains(CapabilityFlags::CLIENT_SECURE_CONNECTION) {
-            ensure_remaining(&cursor, 1, "COM_CHANGE_USER auth response length")?;
-            let length = usize::from(cursor.get_u8());
-            ensure_remaining(&cursor, length, "COM_CHANGE_USER auth response")?;
-            let value = cursor[..length].to_vec();
-            cursor.advance(length);
-            value
-        } else {
-            take_null_terminated(&mut cursor, "COM_CHANGE_USER auth response")?
-        };
-
-    let database =
-        if capabilities.contains(CapabilityFlags::CLIENT_CONNECT_WITH_DB) && !cursor.is_empty() {
-            Some(decode_utf8(
-                take_null_terminated(&mut cursor, "COM_CHANGE_USER database")?,
-                "COM_CHANGE_USER database",
-            )?)
-        } else {
-            None
-        };
-
-    let charset_id =
-        if capabilities.contains(CapabilityFlags::CLIENT_PROTOCOL_41) && cursor.len() >= 2 {
-            let candidate = read_u16_le(&cursor[..2], "COM_CHANGE_USER character set")?;
-            (candidate <= u16::from(u8::MAX)).then_some(candidate)
-        } else {
-            None
-        };
-    if charset_id.is_some() {
+    // Unlike HandshakeResponse41, this command always uses the one-byte
+    // secure-connection auth length, even with LENENC_CLIENT_DATA negotiated.
+    let auth_response = if capabilities.contains(CapabilityFlags::CLIENT_SECURE_CONNECTION) {
+        ensure_remaining(&cursor, 1, "COM_CHANGE_USER auth response length")?;
+        let length = usize::from(cursor.get_u8());
+        ensure_remaining(&cursor, length, "COM_CHANGE_USER auth response")?;
+        let value = cursor[..length].to_vec();
+        cursor.advance(length);
+        value
+    } else {
+        take_null_terminated(&mut cursor, "COM_CHANGE_USER auth response")?
+    };
+    let database = decode_utf8(
+        take_null_terminated(&mut cursor, "COM_CHANGE_USER database")?,
+        "COM_CHANGE_USER database",
+    )?;
+    let database = (!database.is_empty()).then_some(database);
+    let has_extensions = !cursor.is_empty();
+    let charset_id = if has_extensions && capabilities.contains(CapabilityFlags::CLIENT_PROTOCOL_41)
+    {
+        let charset = read_u16_le(cursor, "COM_CHANGE_USER character set")?;
         cursor.advance(2);
-    }
-
+        Some(charset)
+    } else {
+        None
+    };
     let auth_plugin_name =
-        if capabilities.contains(CapabilityFlags::CLIENT_PLUGIN_AUTH) && !cursor.is_empty() {
+        if has_extensions && capabilities.contains(CapabilityFlags::CLIENT_PLUGIN_AUTH) {
             Some(decode_utf8(
                 take_null_terminated(&mut cursor, "COM_CHANGE_USER auth plugin")?,
                 "COM_CHANGE_USER auth plugin",
@@ -245,6 +238,18 @@ fn decode_change_user(body: &[u8], capabilities: CapabilityFlags) -> Result<Comm
         } else {
             None
         };
+    let connect_attrs =
+        if has_extensions && capabilities.contains(CapabilityFlags::CLIENT_CONNECT_ATTRS) {
+            let mut offset = 0;
+            let attrs = crate::handshake::read_connect_attrs(cursor, &mut offset)?;
+            cursor.advance(offset);
+            attrs
+        } else {
+            HashMap::new()
+        };
+    if !cursor.is_empty() {
+        return Err(invalid_packet("trailing COM_CHANGE_USER bytes"));
+    }
 
     Ok(Command::ChangeUser {
         username,
@@ -252,6 +257,7 @@ fn decode_change_user(body: &[u8], capabilities: CapabilityFlags) -> Result<Comm
         auth_response,
         auth_plugin_name,
         charset_id,
+        connect_attrs,
     })
 }
 
@@ -592,7 +598,7 @@ fn decode_time(cursor: &mut &[u8]) -> Result<Value> {
         8 => {
             ensure_remaining(cursor, 8, "TIME parameter")?;
             Ok(Value::Time {
-                negative: cursor.get_u8() != 0,
+                negative: decode_time_sign(cursor)?,
                 days: cursor.get_u32_le(),
                 hours: cursor.get_u8(),
                 minutes: cursor.get_u8(),
@@ -603,7 +609,7 @@ fn decode_time(cursor: &mut &[u8]) -> Result<Value> {
         12 => {
             ensure_remaining(cursor, 12, "TIME parameter")?;
             Ok(Value::Time {
-                negative: cursor.get_u8() != 0,
+                negative: decode_time_sign(cursor)?,
                 days: cursor.get_u32_le(),
                 hours: cursor.get_u8(),
                 minutes: cursor.get_u8(),
@@ -614,6 +620,14 @@ fn decode_time(cursor: &mut &[u8]) -> Result<Value> {
         length => Err(invalid_packet(format!(
             "invalid TIME parameter length {length}"
         ))),
+    }
+}
+
+fn decode_time_sign(cursor: &mut &[u8]) -> Result<bool> {
+    match cursor.get_u8() {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(invalid_packet("invalid TIME parameter sign")),
     }
 }
 
@@ -629,6 +643,77 @@ fn bitmap_is_set(bitmap: &[u8], index: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn time_parameter_sign_must_be_zero_or_one() {
+        for length in [8, 12] {
+            for sign in 0..=u8::MAX {
+                let mut payload = vec![0, 1, field_type::TIME, 0, length, sign];
+                payload.resize(5 + usize::from(length), 0);
+                assert_eq!(
+                    decode_stmt_execute_parameters(&payload, 1, &[]).is_ok(),
+                    sign <= 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn change_user_always_reads_database_full_charset_and_connection_attributes() {
+        let capabilities = CapabilityFlags::CLIENT_PROTOCOL_41
+            | CapabilityFlags::CLIENT_SECURE_CONNECTION
+            | CapabilityFlags::CLIENT_PLUGIN_AUTH
+            | CapabilityFlags::CLIENT_CONNECT_ATTRS;
+        // CONNECT_WITH_DB is deliberately absent. Charset 0x012d must not be
+        // confused with the beginning of the plugin name.
+        let payload = b"\x11alice\0\x00reporting\0\x2d\x01caching_sha2_password\0\x04\x01k\x01v";
+        let Command::ChangeUser {
+            database,
+            charset_id,
+            auth_plugin_name,
+            connect_attrs,
+            ..
+        } = Command::decode(payload, capabilities.bits()).unwrap()
+        else {
+            panic!("wrong command");
+        };
+        assert_eq!(database.as_deref(), Some("reporting"));
+        assert_eq!(charset_id, Some(301));
+        assert_eq!(auth_plugin_name.as_deref(), Some("caching_sha2_password"));
+        assert_eq!(connect_attrs.get("k").map(String::as_str), Some("v"));
+        let mut trailing = payload.to_vec();
+        trailing.push(1);
+        assert!(Command::decode(&trailing, capabilities.bits()).is_err());
+        assert!(Command::decode(&payload[..payload.len() - 1], capabilities.bits()).is_err());
+    }
+
+    #[test]
+    fn change_user_secure_auth_length_is_a_byte_even_with_lenenc_handshake_capability() {
+        let capabilities = CapabilityFlags::CLIENT_SECURE_CONNECTION
+            | CapabilityFlags::CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA;
+        let mut payload = b"\x11alice\0\xfb".to_vec();
+        payload.extend_from_slice(&[7; 251]);
+        payload.push(0); // Mandatory empty database.
+        let Command::ChangeUser {
+            auth_response,
+            database,
+            ..
+        } = Command::decode(&payload, capabilities.bits()).unwrap()
+        else {
+            panic!("wrong command");
+        };
+        assert_eq!(auth_response, vec![7; 251]);
+        assert!(database.is_none());
+        assert!(Command::decode(&payload[..payload.len() - 1], capabilities.bits()).is_err());
+        payload.push(45); // A partial two-byte charset is invalid.
+        assert!(
+            Command::decode(
+                &payload,
+                (capabilities | CapabilityFlags::CLIENT_PROTOCOL_41).bits()
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn execute_uses_cached_types_and_the_unsigned_high_bit() {
@@ -703,6 +788,7 @@ mod tests {
                 auth_response: secret.as_bytes().to_vec(),
                 auth_plugin_name: Some(secret.into()),
                 charset_id: None,
+                connect_attrs: HashMap::new(),
             },
             Command::StmtExecute {
                 stmt_id: 1,
@@ -809,6 +895,7 @@ mod tests {
                 auth_response: b"xyz".to_vec(),
                 auth_plugin_name: Some("mysql_native".to_owned()),
                 charset_id: Some(45),
+                connect_attrs: HashMap::new(),
             }
         );
     }

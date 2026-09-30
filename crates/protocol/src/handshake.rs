@@ -259,7 +259,10 @@ fn read_null_terminated_bytes(payload: &[u8], offset: &mut usize) -> Result<Byte
     Ok(Bytes::copy_from_slice(&payload[start..end]))
 }
 
-fn read_connect_attrs(payload: &[u8], offset: &mut usize) -> Result<HashMap<String, String>> {
+pub(crate) fn read_connect_attrs(
+    payload: &[u8],
+    offset: &mut usize,
+) -> Result<HashMap<String, String>> {
     let mut cursor = &payload[*offset..];
     let attr_len = read_lenenc_int(&mut cursor)?;
     let attr_len = usize::try_from(attr_len)
