@@ -136,7 +136,13 @@ complete release gate runs once on the final candidate.
   execution validity and MySQL wire metadata remain pending; reading native
   definitions does not certify these gates.
 - Native prepared descriptions are checked before execution by
-  `darmok-execute::NativeStatementUtc`; the [statement contract](native-statements.md)
+  `darmok-execute::NativeStatementUtc`.
+  [PR #8](https://github.com/duotronic-ai/darmok-proxy/pull/8) is merged as
+  `479f9e82a07f2736bf64ce95fefb3bea8ca06c0e`. Linux/macOS CI passed 1,595
+  all-feature and 1,588 default-feature tests/doctests with seven ignored
+  upstream cases; 25 required fixtures passed on each PostgreSQL version.
+  Independent ordinary functional review is complete. The
+  [statement contract](native-statements.md)
   separates type/arity checks from semantic admission, value ranges and rollback.
   Six required ordinary fixtures per backend exercise empty results, unsupported
   write outputs, domain types, borrowed bindings and description/value errors.
@@ -144,6 +150,11 @@ complete release gate runs once on the final candidate.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.
+- The [statement execution contract](native-execution.md) defines the next
+  functional engine boundary: owned rollback scopes through decoding/encoding,
+  explicit completion, and uncertainty disposition. It is a design, not an
+  implemented executor; semantic admission and live catalog validity remain
+  prerequisites. This does not complete M2 or any release gate.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
