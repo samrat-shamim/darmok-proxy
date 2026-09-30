@@ -112,6 +112,10 @@ savepoints, autocommit transitions, DDL implicit commits, disconnect rollback,
 locks and multi-step emulations. A translation that needs several backend
 statements must define atomicity and failure behavior for every step.
 
+The [statement execution contract](native-execution.md) specifies the pending
+owned rollback scope, streaming/encoding boundary and completion states. Native
+type checks alone cannot approve a statement or certify this execution path.
+
 ## Catalog and cache correctness
 
 PostgreSQL catalogs are authoritative for native objects. Supplemental metadata

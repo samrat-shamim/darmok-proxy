@@ -144,6 +144,11 @@ complete release gate runs once on the final candidate.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.
+- The [statement execution contract](native-execution.md) defines the next
+  functional engine boundary: owned rollback scopes through decoding/encoding,
+  explicit completion, and uncertainty disposition. It is a design, not an
+  implemented executor; semantic admission and live catalog validity remain
+  prerequisites. This does not complete M2 or any release gate.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
