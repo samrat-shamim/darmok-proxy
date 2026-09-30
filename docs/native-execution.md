@@ -1,8 +1,8 @@
 # Statement execution and rollback contract
 
 Status: **design for the next engine component; not implemented**. The native
-value and parameter codecs are implemented. Prepared representation checks are
-in [PR #8](https://github.com/duotronic-ai/darmok-proxy/pull/8). None of these
+value and parameter codecs and [prepared representation checks](native-statements.md)
+are implemented. None of these
 components supplies semantic admission, connection ownership, statement
 rollback, result completion or a runnable proxy.
 
@@ -31,6 +31,13 @@ type checks and a guessed first keyword cannot construct this plan. Admission
 must establish the supported AST forms and functions, parameter identity and
 coercions, result metadata/encoding, command effects and catalog conditions.
 Unverified constructs fail before preparing or executing backend SQL.
+
+Only the semantic admission component can construct this plan. Its constructor
+is private, and its SQL, category, binding layout and conditions are opaque and
+immutable to callers. A public struct with writable SQL/category fields, or a
+public constructor accepting them, would bypass admission even if named
+"admitted". Parsing and native statement checks retain their separate input
+types and cannot promote themselves into this executable plan.
 
 The ordinary statement lane initially admits only supported transactional
 query/INSERT/UPDATE/DELETE operations. A query may contain write effects through
@@ -175,6 +182,10 @@ Ordinary PostgreSQL 17/18 fixtures must demonstrate:
   rolled back and native sequence behavior preserved.
 - Backend constraint and prepare errors, preserving earlier outer-transaction
   writes where statement-local recovery is required, followed by a valid write.
+- A deferred constraint failing at autocommit COMMIT after a successful
+  statement. Record the confirmed rollback separately from an unknown finish
+  outcome, return the commit error rather than success, and allow the next
+  operation only after confirmed idle state.
 - Several-step emulation failure and repeated statement failures with released
   internal savepoints; explicit client savepoints retain their own behavior.
 - A consumer ending normally or stopping early, with the owner's next command
