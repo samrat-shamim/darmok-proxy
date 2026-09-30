@@ -22,7 +22,8 @@ through an exact-size iterator. Values are encoded once by the driver using
 
 `decode_row` compares the row's driver description to the checked statement,
 including count, names, types, typmods and origins, before ordinary native
-decoding. It prevents accidentally using a different query's row description.
+decoding. Incompatible descriptions are rejected; separate statements with
+identical description fields are accepted.
 Rows sharing the immutable prepared description bypass the per-field comparison;
 other descriptions are compared in full. These are **driver metadata**, not a fresh backend portal description:
 tokio-postgres attaches cached statement metadata to rows. The comparison does
