@@ -48,6 +48,12 @@ the transaction state after that error. A stream `Err` instead means parsing,
 transport or unexpected-response failure and terminates without confirmation.
 Neither an error event alone nor a command tag alone proves readiness.
 
+In native autocommit, Execute can emit rows and CommandComplete before Sync
+finishes the implicit transaction. A deferred constraint can fail during that
+finish. The stream retains the earlier tag and rows, then the precise backend
+error and final state; the command tag cannot become a write-success
+acknowledgement. It must not reject that late SQL error as an unexpected message.
+
 ReadyForQuery reports exactly Idle (`I`), Transaction (`T`) or FailedTransaction
 (`E`); unknown codes fail explicitly. The backend
 [command tag](https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-COMMANDCOMPLETE)
@@ -72,7 +78,7 @@ or whole-result buffer. One owned string retains each command tag. Prepared
 rows keep the existing statement reference-count operation; binding keeps the
 upstream format/parameter container allocations. There is no benchmark claim.
 
-Seven required fixtures on PostgreSQL 17/18 exercise:
+Eight required fixtures on PostgreSQL 17/18 exercise:
 
 - Exact control tags, multi-command completion, explicit zero counts and empty
   query outcomes.
@@ -80,6 +86,9 @@ Seven required fixtures on PostgreSQL 17/18 exercise:
   as ROLLBACK and a valid later write.
 - A successful insert followed by a deferred constraint error at COMMIT, with
   confirmed idle state and rolled-back table rows.
+- An autocommit prepared INSERT, with and without RETURNING, whose deferred
+  constraint fails at Sync after CommandComplete; retain its exact SQL error
+  and idle state, with no table rows left behind.
 - Prepared rows, native bindings/decoding, empty/zero-row/zero-column results,
   exact labels and one parameter encoding pass.
 - A row before an execution error, a subsequent error before BindComplete,

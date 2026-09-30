@@ -215,7 +215,12 @@ impl Stream for QueryEventStream {
                     this.phase = QueryPhase::Complete;
                     Ok(QueryEvent::PortalSuspended)
                 }
-                (QueryPhase::Binding | QueryPhase::Rows, Message::ErrorResponse(body)) => {
+                (
+                    QueryPhase::Binding | QueryPhase::Rows | QueryPhase::Complete,
+                    Message::ErrorResponse(body),
+                ) => {
+                    // In autocommit, Sync can fail a deferred constraint after
+                    // Execute already emitted rows and CommandComplete.
                     let error = Error::db(body);
                     if error.as_db_error().is_some() {
                         this.phase = QueryPhase::Failed;

@@ -89,7 +89,7 @@ async fn drain_query(mut stream: QueryEventStream) -> Query {
             }
             QueryEvent::PortalSuspended => panic!("unbounded execution suspended a portal"),
             QueryEvent::BackendError(error) => {
-                assert!(tag.is_none() && !empty && errors.is_empty());
+                assert!(errors.is_empty());
                 errors.push(error);
             }
             QueryEvent::ReadyForQuery(value) => state = Some(value),
@@ -212,6 +212,82 @@ async fn deferred_constraint_failure_at_commit_retains_error_and_idle_state() {
         TransactionState::Idle,
     )
     .await;
+    drop(client);
+    connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn autocommit_sync_error_after_command_complete_keeps_error_and_ready_state() {
+    let (client, connection) = client().await;
+    command(
+        &client,
+        "CREATE TEMP TABLE completion_auto_deferred \
+         (n integer UNIQUE DEFERRABLE INITIALLY DEFERRED)",
+        &["CREATE TABLE"],
+        TransactionState::Idle,
+    )
+    .await;
+    for returning in [false, true] {
+        let suffix = if returning { " RETURNING n" } else { "" };
+        let statement = client
+            .prepare(&format!(
+                "INSERT INTO completion_auto_deferred VALUES (1), (1){suffix}"
+            ))
+            .await
+            .unwrap();
+        let description = NativeStatementUtc::new(&statement).unwrap();
+        let bindings = description.bind(&[]).unwrap();
+        let result = drain_query(
+            client
+                .query_events(bindings.statement(), bindings.parameters())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(result.tag.as_deref(), Some("INSERT 0 2"));
+        assert!(!result.empty);
+        assert_eq!(result.errors.len(), 1);
+        assert_eq!(result.errors[0].code().unwrap().code(), "23505");
+        assert_eq!(result.state, TransactionState::Idle);
+        assert_eq!(result.rows.len(), if returning { 2 } else { 0 });
+        for row in &result.rows {
+            assert_eq!(description.decode_row(row).unwrap(), [Value::Int(1)]);
+        }
+        let count: i64 = client
+            .query_one("SELECT count(*) FROM completion_auto_deferred", &[])
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(count, 0);
+        // A following valid autocommit write succeeds on the same connection
+        // after the failed request's final ReadyForQuery has been observed.
+        let valid = client
+            .prepare("INSERT INTO completion_auto_deferred VALUES (2) RETURNING n")
+            .await
+            .unwrap();
+        let valid_description = NativeStatementUtc::new(&valid).unwrap();
+        let bindings = valid_description.bind(&[]).unwrap();
+        let result = drain_query(
+            client
+                .query_events(bindings.statement(), bindings.parameters())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(
+            valid_description.decode_row(&result.rows[0]).unwrap(),
+            [Value::Int(2)]
+        );
+        assert_eq!(result.tag.as_deref(), Some("INSERT 0 1"));
+        assert!(result.errors.is_empty());
+        assert_eq!(result.state, TransactionState::Idle);
+        command(
+            &client,
+            "DELETE FROM completion_auto_deferred",
+            &["DELETE 1"],
+            TransactionState::Idle,
+        )
+        .await;
+    }
     drop(client);
     connection.await.unwrap().unwrap();
 }

@@ -157,7 +157,7 @@ complete release gate runs once on the final candidate.
   prerequisites. This does not complete M2 or any release gate.
 - A vendored connector addition exposes [backend completion events](backend-completion.md)
   with exact command tags, backend errors and request-boundary transaction states.
-  Seven required ordinary fixtures per backend cover control/commit outcomes,
+  Eight required ordinary fixtures per backend cover control/commit outcomes,
   prepared rows/errors, local binding failures and queued request association.
   Connection ownership, rollback, semantic admission and catalog validity are
   still pending; this is connector component evidence, not an executor gate.
