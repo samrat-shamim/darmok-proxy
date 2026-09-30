@@ -1,0 +1,12 @@
+Vendored SQL parser
+
+This component includes software developed by the Apache Software Foundation
+(https://www.apache.org/), including Apache DataFusion sqlparser-rs, and by
+the sqlparser-rs authors.
+
+The imported source additionally credits Genesis contributors for its MySQL
+mode, construct metadata and PostgreSQL emitter extensions. This attribution
+is retained from that source; it does not introduce a runtime dependency.
+
+Modified files carry a notice identifying the Darmok changes. The import
+retains the parser, AST, dialect implementations, derive macros and test corpus.

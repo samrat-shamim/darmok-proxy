@@ -1,0 +1,2 @@
+# Keep the imported SQL corpus byte-for-byte, including its CRLF line endings.
+third_party/sqlparser/tests/queries/tpch/*.sql -text whitespace=cr-at-eol

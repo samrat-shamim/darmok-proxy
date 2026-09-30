@@ -1,0 +1,7 @@
+/target/
+**/target/
+/artifacts/
+.env
+*.pem
+*.key
+.DS_Store
