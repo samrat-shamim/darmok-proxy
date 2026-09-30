@@ -129,7 +129,8 @@
 pub use crate::cancel_token::CancelToken;
 pub use crate::client::Client;
 pub use crate::completion::{
-    CommandEvent, CommandEventStream, QueryEvent, QueryEventStream, TransactionState,
+    BuiltinQueryEventStream, CommandEvent, CommandEventStream, QueryEvent, QueryEventStream,
+    TransactionState, UnsupportedBuiltinResultType,
 };
 pub use crate::config::Config;
 pub use crate::connection::Connection;

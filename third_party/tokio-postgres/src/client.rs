@@ -3,7 +3,7 @@
 #[cfg(feature = "runtime")]
 use crate::Socket;
 use crate::codec::{BackendMessages, FrontendMessage};
-use crate::completion::{CommandEventStream, QueryEventStream};
+use crate::completion::{BuiltinQueryEventStream, CommandEventStream, QueryEventStream};
 use crate::config::{SslMode, SslNegotiation};
 use crate::connection::{Request, RequestMessages};
 use crate::copy_out::CopyOutStream;
@@ -740,6 +740,31 @@ impl Client {
         I::IntoIter: ExactSizeIterator,
     {
         crate::completion::query_events(self.inner(), statement.clone(), params)
+    }
+
+    /// Enqueues a one-shot typed internal query with built-in result types.
+    ///
+    /// Parse/Bind/Describe/Execute/Sync share one request. Parameters are encoded
+    /// once before queuing; result descriptions are observed after submission.
+    /// Unknown result OIDs produce a terminal error with an
+    /// `UnsupportedBuiltinResultType` source, without an extra type query.
+    /// Execute may already have had effects: this is not pre-execution checking.
+    /// SQL errors remain events through ReadyForQuery, including parse errors
+    /// and errors at Sync after CommandComplete. An `Err` item leaves completion
+    /// unconfirmed. Establish ownership and rollback before calling this method.
+    ///
+    /// Use this for known fixed internal queries, not as an admission bypass for
+    /// frontend statements. It does not supply a prepared statement handle.
+    pub fn query_typed_builtin_events<P, I>(
+        &self,
+        query: &str,
+        params: I,
+    ) -> Result<BuiltinQueryEventStream, Error>
+    where
+        P: BorrowToSql,
+        I: IntoIterator<Item = (P, Type)>,
+    {
+        crate::completion::query_typed_builtin_events(self.inner(), query, params)
     }
 
     /// Check that the connection is alive and wait for the confirmation.

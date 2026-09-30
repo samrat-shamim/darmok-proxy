@@ -1,3 +1,5 @@
+// Modified for Darmok: share the existing typed parameter encoder with events.
+// See ../UPSTREAM.md for the upstream source pin and local changes.
 use crate::client::{InnerClient, Responses};
 use crate::codec::FrontendMessage;
 use crate::connection::RequestMessages;
@@ -291,7 +293,7 @@ where
     )
 }
 
-fn encode_bind_raw<P, I>(
+pub(crate) fn encode_bind_raw<P, I>(
     statement_name: &str,
     params: I,
     portal: &str,

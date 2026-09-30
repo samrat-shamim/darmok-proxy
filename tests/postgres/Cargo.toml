@@ -43,3 +43,7 @@ path = "backend_completion.rs"
 [[test]]
 name = "native_controls"
 path = "native_controls.rs"
+
+[[test]]
+name = "typed_completion"
+path = "typed_completion.rs"
