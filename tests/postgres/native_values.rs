@@ -196,6 +196,75 @@ async fn native_text_padding_nulls_and_temporal_endpoints_remain_exact() {
 }
 
 #[tokio::test]
+async fn domain_results_follow_reported_base_types_without_claiming_catalog_identity() {
+    let (client, connection) = client().await;
+    client
+        .batch_execute(
+            "CREATE TEMP TABLE native_domain_namespace (marker boolean);
+        CREATE DOMAIN pg_temp.native_positive AS integer CHECK (VALUE > 0);
+        CREATE DOMAIN pg_temp.native_amount AS numeric(8,4);
+        CREATE TEMP TABLE native_domain_values (
+            n pg_temp.native_positive, amount pg_temp.native_amount
+        );
+        INSERT INTO native_domain_values VALUES (1, 12.3400);",
+        )
+        .await
+        .unwrap();
+    let declaration = client
+        .query(
+            "SELECT a.atttypid, t.typtype::text
+        FROM pg_catalog.pg_attribute a
+        JOIN pg_catalog.pg_type t ON t.oid = a.atttypid
+        WHERE a.attrelid = 'pg_temp.native_domain_values'::regclass AND a.attnum > 0
+        ORDER BY a.attnum",
+            &[],
+        )
+        .await
+        .unwrap();
+    let statement = client
+        .prepare("SELECT n, amount FROM native_domain_values")
+        .await
+        .unwrap();
+    assert_eq!(
+        statement.columns()[0].type_(),
+        &tokio_postgres::types::Type::INT4
+    );
+    assert_eq!(
+        statement.columns()[1].type_(),
+        &tokio_postgres::types::Type::NUMERIC
+    );
+    assert_eq!(statement.columns()[1].type_modifier(), (8 << 16) + 4 + 4);
+    for (declared, reported) in declaration.iter().zip(statement.columns()) {
+        assert_eq!(declared.get::<_, &str>(1), "d");
+        assert_ne!(declared.get::<_, u32>(0), reported.type_().oid());
+    }
+    let row = client.query_one(&statement, &[]).await.unwrap();
+    assert_eq!(
+        decode_native_row_utc(&row).unwrap(),
+        vec![Value::Int(1), Value::Decimal("12.3400".into())]
+    );
+    let row = client
+        .query_one(
+            "SELECT NULL::pg_temp.native_positive, NULL::pg_temp.native_amount",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        decode_native_row_utc(&row).unwrap(),
+        vec![Value::Null, Value::Null]
+    );
+    let error = client
+        .execute("INSERT INTO native_domain_values VALUES (0, 1.0000)", &[])
+        .await
+        .unwrap_err();
+    assert_eq!(error.code().unwrap().code(), "23514");
+    drop(statement);
+    drop(client);
+    connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn exact_numeric_binary_decoding_matches_postgres_text_with_scale_intact() {
     let (client, connection) = client().await;
     for input in [

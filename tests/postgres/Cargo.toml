@@ -21,3 +21,7 @@ path = "schema_routing.rs"
 [[test]]
 name = "native_values"
 path = "native_values.rs"
+
+[[test]]
+name = "native_parameters"
+path = "native_parameters.rs"
