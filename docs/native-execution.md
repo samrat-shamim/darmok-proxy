@@ -107,7 +107,14 @@ separate identities under the owner, without changing client-visible semantics.
 The recovery policy is semantic input. Some frontend errors require an entire
 transaction rollback; they must not be converted into statement-local recovery
 merely because PostgreSQL can recover a savepoint. The MySQL 8.4 differential
-transaction matrix must establish that policy before it is advertised.
+transaction matrix must establish that policy before it is advertised. The
+control owner now requires an explicit Statement or Transaction recovery choice;
+the latter submits one full ROLLBACK even when the statement owns a savepoint.
+It confirms idle before permitting reuse and removes all earlier transaction
+work and savepoints. This mechanism does not classify frontend errors or stage
+frontend state changes. Native statement-savepoint recovery can release locks
+that MySQL would retain, so equivalent data effects alone do not establish the
+required lock semantics.
 
 The tokio-postgres 0.7.18 nested transaction helper rolls back to a savepoint
 without releasing it. Its transaction commit/rollback methods also mark their
@@ -178,7 +185,9 @@ Explicit autocommit adds BEGIN and COMMIT around the prepare/execute path.
 An outer transaction adds SAVEPOINT and RELEASE; statement failure requires
 ROLLBACK TO followed by RELEASE. These are real protocol and locking costs,
 not free wrappers. Recovery commands may share a batch only when dependent
-failure behavior is correct. Pipelining, proven read-only shortcuts and reusable
+failure behavior is correct. Whole-transaction recovery costs one ROLLBACK
+request from either boundary; local cleanup followed by a separate outer
+rollback is unnecessary. Pipelining, proven read-only shortcuts and reusable
 plans require separate correctness and performance evidence before enabling
 them. The initial implementation favors a correct ownership boundary.
 

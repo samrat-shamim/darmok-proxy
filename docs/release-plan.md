@@ -175,6 +175,14 @@ complete release gate runs once on the final candidate.
   17/18, without exposing a public raw SQL execution escape. This implements
   the control ownership boundary, not semantic admission, catalog validity,
   rollback through output validation, wire execution or the M2 end-to-end gate.
+- Scope recovery requires an explicit Statement or Transaction choice. The
+  whole-transaction choice confirms one ROLLBACK/idle even inside a statement
+  savepoint, removing earlier writes and all savepoints. Four additional required
+  private fixtures per PostgreSQL version cover complete discard, native errors
+  followed by valid work, an already removed internal savepoint, and abandoned
+  recovery futures. The owner suite now has thirteen fixtures. Frontend error
+  classification, state changes and MySQL lock-retention equivalence remain
+  pending; this is a native control mechanism, not a transaction compatibility gate.
 - Built-in typed-query completion is implemented for fixed internal queries.
   Parse/Bind/Describe/Execute/Sync share one request, retaining SQL errors,
   exact tags and final state without hidden type lookups. Eight further ordinary

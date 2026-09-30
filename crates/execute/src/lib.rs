@@ -11,7 +11,7 @@ mod numeric;
 
 pub use native_backend::{
     NativeBackend, NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError,
-    NativeBackendOperation, NativeBackendState, NativeScope, NativeScopeBoundary,
+    NativeBackendOperation, NativeBackendState, NativeRecovery, NativeScope, NativeScopeBoundary,
 };
 pub use native_control::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
