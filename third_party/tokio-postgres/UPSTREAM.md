@@ -20,6 +20,8 @@ events from `src/client.rs` and `src/lib.rs`, and separate raw backend responses
 from upstream error conversion in `src/client.rs`. Existing query helpers keep
 their upstream behavior. The added event APIs preserve command tags, backend
 errors and ReadyForQuery transaction states without adding protocol exchanges.
+The command stream also records whether any item has been yielded, so a
+complete-request consumer can reject a previously consumed stream.
 They do not provide semantic admission, connection ownership or MySQL behavior.
 The generated `src/error/sqlstate.rs` map declaration has one trailing space
 removed, with no change to its constants.

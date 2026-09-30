@@ -26,6 +26,13 @@ cannot construct it. These expectations cover the owner's ordinary internal
 controls, without `AND CHAIN`, transaction-prepared operations or arbitrary
 batches.
 
+The connector records whether the stream has yielded any event or terminal
+error. Passing a partially or completely consumed stream fails with
+`AlreadyConsumed`; a matching tail cannot certify the full request. The checker
+still drains any remaining events. Earlier consumed items are unavailable to
+it and cannot be reconstructed. Polling Pending alone consumes no item and
+does not prevent checking the complete request.
+
 COMMIT completing as ROLLBACK is a tag mismatch, even when the backend confirms
 idle state. A deferred constraint failure at COMMIT is a backend error, also
 potentially followed by idle state. Neither is committed success. A matched
@@ -42,8 +49,10 @@ undo or erase the control already observed.
 ## Failure information and draining
 
 `NativeControlFailure` retains the control expectation, the number of matching
-prefix tags, the first tag/empty/completion mismatch, the backend SQL error,
-the terminal stream error and the optional observed ReadyForQuery state.
+prefix tags, the first stream-handoff/tag/empty/completion mismatch, the backend
+SQL error, the terminal stream error and the optional ReadyForQuery state
+observed by the checker. A previously consumed stream has no trusted matched
+prefix; errors or states consumed before the handoff are unavailable.
 Database and terminal errors have separate accessors; a transport failure must
 not erase a preceding SQL error. `Error::source` prefers the backend error when
 present, while the complete failure remains available for disposition.
@@ -93,6 +102,8 @@ analysis, not a benchmark.
 Required ordinary PostgreSQL 17/18 fixtures cover successful controls and table
 effects, aborted and deferred-error commits, repeated savepoint recovery,
 partial recovery failure, missing/extra/empty outcomes, chained finishes and
-errors before a control tag. They do not verify transport interruption,
+errors before a control tag. A ninth fixture checks untouched, partially and
+completely consumed streams and Pending-only polling. These fixtures do not
+verify transport interruption,
 connection ownership or MySQL semantics. Security-related work and
 adversarial/resource stress verification remain deferred at the user's request.

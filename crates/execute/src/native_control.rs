@@ -62,6 +62,8 @@ impl NativeControlCompletion {
 /// The first mismatch with an expected control. Tag positions are zero-based.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NativeControlMismatch {
+    #[error("control stream was already consumed before checking the complete request")]
+    AlreadyConsumed,
     #[error(
         "unexpected command tag at position {position}: expected {expected:?}, observed {actual:?}"
     )]
@@ -150,6 +152,7 @@ impl StdError for NativeControlFailure {
 ///
 /// SQL has already been queued. The caller supplies the expectation for known
 /// internal SQL; this function does not authorize or submit frontend commands.
+/// A previously consumed stream is rejected; any remaining tail is still drained.
 /// A mismatch or SQL error still drains to readiness or a terminal stream error.
 /// Dropping this future supplies no receipt and performs no owned recovery.
 pub async fn check_native_control(
@@ -161,7 +164,9 @@ pub async fn check_native_control(
         control,
         matched_tags: 0,
         ready_state: None,
-        mismatch: None,
+        mismatch: events
+            .has_yielded()
+            .then_some(NativeControlMismatch::AlreadyConsumed),
         backend_error: None,
         stream_error: None,
     };

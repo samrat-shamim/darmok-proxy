@@ -77,6 +77,18 @@ enum CommandPhase {
 pub struct CommandEventStream {
     responses: Responses,
     phase: CommandPhase,
+    has_yielded: bool,
+}
+
+impl CommandEventStream {
+    /// Whether this stream has already yielded an event or terminal error.
+    ///
+    /// A consumer requiring the complete request must check this before taking
+    /// over the stream. Polling Pending does not consume an event. This flag
+    /// says nothing about SQL execution, readiness or connection ownership.
+    pub fn has_yielded(&self) -> bool {
+        self.has_yielded
+    }
 }
 
 pub(crate) fn command_events(client: &InnerClient, sql: &str) -> Result<CommandEventStream, Error> {
@@ -87,6 +99,7 @@ pub(crate) fn command_events(client: &InnerClient, sql: &str) -> Result<CommandE
     Ok(CommandEventStream {
         responses: client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?,
         phase: CommandPhase::Commands,
+        has_yielded: false,
     })
 }
 
@@ -102,6 +115,7 @@ impl Stream for CommandEventStream {
             Ok(message) => message,
             Err(error) => {
                 this.phase = CommandPhase::Done;
+                this.has_yielded = true;
                 return Poll::Ready(Some(Err(error)));
             }
         };
@@ -129,6 +143,7 @@ impl Stream for CommandEventStream {
         if event.is_err() {
             this.phase = CommandPhase::Done;
         }
+        this.has_yielded = true;
         Poll::Ready(Some(event))
     }
 }

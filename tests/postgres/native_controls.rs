@@ -1,10 +1,13 @@
 use std::error::Error as StdError;
+use std::pin::Pin;
+use std::task::Context;
 
 use darmok_execute::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
     check_native_control,
 };
-use tokio_postgres::{Client, Error, NoTls, TransactionState};
+use futures_util::{Stream, StreamExt, task::noop_waker_ref};
+use tokio_postgres::{Client, CommandEvent, Error, NoTls, TransactionState};
 
 async fn client() -> (Client, tokio::task::JoinHandle<Result<(), Error>>) {
     let url = std::env::var("DARMOK_TEST_DATABASE_URL")
@@ -507,4 +510,104 @@ async fn errors_before_control_tags_preserve_sqlstate_and_actual_ready_state() {
     assert!(values(&client, "controls_setup_error").await.is_empty());
     drop(client);
     connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn complete_request_check_rejects_consumed_streams_but_accepts_pending_polling() {
+    let (client, connection) = client().await;
+    let untouched = client.command_events("BEGIN; COMMIT").unwrap();
+    assert!(!untouched.has_yielded());
+    let failure = check_native_control(NativeControl::Commit, untouched)
+        .await
+        .unwrap_err();
+    assert_eq!(failure.ready_state(), Some(TransactionState::Idle));
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::Tag {
+            position: 0,
+            expected: Some("COMMIT"),
+            actual: "BEGIN".to_owned(),
+        })
+    );
+
+    let mut partial = client.command_events("BEGIN; COMMIT").unwrap();
+    assert!(!partial.has_yielded());
+    assert!(matches!(
+        partial.next().await.unwrap().unwrap(),
+        CommandEvent::CommandComplete(tag) if tag == "BEGIN"
+    ));
+    assert!(partial.has_yielded());
+    let failure = check_native_control(NativeControl::Commit, partial)
+        .await
+        .unwrap_err();
+    assert_eq!(failure.matched_tags(), 0);
+    assert_eq!(failure.ready_state(), Some(TransactionState::Idle));
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::AlreadyConsumed)
+    );
+    assert!(failure.backend_error().is_none() && failure.stream_error().is_none());
+
+    let mut partial_error = client
+        .command_events("BEGIN; SAVEPOINT existing_scope; RELEASE SAVEPOINT missing_scope")
+        .unwrap();
+    assert!(matches!(
+        partial_error.next().await.unwrap().unwrap(),
+        CommandEvent::CommandComplete(tag) if tag == "BEGIN"
+    ));
+    let failure = check_native_control(NativeControl::Begin, partial_error)
+        .await
+        .unwrap_err();
+    assert_eq!(failure.matched_tags(), 0);
+    assert_eq!(
+        failure.ready_state(),
+        Some(TransactionState::FailedTransaction)
+    );
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::AlreadyConsumed)
+    );
+    assert_eq!(
+        failure.backend_error().unwrap().code().unwrap().code(),
+        "3B001"
+    );
+    assert!(failure.stream_error().is_none());
+    success(&client, "ROLLBACK", NativeControl::Rollback).await;
+
+    let mut complete = client.command_events("BEGIN").unwrap();
+    while let Some(event) = complete.next().await {
+        event.unwrap();
+    }
+    assert!(complete.has_yielded());
+    let failure = check_native_control(NativeControl::Begin, complete)
+        .await
+        .unwrap_err();
+    assert_eq!(failure.matched_tags(), 0);
+    // The state consumed before handoff cannot be reconstructed or fabricated.
+    assert_eq!(failure.ready_state(), None);
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::AlreadyConsumed)
+    );
+    assert!(failure.backend_error().is_none() && failure.stream_error().is_none());
+    success(&client, "ROLLBACK", NativeControl::Rollback).await;
+    drop(client);
+    connection.await.unwrap().unwrap();
+
+    // No request events are available until the normal connection future runs.
+    // An initial Pending poll therefore leaves the complete stream available.
+    let url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
+    let (pending_client, pending_connection) = tokio_postgres::connect(&url, NoTls).await.unwrap();
+    let mut pending = pending_client.command_events("BEGIN").unwrap();
+    let mut context = Context::from_waker(noop_waker_ref());
+    assert!(Pin::new(&mut pending).poll_next(&mut context).is_pending());
+    assert!(!pending.has_yielded());
+    let pending_connection = tokio::spawn(pending_connection);
+    let completion = check_native_control(NativeControl::Begin, pending)
+        .await
+        .unwrap();
+    assert_eq!(completion.ready_state(), TransactionState::Transaction);
+    success(&pending_client, "ROLLBACK", NativeControl::Rollback).await;
+    drop(pending_client);
+    pending_connection.await.unwrap().unwrap();
 }
