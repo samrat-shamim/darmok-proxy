@@ -104,29 +104,33 @@ impl<'a> FromSql<'a> for NativeValue {
     }
 
     fn accepts(ty: &Type) -> bool {
-        matches!(
-            *ty,
-            Type::BOOL
-                | Type::INT2
-                | Type::INT4
-                | Type::INT8
-                | Type::OID
-                | Type::FLOAT4
-                | Type::FLOAT8
-                | Type::NUMERIC
-                | Type::BYTEA
-                | Type::TEXT
-                | Type::VARCHAR
-                | Type::BPCHAR
-                | Type::NAME
-                | Type::JSON
-                | Type::JSONB
-                | Type::DATE
-                | Type::TIME
-                | Type::TIMESTAMP
-                | Type::TIMESTAMPTZ
-        )
+        supported_native_type(ty)
     }
+}
+
+pub(crate) fn supported_native_type(ty: &Type) -> bool {
+    matches!(
+        *ty,
+        Type::BOOL
+            | Type::INT2
+            | Type::INT4
+            | Type::INT8
+            | Type::OID
+            | Type::FLOAT4
+            | Type::FLOAT8
+            | Type::NUMERIC
+            | Type::BYTEA
+            | Type::TEXT
+            | Type::VARCHAR
+            | Type::BPCHAR
+            | Type::NAME
+            | Type::JSON
+            | Type::JSONB
+            | Type::DATE
+            | Type::TIME
+            | Type::TIMESTAMP
+            | Type::TIMESTAMPTZ
+    )
 }
 
 fn finite_float(value: f64) -> Result<Value, NativeValueError> {

@@ -28,7 +28,7 @@ documentation. Deferred gates cannot count as release certification.
 | --- | --- | --- | --- |
 | M0 | Pin and inventory the starting implementation; establish baseline; write contracts | Reproducible source inventory and test results, documented inherited failures, architecture and scope contracts | Complete; baseline has one recorded failure |
 | M1 | Independent workspace, vendored parser, package names, licensing and CI | Fresh checkout builds and tests without another repository or private dependency; upstream notices preserved | Complete |
-| M2 | Extract the generic translation and execution engine | All application assumptions and allocation/capture/control-plane dependencies removed; both minimal end-to-end examples pass | Pending |
+| M2 | Extract the generic translation and execution engine | All application assumptions and allocation/capture/control-plane dependencies removed; both minimal end-to-end examples pass | In progress; component extraction only |
 | M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | Pending |
 | M4 | SQL, types, metadata, transaction/session/prepared/cache correctness | Every advertised construct has executable evidence; external DDL and native schema tests pass | Pending |
 | M5 | Drivers, adversarial inputs, concurrency and performance | Required driver and differential matrices, fuzz smoke, resource limits, isolation and cancellation tests, reproducible benchmarks pass | Pending |
@@ -112,12 +112,18 @@ complete release gate runs once on the final candidate.
   not certification of authentication or session semantics.
 - The [compiler draft](https://github.com/duotronic-ai/darmok-proxy/pull/4) carries
   explicit AST binding layouts. It is not merged or certified for execution.
-- Native scalar decoding is implemented independently; its contract is recorded
-  in [native values](native-values.md). Ordinary correctness review found no
-  remaining decoder defect. Global temporal sentinels and implicit
-  fallback-to-text coercion variants are removed. The current required suite
-  executes six tests on each PostgreSQL version: one schema fixture and five
-  native value fixtures. Metadata, parameters and session integration remain
+- [Native values PR #5](https://github.com/duotronic-ai/darmok-proxy/pull/5) is
+  merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588 default
+  tests/doctests with seven ignored upstream formatting cases. Six required
+  fixtures passed on each PostgreSQL version. Ordinary correctness review found
+  no remaining decoder defect. Global temporal sentinels and implicit
+  fallback-to-text coercion variants are removed. The [value contract](native-values.md)
+  records the supported representations.
+- Native parameter encoding is implemented separately, with its conditions in
+  [the parameter contract](native-parameters.md). The current required suite
+  passes eleven tests on each PostgreSQL version: one schema, five value and five
+  parameter fixtures. Input parameters use backend types with explicit UTC
+  temporal semantics. Metadata, MySQL coercion and session integration remain
   separate gates.
 - Inherited runtime semantic risks are tracked in
   [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).

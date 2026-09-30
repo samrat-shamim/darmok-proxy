@@ -4,8 +4,9 @@
   exact PostgreSQL schema identifiers.
 - `darmok-protocol`: packet encoding/decoding and authentication primitives.
 - `darmok-session`: SQL session state and bounded prepared-statement storage.
-- `darmok-execute`: explicit native PostgreSQL scalar decoding, including exact
-  decimal scale, native year-one dates and the 24:00:00 time endpoint.
+- `darmok-execute`: explicit native PostgreSQL scalar decoding and typed
+  parameter encoding, including exact decimal scale, native year-one dates and
+  the 24:00:00 time endpoint.
 
 These libraries are an extraction foundation. They do not form a runnable
 proxy yet. The [release plan](../docs/release-plan.md) remains authoritative for
@@ -42,6 +43,12 @@ The native value decoder preserves PostgreSQL text and bytes as stored, with no
 global sentinel or escape interpretation. Its supported scalar representations
 are documented in [native values](../docs/native-values.md). Result metadata,
 session timezone integration and statement execution remain separate work.
+
+Native parameters borrow their values and use the backend's expected types.
+They reject implicit string/number/date conversions and lossy real-number
+conversion. The [parameter contract](../docs/native-parameters.md) records the
+accepted representations and native PostgreSQL input semantics. MySQL coercion
+rules and frontend prepared-statement metadata require separate integration.
 
 Session-variable, charset/collation, engine, temporal and transaction behavior
 still requires semantic certification. Inherited metadata must not become an
