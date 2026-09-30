@@ -1,6 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["third_party/sqlparser", "third_party/sqlparser/derive"]
+members = [
+    "third_party/sqlparser",
+    "third_party/sqlparser/derive",
+    "crates/types",
+    "crates/protocol",
+    "crates/session",
+    "tests/postgres",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,3 +18,14 @@ repository = "https://github.com/duotronic-ai/darmok-proxy"
 
 [workspace.dependencies]
 sqlparser = { package = "darmok-sqlparser", path = "third_party/sqlparser", features = ["visitor"] }
+darmok-types = { path = "crates/types" }
+darmok-protocol = { path = "crates/protocol" }
+darmok-session = { path = "crates/session" }
+thiserror = "2"
+bytes = "1.10"
+bitflags = "2.6"
+byteorder = "1.5"
+tokio-util = { version = "0.7", features = ["codec"] }
+subtle = "2.6"
+tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
+tokio-postgres = "0.7"

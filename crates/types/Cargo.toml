@@ -1,0 +1,11 @@
+[package]
+name = "darmok-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+bytes = { workspace = true }
+bitflags = { workspace = true }

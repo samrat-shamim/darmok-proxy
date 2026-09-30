@@ -1,0 +1,16 @@
+[package]
+name = "darmok-postgres-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dev-dependencies]
+darmok-types = { workspace = true }
+tokio = { workspace = true }
+tokio-postgres = { workspace = true }
+
+[[test]]
+name = "schema_routing"
+path = "schema_routing.rs"

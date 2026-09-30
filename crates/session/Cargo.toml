@@ -1,0 +1,10 @@
+[package]
+name = "darmok-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+darmok-types = { workspace = true }
+thiserror = { workspace = true }

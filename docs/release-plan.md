@@ -92,11 +92,16 @@ complete release gate runs once on the final candidate.
   capture integration path excluded from Darmok; it does not certify or block
   a Darmok feature. Full source pins, commands, failure details and hashed logs
   are preserved in the external extraction work log.
-- The vendored parser's own tests exposed an incorrect lexical round-trip
-  assertion for equivalent `SHOW INDEX` spellings. The assertion now verifies
-  all three aliases against the canonical AST, including the WHERE filter.
-  Feature-combination and strict-toolchain checks are being completed before
-  the foundation PR merges.
+- [Foundation PR #1](https://github.com/duotronic-ai/darmok-proxy/pull/1) passed
+  fresh Linux/macOS CI and independent review: 1,499 all-feature tests/doctests,
+  1,492 default-feature tests/doctests, seven explicitly ignored upstream
+  formatting cases, strict Clippy, formatting, repository boundaries, and
+  minimal/std-only/visitor-only feature builds. It is merged.
+- Generic types, wire protocol and session libraries are being extracted.
+  Domain allocation/trust state is removed, schemas preserve their exact
+  names, and prepared-statement storage has explicit resource limits.
+- Inherited runtime semantic risks are tracked in
+  [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
