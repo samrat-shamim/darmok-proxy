@@ -1,0 +1,167 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "SET SESSION sql_mode=DEFAULT;",
+  "reset_sql": "SET SESSION sql_mode=DEFAULT;",
+  "cases": [
+    {
+      "name": "default-mode-set",
+      "sql": "SET SESSION sql_mode=DEFAULT;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "empty-mode-set",
+      "sql": "SET SESSION sql_mode='';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": ""
+      }
+    },
+    {
+      "name": "case-and-duplicate-canonicalization",
+      "sql": "SET SESSION sql_mode='no_backslash_escapes,ansi_quotes,ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES"
+      }
+    },
+    {
+      "name": "ansi-expansion",
+      "sql": "SET SESSION sql_mode='ANSI';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI"
+      }
+    },
+    {
+      "name": "traditional-expansion",
+      "sql": "SET SESSION sql_mode='TRADITIONAL';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "public-mode-vocabulary",
+      "sql": "SET SESSION sql_mode='REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,NO_UNSIGNED_SUBTRACTION,NO_DIR_IN_CREATE,ANSI,NO_AUTO_VALUE_ON_ZERO,NO_BACKSLASH_ESCAPES,STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ALLOW_INVALID_DATES,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,HIGH_NOT_PRECEDENCE,NO_ENGINE_SUBSTITUTION,PAD_CHAR_TO_FULL_LENGTH,TIME_TRUNCATE_FRACTIONAL';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,NO_UNSIGNED_SUBTRACTION,NO_DIR_IN_CREATE,ANSI,NO_AUTO_VALUE_ON_ZERO,NO_BACKSLASH_ESCAPES,STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ALLOW_INVALID_DATES,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,HIGH_NOT_PRECEDENCE,NO_ENGINE_SUBSTITUTION,PAD_CHAR_TO_FULL_LENGTH,TIME_TRUNCATE_FRACTIONAL"
+      }
+    },
+    {
+      "name": "leading-mode-space-is-not-erased",
+      "sql": "SET SESSION sql_mode=' ansi_quotes , no_backslash_escapes ';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode=' ansi_quotes , no_backslash_escapes ';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "session-mode-survives-rollback-and-preserves-savepoint",
+      "sql": "START TRANSACTION;\nSAVEPOINT before_modes;\nSET SESSION sql_mode='ANSI_QUOTES';\nRELEASE SAVEPOINT before_modes;\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode,'global_mode',@@GLOBAL.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES",
+        "global_mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "unknown-mode-retains-prior-value",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';\nSET SESSION sql_mode='DARMOK_UNDECLARED_MODE';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='DARMOK_UNDECLARED_MODE';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "obsolete-mode-retains-prior-value",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';\nSET SESSION sql_mode='NO_FIELD_OPTIONS';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='NO_FIELD_OPTIONS';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "trailing-element-space-is-not-erased",
+      "sql": "SET SESSION sql_mode='ansi_quotes   ,no_backslash_escapes  ';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ansi_quotes   ,no_backslash_escapes  ';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "final-value-spaces-are-discarded",
+      "sql": "SET SESSION sql_mode='ansi_quotes,no_backslash_escapes  ';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES"
+      }
+    },
+    {
+      "name": "empty-mode-elements-are-ignored",
+      "sql": "SET SESSION sql_mode=',ansi_quotes,,no_backslash_escapes,, ';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES"
+      }
+    },
+    {
+      "name": "blank-whole-value-is-empty",
+      "sql": "SET SESSION sql_mode='   ';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": ""
+      }
+    }
+  ]
+}

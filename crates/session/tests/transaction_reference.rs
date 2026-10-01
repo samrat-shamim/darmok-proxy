@@ -131,21 +131,15 @@ fn assert_projection(state: &SessionState, selected: TransactionCharacteristics,
     );
     assert_eq!(
         state.get_system_var("transaction_isolation").unwrap(),
-        Some(SessionValue::String(
-            snapshot.defaults.isolation.variable_label().into()
-        ))
+        SessionValue::String(snapshot.defaults.isolation.variable_label().into())
     );
     assert_eq!(
         state.get_system_var("transaction_read_only").unwrap(),
-        Some(SessionValue::UInt(u64::from(
-            snapshot.defaults.access == ReadOnly
-        )))
+        SessionValue::UInt(u64::from(snapshot.defaults.access == ReadOnly))
     );
     assert_eq!(
         state.get_system_var("autocommit").unwrap(),
-        Some(SessionValue::UInt(u64::from(
-            snapshot.autocommit == AutocommitSetting::Enabled
-        )))
+        SessionValue::UInt(u64::from(snapshot.autocommit == AutocommitSetting::Enabled))
     );
 }
 
@@ -335,9 +329,7 @@ fn autocommit_statement_consumes_next_without_changing_defaults() {
     // transaction commands in this trace. No statement classifier is tested.
     assert_eq!(
         state.get_system_var("transaction_isolation").unwrap(),
-        Some(SessionValue::String(
-            expected["visible"].as_str().unwrap().into()
-        ))
+        SessionValue::String(expected["visible"].as_str().unwrap().into())
     );
     assert_eq!(state.transaction_settings().unwrap().next, pending);
     for key in ["first", "second"] {

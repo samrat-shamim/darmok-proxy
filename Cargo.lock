@@ -263,6 +263,7 @@ dependencies = [
 name = "darmok-session"
 version = "0.1.0"
 dependencies = [
+ "darmok-sqlparser",
  "darmok-types",
  "serde_json",
  "thiserror",

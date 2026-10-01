@@ -225,14 +225,15 @@ vocabulary. No SQL syntax is supported merely because it has a typed command.
 The string/map/lifecycle replacement has no setter shim. The translation
 fingerprint includes the complete confirmed transaction snapshot: defaults,
 independent pending choices, active pair and autocommit. It returns an error for
-unsettled outcomes. Explicit NULL or other nonstring charset values also return
-an identity error instead of silently using the profile default; absent values
-retain the declared initial default. SQL NULL charset behavior remains pending.
+unsettled outcomes. The [canonical variable model](session-variable-values.md)
+removes generic insertion of NULL or nonstring charset values: text settings
+are immutable initial model values and their mutation path is unimplemented.
+SQL NULL/no-conversion charset behavior remains pending.
 A fingerprint is not a catalog-validity lease or a completed session controller.
 
 Choices, plans and transaction snapshots are fixed-size copies, with no isolation
 string allocation, native query or lock added by this component. Canonical name
-normalization and the internal isolation `Value::String` read still allocate;
+lookup no longer allocates a successful key; the isolation `Value::String` read still allocates;
 the typed snapshot/label API avoids that string materialization. Other fingerprint
 strings are still cloned. More state dimensions can create legitimate cache
 misses when choices change. Actual hit rates, allocations, requests, latency and

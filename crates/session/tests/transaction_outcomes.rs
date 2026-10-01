@@ -62,10 +62,8 @@ fn assert_unsettled(state: &mut SessionState) {
         );
     }
     assert_eq!(
-        state.set_system_var("sql_mode", Value::String("ANSI_QUOTES".into())),
-        Err(SessionVariableError::TransactionOutcome(
-            TransactionSettingsError::UnsettledOutcome
-        ))
+        state.set_sql_modes(SqlModes::parse_names("ANSI_QUOTES").unwrap()),
+        Err(TransactionSettingsError::UnsettledOutcome)
     );
     assert_eq!(
         state
@@ -505,17 +503,18 @@ fn fingerprints_include_pending_access_active_choices_and_autocommit() {
 }
 
 #[test]
-fn charset_null_or_nonstring_does_not_silently_use_profile_identity() {
-    let mut state = SessionState::new(12);
-    for value in [Value::Null, Value::Bool(true)] {
-        state
-            .set_system_var("character_set_results", value)
-            .unwrap();
-        assert_eq!(
-            state.translation_fingerprint(),
-            Err(SessionVariableError::NonStringTranslationValue(
-                "character_set_results".into()
-            ))
-        );
-    }
+fn unimplemented_charset_changes_have_no_generic_insertion_path() {
+    let state = SessionState::new(12);
+    let before = state.translation_fingerprint().unwrap();
+    assert_eq!(
+        SessionVariable::CharacterSetResults.write_path(),
+        Err(SessionVariableError::SettingNotImplemented(
+            SessionVariable::CharacterSetResults
+        ))
+    );
+    assert_eq!(
+        state.get_system_var("character_set_results").unwrap(),
+        Value::String("utf8mb4".into())
+    );
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
 }
