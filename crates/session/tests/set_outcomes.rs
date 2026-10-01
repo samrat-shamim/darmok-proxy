@@ -7,9 +7,10 @@ fn abandoned_set_retains_known_effects_and_blocks_all_setting_authorities() {
     let mut state = SessionState::new(1);
     let before = state.sql_modes().unwrap();
     let modes = SqlModes::empty().with(SqlMode::AnsiQuotes);
-    let mut stage = state.stage_set_command().unwrap();
-    stage.apply_sql_modes(modes);
-    drop(stage);
+    {
+        let mut stage = state.stage_set_command().unwrap();
+        stage.apply_sql_modes(modes);
+    }
     let pending = state.unconfirmed_set_command().unwrap();
     assert_eq!(pending.before.sql_modes, before);
     assert_eq!(pending.last_confirmed.sql_modes, modes);

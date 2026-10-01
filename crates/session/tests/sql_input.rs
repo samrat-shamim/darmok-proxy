@@ -162,7 +162,8 @@ fn a_parsed_next_setting_inside_active_preserves_confirmed_choices() {
 
 #[test]
 fn additional_transaction_scopes_and_source_forms_are_explicit_inputs() {
-    for scope in [ContextModifier::Global] {
+    {
+        let scope = ContextModifier::Global;
         let sql = format!("SET {scope}TRANSACTION READ ONLY");
         let Set::SetTransaction(input) = set(&sql) else {
             panic!("expected transaction setting")
