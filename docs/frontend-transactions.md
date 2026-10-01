@@ -78,9 +78,10 @@ distinguish these ordinary forms:
 | SET @@transaction_isolation = ... | Next isolation choice |
 | Corresponding transaction_read_only assignments | Corresponding access choice, preserving the same form distinction |
 
-This table is not a supported syntax registry. The corpus exercises the bare
-and unqualified-@@ assignments plus transaction statements; the other listed
-assignment forms have documentation evidence and still need executable cases.
+This table is not a supported syntax registry. The corpus exercises explicit
+SESSION variable assignments, bare assignments, unqualified-@@ assignments and
+transaction statements. The listed @@SESSION assignment forms have documentation
+evidence and still need executable cases.
 LOCAL synonyms, DEFAULT expressions, aliases, prepared forms and compound SET
 assignments are also separate verification work. Global or persistent forms
 must not be silently converted into session updates; their behavior is outside
@@ -97,7 +98,7 @@ Case names identify entries in
 | all-four-isolations-and-both-access-modes | Keep isolation/access choices distinct; labels alone do not establish snapshots or write enforcement |
 | next-only-controls-one-explicit-transaction | Select the pending pair for the first start; the later ordinary start uses defaults |
 | session-update-inside-active-keeps-active-modes | Change future defaults while preserving the active pair |
-| per-characteristic-next-updates-compose | An access-only next update retains the pending isolation and vice versa |
+| per-characteristic-next-updates-compose | The observed access-only next update retains pending isolation; reverse ordering is a planned requirement needing its own case |
 | session-update-between-transactions-overrides-only-named-next | A session isolation update supersedes pending isolation while retaining pending access |
 | explicit-start-access-overrides-next-and-is-one-only | Explicit START access wins for that transaction; it does not change session defaults |
 | next-only-set-inside-active-rejected-and-prior-work-retained | Both observed next-only SET commands fail with 1568/25001, preserving writes, active choices and later valid work |
@@ -109,9 +110,12 @@ Case names identify entries in
 Compose a proposed start per characteristic: explicit supported START choice,
 then pending next choice, then session default. This precedence is established
 for access by the finite explicit-start case; it is not a license to invent
-START isolation syntax. Successful consumption removes the pending choices
-for that transaction, including an overridden access choice. Do not reset the
-entire session pair when only one named default is updated.
+START isolation syntax. The planned consumption rule removes the pending choices
+for that transaction, including an overridden access choice. In the current
+explicit-start case, session and pending access are both Read Only, so the later
+Read Only transaction cannot prove that the overridden access was cleared.
+That rule needs a reference case with distinct session and pending access values.
+Do not reset the entire session pair when only one named default is updated.
 
 Chaining derives its new pair from the preceding active pair, as documented
 for [COMMIT and ROLLBACK](https://dev.mysql.com/doc/refman/8.4/en/commit.html).
@@ -177,7 +181,8 @@ Before claiming implemented behavior, require:
 1. State transitions independently checked against the declared finite
    reference outcomes, including partial updates and later transactions.
 2. Ordinary reference cases for newly supported SET/read forms, actual failing
-   start/statement boundaries, completion variants and default expressions.
+   start/statement boundaries, completion variants and default expressions,
+   plus reverse partial-update order and distinct-value overridden-access reset.
 3. The actual frontend controller integrated with exclusive native ownership,
    semantic admission, catalog validity, recovery and encoding completion.
 4. MySQL wire/driver evidence on PostgreSQL 17/18 over proxy-created and native
