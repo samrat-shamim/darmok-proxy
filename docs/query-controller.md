@@ -61,7 +61,9 @@ counts and evidence boundaries are recorded in the release plan.
 
 The command decodes one owned SQL string using the existing protocol decoder
 and parses it once. Parsing creates tokens and the statement AST; admission
-builds the existing vector of fixed-size SET actions. There is no new catalog
+builds a vector of fixed-size actions for SET commands. The local SELECT path's
+source/row allocations are documented in [query-results.md](query-results.md).
+There is no new catalog
 lookup, cache invalidation mechanism, lock or native round trip. Only a required
 active autocommit commit sends a native control request. End-to-end performance
 measurements remain pending.

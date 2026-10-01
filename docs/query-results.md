@@ -18,7 +18,8 @@ digits; neither expansion nor an offset-only repair provides that contract.
 The source API retains executable comment tokens in its single tokenization
 and rejects them before parsing. Quoted values/identifiers containing the same
 characters, ordinary comments and line comments retain their normal behavior.
-See [MySQL's executable-comment semantics](https://dev.mysql.com/doc/refman/8.4/en/comments.html).
+See [MySQL's executable-comment semantics](https://dev.mysql.com/doc/refman/8.4/en/comments.html)
+and [support issue #32](https://github.com/samrat-shamim/darmok-proxy/issues/32).
 
 The selected variable reads are autocommit, transaction isolation/read-only,
 sql_mode, time_zone, client/connection/results character sets, connection
@@ -93,8 +94,13 @@ native fixtures decode COM_QUERY and verify output bytes, both EOF forms,
 sequence wrapping, diagnostics, current modes, defaults/next choices, and
 preservation of an owned active read-only transaction on PostgreSQL 17 and 18.
 Trusted fixture starts do not certify public transaction SQL or isolation
-equivalence. Current-revision execution and independent review are pending
-until recorded in the release plan.
+equivalence. At `029609697d270b44adf982df6e5df0de767559e2`, four SELECT and
+fourteen SET fixture groups pass on each backend; both workspace suites and
+strict local checks pass. Independent passive review closes the original
+executable-comment provenance defect and test-module placement lint failure,
+with no new finding. It audited saved author receipts without rerunning Cargo
+or SQL. Exact commands, environment, counts, original failures and evidence
+boundaries are recorded in [the release plan](release-plan.md).
 
 Table execution, catalog coherence, transaction starts, prepared commands,
 a runnable proxy, real MySQL driver exchanges and release publication remain

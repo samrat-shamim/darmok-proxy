@@ -454,14 +454,66 @@ literal/variable semantics from unsupported clauses, numeric representations,
 diagnostic reads and name-normalization outcomes. Parser-owned source facts,
 declared metadata, both EOF modes and command diagnostics are integrated into
 the existing public dispatcher. Table/native execution and the executable,
-real-driver, catalog and release gates remain open. Current-source validation
-and independent second review have not yet been completed for this change.
+real-driver, catalog and release gates remain open. Executable comments are
+explicitly unsupported before SELECT/SET effects; their version and source
+contract is tracked in
+[issue #32](https://github.com/samrat-shamim/darmok-proxy/issues/32).
 
 A new mandatory stock CLI reference step observes five column-declaration
 cases. It preserves CLI transcripts and compares its declared fields; it does
 not assert raw server flags or a proxy exchange. Existing reference observers
 and corpora retain their source bytes. PostgreSQL native-owner CI includes
 four ordinary SELECT fixture groups alongside the existing SET fixtures.
+
+At clean `029609697d270b44adf982df6e5df0de767559e2`, tree
+`597d99d79d1b8861fc56f03fa285baf56b18f1b1`, fourteen serial local checks and
+their outer wrapper exit 0. Exact Rust/check commands are:
+
+- `cargo test -p darmok-execute --lib --locked native_backend::tests::query_results -- --ignored`
+- `cargo test -p darmok-execute --lib --locked native_backend::tests::set_controller -- --ignored`
+- `cargo test --workspace --exclude darmok-postgres-tests --all-features --locked`
+- `cargo test --workspace --exclude darmok-postgres-tests --locked`
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
+- `cargo check -p darmok-sqlparser --no-default-features --features visitor --locked`
+- `cargo fmt --all -- --check`
+- `python3 scripts/check_repository.py`
+- `git diff --check 4e1910ac5d4143b69083e7c44a1ca6e6da093c82..HEAD`
+
+Both native commands run separately on PostgreSQL 17.11 and 18.6, with four
+SELECT and fourteen SET groups per backend, zero failures and zero ignored
+within those selected runs. Workspace counts are 1,658/1,651 passing, each
+with 40 ignored; ignored groups are not counted as passing. The native fixture
+ports are 32769/32768. Every Cargo process uses the task's pinned toolchain
+and the mandatory `RUSTUP_HOME` and shared `CARGO_TARGET_DIR` from its receipt.
+PostgreSQL version requests and the stock observer are the remaining three
+checks. The exact observer is
+`python3 tests/reference/observe_mysql_query_results.py --container darmok-mysql-reference-84 --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 --corpus tests/reference/mysql_query_results.json --evidence-dir <new external directory>`.
+It observes MySQL 8.4.11 with five cases and eight actual child exits 0;
+the exclusive actual directory is `logs/query-results-stock-columns-0296096`
+outside the distribution. These are CLI declaration expectations, not raw stock
+wire flags, a real driver exchange or a proxy differential.
+
+Original `1fab01c157901f2a7754a1a8bfc097871cc01941` has a static independent
+executable-comment provenance finding F1 and strict Clippy exit 101; its serial
+wrapper exits 1 and does not execute its later checks. The intact test module
+is relocated to EOF in `fd7b48a`, with runtime source otherwise unchanged.
+The correction at `0296096` retains executable comment tokens in the same
+tokenization and rejects them before AST/SET admission. Independent passive
+delta review closes F1 and the lint failure at that exact revision, with no new
+finding. Reviewers checked saved author receipts and hashes without running
+Cargo, SQL or product APIs. Original reports, failures, worktrees and manifests
+remain frozen; no failed attempt is relabeled as passing.
+
+Exact clean source, tree, commands, environments, fixture ports, actual exits
+and hashed streams are in `logs/query-results-admission-*.json` outside the
+distribution. `logs/query-results-admission-code-evidence.json` seals those
+receipts, stock observations and additive review against the code revision.
+The original optional stock wire-client attempt failed before SQL and is
+excluded from accepted wire evidence. A subsequent documentation-only leaf
+preserves all nondocument bytes and has fresh boundary/diff checks; the code
+receipts remain bound to `0296096`. This is local component verification and
+does not complete M2/M4 or a release gate.
+
 No CI restart, account change, main push, merge or release is authorized by
 this implementation milestone. The recorded account Actions condition remains
 a merge/release blocker; authorized functional work can still progress.
