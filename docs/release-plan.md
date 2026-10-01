@@ -321,8 +321,10 @@ complete release gate runs once on the final candidate.
   (1,640 passed), each with 22 existing ignored tests. Strict workspace Clippy,
   formatting, repository boundaries and minimal/std/visitor parser checks pass.
   Exact candidate, command, environment and evidence records are retained
-  outside the distribution. Independent review is pending. GitHub Actions is
-  disabled for the personal account, so fresh CI and merging remain pending.
+  outside the distribution. Independent review found no ordinary functional
+  defect; its 94 focused tests and minimal/std/visitor builds pass. GitHub
+  Actions is disabled for the personal account, so fresh CI and merging
+  remain pending.
   This does not implement session mode changes, value coercion, native effects, SQL
   admission, output, catalog coherence, performance or M2/M4.
 

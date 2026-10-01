@@ -43,9 +43,10 @@ runtime results. Scoped quoted-text names remain in the required corpus.
 
 This is finite stock reference evidence for the declared names and effects.
 The [parser syntax component](mysql-system-variable-syntax.md) consumes this
-reference separately; the fixture itself supplies no AST, classifier,
-coercion, query/write mode semantics, native execution, wire output, SQL admission,
-catalog, performance or M2/M4 release gate is implemented by this fixture.
+reference separately. The fixture does not implement AST construction, input
+classification, coercion, query/write mode semantics, proxy execution, wire
+output, SQL admission, catalog coherence or performance, and it does not
+complete M2/M4 release gates.
 Security-related work remains deferred. Exact revisions, commands and executed
 results are retained with the component's CI and review receipts outside the
 distribution.

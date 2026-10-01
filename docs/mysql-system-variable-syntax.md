@@ -1,7 +1,8 @@
 # MySQL system-variable syntax
 
-Status: local parser and borrowed-input implementation; independent review and
-final CI pending. No session controller or proxy execution is supplied here.
+Status: local parser and borrowed-input implementation. Independent review
+found no ordinary functional defect; required CI and merging remain pending.
+No session controller or proxy execution is supplied here.
 
 The old MySQL tokenizer embedded `@@` in an ordinary word. An immediate
 backtick then entered the unquoted scanner instead of the quoted-name scanner.
