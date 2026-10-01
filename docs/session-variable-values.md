@@ -1,8 +1,10 @@
 # Canonical variable values and SQL modes
 
 Status: implemented model component, not a SQL variable handler or compatibility
-gate. SQL classification, assignment coercion, warning policy, backend effects,
-scope-specific reads, output and reset integration remain pending.
+gate. A separate [SQL input component](session-sql-input.md) preserves assignment
+and read syntax facts. Full SQL classification, assignment coercion, warning
+policy, backend effects, scope-specific reads, output and reset integration
+remain pending.
 
 ## One value authority
 
@@ -52,11 +54,12 @@ MySQL server implementation.
 
 `write_path` identifies the two typed mutation APIs or returns ReadOnly /
 SettingNotImplemented. The latter does not imply that an available immutable
-read is missing. It is not SQL dispatch: a classifier must first distinguish
+read is missing. It is not SQL dispatch: a controller must first distinguish
 global/session/unqualified reads, SET forms and wrong scopes, then establish
 value coercion and statement semantics. For example, a canonical version value
-does not implement `SELECT @@SESSION.version` or its scope error. The registry
-rejects names containing `@@` or a dot rather than erasing their SQL scope.
+does not implement `SELECT @@SESSION.version` or its scope error. The input
+component retains these forms without claiming a value implementation. The
+registry rejects names containing `@@` or a dot rather than erasing their SQL scope.
 Legacy `storage_engine`, `interactive_wait_timeout` and `tx_isolation` names
 are not invented as aliases. `interactive_timeout` is declared but unimplemented.
 
