@@ -330,6 +330,38 @@ fn incomplete_success_cannot_settle_submission() {
 }
 
 #[test]
+fn success_before_submission_is_not_effect_free_abandonment() {
+    let mut state = SessionState::new(15);
+    pending(&mut state);
+    let before = state.transaction_settings().unwrap();
+    let stage = state
+        .stage_transaction_command(FrontendTransactionCommand::BeginExplicit {
+            access: Some(ReadWrite),
+        })
+        .unwrap();
+    assert_eq!(
+        stage.finish_success_with_validated_output(),
+        Err(TransactionSettingsError::NotSubmitted)
+    );
+    let unknown = state.unconfirmed_transaction_command().unwrap();
+    assert_eq!(
+        unknown.phase_error,
+        Some(TransactionCommandPhaseError::SuccessBeforeSubmission)
+    );
+    assert_eq!(unknown.before, before);
+    assert_eq!(unknown.last_confirmed, before);
+    assert_eq!(unknown.confirmed_boundaries, 0);
+    assert_eq!(
+        unknown.next_boundary,
+        Some(FrontendTransactionBoundary::Started(choices(
+            Serializable,
+            ReadWrite
+        )))
+    );
+    assert_unsettled(&mut state);
+}
+
+#[test]
 fn repeated_submission_cannot_settle_or_erase_a_confirmed_prior_commit() {
     for confirm_commit in [false, true] {
         let mut state = SessionState::new(13);

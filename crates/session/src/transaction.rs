@@ -141,6 +141,7 @@ pub struct TransactionSettingsSnapshot {
 pub enum TransactionCommandPhaseError {
     RepeatedSubmission,
     BoundaryBeforeSubmission(FrontendTransactionBoundary),
+    SuccessBeforeSubmission,
     UnexpectedBoundary {
         expected: Option<FrontendTransactionBoundary>,
         received: FrontendTransactionBoundary,
@@ -375,6 +376,7 @@ impl TransactionSettings {
 /// After submission, dropping it retains an unconfirmed outcome and prohibits
 /// further settings reads, fingerprints or commands. Boundary methods assert
 /// the caller's semantic receipt; they do not verify a native operation.
+/// Contradictory boundary or success reports are retained before submission too.
 #[derive(Debug)]
 pub struct TransactionCommandStage<'a> {
     settings: &'a mut TransactionSettings,
@@ -427,7 +429,6 @@ impl TransactionCommandStage<'_> {
             return Err(TransactionSettingsError::UnsettledOutcome);
         }
         if !stage.submitted {
-            stage.submitted = true;
             stage.phase_error = Some(TransactionCommandPhaseError::BoundaryBeforeSubmission(
                 boundary,
             ));
@@ -467,12 +468,13 @@ impl TransactionCommandStage<'_> {
         let stage = self
             .settings
             .staged
-            .as_ref()
+            .as_mut()
             .expect("stage is owned by this borrow");
         if stage.phase_error.is_some() {
             return Err(TransactionSettingsError::UnsettledOutcome);
         }
         if !stage.submitted {
+            stage.phase_error = Some(TransactionCommandPhaseError::SuccessBeforeSubmission);
             return Err(TransactionSettingsError::NotSubmitted);
         }
         if self.next_frontend_boundary().is_some() {
@@ -489,7 +491,7 @@ impl Drop for TransactionCommandStage<'_> {
             .settings
             .staged
             .as_ref()
-            .is_some_and(|stage| !stage.submitted)
+            .is_some_and(|stage| !stage.submitted && stage.phase_error.is_none())
         {
             self.settings.staged = None;
         }
