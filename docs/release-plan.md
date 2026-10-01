@@ -234,6 +234,15 @@ complete release gate runs once on the final candidate.
   equivalence, read-only write enforcement, wire status and M2/M4 gates remain
   pending. Security-related work stays deferred.
 
+- The [frontend transaction-settings contract](frontend-transactions.md) defines
+  the planned replacement of duplicated isolation strings and scope-erasing
+  variable storage. It maps the eleven stock cases to separate defaults,
+  pending choices and active settings, preserving assignment form and frontend
+  boundaries independently of native BEGIN. Failed-start consumption,
+  additional command/read forms and integrated outcome evidence remain
+  unverified. This is a design prerequisite; no controller, session support,
+  admitted execution or M2/M4 gate is implemented by it.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 
