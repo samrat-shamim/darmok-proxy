@@ -261,3 +261,87 @@ async fn query_results_preserve_an_owned_active_read_only_transaction() {
     );
     let _ = backend.dispose().await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_results_reject_executable_comments_before_settings_or_transaction_effects() {
+    use darmok_session::{FrontendTransactionAccess, FrontendTransactionCommand};
+    let mut backend = connect_backend().await;
+    let (mut state, globals) = fixture();
+    assert!(matches!(
+        request(&mut state, &mut backend, &globals, "SET autocommit=0", 1)
+            .await
+            .0,
+        QueryOutcome::Success(_)
+    ));
+    let _ = backend
+        .begin(NativeTransactionSpec {
+            isolation: NativeIsolation::RepeatableRead,
+            access: NativeTransactionAccess::ReadOnly,
+        })
+        .await
+        .unwrap();
+    // Trusted fixture start; rejection must not publish an autocommit setting
+    // or finish this owned native transaction.
+    let mut stage = state
+        .stage_transaction_command(FrontendTransactionCommand::BeginExplicit {
+            access: Some(FrontendTransactionAccess::ReadOnly),
+        })
+        .unwrap();
+    stage.mark_submitted().unwrap();
+    while let Some(boundary) = stage.next_frontend_boundary() {
+        stage.record_confirmed_frontend_boundary(boundary).unwrap();
+    }
+    stage.finish_success_with_validated_output().unwrap();
+    state.last_insert_id = 29;
+    let before = state.transaction_settings().unwrap();
+    for sql in [
+        "SELECT /*! TRUE */",
+        "SELECT /*!80411 001 */",
+        "SET /*! autocommit=1 */",
+    ] {
+        let (outcome, output) = request(&mut state, &mut backend, &globals, sql, 1).await;
+        assert!(matches!(
+            outcome,
+            QueryOutcome::SqlError {
+                error: QuerySqlError::UnsupportedExecutableComment,
+                ..
+            }
+        ));
+        let response = packets(&output, 1);
+        assert_eq!(response.len(), 1);
+        assert_eq!(
+            &response[0][..9],
+            &[0xff, 0xd3, 4, b'#', b'4', b'2', b'0', b'0', b'0']
+        );
+        assert_eq!(state.transaction_settings().unwrap(), before);
+        assert_eq!(state.last_insert_id, 29);
+        assert_eq!(state.error_count(), 1);
+        assert_eq!(
+            backend.state(),
+            NativeBackendState::Ready(TransactionState::Transaction)
+        );
+    }
+    // A quoted value containing the same characters is an ordinary string.
+    let (outcome, output) = request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SELECT '/*! TRUE */' AS normal",
+        1,
+    )
+    .await;
+    assert!(matches!(outcome, QueryOutcome::Success(_)));
+    assert_eq!(packets(&output, 1)[3], b"\x0b/*! TRUE */");
+    assert_eq!(state.transaction_settings().unwrap(), before);
+    assert_eq!(state.error_count(), 0);
+    assert_eq!(
+        client(&backend)
+            .query_one("SHOW transaction_read_only", &[])
+            .await
+            .unwrap()
+            .get::<_, String>(0),
+        "on"
+    );
+    let _ = backend.dispose().await.unwrap();
+}

@@ -10,6 +10,16 @@ their own value, metadata and diagnostic contracts. Queries with WHERE, LIMIT,
 ORDER BY, DISTINCT, hints, tables, CTEs or other clauses are not approximated.
 Query and Select fields are exhaustively checked at admission.
 
+MySQL executable comments (`/*! ... */`, including version-prefixed forms)
+return an explicit 1235/42000 before SELECT or SET effects. They need a separate
+server-version and expression-label contract. The upstream tokenizer expands
+them unconditionally with coordinates that omit removed delimiters and version
+digits; neither expansion nor an offset-only repair provides that contract.
+The source API retains executable comment tokens in its single tokenization
+and rejects them before parsing. Quoted values/identifiers containing the same
+characters, ordinary comments and line comments retain their normal behavior.
+See [MySQL's executable-comment semantics](https://dev.mysql.com/doc/refman/8.4/en/comments.html).
+
 The selected variable reads are autocommit, transaction isolation/read-only,
 sql_mode, time_zone, client/connection/results character sets, connection
 collation, version, version comment and compile OS. Explicit GLOBAL reads of
@@ -65,6 +75,8 @@ choices. These reads make zero PostgreSQL requests.
 The opt-in source path adds vectors of spans, endpoints and byte ranges to
 SELECT parsing; AST-only APIs retain their existing allocation behavior. SET
 without a nested SELECT does not build numeric provenance or scan coordinates.
+Executable-comment admission checks the retained token vector once without a
+second lexer, source scan or additional per-token allocation.
 Result admission allocates column and cell vectors and owned output names/text.
 Already normalized names reuse their Bytes allocation; supplementary-character
 conversion allocates a new name. Output is buffered for the whole small result,

@@ -461,7 +461,7 @@ A new mandatory stock CLI reference step observes five column-declaration
 cases. It preserves CLI transcripts and compares its declared fields; it does
 not assert raw server flags or a proxy exchange. Existing reference observers
 and corpora retain their source bytes. PostgreSQL native-owner CI includes
-three ordinary SELECT fixture groups alongside the existing SET fixtures.
+four ordinary SELECT fixture groups alongside the existing SET fixtures.
 No CI restart, account change, main push, merge or release is authorized by
 this implementation milestone. The recorded account Actions condition remains
 a merge/release blocker; authorized functional work can still progress.

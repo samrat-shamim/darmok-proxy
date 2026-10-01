@@ -27,6 +27,7 @@ use tokio_postgres::TransactionState;
 pub enum QuerySqlError {
     Parse,
     UnsupportedStatement,
+    UnsupportedExecutableComment,
     Set(SetSqlError),
     Select(SelectSqlError),
 }
@@ -35,7 +36,7 @@ impl QuerySqlError {
     pub fn code(self) -> u16 {
         match self {
             Self::Parse => 1064,
-            Self::UnsupportedStatement => 1235,
+            Self::UnsupportedStatement | Self::UnsupportedExecutableComment => 1235,
             Self::Set(error) => error.code(),
             Self::Select(error) => error.code(),
         }
@@ -43,7 +44,9 @@ impl QuerySqlError {
 
     pub fn sql_state(self) -> [u8; 5] {
         match self {
-            Self::Parse | Self::UnsupportedStatement => *b"42000",
+            Self::Parse | Self::UnsupportedStatement | Self::UnsupportedExecutableComment => {
+                *b"42000"
+            }
             Self::Set(error) => error.sql_state(),
             Self::Select(error) => error.sql_state(),
         }
@@ -53,6 +56,7 @@ impl QuerySqlError {
         match self {
             Self::Parse => "The MySQL query could not be parsed",
             Self::UnsupportedStatement => "This statement or query batch is not implemented",
+            Self::UnsupportedExecutableComment => "MySQL executable comments are not implemented",
             Self::Set(error) => error.message(),
             Self::Select(error) => error.message(),
         }
@@ -150,6 +154,9 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             _ => Err(QuerySqlError::UnsupportedStatement),
         },
         Err(MySqlSourceParseError::Parse(_)) => Err(QuerySqlError::Parse),
+        Err(MySqlSourceParseError::UnsupportedExecutableComment) => {
+            Err(QuerySqlError::UnsupportedExecutableComment)
+        }
         Err(MySqlSourceParseError::Source(error)) => return Err((*error).into()),
     };
     let mut stage = state.stage_command()?;

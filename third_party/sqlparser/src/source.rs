@@ -12,7 +12,7 @@ use crate::{
     dialect::ModeAwareMySqlDialect,
     mysql_mode::MySqlModeFlags,
     parser::{Parser, ParserError},
-    tokenizer::{Location, Span},
+    tokenizer::{Location, Span, Token, Tokenizer, Whitespace},
 };
 
 #[derive(Debug)]
@@ -52,9 +52,12 @@ impl fmt::Display for ProjectionSourceError {
 }
 impl core::error::Error for ProjectionSourceError {}
 
-/// Distinguishes SQL syntax errors from an internal provenance failure.
+/// Distinguishes unsupported source shapes, SQL syntax errors and internal
+/// provenance failures.
 #[derive(Debug)]
 pub enum MySqlSourceParseError {
+    /// Executable comments need a version-aware admission and source contract.
+    UnsupportedExecutableComment,
     /// The original SQL could not be parsed.
     Parse(ParserError),
     /// Parser-owned source coordinates could not be resolved.
@@ -73,6 +76,9 @@ impl From<ProjectionSourceError> for MySqlSourceParseError {
 impl fmt::Display for MySqlSourceParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UnsupportedExecutableComment => {
+                f.write_str("MySQL executable comments are not implemented")
+            }
             Self::Parse(error) => error.fmt(f),
             Self::Source(error) => error.fmt(f),
         }
@@ -152,7 +158,22 @@ pub fn parse_mysql_source(
     flags: MySqlModeFlags,
 ) -> Result<ParsedMySqlSource<'_>, MySqlSourceParseError> {
     let dialect = ModeAwareMySqlDialect::new(flags);
-    let mut parser = Parser::new(&dialect).try_with_sql(sql)?;
+    // The upstream expansion strips delimiters/version digits and starts inner
+    // token coordinates at the opening comment. It also ignores server version
+    // gates. Retain executable comments in this single tokenization and reject
+    // them before AST parsing; neither approximate coordinates nor unconditional
+    // expansion can supply the source/semantic contract required by this API.
+    let tokens = Tokenizer::new(&dialect, sql)
+        .with_executable_comment_expansion(false)
+        .tokenize_with_location()
+        .map_err(ParserError::from)?;
+    if tokens.iter().any(|token| {
+        matches!(&token.token, Token::Whitespace(Whitespace::MultiLineComment(comment))
+            if comment.starts_with('!'))
+    }) {
+        return Err(MySqlSourceParseError::UnsupportedExecutableComment);
+    }
+    let mut parser = Parser::new(&dialect).with_tokens_with_locations(tokens);
     parser.projection_source = Some(vec![]);
     let statements = parser.parse_statements()?;
     let captured = parser.projection_source.take().expect("capture enabled");
@@ -263,5 +284,35 @@ mod tests {
             "(SELECT 2 AS inner_value) AS outer_value"
         );
         assert_eq!(select.item_source(1).unwrap(), "@@session.autocommit");
+    }
+
+    #[test]
+    fn executable_comments_have_an_explicit_source_admission_boundary() {
+        for sql in [
+            "SELECT /*! TRUE */",
+            "SELECT /*!80411 001 */",
+            "/*! SELECT TRUE */",
+            "SET /*! autocommit=1 */",
+            "SELECT 1 /*!99999 + 2 */",
+            "SELECT 1 /*! */",
+        ] {
+            assert!(matches!(
+                parse_mysql_source(sql, MySqlModeFlags::empty()),
+                Err(MySqlSourceParseError::UnsupportedExecutableComment)
+            ));
+        }
+        // Matching characters in literal values, quoted identifiers, line
+        // comments or an ordinary multiline comment are not executable tokens.
+        let parsed = parse_mysql_source(
+            "SELECT '/*! TRUE */' AS `/*! alias */`, /* note ! */ (001) -- /*! ignored */\n",
+            MySqlModeFlags::empty(),
+        )
+        .unwrap();
+        let select = parsed.single_select().unwrap().unwrap();
+        assert_eq!(
+            select.item_source(0).unwrap(),
+            "'/*! TRUE */' AS `/*! alias */`"
+        );
+        assert_eq!(select.item_source(1).unwrap(), "(001)");
     }
 }
