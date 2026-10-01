@@ -83,3 +83,37 @@ jobs:
         run: cargo test -p darmok-postgres-tests --locked
       - name: Required native owner database unit fixtures
         run: cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
+
+  mysql-reference:
+    name: MySQL 8.4 reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+        env:
+          MYSQL_ROOT_PASSWORD: darmok-test
+        options: >-
+          --health-cmd "mysqladmin ping --silent --host=127.0.0.1"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      MYSQL_PWD: darmok-test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Required stock transaction reference observations
+        run: >-
+          python3 tests/reference/observe_mysql_transactions.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --evidence-dir '${{ runner.temp }}/mysql-transaction-reference'
+      - name: Preserve reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-transaction-reference
+          path: ${{ runner.temp }}/mysql-transaction-reference
+          if-no-files-found: error
