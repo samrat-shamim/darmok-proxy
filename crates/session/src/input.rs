@@ -3,8 +3,9 @@
 //! native operations, or validate frontend output.
 
 use sqlparser::ast::{
-    ContextModifier, Expr, Ident, ObjectName, ObjectNamePart, Set, SetAssignment, SetTransaction,
-    TransactionAccessMode, TransactionIsolationLevel, TransactionMode,
+    ContextModifier, Expr, Ident, MySqlSystemVariable, MySqlSystemVariableScope, Set,
+    SetAssignment, SetAssignmentTarget, SetTransaction, TransactionAccessMode,
+    TransactionIsolationLevel, TransactionMode,
 };
 use thiserror::Error;
 
@@ -35,6 +36,8 @@ pub enum SessionInputError {
     EmptyAssignments,
     #[error("this name shape is outside the system-variable input contract")]
     UnsupportedVariableName,
+    #[error("system-variable scope {0:?} is outside the session input contract")]
+    UnsupportedVariableScope(MySqlSystemVariableScope),
     #[error("system variable is not in the canonical registry")]
     UnknownVariable,
     #[error("expression is not a system-variable reference")]
@@ -118,7 +121,7 @@ pub enum SystemVariableForm {
 pub struct SystemVariableAssignment<'a> {
     pub variable: SessionVariable,
     pub form: SystemVariableForm,
-    pub name: &'a ObjectName,
+    pub name: &'a SetAssignmentTarget,
     pub value: &'a Expr,
     /// Keyword attached to this assignment, if present.
     pub explicit_keyword_scope: Option<ContextModifier>,
@@ -143,7 +146,7 @@ pub struct SystemVariableRead<'a> {
 
 #[derive(Debug)]
 enum AssignmentSource<'a> {
-    Single(Option<(Option<ContextModifier>, &'a ObjectName, &'a Expr)>),
+    Single(Option<(Option<ContextModifier>, &'a SetAssignmentTarget, &'a Expr)>),
     Multiple(std::slice::Iter<'a, SetAssignment>),
 }
 
@@ -228,17 +231,14 @@ impl std::iter::FusedIterator for SystemVariableAssignments<'_> {}
 pub fn classify_mysql_system_variable_read(
     expression: &Expr,
 ) -> Result<SystemVariableRead<'_>, SessionInputError> {
-    let (variable, form) = match expression {
-        Expr::Identifier(ident) if system_variable_prefix(ident) => variable_name(ident, None)?,
-        Expr::CompoundIdentifier(parts) => match parts.as_slice() {
-            [prefix, name] if system_variable_prefix(prefix) => variable_name(prefix, Some(name))?,
-            _ => return Err(SessionInputError::NotSystemVariableRead),
-        },
-        _ => return Err(SessionInputError::NotSystemVariableRead),
-    };
-    if form == SystemVariableForm::Bare {
+    let Expr::MySqlSystemVariable(input) = expression else {
         return Err(SessionInputError::NotSystemVariableRead);
+    };
+    if input.scope.is_none() && !matches!(input.name.quote_style, None | Some('`')) {
+        return Err(SessionInputError::UnsupportedVariableName);
     }
+    let form = system_variable_form(input)?;
+    let variable = registry_name(&input.name)?;
     Ok(SystemVariableRead {
         variable,
         form,
@@ -247,59 +247,52 @@ pub fn classify_mysql_system_variable_read(
 }
 
 fn assignment_name(
-    name: &ObjectName,
+    name: &SetAssignmentTarget,
 ) -> Result<(SessionVariable, SystemVariableForm), SessionInputError> {
-    match name.0.as_slice() {
-        [name] => variable_name(identifier_part(name)?, None),
-        [prefix, name] => variable_name(identifier_part(prefix)?, Some(identifier_part(name)?)),
-        _ => Err(SessionInputError::UnsupportedVariableName),
-    }
-}
-
-fn identifier_part(part: &ObjectNamePart) -> Result<&Ident, SessionInputError> {
-    part.as_ident()
-        .ok_or(SessionInputError::UnsupportedVariableName)
-}
-
-fn system_variable_prefix(ident: &Ident) -> bool {
-    ident.quote_style.is_none() && ident.value.starts_with("@@")
-}
-
-fn variable_name(
-    first: &Ident,
-    second: Option<&Ident>,
-) -> Result<(SessionVariable, SystemVariableForm), SessionInputError> {
-    let (name, form) = match second {
-        None => {
-            if first.quote_style.is_none() {
-                if let Some(name) = first.value.strip_prefix("@@") {
-                    (name, SystemVariableForm::UnqualifiedAt)
-                } else {
-                    (first.value.as_str(), SystemVariableForm::Bare)
-                }
-            } else {
-                (first.value.as_str(), SystemVariableForm::Bare)
-            }
-        }
-        Some(name) => {
-            if first.quote_style.is_some() {
-                return Err(SessionInputError::UnsupportedVariableName);
-            }
-            let scope = if first.value.eq_ignore_ascii_case("@@SESSION") {
-                ContextModifier::Session
-            } else if first.value.eq_ignore_ascii_case("@@LOCAL") {
-                ContextModifier::Local
-            } else if first.value.eq_ignore_ascii_case("@@GLOBAL") {
-                ContextModifier::Global
-            } else {
+    let (name, form) = match name {
+        SetAssignmentTarget::ObjectName(name) => {
+            let [part] = name.0.as_slice() else {
                 return Err(SessionInputError::UnsupportedVariableName);
             };
-            (name.value.as_str(), SystemVariableForm::Qualified(scope))
+            let name = part
+                .as_ident()
+                .ok_or(SessionInputError::UnsupportedVariableName)?;
+            (name, SystemVariableForm::Bare)
+        }
+        SetAssignmentTarget::MySqlSystemVariable(input) => {
+            (&input.name, system_variable_form(input)?)
         }
     };
-    let variable = SessionVariable::ALL
+    if !matches!(name.quote_style, None | Some('`') | Some('"')) {
+        return Err(SessionInputError::UnsupportedVariableName);
+    }
+    Ok((registry_name(name)?, form))
+}
+
+fn system_variable_form(
+    input: &MySqlSystemVariable,
+) -> Result<SystemVariableForm, SessionInputError> {
+    if input.prefix.is_some() {
+        return Err(SessionInputError::UnsupportedVariableName);
+    }
+    Ok(match input.scope {
+        None => SystemVariableForm::UnqualifiedAt,
+        Some(MySqlSystemVariableScope::Session) => {
+            SystemVariableForm::Qualified(ContextModifier::Session)
+        }
+        Some(MySqlSystemVariableScope::Local) => {
+            SystemVariableForm::Qualified(ContextModifier::Local)
+        }
+        Some(MySqlSystemVariableScope::Global) => {
+            SystemVariableForm::Qualified(ContextModifier::Global)
+        }
+        Some(scope) => return Err(SessionInputError::UnsupportedVariableScope(scope)),
+    })
+}
+
+fn registry_name(name: &Ident) -> Result<SessionVariable, SessionInputError> {
+    SessionVariable::ALL
         .into_iter()
-        .find(|variable| variable.name().eq_ignore_ascii_case(name))
-        .ok_or(SessionInputError::UnknownVariable)?;
-    Ok((variable, form))
+        .find(|variable| variable.name().eq_ignore_ascii_case(&name.value))
+        .ok_or(SessionInputError::UnknownVariable)
 }

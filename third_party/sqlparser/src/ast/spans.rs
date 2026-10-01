@@ -1,3 +1,4 @@
+// Modified for Darmok: Preserve the full source span of MySQL variable references.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -1454,6 +1455,7 @@ impl Spanned for Expr {
     fn span(&self) -> Span {
         match self {
             Expr::Identifier(ident) => ident.span,
+            Expr::MySqlSystemVariable(variable) => variable.sigil_span.union(&variable.name.span),
             Expr::CompoundIdentifier(vec) => union_spans(vec.iter().map(|i| i.span)),
             Expr::CompoundFieldAccess { root, access_chain } => {
                 union_spans(iter::once(root.span()).chain(access_chain.iter().map(|i| i.span())))

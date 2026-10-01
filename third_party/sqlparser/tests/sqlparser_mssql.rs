@@ -1,3 +1,4 @@
+// Modified for Darmok: Use typed SET assignment targets in ordinary assertions.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -1491,7 +1492,7 @@ fn parse_mssql_declare() {
             Statement::Set(Set::SingleAssignment {
                 scope: None,
                 hivevar: false,
-                variable: ObjectName::from(vec![Ident::new("@bar")]),
+                variable: ObjectName::from(vec![Ident::new("@bar")]).into(),
                 values: vec![Expr::Value(
                     (Value::Number("2".parse().unwrap(), false)).with_empty_span()
                 )],

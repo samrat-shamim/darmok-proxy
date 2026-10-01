@@ -1,3 +1,4 @@
+// Modified for Darmok: Distinguish typed MySQL variables from generic-dialect identifiers.
 // Modified for Darmok: verify SHOW INDEX aliases against their canonical form.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -659,13 +660,15 @@ fn parse_use() {
 
 #[test]
 fn parse_set_variables() {
-    mysql_and_generic().verified_stmt("SET sql_mode = CONCAT(@@sql_mode, ',STRICT_TRANS_TABLES')");
+    mysql().verified_stmt("SET sql_mode = CONCAT(@@sql_mode, ',STRICT_TRANS_TABLES')");
+    TestedDialects::new(vec![Box::new(GenericDialect {})])
+        .verified_stmt("SET sql_mode = CONCAT(@@sql_mode, ',STRICT_TRANS_TABLES')");
     assert_eq!(
         mysql_and_generic().verified_stmt("SET LOCAL autocommit = 1"),
         Statement::Set(Set::SingleAssignment {
             scope: Some(ContextModifier::Local),
             hivevar: false,
-            variable: ObjectName::from(vec!["autocommit".into()]),
+            variable: ObjectName::from(vec!["autocommit".into()]).into(),
             values: vec![Expr::value(number("1"))],
         })
     );

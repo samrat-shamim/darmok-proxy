@@ -1,3 +1,4 @@
+// Modified for Darmok: Keep MySQL double-at sigils separate from variable-name tokens.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -1778,8 +1779,12 @@ impl<'a> Tokenizer<'a> {
                     }
                 }
                 '@' => {
+                    let dialect = self.dialect;
                     chars.next();
                     match chars.peek() {
+                        Some('@') if dialect_is!(dialect is MySqlDialect) => {
+                            self.consume_and_return(chars, Token::AtAt)
+                        }
                         Some('@') if self.dialect.supports_geometric_types() => {
                             self.consume_and_return(chars, Token::AtAt)
                         }

@@ -42,7 +42,8 @@ the other five removed forms have source-based inference rather than native
 runtime results. Scoped quoted-text names remain in the required corpus.
 
 This is finite stock reference evidence for the declared names and effects.
-The existing parser still rejects quoted unqualified names; no AST, classifier,
+The [parser syntax component](mysql-system-variable-syntax.md) consumes this
+reference separately; the fixture itself supplies no AST, classifier,
 coercion, query/write mode semantics, native execution, wire output, SQL admission,
 catalog, performance or M2/M4 release gate is implemented by this fixture.
 Security-related work remains deferred. Exact revisions, commands and executed

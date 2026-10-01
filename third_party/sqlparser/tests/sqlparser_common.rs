@@ -1,3 +1,4 @@
+// Modified for Darmok: Use typed SET assignment targets in ordinary assertions.
 // Modified for Darmok: test transaction-setting syntax and keyword scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -9194,7 +9195,7 @@ fn parse_set_variable() {
         }) => {
             assert_eq!(scope, None);
             assert!(!hivevar);
-            assert_eq!(variable, ObjectName::from(vec!["SOMETHING".into()]));
+            assert_eq!(variable, ObjectName::from(vec!["SOMETHING".into()]).into());
             assert_eq!(
                 values,
                 vec![Expr::Value(
@@ -9214,7 +9215,7 @@ fn parse_set_variable() {
         }) => {
             assert_eq!(scope, Some(ContextModifier::Global));
             assert!(!hivevar);
-            assert_eq!(variable, ObjectName::from(vec!["VARIABLE".into()]));
+            assert_eq!(variable, ObjectName::from(vec!["VARIABLE".into()]).into());
             assert_eq!(
                 values,
                 vec![Expr::Value(
@@ -9306,7 +9307,7 @@ fn parse_set_role_as_variable() {
         }) => {
             assert_eq!(scope, None);
             assert!(!hivevar);
-            assert_eq!(variable, ObjectName::from(vec!["role".into()]));
+            assert_eq!(variable, ObjectName::from(vec!["role".into()]).into());
             assert_eq!(
                 values,
                 vec![Expr::Value(
@@ -9354,7 +9355,7 @@ fn parse_set_time_zone() {
         }) => {
             assert_eq!(scope, None);
             assert!(!hivevar);
-            assert_eq!(variable, ObjectName::from(vec!["TIMEZONE".into()]));
+            assert_eq!(variable, ObjectName::from(vec!["TIMEZONE".into()]).into());
             assert_eq!(
                 values,
                 vec![Expr::Value(
@@ -17121,12 +17122,12 @@ fn parse_multiple_set_statements() -> Result<(), ParserError> {
                 vec![
                     SetAssignment {
                         scope: None,
-                        name: ObjectName::from(vec!["@a".into()]),
+                        name: ObjectName::from(vec!["@a".into()]).into(),
                         value: Expr::value(number("1"))
                     },
                     SetAssignment {
                         scope: None,
-                        name: ObjectName::from(vec!["b".into()]),
+                        name: ObjectName::from(vec!["b".into()]).into(),
                         value: Expr::value(number("2"))
                     }
                 ]
@@ -17144,22 +17145,22 @@ fn parse_multiple_set_statements() -> Result<(), ParserError> {
                 vec![
                     SetAssignment {
                         scope: Some(ContextModifier::Global),
-                        name: ObjectName::from(vec!["@a".into()]),
+                        name: ObjectName::from(vec!["@a".into()]).into(),
                         value: Expr::value(number("1"))
                     },
                     SetAssignment {
                         scope: Some(ContextModifier::Session),
-                        name: ObjectName::from(vec!["b".into()]),
+                        name: ObjectName::from(vec!["b".into()]).into(),
                         value: Expr::value(number("2"))
                     },
                     SetAssignment {
                         scope: Some(ContextModifier::Local),
-                        name: ObjectName::from(vec!["c".into()]),
+                        name: ObjectName::from(vec!["c".into()]).into(),
                         value: Expr::value(number("3"))
                     },
                     SetAssignment {
                         scope: None,
-                        name: ObjectName::from(vec!["d".into()]),
+                        name: ObjectName::from(vec!["d".into()]).into(),
                         value: Expr::value(number("4"))
                     }
                 ]

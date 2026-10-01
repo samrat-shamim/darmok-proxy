@@ -1,3 +1,4 @@
+// Modified for Darmok: Use typed SET assignment targets in ordinary assertions.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -379,7 +380,8 @@ fn set_statement_with_minus() {
                 Ident::new("tez"),
                 Ident::new("java"),
                 Ident::new("opts")
-            ]),
+            ])
+            .into(),
             values: vec![Expr::UnaryOp {
                 op: UnaryOperator::Minus,
                 expr: Box::new(Expr::Identifier(Ident::new("Xmx4g")))
