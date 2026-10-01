@@ -204,6 +204,13 @@ complete release gate runs once on the final candidate.
   [blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15). These are
   stock reference observations, not proxy equivalence, driver, performance or
   release certification. M2/M4 and the installation choice remain pending.
+- The [stock transaction reference fixture](transaction-reference.md) distributes
+  the thirteen earlier cases as declared data with a standalone Python/Docker
+  observer. Its required MySQL 8.4 CI job checks exact statement/occurrence error
+  attribution, complete CLI stderr, unique request completion, final effects and
+  disposable database absence, and preserves its receipts. This makes reference
+  evidence reproducible from the checkout; it does not execute the proxy or
+  complete differential, native-schema, transaction or M2/M4 gates.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

@@ -1,0 +1,208 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "CREATE TABLE items(id integer PRIMARY KEY,v integer NOT NULL UNIQUE CHECK(v > 0),label varchar(16) NOT NULL) ENGINE=InnoDB;\n",
+  "reset_sql": "TRUNCATE TABLE items;",
+  "cases": [
+    {
+      "name": "duplicate-key-keeps-prior-and-next-writes",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(10,10,'prior');\nINSERT INTO items VALUES(11,10,'duplicate');\nINSERT INTO items VALUES(12,12,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "INSERT INTO items VALUES(11,10,'duplicate');",
+          "occurrence": 1,
+          "code": 1062,
+          "sqlstate": "23000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "10,12"
+      }
+    },
+    {
+      "name": "check-error-keeps-prior-and-next-writes",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(20,20,'prior');\nINSERT INTO items VALUES(21,-21,'check');\nINSERT INTO items VALUES(22,22,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "INSERT INTO items VALUES(21,-21,'check');",
+          "occurrence": 1,
+          "code": 3819,
+          "sqlstate": "HY000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "20,22"
+      }
+    },
+    {
+      "name": "not-null-error-keeps-prior-and-next-writes",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(30,30,'prior');\nINSERT INTO items VALUES(31,31,NULL);\nINSERT INTO items VALUES(32,32,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "INSERT INTO items VALUES(31,31,NULL);",
+          "occurrence": 1,
+          "code": 1048,
+          "sqlstate": "23000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "30,32"
+      }
+    },
+    {
+      "name": "missing-column-error-keeps-prior-and-next-writes",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(40,40,'prior');\nINSERT INTO items(missing_column) VALUES(1);\nINSERT INTO items VALUES(42,42,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "INSERT INTO items(missing_column) VALUES(1);",
+          "occurrence": 1,
+          "code": 1054,
+          "sqlstate": "42S22"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "40,42"
+      }
+    },
+    {
+      "name": "multirow-error-rolls-back-entire-statement",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(50,50,'prior');\nINSERT INTO items VALUES(51,51,'first row'),(52,50,'duplicate');\nINSERT INTO items VALUES(53,53,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "INSERT INTO items VALUES(51,51,'first row'),(52,50,'duplicate');",
+          "occurrence": 1,
+          "code": 1062,
+          "sqlstate": "23000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "50,53"
+      }
+    },
+    {
+      "name": "rollback-to-retains-target-and-removes-later-savepoints",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(60,60,'prior');\nSAVEPOINT target;\nINSERT INTO items VALUES(61,61,'after target');\nSAVEPOINT later;\nINSERT INTO items VALUES(62,62,'after later');\nROLLBACK TO SAVEPOINT target;\nROLLBACK TO SAVEPOINT target;\nROLLBACK TO SAVEPOINT later;\nRELEASE SAVEPOINT target;\nROLLBACK TO SAVEPOINT target;\nINSERT INTO items VALUES(63,63,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "ROLLBACK TO SAVEPOINT later;",
+          "occurrence": 1,
+          "code": 1305,
+          "sqlstate": "42000"
+        },
+        {
+          "statement": "ROLLBACK TO SAVEPOINT target;",
+          "occurrence": 3,
+          "code": 1305,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "60,63"
+      }
+    },
+    {
+      "name": "reused-savepoint-name-replaces-prior-savepoint",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(70,70,'prior');\nSAVEPOINT reused;\nINSERT INTO items VALUES(71,71,'between');\nSAVEPOINT reused;\nINSERT INTO items VALUES(72,72,'after reused');\nROLLBACK TO SAVEPOINT reused;\nRELEASE SAVEPOINT reused;\nROLLBACK TO SAVEPOINT reused;\nINSERT INTO items VALUES(73,73,'next');\nCOMMIT;\n",
+      "expected_errors": [
+        {
+          "statement": "ROLLBACK TO SAVEPOINT reused;",
+          "occurrence": 2,
+          "code": 1305,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "70,71,73"
+      }
+    },
+    {
+      "name": "ordinary-create-commits-and-removes-savepoint",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(80,80,'prior');\nSAVEPOINT prior;\nCREATE TABLE created_by_ddl(n integer) ENGINE=InnoDB;\nROLLBACK TO SAVEPOINT prior;\nROLLBACK;\n",
+      "expected_errors": [
+        {
+          "statement": "ROLLBACK TO SAVEPOINT prior;",
+          "occurrence": 1,
+          "code": 1305,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids',(SELECT GROUP_CONCAT(id ORDER BY id) FROM items), 'ddl_table',          (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='created_by_ddl'));",
+      "expected_effect": {
+        "ids": "80",
+        "ddl_table": 1
+      }
+    },
+    {
+      "name": "failed-ordinary-create-still-commits-earlier-writes",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(90,90,'prior');\nCREATE TABLE items(n integer) ENGINE=InnoDB;\nROLLBACK;\n",
+      "expected_errors": [
+        {
+          "statement": "CREATE TABLE items(n integer) ENGINE=InnoDB;",
+          "occurrence": 1,
+          "code": 1050,
+          "sqlstate": "42S01"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "90"
+      }
+    },
+    {
+      "name": "temporary-create-survives-rollback-without-committing",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(100,100,'prior');\nSAVEPOINT before_temp;\nCREATE TEMPORARY TABLE temp_created(n integer) ENGINE=InnoDB;\nROLLBACK TO SAVEPOINT before_temp;\nINSERT INTO temp_created VALUES(7);\nROLLBACK;\n",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('ids',(SELECT GROUP_CONCAT(id ORDER BY id) FROM items),          'temp_rows',(SELECT COUNT(*) FROM temp_created));",
+      "expected_effect": {
+        "ids": null,
+        "temp_rows": 0
+      }
+    },
+    {
+      "name": "alter-temporary-table-commits-earlier-writes",
+      "sql": "\nCREATE TEMPORARY TABLE temp_altered(n integer) ENGINE=InnoDB;\nINSERT INTO temp_altered VALUES(1);\nBEGIN;\nINSERT INTO items VALUES(110,110,'prior');\nALTER TABLE temp_altered ADD COLUMN extra integer DEFAULT 9;\nROLLBACK;\n",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('ids',(SELECT GROUP_CONCAT(id ORDER BY id) FROM items),          'extra',(SELECT extra FROM temp_altered WHERE n=1));",
+      "expected_effect": {
+        "ids": "110",
+        "extra": 9
+      }
+    },
+    {
+      "name": "autocommit-transition-commits-but-repeated-zero-does-not",
+      "sql": "\nSET autocommit=0;\nINSERT INTO items VALUES(120,120,'first');\nSET autocommit=1;\nROLLBACK;\nSET autocommit=0;\nINSERT INTO items VALUES(121,121,'second');\nSET autocommit=0;\nROLLBACK;\nSET autocommit=1;\n",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "120"
+      }
+    },
+    {
+      "name": "start-transaction-commits-existing-transaction",
+      "sql": "\nBEGIN;\nINSERT INTO items VALUES(130,130,'prior');\nSAVEPOINT prior;\nSTART TRANSACTION;\nROLLBACK TO SAVEPOINT prior;\nROLLBACK;\n",
+      "expected_errors": [
+        {
+          "statement": "ROLLBACK TO SAVEPOINT prior;",
+          "occurrence": 1,
+          "code": 1305,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('ids', (SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
+      "expected_effect": {
+        "ids": "130"
+      }
+    }
+  ]
+}
