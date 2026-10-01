@@ -297,12 +297,14 @@ complete release gate runs once on the final candidate.
   pending. Security-related work remains deferred.
 
 - The [stock system-variable name fixture](mysql-system-variable-names.md)
-  declares twenty-four ordinary MySQL 8.4 cases for backticks, quoted-text reads,
+  declares nineteen ordinary MySQL 8.4 cases for backticks, scoped quoted-text reads,
   ANSI_QUOTES, scoped and bare assignments, whitespace, case-insensitive names
   and quoted columns that resemble variables. It uses the unchanged observer
-  with thirty SQL clients, two inspections and three metadata processes, and
+  with twenty-five SQL clients, two inspections and three metadata processes, and
   a separate required CI step/artifact. Existing corpora remain unchanged.
   Parser correction is pending in [issue #25](https://github.com/duotronic-ai/darmok-proxy/issues/25).
+  The initial draft completed eight cases, then rejected an immediate
+  single-quoted read; its failure, unrun cases and cleanup remain preserved.
   Exact source, command, review and CI records are retained outside the
   distribution. This fixture does not execute the proxy or complete syntax
   admission, native effects, catalog validity or M2/M4 gates. Security-related
