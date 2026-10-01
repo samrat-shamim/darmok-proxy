@@ -104,6 +104,11 @@ persistent forms must not be silently converted into session updates; their
 behavior is outside this controller contract. No global setting implementation
 is proposed here.
 
+The separate [stock SET semantics fixture](mysql-set-semantics.md) supplies
+selected LOCAL, compound-assignment and DEFAULT failure observations for the
+controller's requirements. It does not change the classifier's implemented
+forms or supply native/output integration.
+
 ## Reference boundaries and state transitions
 
 The following table maps the existing finite observations to requirements.

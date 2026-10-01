@@ -30,21 +30,21 @@
     },
     {
       "name": "local-keyword-carries-to-bare-name-not-unqualified-at",
-      "sql": "SET LOCAL transaction_isolation='READ-COMMITTED', @@transaction_isolation='SERIALIZABLE', transaction_read_only=0;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "sql": "SET LOCAL transaction_isolation='READ-COMMITTED', @@transaction_isolation='SERIALIZABLE', transaction_read_only=1;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
       "expected_errors": [],
       "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
       "expected_effect": {
         "first": {
           "isolation": "SERIALIZABLE",
-          "access": "READ WRITE",
+          "access": "READ ONLY",
           "default_isolation": "READ-COMMITTED",
-          "default_read_only": 0
+          "default_read_only": 1
         },
         "second": {
           "isolation": "READ COMMITTED",
-          "access": "READ WRITE",
+          "access": "READ ONLY",
           "default_isolation": "READ-COMMITTED",
-          "default_read_only": 0
+          "default_read_only": 1
         }
       }
     },

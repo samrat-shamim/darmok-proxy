@@ -96,6 +96,26 @@ returned JSON booleans. Its actual failure, unrun cases and successful cleanup
 remain preserved. The corrected corpus retains the observed boolean types and
 adds the companion read-only DEFAULT failure case.
 
+At revision `0cd781a6e6fe46a11b337ea5ad009e38eafc7b60`, the command above
+completed all nineteen cases on the pinned stock MySQL 8.4.11 Linux arm64
+fixture. The outer observer exited 0. Its thirty child processes exited 0:
+twenty-five SQL clients, two image/container identity inspections and three
+metadata commands. All twenty-five SQL completion markers and the seven
+declared error attributions were verified, and final database absence was 0.
+The observer and four earlier corpora are byte-identical to the parent.
+Exact source snapshots, failed/corrected raw receipts, commands, environment
+and hashes remain outside the distribution under
+`.darmok-work/logs/set-semantics-reference-*`. Schema validation, diff checks
+and repository boundary checks also exit 0. Rust source is unchanged, so these
+reference checks do not re-certify the historical workspace Rust results.
+Independent review identified that the LOCAL case assigned the access value
+already established by reset. That case could not distinguish an inherited
+session update from a next-only update or no change. The corrected case changes
+the later bare value from 0 to 1 and requires both defaults and both successive
+transactions to retain Read Only. Followup native validation and independent
+review remain pending. Actions is disabled for the personal account, so fresh
+CI and merging remain pending.
+
 Reference SQL includes session-local assignments, finite transaction controls
 and ordinary data operations; it changes no global configuration. These checks
 do not test the proxy, implement a SQL handler, or complete M2/M4, catalog,
