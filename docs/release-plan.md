@@ -222,6 +222,18 @@ complete release gate runs once on the final candidate.
   frontend session mapping, MySQL snapshot/lock equivalence, catalog validity,
   admitted execution and M2/M4 remain pending.
 
+- The [stock transaction-characteristic fixture](mysql-transaction-characteristics.md)
+  adds eleven ordinary MySQL 8.4 cases using an explicit corpus and the existing
+  observer. Actual current-thread transaction events and session defaults cover
+  all eight MySQL isolation/access combinations, session/next/active lifetimes,
+  named updates, implicit/autocommit consumption, chaining and both active-transaction
+  SET errors with retained writes. The corpus uses seventeen SQL clients, two
+  read-only inspections and three metadata processes, with a separate required
+  CI step/artifact. The thirteen recovery cases are unchanged. These are stock
+  labels/boundaries/data observations; frontend policy, native snapshot/lock
+  equivalence, read-only write enforcement, wire status and M2/M4 gates remain
+  pending. Security-related work stays deferred.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

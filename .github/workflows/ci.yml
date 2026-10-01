@@ -109,6 +109,7 @@ jobs:
           python3 tests/reference/observe_mysql_transactions.py
           --container '${{ job.services.mysql.id }}'
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_transactions.json
           --evidence-dir '${{ runner.temp }}/mysql-transaction-reference'
       - name: Preserve reference receipts
         if: always()
@@ -116,4 +117,18 @@ jobs:
         with:
           name: mysql-transaction-reference
           path: ${{ runner.temp }}/mysql-transaction-reference
+          if-no-files-found: error
+      - name: Required stock transaction characteristic observations
+        run: >-
+          python3 tests/reference/observe_mysql_transactions.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_transaction_characteristics.json
+          --evidence-dir '${{ runner.temp }}/mysql-transaction-characteristics'
+      - name: Preserve characteristic receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-transaction-characteristics
+          path: ${{ runner.temp }}/mysql-transaction-characteristics
           if-no-files-found: error
