@@ -483,6 +483,7 @@ impl StdError for NativeBackendDisposeError {
 
 #[cfg(test)]
 mod tests {
+    mod query_results;
     mod set_controller;
     use std::{future::Future, pin::Pin, task::Context};
 

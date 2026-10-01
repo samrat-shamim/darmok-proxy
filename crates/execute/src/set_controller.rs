@@ -249,7 +249,7 @@ fn evaluate<'a>(
     })
 }
 
-fn global_value(
+pub(crate) fn global_value(
     globals: &ServerSetValues,
     variable: SessionVariable,
 ) -> Result<Value, SetSqlError> {

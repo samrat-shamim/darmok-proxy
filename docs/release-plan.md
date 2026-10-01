@@ -445,3 +445,23 @@ and inherited semantic risks that require verification.
 - [ ] Artifact architecture, checksums, provenance and licenses are verified.
 - [ ] Independent review is complete with no unresolved release blockers.
 - [ ] Final merged commit passes all gates and the experimental release is published.
+
+## Local SELECT command progress
+
+The selected COM_QUERY path now includes local SELECT result planning and
+protocol output. [The result contract](query-results.md) separates implemented
+literal/variable semantics from unsupported clauses, numeric representations,
+diagnostic reads and name-normalization outcomes. Parser-owned source facts,
+declared metadata, both EOF modes and command diagnostics are integrated into
+the existing public dispatcher. Table/native execution and the executable,
+real-driver, catalog and release gates remain open. Current-source validation
+and independent second review have not yet been completed for this change.
+
+A new mandatory stock CLI reference step observes five column-declaration
+cases. It preserves CLI transcripts and compares its declared fields; it does
+not assert raw server flags or a proxy exchange. Existing reference observers
+and corpora retain their source bytes. PostgreSQL native-owner CI includes
+three ordinary SELECT fixture groups alongside the existing SET fixtures.
+No CI restart, account change, main push, merge or release is authorized by
+this implementation milestone. The recorded account Actions condition remains
+a merge/release blocker; authorized functional work can still progress.

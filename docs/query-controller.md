@@ -2,7 +2,8 @@
 
 `darmok-execute::execute_query_command` takes a decoded `Command::Query` and
 parses its original SQL with the settled session's current `sql_mode`. It
-dispatches one SET statement to the [selected evaluator](set-controller.md).
+dispatches one SET statement to the [selected evaluator](set-controller.md) or
+one local SELECT to the [result controller](query-results.md).
 There is no public execution function accepting a constructed SET AST. The
 pure input classifiers remain syntax views, rather than execution entry points.
 
@@ -15,10 +16,10 @@ START parser. No source string rewriting or secondary token scan is used.
 These rules follow the pinned MySQL 8.4.11 grammar, revision
 `99960bf74fa919347e4f4e3ca47672f333d6e91f`; upstream implementation source is
 kept outside the Apache distribution. The parser is not a complete MySQL
-grammar validator, and support remains limited to the selected SET shapes.
+grammar validator, and support remains limited to the selected SET and local SELECT shapes.
 
 The complete command is parsed before any effect. A successfully parsed batch or any
-other parsed statement returns 1235/42000 before an earlier SET can update settings or
+other unimplemented parsed statement returns 1235/42000 before an earlier SET can update settings or
 commit a transaction. Batch execution is unimplemented regardless of client
 capabilities; empty/comment-only input is also explicitly unimplemented.
 A parser failure returns 1064/42000 with project wording. General MySQL error
@@ -27,12 +28,14 @@ is a caller error and emits no SQL response; the caller must dispatch it to its
 own controller. This is not a complete frontend command loop.
 
 `SessionCommandStage` replaces the SET-only name: it holds setting effects and
-SQL diagnostics until the complete OK or ERR frame is written and flushed.
+SQL diagnostics until the complete OK, ERR or SELECT packet sequence is written and flushed.
 Known SQL errors settle the command without losing confirmed effects. Native
 or output uncertainty retains the pending guard and requires disposal. This
 component does not implement cancellation recovery or a transport server.
 The response sequence is supplied by the caller's wire phase. Protocol 4.1
-without session tracking remains the required output contract.
+without session tracking or optional result metadata remains the required output
+contract. Both ordinary EOF and CLIENT_DEPRECATE_EOF result terminators are
+implemented for the local SELECT path.
 
 All ten existing SET native groups now decode ordinary COM_QUERY payloads and
 use this public source path. Four additional required native groups cover `:=`
@@ -63,7 +66,11 @@ lookup, cache invalidation mechanism, lock or native round trip. Only a required
 active autocommit commit sends a native control request. End-to-end performance
 measurements remain pending.
 
-Row results, transaction starts, prepared execution, catalog coherence, a
+Table row execution, transaction starts, prepared execution, catalog coherence, a
 runnable proxy and real-driver/release gates remain incomplete. Required account
 CI is unavailable under the recorded Actions condition. Security-related work
 and the separate compiler draft remain excluded.
+
+Local SELECT implementation and its current validation boundary are documented
+in [query-results.md](query-results.md). The prior SET results above remain
+revision-bound evidence; they do not certify subsequent code.

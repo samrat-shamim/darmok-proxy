@@ -1,6 +1,6 @@
 //! Native representations, prepared checks, borrowed bindings, observed
 //! controls, exclusively owned transaction scopes and source-admitted selected
-//! COM_QUERY SET execution. Row execution and wire metadata remain gates.
+//! COM_QUERY SET and local SELECT execution. Table execution remains a gate.
 
 mod native_backend;
 mod native_control;
@@ -10,6 +10,7 @@ mod native_transaction;
 mod native_value;
 mod numeric;
 mod query_controller;
+mod select_controller;
 mod set_controller;
 
 pub use native_backend::{
@@ -27,4 +28,5 @@ pub use native_value::{NativeValueError, decode_native_row_utc};
 pub use query_controller::{
     QueryExecutionError, QueryOutcome, QuerySqlError, execute_query_command,
 };
+pub use select_controller::SelectSqlError;
 pub use set_controller::{ServerSetValues, SetSqlError};

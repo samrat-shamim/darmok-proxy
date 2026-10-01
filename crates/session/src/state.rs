@@ -140,6 +140,12 @@ impl SessionState {
         Ok(self.sql_modes)
     }
 
+    /// Borrow the declared text authority without allocating a cache fingerprint.
+    pub fn text_collation(&self) -> Result<&'static CharsetInfo, TransactionSettingsError> {
+        self.ensure_settled()?;
+        Ok(self.text_collation)
+    }
+
     /// Change the locally owned typed model value. This does not evaluate a
     /// SET expression, coerce SQL values, generate warnings, classify scope,
     /// mutate PostgreSQL, or acknowledge frontend output. An integrated caller

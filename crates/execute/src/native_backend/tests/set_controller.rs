@@ -205,14 +205,13 @@ async fn query_source_rejects_unimplemented_statements_and_batches_before_commit
     setup(&backend, "CREATE TEMP TABLE query_batch(id integer PRIMARY KEY,n integer); INSERT INTO query_batch VALUES(0,0)").await;
     let (mut state, globals) = set_fixture();
     let before = state.translation_fingerprint().unwrap();
-    let (outcome, bytes) = set_request(
-        &mut state,
-        &mut backend,
-        &globals,
-        "SELECT @@session.sql_mode",
-    )
-    .await;
-    query_error(outcome, &bytes, QuerySqlError::UnsupportedStatement);
+    let (outcome, bytes) =
+        set_request(&mut state, &mut backend, &globals, "SELECT ROW_COUNT()").await;
+    query_error(
+        outcome,
+        &bytes,
+        QuerySqlError::Select(crate::SelectSqlError::Unsupported),
+    );
     assert_eq!(state.translation_fingerprint().unwrap(), before);
     assert_eq!(state.error_count(), 1);
     assert_eq!(state.row_count, -1);

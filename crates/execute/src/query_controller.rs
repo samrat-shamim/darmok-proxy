@@ -1,15 +1,25 @@
 //! Source admission and response ownership for the selected COM_QUERY subset.
 //! The parser uses the settled session's current mode on every command.
 
-use crate::{NativeBackend, NativeBackendError, NativeBackendState, ServerSetValues, SetSqlError};
+use crate::select_controller::{SelectAdmissionError, SelectPlan};
+use crate::{
+    NativeBackend, NativeBackendError, NativeBackendState, SelectSqlError, ServerSetValues,
+    SetSqlError,
+};
 use bytes::{Bytes, BytesMut};
-use darmok_protocol::{CapabilityFlags, Command, ErrPacket, OkPacket, RawPacket, StatusFlags};
+use darmok_protocol::{
+    CapabilityFlags, Command, EofPacket, ErrPacket, OkPacket, RawPacket, StatusFlags,
+    encode_result_set_header, encode_text_row,
+};
 use darmok_session::{
     AutocommitSetting, CommandSettingsSnapshot, FrontendTransactionAccess, SessionState, SqlMode,
     TransactionSettingsError,
 };
 use darmok_types::error::ProxyError;
-use sqlparser::{ast::Statement, mysql_mode::parse_mysql_with_mode};
+use sqlparser::{
+    ast::Statement,
+    source::{MySqlSourceParseError, ProjectionSourceError, parse_mysql_source},
+};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_postgres::TransactionState;
 
@@ -18,6 +28,7 @@ pub enum QuerySqlError {
     Parse,
     UnsupportedStatement,
     Set(SetSqlError),
+    Select(SelectSqlError),
 }
 
 impl QuerySqlError {
@@ -26,6 +37,7 @@ impl QuerySqlError {
             Self::Parse => 1064,
             Self::UnsupportedStatement => 1235,
             Self::Set(error) => error.code(),
+            Self::Select(error) => error.code(),
         }
     }
 
@@ -33,6 +45,7 @@ impl QuerySqlError {
         match self {
             Self::Parse | Self::UnsupportedStatement => *b"42000",
             Self::Set(error) => error.sql_state(),
+            Self::Select(error) => error.sql_state(),
         }
     }
 
@@ -41,6 +54,7 @@ impl QuerySqlError {
             Self::Parse => "The MySQL query could not be parsed",
             Self::UnsupportedStatement => "This statement or query batch is not implemented",
             Self::Set(error) => error.message(),
+            Self::Select(error) => error.message(),
         }
     }
 }
@@ -62,8 +76,10 @@ pub enum QueryExecutionError {
     Settings(#[from] TransactionSettingsError),
     #[error("frontend/native transaction ownership differs: {0:?}")]
     NativeState(NativeBackendState),
-    #[error("query output requires protocol 4.1 without session tracking")]
+    #[error("query output requires protocol 4.1 without session tracking or optional metadata")]
     OutputContract,
+    #[error(transparent)]
+    Source(#[from] ProjectionSourceError),
     #[error(transparent)]
     Native(#[from] NativeBackendError),
     #[error(transparent)]
@@ -72,7 +88,12 @@ pub enum QueryExecutionError {
     Output(#[from] std::io::Error),
 }
 
-/// Executes one selected SET statement from an original decoded query.
+enum QueryPlan {
+    Set(crate::set_controller::SetPlan),
+    Select(SelectPlan),
+}
+
+/// Executes one selected SET or local SELECT from an original decoded query.
 /// Other statements and batches return an explicit SQL error before effects.
 /// A transport/native error requires caller disposal: no response or recovery
 /// is invented. The caller supplies the response sequence from its wire phase.
@@ -98,33 +119,57 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
     }
     let capabilities = CapabilityFlags::from_bits_retain(state.client_capabilities);
     if !capabilities.contains(CapabilityFlags::CLIENT_PROTOCOL_41)
-        || capabilities.contains(CapabilityFlags::CLIENT_SESSION_TRACK)
+        || capabilities.intersects(
+            CapabilityFlags::CLIENT_SESSION_TRACK
+                | CapabilityFlags::CLIENT_OPTIONAL_RESULTSET_METADATA,
+        )
     {
         return Err(QueryExecutionError::OutputContract);
     }
 
     // Retain the source-derived AST until admission finishes. Neither callers
     // nor a previous command's parser mode can substitute a constructed AST.
-    let parsed = parse_mysql_with_mode(sql, state.sql_modes()?.parser_flags());
+    let parsed = parse_mysql_source(sql, state.sql_modes()?.parser_flags());
     let planned = match &parsed {
-        Ok(statements) => match statements.as_slice() {
-            [Statement::Set(input)] => {
-                crate::set_controller::admit_set(state, globals, input).map_err(QuerySqlError::Set)
+        Ok(parsed) => match parsed.statements() {
+            [Statement::Set(input)] => crate::set_controller::admit_set(state, globals, input)
+                .map(QueryPlan::Set)
+                .map_err(QuerySqlError::Set),
+            [Statement::Query(_)] => {
+                if let Some(source) = parsed.single_select()? {
+                    match crate::select_controller::admit_select(state, globals, source) {
+                        Ok(plan) => Ok(QueryPlan::Select(plan)),
+                        Err(SelectAdmissionError::Sql(error)) => Err(QuerySqlError::Select(error)),
+                        Err(SelectAdmissionError::Source(error)) => return Err(error.into()),
+                        Err(SelectAdmissionError::Settings(error)) => return Err(error.into()),
+                    }
+                } else {
+                    Err(QuerySqlError::UnsupportedStatement)
+                }
             }
             _ => Err(QuerySqlError::UnsupportedStatement),
         },
-        Err(_) => Err(QuerySqlError::Parse),
+        Err(MySqlSourceParseError::Parse(_)) => Err(QuerySqlError::Parse),
+        Err(MySqlSourceParseError::Source(error)) => return Err((*error).into()),
     };
     let mut stage = state.stage_command()?;
     stage.clear_diagnostics();
+    let mut select = None;
     let error = match planned {
         Err(error) => Some(error),
-        Ok(plan) => crate::set_controller::apply_set(&mut stage, backend, plan)
+        Ok(QueryPlan::Set(plan)) => crate::set_controller::apply_set(&mut stage, backend, plan)
             .await?
             .err()
             .map(QuerySqlError::Set),
+        Ok(QueryPlan::Select(plan)) => {
+            stage.record_select_success(1);
+            select = Some(plan);
+            None
+        }
     };
     let mut payload = BytesMut::new();
+    let mut encoded = BytesMut::new();
+    let mut sequence = response_sequence;
     if let Some(error) = error {
         stage.record_sql_error(error.code(), error.message());
         ErrPacket {
@@ -133,8 +178,11 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             message: Bytes::from_static(error.message().as_bytes()),
         }
         .encode(&mut payload);
+        append_packet(&mut payload, &mut sequence, &mut encoded)?;
     } else {
-        stage.record_sql_success();
+        if select.is_none() {
+            stage.record_sql_success();
+        }
         let settings = stage.settings()?;
         let mut flags = StatusFlags::empty();
         flags.set(
@@ -156,19 +204,46 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             StatusFlags::SERVER_STATUS_NO_BACKSLASH_ESCAPES,
             settings.sql_modes.contains(SqlMode::NoBackslashEscapes),
         );
-        OkPacket {
+        let ok = OkPacket {
             affected_rows: 0,
             last_insert_id: 0,
             status_flags: flags,
             warnings: 0,
             info: Bytes::new(),
             session_state_changes: None,
+        };
+        if let Some(select) = select {
+            encode_result_set_header(select.columns.len() as u64, &mut payload);
+            append_packet(&mut payload, &mut sequence, &mut encoded)?;
+            for column in &select.columns {
+                column.encode(&mut payload);
+                append_packet(&mut payload, &mut sequence, &mut encoded)?;
+            }
+            if !capabilities.contains(CapabilityFlags::CLIENT_DEPRECATE_EOF) {
+                EofPacket {
+                    warnings: 0,
+                    status_flags: flags,
+                }
+                .encode(&mut payload);
+                append_packet(&mut payload, &mut sequence, &mut encoded)?;
+            }
+            let values: Vec<_> = select.row.iter().map(|cell| cell.as_deref()).collect();
+            encode_text_row(&values, &mut payload);
+            append_packet(&mut payload, &mut sequence, &mut encoded)?;
+            if capabilities.contains(CapabilityFlags::CLIENT_DEPRECATE_EOF) {
+                ok.encode_ok_as_eof(&mut payload, capabilities)?;
+            } else {
+                EofPacket {
+                    warnings: 0,
+                    status_flags: flags,
+                }
+                .encode(&mut payload);
+            }
+        } else {
+            ok.encode(&mut payload, capabilities)?;
         }
-        .encode(&mut payload, capabilities)?;
+        append_packet(&mut payload, &mut sequence, &mut encoded)?;
     }
-    let packet = RawPacket::new(response_sequence, payload.freeze())?;
-    let mut encoded = BytesMut::with_capacity(packet.encoded_len()?);
-    packet.encode_into(&mut encoded)?;
     output.write_all(&encoded).await?;
     output.flush().await?;
     let settings = stage.finish_with_sent_output()?;
@@ -176,4 +251,15 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
         Some(error) => QueryOutcome::SqlError { error, settings },
         None => QueryOutcome::Success(settings),
     })
+}
+
+fn append_packet(
+    payload: &mut BytesMut,
+    sequence: &mut u8,
+    encoded: &mut BytesMut,
+) -> Result<(), ProxyError> {
+    let packet = RawPacket::new(*sequence, std::mem::take(payload).freeze())?;
+    packet.encode_into(encoded)?;
+    *sequence = packet.next_sequence_id();
+    Ok(())
 }
