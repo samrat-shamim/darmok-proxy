@@ -212,6 +212,16 @@ complete release gate runs once on the final candidate.
   evidence reproducible from the checkout; it does not execute the proxy or
   complete differential, native-schema, transaction or M2/M4 gates.
 
+- [Explicit native transaction characteristics](native-transactions.md) require
+  isolation and access choices when beginning an owned transaction. Separate
+  transaction/savepoint scope methods reject the wrong boundary before
+  submission; savepoints retain their parent modes. Two further native-owner
+  fixtures are required on each PostgreSQL version for all six combinations,
+  ambient default override/preservation and savepoint recovery/release. The
+  owner suite now has fifteen fixtures. This is a native control component;
+  frontend session mapping, MySQL snapshot/lock equivalence, catalog validity,
+  admitted execution and M2/M4 remain pending.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

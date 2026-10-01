@@ -22,11 +22,12 @@ Transaction methods require a mutable borrow. Its Debug output contains the
 lifecycle state only. The connector argument is forwarded unchanged; this work
 adds no authentication, TLS, credential mapping, or authorization behavior.
 
-Explicit `begin` requires confirmed idle. `commit` and `rollback` require a
-confirmed transaction or failed transaction. Idle frontend COMMIT/ROLLBACK
-semantics, SQL transaction modes, client savepoints and session changes belong
-to the future frontend controller, not guessed behavior in these internal
-methods.
+Explicit `begin(spec)` requires confirmed idle and a complete
+[native transaction specification](native-transactions.md). `commit` and
+`rollback` require a confirmed transaction or failed transaction. Idle frontend
+COMMIT/ROLLBACK semantics, frontend transaction-mode mapping, client savepoints
+and session changes belong to the future frontend controller, not guessed
+behavior in these internal methods.
 
 ## Control lifecycle
 
@@ -57,8 +58,11 @@ alone is insufficient evidence that a failed cleanup removed its owned scope.
 
 ## Borrowed scope identities
 
-In idle state, `scope` begins an owned transaction. In an explicit transaction,
-it creates a savepoint named `darmok_statement_<serial>`. The generated integer
+In idle state, `transaction_scope(spec)` begins an owned transaction with
+explicit isolation/access and NOT DEFERRABLE. `savepoint_scope()` requires an
+explicit transaction and creates a savepoint named `darmok_statement_<serial>`.
+Neither method accepts the other's state; savepoints retain the parent's
+characteristics. The generated integer
 identity is private, checked for overflow, and never reused on that connection,
 including after a failed creation attempt. Future client savepoint identities
 must occupy a separate namespace under the owner. No caller-selected name or
@@ -119,7 +123,8 @@ shutdown and statement/stream disposition remain integration gates.
 
 There is one driver task per connection and one initialization control round
 trip. BEGIN/COMMIT/ROLLBACK and savepoint creation/release each cost their own
-control request. Savepoint recovery combines two dependent commands into one
+control request. Transaction start selects static SQL with explicit modes,
+without an additional SET or readback request. Savepoint recovery combines two dependent commands into one
 request, with both outcomes checked. Savepoint SQL allocates a bounded string;
 whole-transaction recovery from either boundary uses fixed static SQL and one
 control request. It avoids a savepoint-recovery request followed by a separate
@@ -137,7 +142,7 @@ cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
 ```
 
 The command requires `DARMOK_TEST_DATABASE_URL` and fails if it is absent or
-unavailable. Thirteen ordinary fixtures on each supported backend cover successful
+unavailable. Fifteen ordinary fixtures on each supported backend cover successful
 transaction/scope effects; repeated rollback-and-release preserving earlier
 writes and a separate client savepoint; prepare and constraint errors followed
 by valid writes; deferred COMMIT and COMMIT-as-ROLLBACK failures; invalid parent
@@ -148,6 +153,11 @@ and all savepoint identities being removed; recovery after a native constraint
 error at either boundary followed by a valid scope; recovery after an earlier
 client rollback removed the internal savepoint; and abandoned unpolled/pending
 full recovery at either boundary.
+The two transaction-characteristic fixtures additionally cover all six native
+isolation/access combinations through explicit BEGIN and transaction scopes,
+unchanged session defaults, inherited savepoint characteristics through recovery
+and release, and wrong-boundary errors. They check native settings, not MySQL
+snapshot or lock equivalence.
 Fixture SQL uses private test access and is not an admitted statement path.
 No forced transport interruption, security review, adversarial inputs or
 resource stress is included. MySQL behavior and release gates remain pending.

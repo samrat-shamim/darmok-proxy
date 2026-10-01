@@ -5,7 +5,7 @@ use tokio_postgres::{Client, Config, Error, Socket, TransactionState, tls::MakeT
 
 use crate::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
-    check_native_control,
+    NativeTransactionSpec, check_native_control,
 };
 
 /// Known lifecycle state under this owner's exclusive SQL submission boundary.
@@ -24,7 +24,8 @@ pub enum NativeBackendOperation {
     Begin,
     Commit,
     Rollback,
-    StartScope,
+    StartTransactionScope,
+    StartSavepointScope,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -73,9 +74,15 @@ pub enum NativeRecovery {
 ///
 /// A scope excludes interleaved parent commands:
 /// ```compile_fail
-/// use darmok_execute::NativeBackend;
+/// use darmok_execute::{
+///     NativeBackend, NativeIsolation, NativeTransactionAccess, NativeTransactionSpec,
+/// };
 /// async fn interleave(backend: &mut NativeBackend) {
-///     let scope = backend.scope().await.unwrap();
+///     let spec = NativeTransactionSpec {
+///         isolation: NativeIsolation::ReadCommitted,
+///         access: NativeTransactionAccess::ReadWrite,
+///     };
+///     let scope = backend.transaction_scope(spec).await.unwrap();
 ///     backend.commit().await.unwrap();
 ///     scope.finish().await.unwrap();
 /// }
@@ -116,9 +123,14 @@ impl NativeBackend {
         self.state
     }
 
-    pub async fn begin(&mut self) -> Result<NativeControlCompletion, NativeBackendError> {
+    /// Start a native transaction with explicit characteristics. No frontend
+    /// isolation mapping or ambient session defaults are inferred here.
+    pub async fn begin(
+        &mut self,
+        spec: NativeTransactionSpec,
+    ) -> Result<NativeControlCompletion, NativeBackendError> {
         self.require(NativeBackendOperation::Begin, &[TransactionState::Idle])?;
-        self.control(NativeControl::Begin, "BEGIN").await
+        self.control(NativeControl::Begin, spec.begin_sql()).await
     }
 
     pub async fn commit(&mut self) -> Result<NativeControlCompletion, NativeBackendError> {
@@ -143,38 +155,47 @@ impl NativeBackend {
         self.control(NativeControl::Rollback, "ROLLBACK").await
     }
 
-    /// Start a control scope before future admission/preparation work. There is
-    /// no statement execution method yet. The mutable borrow excludes another
-    /// command; the state check also excludes reuse after forgetting a scope.
-    pub async fn scope(&mut self) -> Result<NativeScope<'_>, NativeBackendError> {
+    /// Start an owned transaction scope from confirmed idle. There is no
+    /// statement execution method yet. A savepoint requires savepoint_scope;
+    /// these options are never silently ignored inside an existing transaction.
+    pub async fn transaction_scope(
+        &mut self,
+        spec: NativeTransactionSpec,
+    ) -> Result<NativeScope<'_>, NativeBackendError> {
         self.require(
-            NativeBackendOperation::StartScope,
-            &[TransactionState::Idle, TransactionState::Transaction],
+            NativeBackendOperation::StartTransactionScope,
+            &[TransactionState::Idle],
         )?;
-        let boundary = match self.state {
-            NativeBackendState::Ready(TransactionState::Idle) => {
-                let _ = self.control(NativeControl::Begin, "BEGIN").await?;
-                OwnedBoundary::Transaction
-            }
-            NativeBackendState::Ready(TransactionState::Transaction) => {
-                let serial = self
-                    .last_savepoint
-                    .checked_add(1)
-                    .ok_or(NativeBackendError::SavepointIdentifiersExhausted)?;
-                // Never reuse a name, including after a failed creation attempt.
-                self.last_savepoint = serial;
-                let sql = format!("SAVEPOINT \"darmok_statement_{serial}\"");
-                let _ = self.control(NativeControl::Savepoint, &sql).await?;
-                OwnedBoundary::Savepoint(serial)
-            }
-            _ => unreachable!("require established a ready scope state"),
-        };
+        let _ = self.control(NativeControl::Begin, spec.begin_sql()).await?;
+        Ok(self.enter_scope(OwnedBoundary::Transaction))
+    }
+
+    /// Start a savepoint scope in the existing confirmed native transaction.
+    /// Its characteristics remain those of its parent. The mutable borrow and
+    /// state check also exclude parent reuse after forgetting a scope.
+    pub async fn savepoint_scope(&mut self) -> Result<NativeScope<'_>, NativeBackendError> {
+        self.require(
+            NativeBackendOperation::StartSavepointScope,
+            &[TransactionState::Transaction],
+        )?;
+        let serial = self
+            .last_savepoint
+            .checked_add(1)
+            .ok_or(NativeBackendError::SavepointIdentifiersExhausted)?;
+        // Never reuse a name, including after a failed creation attempt.
+        self.last_savepoint = serial;
+        let sql = format!("SAVEPOINT \"darmok_statement_{serial}\"");
+        let _ = self.control(NativeControl::Savepoint, &sql).await?;
+        Ok(self.enter_scope(OwnedBoundary::Savepoint(serial)))
+    }
+
+    fn enter_scope(&mut self, boundary: OwnedBoundary) -> NativeScope<'_> {
         self.state = NativeBackendState::Scoped(boundary.kind());
-        Ok(NativeScope {
+        NativeScope {
             backend: self,
             boundary,
             finished: false,
-        })
+        }
     }
 
     /// Stop and await the owned local driver. Disposal does not prove rollback
@@ -468,6 +489,12 @@ mod tests {
     use tokio_postgres::{NoTls, error::SqlState};
 
     use super::*;
+    use crate::{NativeIsolation, NativeTransactionAccess};
+
+    const READ_COMMITTED_WRITE: NativeTransactionSpec = NativeTransactionSpec {
+        isolation: NativeIsolation::ReadCommitted,
+        access: NativeTransactionAccess::ReadWrite,
+    };
 
     // These are required database unit fixtures, invoked explicitly in both
     // PostgreSQL CI jobs. Ordinary workspace tests do not have a database.
@@ -509,6 +536,160 @@ mod tests {
         assert!(future.poll(&mut context).is_pending());
     }
 
+    fn transaction_cases() -> [(
+        NativeTransactionSpec,
+        (&'static str, &'static str, &'static str),
+    ); 6] {
+        use NativeIsolation::{ReadCommitted, RepeatableRead, Serializable};
+        use NativeTransactionAccess::{ReadOnly, ReadWrite};
+
+        [
+            (
+                NativeTransactionSpec {
+                    isolation: ReadCommitted,
+                    access: ReadWrite,
+                },
+                ("read committed", "off", "off"),
+            ),
+            (
+                NativeTransactionSpec {
+                    isolation: ReadCommitted,
+                    access: ReadOnly,
+                },
+                ("read committed", "on", "off"),
+            ),
+            (
+                NativeTransactionSpec {
+                    isolation: RepeatableRead,
+                    access: ReadWrite,
+                },
+                ("repeatable read", "off", "off"),
+            ),
+            (
+                NativeTransactionSpec {
+                    isolation: RepeatableRead,
+                    access: ReadOnly,
+                },
+                ("repeatable read", "on", "off"),
+            ),
+            (
+                NativeTransactionSpec {
+                    isolation: Serializable,
+                    access: ReadWrite,
+                },
+                ("serializable", "off", "off"),
+            ),
+            (
+                NativeTransactionSpec {
+                    isolation: Serializable,
+                    access: ReadOnly,
+                },
+                ("serializable", "on", "off"),
+            ),
+        ]
+    }
+
+    async fn transaction_modes(backend: &NativeBackend) -> (String, String, String) {
+        let row = client(backend)
+            .query_one(
+                "SELECT current_setting('transaction_isolation'), current_setting('transaction_read_only'), current_setting('transaction_deferrable')",
+                &[],
+            )
+            .await
+            .unwrap();
+        (row.get(0), row.get(1), row.get(2))
+    }
+
+    fn assert_modes(actual: (String, String, String), expected: (&str, &str, &str)) {
+        assert_eq!(
+            (actual.0.as_str(), actual.1.as_str(), actual.2.as_str()),
+            expected
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+    async fn explicit_begin_and_transaction_scopes_override_ambient_characteristics() {
+        let mut backend = connect_backend().await;
+        setup(
+            &backend,
+            "SET default_transaction_isolation = 'serializable'; SET default_transaction_read_only = on; SET default_transaction_deferrable = on",
+        )
+        .await;
+        for (spec, expected) in transaction_cases() {
+            let completion = backend.begin(spec).await.unwrap();
+            assert_eq!(completion.control(), NativeControl::Begin);
+            assert_eq!(completion.ready_state(), TransactionState::Transaction);
+            assert_modes(transaction_modes(&backend).await, expected);
+            let _ = backend.rollback().await.unwrap();
+
+            let scope = backend.transaction_scope(spec).await.unwrap();
+            assert_eq!(scope.boundary(), NativeScopeBoundary::Transaction);
+            assert_modes(transaction_modes(scope.backend).await, expected);
+            let completion = scope.finish().await.unwrap();
+            assert_eq!(completion.control(), NativeControl::Commit);
+            assert_eq!(completion.ready_state(), TransactionState::Idle);
+            assert_eq!(
+                backend.state(),
+                NativeBackendState::Ready(TransactionState::Idle)
+            );
+        }
+        // BEGIN's explicit modes do not change this connection's defaults.
+        for (name, expected) in [
+            ("default_transaction_isolation", "serializable"),
+            ("default_transaction_read_only", "on"),
+            ("default_transaction_deferrable", "on"),
+        ] {
+            let row = client(&backend)
+                .query_one(&format!("SHOW {name}"), &[])
+                .await
+                .unwrap();
+            assert_eq!(row.get::<_, String>(0), expected);
+        }
+        let _ = backend.dispose().await.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+    async fn savepoint_scopes_preserve_parent_characteristics_and_require_a_transaction() {
+        let mut backend = connect_backend().await;
+        for (spec, expected) in transaction_cases() {
+            assert!(matches!(
+                backend.savepoint_scope().await,
+                Err(NativeBackendError::InvalidState {
+                    operation: NativeBackendOperation::StartSavepointScope,
+                    state: NativeBackendState::Ready(TransactionState::Idle),
+                })
+            ));
+            let _ = backend.begin(spec).await.unwrap();
+            assert!(matches!(
+                backend.transaction_scope(READ_COMMITTED_WRITE).await,
+                Err(NativeBackendError::InvalidState {
+                    operation: NativeBackendOperation::StartTransactionScope,
+                    state: NativeBackendState::Ready(TransactionState::Transaction),
+                })
+            ));
+            assert_modes(transaction_modes(&backend).await, expected);
+
+            let scope = backend.savepoint_scope().await.unwrap();
+            assert_eq!(scope.boundary(), NativeScopeBoundary::Savepoint);
+            assert_modes(transaction_modes(scope.backend).await, expected);
+            let completion = scope.recover(NativeRecovery::Statement).await.unwrap();
+            assert_eq!(completion.control(), NativeControl::RecoverSavepoint);
+            assert_eq!(completion.ready_state(), TransactionState::Transaction);
+            assert_modes(transaction_modes(&backend).await, expected);
+
+            let scope = backend.savepoint_scope().await.unwrap();
+            assert_modes(transaction_modes(scope.backend).await, expected);
+            let completion = scope.finish().await.unwrap();
+            assert_eq!(completion.control(), NativeControl::Release);
+            assert_eq!(completion.ready_state(), TransactionState::Transaction);
+            assert_modes(transaction_modes(&backend).await, expected);
+            let _ = backend.rollback().await.unwrap();
+        }
+        let _ = backend.dispose().await.unwrap();
+    }
+
     #[tokio::test]
     #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
     async fn owned_transactions_and_autocommit_scopes_have_confirmed_effects() {
@@ -518,13 +699,19 @@ mod tests {
             NativeBackendState::Ready(TransactionState::Idle)
         );
         setup(&backend, "CREATE TEMP TABLE owned_values (n integer)").await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         assert_eq!(scope.boundary(), NativeScopeBoundary::Transaction);
         setup(scope.backend, "INSERT INTO owned_values VALUES (1), (2)").await;
         let complete = scope.finish().await.unwrap();
         assert_eq!(complete.control(), NativeControl::Commit);
         assert_eq!(values(&backend).await, [1, 2]);
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (3)").await;
         assert_eq!(
             scope
@@ -535,11 +722,11 @@ mod tests {
             NativeControl::Rollback
         );
         assert_eq!(values(&backend).await, [1, 2]);
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(&backend, "INSERT INTO owned_values VALUES (4)").await;
         let _ = backend.rollback().await.unwrap();
         assert_eq!(values(&backend).await, [1, 2]);
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(&backend, "INSERT INTO owned_values VALUES (5)").await;
         let _ = backend.commit().await.unwrap();
         assert_eq!(values(&backend).await, [1, 2, 5]);
@@ -558,14 +745,14 @@ mod tests {
             "CREATE TEMP TABLE owned_values (n integer CHECK (n > 0))",
         )
         .await;
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(
             &backend,
             "INSERT INTO owned_values VALUES (1); SAVEPOINT client_named",
         )
         .await;
         for serial in 1..=3 {
-            let scope = backend.scope().await.unwrap();
+            let scope = backend.savepoint_scope().await.unwrap();
             assert_eq!(scope.boundary(), NativeScopeBoundary::Savepoint);
             assert!(matches!(scope.boundary, OwnedBoundary::Savepoint(id) if id == serial));
             setup(scope.backend, "INSERT INTO owned_values VALUES (2)").await;
@@ -592,7 +779,7 @@ mod tests {
             assert_eq!(error.code(), Some(&SqlState::from_code("3B001")));
             setup(&backend, "ROLLBACK TO SAVEPOINT client_named").await;
         }
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (3)").await;
         assert_eq!(
             scope.finish().await.unwrap().control(),
@@ -604,7 +791,7 @@ mod tests {
         )
         .await;
         assert_eq!(values(&backend).await, [1]);
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (4)").await;
         let _ = scope.finish().await.unwrap();
         let _ = backend.commit().await.unwrap();
@@ -621,13 +808,13 @@ mod tests {
             "CREATE TEMP TABLE owned_values (n integer); INSERT INTO owned_values VALUES (1)",
         )
         .await;
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(
             &backend,
             "INSERT INTO owned_values VALUES (2); SAVEPOINT client_named",
         )
         .await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         assert!(matches!(scope.boundary, OwnedBoundary::Savepoint(1)));
         setup(
             scope.backend,
@@ -645,7 +832,7 @@ mod tests {
 
         // None of the client or internal savepoints survives full rollback.
         for name in ["client_named", "client_later", "darmok_statement_1"] {
-            let _ = backend.begin().await.unwrap();
+            let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
             let error = client(&backend)
                 .batch_execute(&format!("ROLLBACK TO SAVEPOINT \"{name}\""))
                 .await
@@ -654,8 +841,8 @@ mod tests {
             let _ = backend.rollback().await.unwrap();
         }
 
-        let _ = backend.begin().await.unwrap();
-        let scope = backend.scope().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         // Full recovery removes the scope, but never reuses its identity.
         assert!(matches!(scope.boundary, OwnedBoundary::Savepoint(2)));
         setup(scope.backend, "INSERT INTO owned_values VALUES (4)").await;
@@ -676,10 +863,17 @@ mod tests {
             )
             .await;
             if outer {
-                let _ = backend.begin().await.unwrap();
+                let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
                 setup(&backend, "INSERT INTO owned_values VALUES (2)").await;
             }
-            let scope = backend.scope().await.unwrap();
+            let scope = if outer {
+                backend.savepoint_scope().await.unwrap()
+            } else {
+                backend
+                    .transaction_scope(READ_COMMITTED_WRITE)
+                    .await
+                    .unwrap()
+            };
             setup(scope.backend, "INSERT INTO owned_values VALUES (3)").await;
             let original = client(scope.backend)
                 .execute("INSERT INTO owned_values VALUES (-1)", &[])
@@ -696,7 +890,10 @@ mod tests {
             assert_eq!(completion.control(), NativeControl::Rollback);
             assert_eq!(completion.ready_state(), TransactionState::Idle);
             assert_eq!(values(&backend).await, [1]);
-            let scope = backend.scope().await.unwrap();
+            let scope = backend
+                .transaction_scope(READ_COMMITTED_WRITE)
+                .await
+                .unwrap();
             assert_eq!(scope.boundary(), NativeScopeBoundary::Transaction);
             setup(scope.backend, "INSERT INTO owned_values VALUES (4)").await;
             let _ = scope.finish().await.unwrap();
@@ -714,13 +911,13 @@ mod tests {
             "CREATE TEMP TABLE owned_values (n integer); INSERT INTO owned_values VALUES (1)",
         )
         .await;
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(
             &backend,
             "INSERT INTO owned_values VALUES (2); SAVEPOINT client_named",
         )
         .await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(
             scope.backend,
             "INSERT INTO owned_values VALUES (3); ROLLBACK TO SAVEPOINT client_named",
@@ -742,9 +939,16 @@ mod tests {
             for polled in [false, true] {
                 let mut backend = connect_backend().await;
                 if outer {
-                    let _ = backend.begin().await.unwrap();
+                    let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
                 }
-                let scope = backend.scope().await.unwrap();
+                let scope = if outer {
+                    backend.savepoint_scope().await.unwrap()
+                } else {
+                    backend
+                        .transaction_scope(READ_COMMITTED_WRITE)
+                        .await
+                        .unwrap()
+                };
                 let mut future = Box::pin(scope.recover(NativeRecovery::Transaction));
                 if polled {
                     pending(future.as_mut());
@@ -754,7 +958,7 @@ mod tests {
                 // No transport interruption or asynchronous Drop is assumed.
                 assert_eq!(backend.state(), NativeBackendState::Uncertain);
                 assert!(matches!(
-                    backend.begin().await,
+                    backend.begin(READ_COMMITTED_WRITE).await,
                     Err(NativeBackendError::InvalidState { .. })
                 ));
                 assert!(matches!(
@@ -762,7 +966,7 @@ mod tests {
                     Err(NativeBackendError::InvalidState { .. })
                 ));
                 assert!(matches!(
-                    backend.scope().await,
+                    backend.transaction_scope(READ_COMMITTED_WRITE).await,
                     Err(NativeBackendError::InvalidState { .. })
                 ));
                 assert_eq!(
@@ -782,9 +986,9 @@ mod tests {
             "CREATE TEMP TABLE owned_values (n integer CHECK (n > 0))",
         )
         .await;
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         setup(&backend, "INSERT INTO owned_values VALUES (1)").await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         let error = client(scope.backend)
             .prepare("SELECT missing_column FROM owned_values")
             .await
@@ -792,18 +996,24 @@ mod tests {
         assert_eq!(error.code(), Some(&SqlState::UNDEFINED_COLUMN));
         let _ = scope.recover(NativeRecovery::Statement).await.unwrap();
         assert_eq!(values(&backend).await, [1]);
-        let scope = backend.scope().await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (2)").await;
         let _ = scope.finish().await.unwrap();
         let _ = backend.commit().await.unwrap();
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         let error = client(scope.backend)
             .execute("INSERT INTO owned_values VALUES (-1)", &[])
             .await
             .unwrap_err();
         assert_eq!(error.code(), Some(&SqlState::CHECK_VIOLATION));
         let _ = scope.recover(NativeRecovery::Statement).await.unwrap();
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (3)").await;
         let _ = scope.finish().await.unwrap();
         assert_eq!(values(&backend).await, [1, 2, 3]);
@@ -819,7 +1029,10 @@ mod tests {
             "CREATE TEMP TABLE owned_values (n integer UNIQUE DEFERRABLE INITIALLY DEFERRED)",
         )
         .await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (1), (1)").await;
         let error = scope.finish().await.unwrap_err();
         let failure = control_failure(&error);
@@ -833,11 +1046,17 @@ mod tests {
             NativeBackendState::Ready(TransactionState::Idle)
         );
         assert!(values(&backend).await.is_empty());
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (2)").await;
         let _ = scope.finish().await.unwrap();
         assert_eq!(values(&backend).await, [2]);
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         setup(scope.backend, "INSERT INTO owned_values VALUES (3)").await;
         let error = client(scope.backend)
             .execute("SELECT 1 / 0", &[])
@@ -853,7 +1072,7 @@ mod tests {
             NativeBackendState::Ready(TransactionState::Idle)
         );
         assert_eq!(values(&backend).await, [2]);
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         let error = client(&backend)
             .execute("SELECT 1 / 0", &[])
             .await
@@ -888,24 +1107,38 @@ mod tests {
                 ..
             })
         ));
-        let _ = backend.begin().await.unwrap();
         assert!(matches!(
-            backend.begin().await,
+            backend.savepoint_scope().await,
+            Err(NativeBackendError::InvalidState {
+                operation: NativeBackendOperation::StartSavepointScope,
+                ..
+            })
+        ));
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+        assert!(matches!(
+            backend.begin(READ_COMMITTED_WRITE).await,
             Err(NativeBackendError::InvalidState {
                 operation: NativeBackendOperation::Begin,
                 ..
             })
         ));
-        let scope = backend.scope().await.unwrap();
+        assert!(matches!(
+            backend.transaction_scope(READ_COMMITTED_WRITE).await,
+            Err(NativeBackendError::InvalidState {
+                operation: NativeBackendOperation::StartTransactionScope,
+                ..
+            })
+        ));
+        let scope = backend.savepoint_scope().await.unwrap();
         std::mem::forget(scope);
         assert_eq!(
             backend.state(),
             NativeBackendState::Scoped(NativeScopeBoundary::Savepoint)
         );
         assert!(matches!(
-            backend.scope().await,
+            backend.savepoint_scope().await,
             Err(NativeBackendError::InvalidState {
-                operation: NativeBackendOperation::StartScope,
+                operation: NativeBackendOperation::StartSavepointScope,
                 ..
             })
         ));
@@ -923,12 +1156,12 @@ mod tests {
     #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
     async fn unpolled_control_is_inert_and_dropped_pending_control_is_uncertain() {
         let mut backend = connect_backend().await;
-        drop(backend.begin());
+        drop(backend.begin(READ_COMMITTED_WRITE));
         assert_eq!(
             backend.state(),
             NativeBackendState::Ready(TransactionState::Idle)
         );
-        let mut future = Box::pin(backend.begin());
+        let mut future = Box::pin(backend.begin(READ_COMMITTED_WRITE));
         // A current-thread test does not poll the background driver during this
         // synchronous first poll. No network fault or forced interruption.
         pending(future.as_mut());
@@ -939,7 +1172,7 @@ mod tests {
             Err(NativeBackendError::InvalidState { .. })
         ));
         assert!(matches!(
-            backend.scope().await,
+            backend.transaction_scope(READ_COMMITTED_WRITE).await,
             Err(NativeBackendError::InvalidState { .. })
         ));
         assert_eq!(
@@ -949,11 +1182,23 @@ mod tests {
         for outer in [false, true] {
             let mut backend = connect_backend().await;
             if outer {
-                let _ = backend.begin().await.unwrap();
+                let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
             }
-            drop(backend.scope());
+            drop(async {
+                if outer {
+                    backend.savepoint_scope().await
+                } else {
+                    backend.transaction_scope(READ_COMMITTED_WRITE).await
+                }
+            });
             assert!(matches!(backend.state(), NativeBackendState::Ready(_)));
-            let mut future = Box::pin(backend.scope());
+            let mut future = Box::pin(async {
+                if outer {
+                    backend.savepoint_scope().await
+                } else {
+                    backend.transaction_scope(READ_COMMITTED_WRITE).await
+                }
+            });
             pending(future.as_mut());
             drop(future);
             assert_eq!(backend.state(), NativeBackendState::Uncertain);
@@ -965,17 +1210,26 @@ mod tests {
     #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
     async fn dropped_scope_and_dropped_finish_never_restore_ready() {
         let mut backend = connect_backend().await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         drop(scope);
         assert_eq!(backend.state(), NativeBackendState::Uncertain);
         let _ = backend.dispose().await.unwrap();
         let mut backend = connect_backend().await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         drop(scope.finish());
         assert_eq!(backend.state(), NativeBackendState::Uncertain);
         let _ = backend.dispose().await.unwrap();
         let mut backend = connect_backend().await;
-        let scope = backend.scope().await.unwrap();
+        let scope = backend
+            .transaction_scope(READ_COMMITTED_WRITE)
+            .await
+            .unwrap();
         let mut future = Box::pin(scope.finish());
         pending(future.as_mut());
         drop(future);
@@ -983,8 +1237,8 @@ mod tests {
         let _ = backend.dispose().await.unwrap();
         for recover in [false, true] {
             let mut backend = connect_backend().await;
-            let _ = backend.begin().await.unwrap();
-            let scope = backend.scope().await.unwrap();
+            let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+            let scope = backend.savepoint_scope().await.unwrap();
             if recover {
                 let mut future = Box::pin(scope.recover(NativeRecovery::Statement));
                 pending(future.as_mut());
@@ -1003,13 +1257,13 @@ mod tests {
     #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
     async fn savepoint_creation_error_observes_failed_outer_transaction() {
         let mut backend = connect_backend().await;
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         let error = client(&backend)
             .execute("SELECT 1 / 0", &[])
             .await
             .unwrap_err();
         assert_eq!(error.code(), Some(&SqlState::DIVISION_BY_ZERO));
-        let error = match backend.scope().await {
+        let error = match backend.savepoint_scope().await {
             Err(error) => error,
             Ok(_) => panic!("failed outer transaction must not create a scope"),
         };
@@ -1022,11 +1276,11 @@ mod tests {
             NativeBackendState::Ready(TransactionState::FailedTransaction)
         );
         assert!(matches!(
-            backend.scope().await,
+            backend.savepoint_scope().await,
             Err(NativeBackendError::InvalidState { .. })
         ));
         let _ = backend.rollback().await.unwrap();
-        let _ = backend.begin().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
         let _ = backend.commit().await.unwrap();
         let _ = backend.dispose().await.unwrap();
     }
@@ -1035,8 +1289,8 @@ mod tests {
     #[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
     async fn failed_savepoint_cleanup_preserves_source_and_requires_disposal() {
         let mut backend = connect_backend().await;
-        let _ = backend.begin().await.unwrap();
-        let scope = backend.scope().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(scope.backend, "RELEASE SAVEPOINT \"darmok_statement_1\"").await;
         let error = scope.recover(NativeRecovery::Statement).await.unwrap_err();
         let failure = control_failure(&error);
@@ -1055,8 +1309,8 @@ mod tests {
         ));
         let _ = backend.dispose().await.unwrap();
         let mut backend = connect_backend().await;
-        let _ = backend.begin().await.unwrap();
-        let scope = backend.scope().await.unwrap();
+        let _ = backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+        let scope = backend.savepoint_scope().await.unwrap();
         setup(scope.backend, "RELEASE SAVEPOINT \"darmok_statement_1\"").await;
         let error = scope.finish().await.unwrap_err();
         assert_eq!(
