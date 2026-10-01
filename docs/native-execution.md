@@ -116,6 +116,12 @@ frontend state changes. Native statement-savepoint recovery can release locks
 that MySQL would retain, so equivalent data effects alone do not establish the
 required lock semantics.
 
+The [frontend recovery contract](transaction-recovery.md) separates those
+categories, records ordinary stock data/lock observations and retains
+[blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15). In particular,
+earlier InnoDB participation changes savepoint lock retention; no universal
+retention rule or native control receipt supplies frontend transaction support.
+
 The tokio-postgres 0.7.18 nested transaction helper rolls back to a savepoint
 without releasing it. Its transaction commit/rollback methods also mark their
 object finished before awaiting backend confirmation. Using these helpers

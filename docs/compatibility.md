@@ -19,6 +19,11 @@ The executable registry must distinguish parsing, semantic acceptance,
 translation, execution, and evidence. A successful parse or a plausible emitted
 SQL string cannot promote a feature to supported.
 
+Transaction effects include lock lifetime and snapshots, not only final values.
+The [frontend recovery contract](transaction-recovery.md) records observed
+MySQL/native savepoint differences and the remaining mechanism requirement.
+Native rollback receipts cannot promote transaction behavior to supported.
+
 ## Initial verification priorities
 
 | Area | Required cases |
