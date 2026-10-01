@@ -1,6 +1,6 @@
 # Darmok
 
-Darmok is an experimental MySQL-to-PostgreSQL compatibility proxy, licensed
+Darmok is a MySQL-to-PostgreSQL compatibility proxy, licensed
 under Apache-2.0. It is being prepared for its first release, **0.1.0**.
 
 The project has two equally important uses:
