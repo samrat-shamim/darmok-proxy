@@ -19,9 +19,12 @@ and AUTOCOMMIT fields are observations, not MySQL packet status flags.
 
 The corpus checks that the transaction instrument and current-event consumer
 are enabled on the stock fixture. It changes no global configuration. Missing
-instrumentation, a missing event, stale/different values or incomplete results
-fail the required observation; they are not skipped or replaced with defaults.
-Boolean completion values remain distinct from integer default/count values.
+instrumentation, a missing event, projected-field mismatches or incomplete
+results fail the required observation; they are not skipped or replaced with
+defaults. The observer does not retain `EVENT_ID` lineage, so these fields cannot
+distinguish a stale event with an identical projection; event identity across
+captures remains unverified. Boolean completion values remain distinct from
+integer default/count values.
 
 The fourteen cases cover:
 
