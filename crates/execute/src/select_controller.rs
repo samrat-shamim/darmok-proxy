@@ -164,199 +164,6 @@ fn generated_name(bytes: Bytes) -> Result<Bytes, SelectSqlError> {
     Ok(Bytes::from(converted))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use darmok_session::{AutocommitSetting, MysqlCompatibilityProfile, SqlModes};
-    use sqlparser::source::parse_mysql_source;
-
-    fn fixture() -> (SessionState, ServerSetValues) {
-        (
-            SessionState::new(1),
-            ServerSetValues {
-                sql_modes: SqlModes::MYSQL84_DEFAULT,
-                transactions: MysqlCompatibilityProfile::default_mysql8()
-                    .default_transaction_characteristics,
-                autocommit: AutocommitSetting::Enabled,
-            },
-        )
-    }
-
-    #[test]
-    fn local_cells_keep_declared_metadata_separate_from_normalized_values() {
-        let (state, globals) = fixture();
-        let parsed = parse_mysql_source(
-            "SELECT 001, -2 AS negative, 9223372036854775808, 'hé', '', null, (True)",
-            state.sql_modes().unwrap().parser_flags(),
-        )
-        .unwrap();
-        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
-            .ok()
-            .unwrap();
-        let observed: Vec<_> = plan
-            .columns
-            .iter()
-            .map(|c| {
-                (
-                    c.name.as_ref(),
-                    c.column_type,
-                    c.column_length,
-                    c.flags,
-                    c.character_set,
-                    c.decimals,
-                )
-            })
-            .collect();
-        assert_eq!(
-            observed,
-            vec![
-                (
-                    b"001".as_slice(),
-                    ty::LONGLONG,
-                    4,
-                    flag::NOT_NULL | flag::BINARY,
-                    63,
-                    0
-                ),
-                (
-                    b"negative".as_slice(),
-                    ty::LONGLONG,
-                    2,
-                    flag::NOT_NULL | flag::BINARY,
-                    63,
-                    0
-                ),
-                (
-                    b"9223372036854775808".as_slice(),
-                    ty::LONGLONG,
-                    19,
-                    flag::NOT_NULL | flag::UNSIGNED | flag::BINARY,
-                    63,
-                    0
-                ),
-                ("hé".as_bytes(), ty::VAR_STRING, 8, flag::NOT_NULL, 45, 31),
-                (b"".as_slice(), ty::VAR_STRING, 0, flag::NOT_NULL, 45, 31),
-                (b"NULL".as_slice(), ty::NULL, 0, flag::BINARY, 63, 0),
-                (
-                    b"(True)".as_slice(),
-                    ty::LONGLONG,
-                    1,
-                    flag::NOT_NULL | flag::BINARY,
-                    63,
-                    0
-                ),
-            ]
-        );
-        assert_eq!(
-            plan.row,
-            vec![
-                Some(Bytes::from_static(b"1")),
-                Some(Bytes::from_static(b"-2")),
-                Some(Bytes::from_static(b"9223372036854775808")),
-                Some(Bytes::from("hé")),
-                Some(Bytes::new()),
-                None,
-                Some(Bytes::from_static(b"1"))
-            ]
-        );
-        assert!(plan.columns.iter().all(|c| c.catalog == b"def".as_slice()
-            && c.schema.is_empty()
-            && c.table.is_empty()
-            && c.org_table.is_empty()
-            && c.org_name.is_empty()));
-    }
-
-    #[test]
-    fn source_labels_and_explicit_global_authority_follow_selected_scope_contract() {
-        let (mut state, mut globals) = fixture();
-        state.set_sql_modes(SqlModes::empty()).unwrap();
-        globals.autocommit = AutocommitSetting::Disabled;
-        let parsed = parse_mysql_source("SELECT ( @@SESSION . AUTOCOMMIT ), @@global.autocommit AS global_auto, @@session.sql_mode, @@GLOBAL.version AS version", state.sql_modes().unwrap().parser_flags()).unwrap();
-        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
-            .ok()
-            .unwrap();
-        assert_eq!(
-            plan.columns[0].name,
-            b"( @@SESSION . AUTOCOMMIT )".as_slice()
-        );
-        assert_eq!(plan.columns[0].flags, flag::BINARY);
-        assert_eq!(plan.row[0].as_deref(), Some(b"1".as_slice()));
-        assert_eq!(plan.row[1].as_deref(), Some(b"0".as_slice()));
-        assert_eq!(plan.columns[2].column_length, 87380);
-        assert_eq!(plan.columns[2].flags, 0);
-        assert_eq!(plan.row[2].as_deref(), Some(b"".as_slice()));
-        assert_eq!(
-            plan.row[3].as_deref(),
-            Some(
-                MysqlCompatibilityProfile::default_mysql8()
-                    .server_version
-                    .as_bytes()
-            )
-        );
-        for sql in ["SELECT @@SESSION.version", "SELECT @@LOCAL.version_comment"] {
-            let parsed =
-                parse_mysql_source(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
-            assert!(matches!(
-                admit_select(&state, &globals, parsed.single_select().unwrap().unwrap()),
-                Err(SelectAdmissionError::Sql(SelectSqlError::GlobalVariable))
-            ));
-        }
-    }
-
-    #[test]
-    fn generated_labels_use_system_names_while_rows_keep_utf8mb4_text() {
-        let (state, globals) = fixture();
-        let parsed = parse_mysql_source(
-            "SELECT 'é', '😀', ' hi ', ' x', ' hi ' AS untrimmed_value",
-            state.sql_modes().unwrap().parser_flags(),
-        )
-        .unwrap();
-        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
-            .ok()
-            .unwrap();
-        for (index, (name, value, width)) in [
-            ("é", "é", 4),
-            ("?", "😀", 4),
-            ("hi ", " hi ", 16),
-            (" x", " x", 8),
-            ("untrimmed_value", " hi ", 16),
-        ]
-        .iter()
-        .enumerate()
-        {
-            assert_eq!(plan.columns[index].name, name.as_bytes());
-            assert_eq!(plan.columns[index].column_length, *width);
-            assert_eq!(plan.row[index].as_deref(), Some(value.as_bytes()));
-        }
-    }
-
-    #[test]
-    fn unimplemented_valid_select_semantics_return_explicit_errors() {
-        let (state, globals) = fixture();
-        for sql in [
-            "SELECT 1 WHERE FALSE",
-            "SELECT 1 LIMIT 0",
-            "SELECT DISTINCT 1",
-            "SELECT 1 ORDER BY 1",
-            "SELECT 1 + 2",
-            "SELECT 3.14",
-            "SELECT 1e2",
-            "SELECT @@global.time_zone",
-            "SELECT @@warning_count",
-        ] {
-            let parsed =
-                parse_mysql_source(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
-            assert!(
-                matches!(
-                    admit_select(&state, &globals, parsed.single_select().unwrap().unwrap()),
-                    Err(SelectAdmissionError::Sql(SelectSqlError::Unsupported))
-                ),
-                "{sql}"
-            );
-        }
-    }
-}
-
 fn check_clauses(query: &Query, select: &Select) -> Result<(), SelectSqlError> {
     // Exhaustive destructuring makes additions to the AST an admission decision.
     let Query {
@@ -632,5 +439,198 @@ fn variable(
             0,
         )),
         _ => Err(SelectSqlError::Unsupported.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use darmok_session::{AutocommitSetting, MysqlCompatibilityProfile, SqlModes};
+    use sqlparser::source::parse_mysql_source;
+
+    fn fixture() -> (SessionState, ServerSetValues) {
+        (
+            SessionState::new(1),
+            ServerSetValues {
+                sql_modes: SqlModes::MYSQL84_DEFAULT,
+                transactions: MysqlCompatibilityProfile::default_mysql8()
+                    .default_transaction_characteristics,
+                autocommit: AutocommitSetting::Enabled,
+            },
+        )
+    }
+
+    #[test]
+    fn local_cells_keep_declared_metadata_separate_from_normalized_values() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT 001, -2 AS negative, 9223372036854775808, 'hé', '', null, (True)",
+            state.sql_modes().unwrap().parser_flags(),
+        )
+        .unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        let observed: Vec<_> = plan
+            .columns
+            .iter()
+            .map(|c| {
+                (
+                    c.name.as_ref(),
+                    c.column_type,
+                    c.column_length,
+                    c.flags,
+                    c.character_set,
+                    c.decimals,
+                )
+            })
+            .collect();
+        assert_eq!(
+            observed,
+            vec![
+                (
+                    b"001".as_slice(),
+                    ty::LONGLONG,
+                    4,
+                    flag::NOT_NULL | flag::BINARY,
+                    63,
+                    0
+                ),
+                (
+                    b"negative".as_slice(),
+                    ty::LONGLONG,
+                    2,
+                    flag::NOT_NULL | flag::BINARY,
+                    63,
+                    0
+                ),
+                (
+                    b"9223372036854775808".as_slice(),
+                    ty::LONGLONG,
+                    19,
+                    flag::NOT_NULL | flag::UNSIGNED | flag::BINARY,
+                    63,
+                    0
+                ),
+                ("hé".as_bytes(), ty::VAR_STRING, 8, flag::NOT_NULL, 45, 31),
+                (b"".as_slice(), ty::VAR_STRING, 0, flag::NOT_NULL, 45, 31),
+                (b"NULL".as_slice(), ty::NULL, 0, flag::BINARY, 63, 0),
+                (
+                    b"(True)".as_slice(),
+                    ty::LONGLONG,
+                    1,
+                    flag::NOT_NULL | flag::BINARY,
+                    63,
+                    0
+                ),
+            ]
+        );
+        assert_eq!(
+            plan.row,
+            vec![
+                Some(Bytes::from_static(b"1")),
+                Some(Bytes::from_static(b"-2")),
+                Some(Bytes::from_static(b"9223372036854775808")),
+                Some(Bytes::from("hé")),
+                Some(Bytes::new()),
+                None,
+                Some(Bytes::from_static(b"1"))
+            ]
+        );
+        assert!(plan.columns.iter().all(|c| c.catalog == b"def".as_slice()
+            && c.schema.is_empty()
+            && c.table.is_empty()
+            && c.org_table.is_empty()
+            && c.org_name.is_empty()));
+    }
+
+    #[test]
+    fn source_labels_and_explicit_global_authority_follow_selected_scope_contract() {
+        let (mut state, mut globals) = fixture();
+        state.set_sql_modes(SqlModes::empty()).unwrap();
+        globals.autocommit = AutocommitSetting::Disabled;
+        let parsed = parse_mysql_source("SELECT ( @@SESSION . AUTOCOMMIT ), @@global.autocommit AS global_auto, @@session.sql_mode, @@GLOBAL.version AS version", state.sql_modes().unwrap().parser_flags()).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        assert_eq!(
+            plan.columns[0].name,
+            b"( @@SESSION . AUTOCOMMIT )".as_slice()
+        );
+        assert_eq!(plan.columns[0].flags, flag::BINARY);
+        assert_eq!(plan.row[0].as_deref(), Some(b"1".as_slice()));
+        assert_eq!(plan.row[1].as_deref(), Some(b"0".as_slice()));
+        assert_eq!(plan.columns[2].column_length, 87380);
+        assert_eq!(plan.columns[2].flags, 0);
+        assert_eq!(plan.row[2].as_deref(), Some(b"".as_slice()));
+        assert_eq!(
+            plan.row[3].as_deref(),
+            Some(
+                MysqlCompatibilityProfile::default_mysql8()
+                    .server_version
+                    .as_bytes()
+            )
+        );
+        for sql in ["SELECT @@SESSION.version", "SELECT @@LOCAL.version_comment"] {
+            let parsed =
+                parse_mysql_source(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
+            assert!(matches!(
+                admit_select(&state, &globals, parsed.single_select().unwrap().unwrap()),
+                Err(SelectAdmissionError::Sql(SelectSqlError::GlobalVariable))
+            ));
+        }
+    }
+
+    #[test]
+    fn generated_labels_use_system_names_while_rows_keep_utf8mb4_text() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT 'é', '😀', ' hi ', ' x', ' hi ' AS untrimmed_value",
+            state.sql_modes().unwrap().parser_flags(),
+        )
+        .unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        for (index, (name, value, width)) in [
+            ("é", "é", 4),
+            ("?", "😀", 4),
+            ("hi ", " hi ", 16),
+            (" x", " x", 8),
+            ("untrimmed_value", " hi ", 16),
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(plan.columns[index].name, name.as_bytes());
+            assert_eq!(plan.columns[index].column_length, *width);
+            assert_eq!(plan.row[index].as_deref(), Some(value.as_bytes()));
+        }
+    }
+
+    #[test]
+    fn unimplemented_valid_select_semantics_return_explicit_errors() {
+        let (state, globals) = fixture();
+        for sql in [
+            "SELECT 1 WHERE FALSE",
+            "SELECT 1 LIMIT 0",
+            "SELECT DISTINCT 1",
+            "SELECT 1 ORDER BY 1",
+            "SELECT 1 + 2",
+            "SELECT 3.14",
+            "SELECT 1e2",
+            "SELECT @@global.time_zone",
+            "SELECT @@warning_count",
+        ] {
+            let parsed =
+                parse_mysql_source(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
+            assert!(
+                matches!(
+                    admit_select(&state, &globals, parsed.single_select().unwrap().unwrap()),
+                    Err(SelectAdmissionError::Sql(SelectSqlError::Unsupported))
+                ),
+                "{sql}"
+            );
+        }
     }
 }
