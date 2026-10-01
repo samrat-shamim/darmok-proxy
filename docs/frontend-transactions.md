@@ -21,7 +21,7 @@ truth with explicit lifetimes. It must also distinguish a frontend transaction
 start from a native transaction opened internally for execution and recovery.
 An internal BEGIN cannot itself consume a frontend one-transaction override.
 
-The [eleven stock cases](mysql-transaction-characteristics.md) provide finite
+The [fourteen stock cases](mysql-transaction-characteristics.md) provide finite
 reference observations. They do not establish a complete command classifier,
 an error matrix or backend equivalence.
 
@@ -80,8 +80,9 @@ distinguish these ordinary forms:
 
 This table is not a supported syntax registry. The corpus exercises explicit
 SESSION variable assignments, bare assignments, unqualified-@@ assignments and
-transaction statements. The listed @@SESSION assignment forms have documentation
-evidence and still need executable cases.
+transaction statements. A further case exercises both listed @@SESSION
+assignment forms, named pending-access replacement between transactions and
+changed defaults with unchanged active choices.
 LOCAL synonyms, DEFAULT expressions, aliases, prepared forms and compound SET
 assignments are also separate verification work. Global or persistent forms
 must not be silently converted into session updates; their behavior is outside
@@ -98,7 +99,7 @@ Case names identify entries in
 | all-four-isolations-and-both-access-modes | Keep isolation/access choices distinct; labels alone do not establish snapshots or write enforcement |
 | next-only-controls-one-explicit-transaction | Select the pending pair for the first start; the later ordinary start uses defaults |
 | session-update-inside-active-keeps-active-modes | Change future defaults while preserving the active pair |
-| per-characteristic-next-updates-compose | The observed access-only next update retains pending isolation; reverse ordering is a planned requirement needing its own case |
+| per-characteristic-next-updates-compose | The observed access-only next update retains pending isolation |
 | session-update-between-transactions-overrides-only-named-next | A session isolation update supersedes pending isolation while retaining pending access |
 | explicit-start-access-overrides-next-and-is-one-only | Explicit START access wins for that transaction; it does not change session defaults |
 | next-only-set-inside-active-rejected-and-prior-work-retained | Both observed next-only SET commands fail with 1568/25001, preserving writes, active choices and later valid work |
@@ -106,15 +107,19 @@ Case names identify entries in
 | autocommit-next-consumed-after-transactional-statement | The observed DO, literal SELECT and setting statements preserve pending choices; the first table COUNT consumes them |
 | completion-chain-retains-active-characteristics | COMMIT AND CHAIN and ROLLBACK AND CHAIN carry active choices despite changed session defaults; a later ordinary start uses defaults |
 | variable-assignment-distinguishes-bare-and-unqualified-at-scope | Preserve the different assignment forms through classification and state updates |
+| reverse-next-updates-preserve-pending-access | The later isolation-only update retains pending access; a subsequent transaction returns to defaults |
+| explicit-access-discards-overridden-next-with-distinct-defaults | In both observed access directions, explicit START overrides the pending access, then the later transaction uses the distinct session access |
+| qualified-session-assignments-update-named-defaults-not-active | A named @@SESSION access update supersedes pending access while retaining pending isolation; active choices stay unchanged after default updates and two later starts use those defaults |
 
 Compose a proposed start per characteristic: explicit supported START choice,
 then pending next choice, then session default. This precedence is established
 for access by the finite explicit-start case; it is not a license to invent
-START isolation syntax. The planned consumption rule removes the pending choices
-for that transaction, including an overridden access choice. In the current
-explicit-start case, session and pending access are both Read Only, so the later
-Read Only transaction cannot prove that the overridden access was cleared.
-That rule needs a reference case with distinct session and pending access values.
+START isolation syntax. Consumption removes the pending choices for that
+transaction, including an overridden access choice. The original explicit-start
+case has equal session/pending access, so it does not distinguish clearing from
+retention. The distinct-defaults case now checks both override directions and
+the later restoration of session access. This establishes those finite
+transitions, not all command or failure variants.
 Do not reset the entire session pair when only one named default is updated.
 
 Chaining derives its new pair from the preceding active pair, as documented
@@ -181,8 +186,7 @@ Before claiming implemented behavior, require:
 1. State transitions independently checked against the declared finite
    reference outcomes, including partial updates and later transactions.
 2. Ordinary reference cases for newly supported SET/read forms, actual failing
-   start/statement boundaries, completion variants and default expressions,
-   plus reverse partial-update order and distinct-value overridden-access reset.
+   start/statement boundaries, completion variants and default expressions.
 3. The actual frontend controller integrated with exclusive native ownership,
    semantic admission, catalog validity, recovery and encoding completion.
 4. MySQL wire/driver evidence on PostgreSQL 17/18 over proxy-created and native

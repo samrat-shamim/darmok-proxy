@@ -3,7 +3,7 @@
 Status: **required finite MySQL reference suite; actual proxy verification is
 pending**. The corpus and runner live in `tests/reference/` and need only this
 checkout, Python 3 and Docker with the selected existing MySQL container/image.
-The observer requires an explicit corpus; the eleven
+The observer requires an explicit corpus; the fourteen
 [transaction-characteristic cases](mysql-transaction-characteristics.md) use
 the same mechanism with separate SQL/data and evidence. Missing dependencies or
 incomplete observations fail the required check.

@@ -1,7 +1,7 @@
 # Stock MySQL transaction characteristics
 
 Status: **finite stock reference evidence; frontend policy is not implemented**.
-The eleven cases in `tests/reference/mysql_transaction_characteristics.json`
+The fourteen cases in `tests/reference/mysql_transaction_characteristics.json`
 observe transaction characteristics on the pinned MySQL 8.4 fixture. They are
 separate from the thirteen [recovery cases](transaction-reference.md).
 
@@ -19,11 +19,14 @@ and AUTOCOMMIT fields are observations, not MySQL packet status flags.
 
 The corpus checks that the transaction instrument and current-event consumer
 are enabled on the stock fixture. It changes no global configuration. Missing
-instrumentation, a missing event, stale/different values or incomplete results
-fail the required observation; they are not skipped or replaced with defaults.
-Boolean completion values remain distinct from integer default/count values.
+instrumentation, a missing event, projected-field mismatches or incomplete
+results fail the required observation; they are not skipped or replaced with
+defaults. The observer does not retain `EVENT_ID` lineage, so these fields cannot
+distinguish a stale event with an identical projection; event identity across
+captures remains unverified. Boolean completion values remain distinct from
+integer default/count values.
 
-The eleven cases cover:
+The fourteen cases cover:
 
 - All four MySQL isolation labels with both access modes, through explicit
   transaction starts and rollback.
@@ -31,7 +34,13 @@ The eleven cases cover:
 - Session changes during a transaction: changed defaults, unchanged active modes.
 - Independently supplied next isolation/access updates and a session update that
   replaces only the named next characteristic before transaction start.
+- Both partial-update orders: the later named choice retains the other pending
+  characteristic. A qualified session access assignment between transactions
+  replaces pending access while preserving pending isolation.
 - START TRANSACTION access overriding the next access for that transaction.
+  Two additional directions use different session and pending access values,
+  then verify the following transaction uses the session access. This makes
+  clearing the overridden next choice distinguishable from retaining it.
 - Both next-only SET forms rejected during an active transaction with error
   1568/25001, while earlier and subsequent writes and active modes remain intact.
 - Next choices consumed by implicit transactions with autocommit disabled, and
@@ -41,6 +50,9 @@ The eleven cases cover:
 - Bare variable assignment changing session defaults, while unqualified
   `SET @@transaction_isolation` / `SET @@transaction_read_only` apply to the next
   transaction. See the [SET TRANSACTION scope rules](https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html).
+- Explicit `@@SESSION` assignments updating named defaults; changes inside an
+  active transaction preserve its isolation/access pair, and two later starts
+  retain the updated defaults.
 
 These observations require a frontend policy to distinguish named session
 updates, pending next updates and the choices of a confirmed active transaction.
@@ -65,14 +77,17 @@ python3 tests/reference/observe_mysql_transactions.py \
   --evidence-dir /tmp/darmok-mysql-transaction-characteristics
 ```
 
-Each case uses its assigned disposable database and a fresh session. Eleven case
-requests plus metadata/setup/cleanup use seventeen SQL clients, two read-only
-image inspections and three local metadata commands. There are thirty-one
+The cases share the run's assigned disposable database, reset their declared
+data and each use a fresh session. Fourteen case requests plus metadata/setup/
+cleanup use twenty SQL clients, two read-only image inspections and three local
+metadata commands. There are forty-one
 transaction-event captures within those requests. These are fixture costs, not
 proxy round trips or a performance measurement. The observer retains exact SQL,
 errors, effects, sources, identity, completion and database-absence receipts.
 CI runs the corpus in the stock MySQL job and retains a separate
 `mysql-transaction-characteristics` artifact, including failed observations.
+The first eleven cases, setup/reset SQL and observer are unchanged; three
+additional cases resolve the finite settings distinctions above.
 
 The fixture establishes labels, defaults, finite boundaries and declared data
 outcomes. It does not execute the proxy or prove isolation snapshots, dirty-read
