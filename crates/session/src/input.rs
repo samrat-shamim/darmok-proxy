@@ -44,8 +44,7 @@ pub enum SessionInputError {
     NotSystemVariableRead,
 }
 
-/// Classify the directly observed SESSION and next-transaction forms. LOCAL
-/// is retained by the parser but its controller integration remains pending;
+/// Classify the directly observed SESSION/LOCAL and next-transaction forms.
 /// GLOBAL is never converted into a session update. A returned intent does not
 /// establish a native isolation mapping or a completed setting boundary.
 pub fn classify_mysql_transaction_setting(
@@ -54,7 +53,7 @@ pub fn classify_mysql_transaction_setting(
     let SetTransaction::Direct { scope, modes } = input else {
         return Err(SessionInputError::UnsupportedTransactionSyntax);
     };
-    if let Some(scope @ (ContextModifier::Local | ContextModifier::Global)) = scope {
+    if let Some(scope @ ContextModifier::Global) = scope {
         return Err(SessionInputError::UnsupportedTransactionScope(*scope));
     }
     let mut isolation = None;
@@ -102,7 +101,9 @@ pub fn classify_mysql_transaction_setting(
     };
     Ok(match scope {
         None => TransactionSettingAssignment::NextTransaction(update),
-        Some(ContextModifier::Session) => TransactionSettingAssignment::SessionTransaction(update),
+        Some(ContextModifier::Session | ContextModifier::Local) => {
+            TransactionSettingAssignment::SessionTransaction(update)
+        }
         Some(scope) => return Err(SessionInputError::UnsupportedTransactionScope(*scope)),
     })
 }

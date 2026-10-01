@@ -483,6 +483,7 @@ impl StdError for NativeBackendDisposeError {
 
 #[cfg(test)]
 mod tests {
+    mod set_controller;
     use std::{future::Future, pin::Pin, task::Context};
 
     use futures_util::task::noop_waker_ref;

@@ -1,7 +1,8 @@
 # SQL session input
 
-Status: parser preservation and input component implemented; SQL session
-controller, value coercion, native effects and output integration pending.
+Status: parser preservation and input component implemented. The separate
+[SET controller](set-controller.md) executes a selected catalog-independent
+subset; general SQL session and wire/driver integration remain pending.
 
 The inherited parser consumed SESSION/LOCAL/GLOBAL before SET TRANSACTION,
 then dropped that scope. It also collapsed direct settings and CHARACTERISTICS
@@ -24,10 +25,10 @@ returns the existing typed SessionTransaction or NextTransaction assignment.
 It does not stage or change state. The staged model still requires submission,
 trusted frontend boundary confirmation and validated output.
 
-LOCAL/GLOBAL scopes, Characteristics and Snapshot forms return explicit errors.
-LOCAL is a syntactic alias declared by the MySQL grammar, but its controller
-integration has not been verified by the current stock corpus. No global
-setting implementation is supplied. Empty or repeated characteristics and
+SESSION and LOCAL both produce session-default assignments, grounded by the
+reviewed [SET observations](mysql-set-semantics.md). GLOBAL, Characteristics
+and Snapshot forms return explicit errors. No global setting implementation
+is supplied. Empty or repeated characteristics and
 non-MySQL isolation choices cannot produce a typed assignment.
 
 The [MySQL scope specification](https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html)
@@ -57,8 +58,9 @@ applies to its own name. The component retains both facts independently. For
 example, in `SET SESSION sql_mode='', @@transaction_isolation='READ-COMMITTED'`,
 the second item retains both its inherited SESSION keyword context and its
 unqualified-@@ form. Their combined transaction target is not guessed.
-Compound scope resolution, expression order, DEFAULT evaluation, coercion,
-warning behavior and atomicity remain controller work.
+The input component does not resolve compound scopes, evaluate expressions,
+coerce values, apply DEFAULT or decide warning behavior. The separate SET
+controller admits its explicitly documented subset.
 
 The separate [stock SET semantics fixture](mysql-set-semantics.md) records
 selected effective scopes, pre-update expression reads and DEFAULT failure
