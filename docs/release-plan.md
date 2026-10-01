@@ -285,6 +285,17 @@ complete release gate runs once on the final candidate.
   catalog validity, performance and M2/M4 remain pending. Security-related work
   remains deferred.
 
+- The [SQL session input component](session-sql-input.md) fixes dropped keyword
+  scope in the transaction-setting AST and preserves direct, characteristics and
+  snapshot forms distinctly. Direct SESSION/next settings produce typed intents;
+  borrowed variable assignment/read views retain keyword context and @@ forms
+  without guessing values or compound targets. Ordinary parser/model input
+  tests run with `cargo test -p darmok-session --locked`. Exact candidate,
+  command, review and CI records are retained outside the distribution. The
+  stock corpora remain unchanged. Coercion, scope-specific values, native
+  effects, syntax admission, output integration, performance and M2/M4 remain
+  pending. Security-related work remains deferred.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

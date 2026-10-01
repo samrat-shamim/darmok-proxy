@@ -1,3 +1,4 @@
+// Modified for Darmok: test transaction-setting syntax and keyword scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -9145,11 +9146,7 @@ fn parse_set_transaction() {
     // TRANSACTION, so no need to duplicate the tests here. We just do a quick
     // sanity check.
     match verified_stmt("SET TRANSACTION READ ONLY, READ WRITE, ISOLATION LEVEL SERIALIZABLE") {
-        Statement::Set(Set::SetTransaction {
-            modes,
-            session,
-            snapshot,
-        }) => {
+        Statement::Set(Set::SetTransaction(SetTransaction::Direct { modes, scope })) => {
             assert_eq!(
                 modes,
                 vec![
@@ -9158,10 +9155,31 @@ fn parse_set_transaction() {
                     TransactionMode::IsolationLevel(TransactionIsolationLevel::Serializable),
                 ]
             );
-            assert!(!session);
-            assert_eq!(snapshot, None);
+            assert_eq!(scope, None);
         }
         _ => unreachable!(),
+    }
+}
+
+#[test]
+fn parse_set_transaction_preserves_keyword_scope() {
+    for (prefix, scope) in [
+        ("", None),
+        ("SESSION ", Some(ContextModifier::Session)),
+        ("LOCAL ", Some(ContextModifier::Local)),
+        ("GLOBAL ", Some(ContextModifier::Global)),
+    ] {
+        let sql = format!("SET {prefix}TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY");
+        assert_eq!(
+            verified_stmt(&sql),
+            Statement::Set(Set::SetTransaction(SetTransaction::Direct {
+                scope,
+                modes: vec![
+                    TransactionMode::IsolationLevel(TransactionIsolationLevel::ReadCommitted),
+                    TransactionMode::AccessMode(TransactionAccessMode::ReadOnly),
+                ],
+            }))
+        );
     }
 }
 

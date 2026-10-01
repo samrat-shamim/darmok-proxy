@@ -1,4 +1,5 @@
-// Modified for Darmok: simplify match guards and remove raw mode-string parsing.
+// Modified for Darmok: simplify match guards, remove raw mode-string parsing,
+// and preserve transaction-setting syntax and keyword scope.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15188,27 +15189,24 @@ impl<'a> Parser<'a> {
             .into());
         } else if self.parse_keyword(Keyword::CHARACTERISTICS) {
             self.expect_keywords(&[Keyword::AS, Keyword::TRANSACTION])?;
-            return Ok(Set::SetTransaction {
+            return Ok(Set::SetTransaction(SetTransaction::Characteristics {
+                scope,
                 modes: self.parse_transaction_modes()?,
-                snapshot: None,
-                session: true,
-            }
+            })
             .into());
         } else if self.parse_keyword(Keyword::TRANSACTION) {
             if self.parse_keyword(Keyword::SNAPSHOT) {
                 let snapshot_id = self.parse_value()?;
-                return Ok(Set::SetTransaction {
-                    modes: vec![],
-                    snapshot: Some(snapshot_id),
-                    session: false,
-                }
+                return Ok(Set::SetTransaction(SetTransaction::Snapshot {
+                    scope,
+                    value: snapshot_id,
+                })
                 .into());
             }
-            return Ok(Set::SetTransaction {
+            return Ok(Set::SetTransaction(SetTransaction::Direct {
+                scope,
                 modes: self.parse_transaction_modes()?,
-                snapshot: None,
-                session: false,
-            }
+            })
             .into());
         } else if self.parse_keyword(Keyword::AUTHORIZATION) {
             let scope = match scope {

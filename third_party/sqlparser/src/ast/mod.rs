@@ -1,3 +1,4 @@
+// Modified for Darmok: preserve transaction-setting syntax and keyword scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -3205,7 +3206,7 @@ pub enum Set {
     /// SET a = 1;
     /// `SET var = value` (standard SQL-style assignment).
     SingleAssignment {
-        /// Optional scope modifier (`SESSION` / `LOCAL`).
+        /// Optional scope modifier (`SESSION` / `LOCAL` / `GLOBAL`).
         scope: Option<ContextModifier>,
         /// Whether this is a Hive-style `HIVEVAR:` assignment.
         hivevar: bool,
@@ -3292,14 +3293,66 @@ pub enum Set {
     /// ```sql
     /// SET TRANSACTION ...
     /// ```
-    SetTransaction {
-        /// Transaction modes (e.g., ISOLATION LEVEL, READ ONLY).
+    SetTransaction(SetTransaction),
+}
+
+/// Distinct transaction-setting syntax, with its original keyword scope.
+/// This represents syntax rather than a dialect's execution or scope policy.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum SetTransaction {
+    /// `SET [scope] TRANSACTION <modes>`.
+    Direct {
+        /// Original keyword scope, without dialect-specific interpretation.
+        scope: Option<ContextModifier>,
+        /// Transaction characteristics in source order.
         modes: Vec<TransactionMode>,
-        /// Optional snapshot value for transaction snapshot control.
-        snapshot: Option<ValueWithSpan>,
-        /// `true` when the `SESSION` keyword was used.
-        session: bool,
     },
+    /// `SET [scope] CHARACTERISTICS AS TRANSACTION <modes>`.
+    Characteristics {
+        /// Original keyword scope, without dialect-specific interpretation.
+        scope: Option<ContextModifier>,
+        /// Transaction characteristics in source order.
+        modes: Vec<TransactionMode>,
+    },
+    /// `SET [scope] TRANSACTION SNAPSHOT <value>`.
+    Snapshot {
+        /// Original keyword scope, without dialect-specific interpretation.
+        scope: Option<ContextModifier>,
+        /// Snapshot identifier value.
+        value: ValueWithSpan,
+    },
+}
+
+impl Display for SetTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let scope = match self {
+            Self::Direct { scope, .. }
+            | Self::Characteristics { scope, .. }
+            | Self::Snapshot { scope, .. } => scope,
+        };
+        f.write_str("SET ")?;
+        if let Some(scope) = scope {
+            write!(f, "{scope}")?;
+        }
+        match self {
+            Self::Direct { modes, .. } => {
+                f.write_str("TRANSACTION")?;
+                if !modes.is_empty() {
+                    write!(f, " {}", display_comma_separated(modes))?;
+                }
+            }
+            Self::Characteristics { modes, .. } => {
+                f.write_str("CHARACTERISTICS AS TRANSACTION")?;
+                if !modes.is_empty() {
+                    write!(f, " {}", display_comma_separated(modes))?;
+                }
+            }
+            Self::Snapshot { value, .. } => write!(f, "TRANSACTION SNAPSHOT {value}")?,
+        }
+        Ok(())
+    }
 }
 
 impl Display for Set {
@@ -3327,24 +3380,7 @@ impl Display for Set {
             }
             Self::SetSessionAuthorization(kind) => write!(f, "SET SESSION AUTHORIZATION {kind}"),
             Self::SetSessionParam(kind) => write!(f, "SET {kind}"),
-            Self::SetTransaction {
-                modes,
-                snapshot,
-                session,
-            } => {
-                if *session {
-                    write!(f, "SET SESSION CHARACTERISTICS AS TRANSACTION")?;
-                } else {
-                    write!(f, "SET TRANSACTION")?;
-                }
-                if !modes.is_empty() {
-                    write!(f, " {}", display_comma_separated(modes))?;
-                }
-                if let Some(snapshot_id) = snapshot {
-                    write!(f, " SNAPSHOT {snapshot_id}")?;
-                }
-                Ok(())
-            }
+            Self::SetTransaction(transaction) => transaction.fmt(f),
             Self::SetTimeZone { local, value } => {
                 f.write_str("SET ")?;
                 if *local {

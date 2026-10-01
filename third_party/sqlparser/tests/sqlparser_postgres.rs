@@ -1,3 +1,4 @@
+// Modified for Darmok: test distinct transaction-setting syntax and scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -3285,25 +3286,37 @@ fn test_transaction_statement() {
     let statement = pg().verified_stmt("SET TRANSACTION SNAPSHOT '000003A1-1'");
     assert_eq!(
         statement,
-        Statement::Set(Set::SetTransaction {
-            modes: vec![],
-            snapshot: Some(Value::SingleQuotedString(String::from("000003A1-1")).with_empty_span()),
-            session: false
-        })
+        Statement::Set(Set::SetTransaction(SetTransaction::Snapshot {
+            scope: None,
+            value: Value::SingleQuotedString(String::from("000003A1-1")).with_empty_span(),
+        }))
     );
     let statement = pg().verified_stmt("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY, READ WRITE, ISOLATION LEVEL SERIALIZABLE");
     assert_eq!(
         statement,
-        Statement::Set(Set::SetTransaction {
+        Statement::Set(Set::SetTransaction(SetTransaction::Characteristics {
+            scope: Some(ContextModifier::Session),
             modes: vec![
                 TransactionMode::AccessMode(TransactionAccessMode::ReadOnly),
                 TransactionMode::AccessMode(TransactionAccessMode::ReadWrite),
                 TransactionMode::IsolationLevel(TransactionIsolationLevel::Serializable),
             ],
-            snapshot: None,
-            session: true
-        })
+        }))
     );
+}
+
+#[test]
+fn transaction_setting_source_forms_remain_distinct() {
+    for sql in [
+        "SET TRANSACTION READ ONLY",
+        "SET LOCAL TRANSACTION READ ONLY",
+        "SET CHARACTERISTICS AS TRANSACTION READ ONLY",
+        "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY",
+        "SET LOCAL TRANSACTION SNAPSHOT '000003A1-1'",
+    ] {
+        // Parse/format preservation, not PostgreSQL execution certification.
+        assert_eq!(pg().verified_stmt(sql).to_string(), sql);
+    }
 }
 
 #[test]

@@ -2,9 +2,11 @@
 
 Status: **typed setting/staging component implemented; frontend controller and
 transaction equivalence pending**. `darmok-session` owns typed transaction
-choices and ordered command stages. It does not classify or execute SQL,
-validate native receipts, encode output or map frontend choices to the
-[native transaction choices](native-transactions.md).
+choices and ordered command stages. Its separate
+[SQL input component](session-sql-input.md) classifies direct transaction settings
+and retains variable syntax facts.
+Neither component executes SQL, validates native receipts, encodes output or
+maps frontend choices to the [native transaction choices](native-transactions.md).
 
 ## Why the inherited representation was replaced
 
@@ -57,18 +59,19 @@ choices from ambient PostgreSQL configuration.
 
 `transaction_settings()` returns an immutable copy of settled choices.
 Canonical internal reads of `transaction_isolation`, `transaction_read_only`
-and `autocommit` derive from that same state; their generic setter returns an
-error. The generic map is private and stores only declared nontransaction names.
+and `autocommit` derive from that same state. The generic setter and variable
+map have been removed. Other canonical values follow the
+[closed variable contract](session-variable-values.md).
 `SessionState` cannot be cloned to escape a borrowed command stage.
 
 The canonical variable interface accepts internal names, not SQL expressions:
 it rejects scoped references and the old `tx_isolation` alias. Its isolation
 value is a string and its access/autocommit values are internal unsigned zero/
 one values. These representations do not certify MySQL result types, signedness
-or packet metadata. Unqualified SQL reads, aliases and other scopes still need
-their own classification, observations and wire evidence. Nontransaction
-variable values and other extracted session fields remain scaffolding rather
-than an implemented SQL session controller.
+or packet metadata. The SQL input view retains unqualified and scoped reference
+forms without selecting their values. Scope-specific lookup, aliases,
+observations and wire evidence remain separate work. Nontransaction variable
+values do not constitute an implemented SQL session controller.
 
 ## Preserve assignment form until semantic classification
 
@@ -92,10 +95,14 @@ SESSION variable assignments, bare assignments, unqualified-@@ assignments and
 transaction statements. A further case exercises both listed @@SESSION
 assignment forms, named pending-access replacement between transactions and
 changed defaults with unchanged active choices.
-LOCAL synonyms, DEFAULT expressions, aliases, prepared forms and compound SET
-assignments are also separate verification work. Global or persistent forms
-must not be silently converted into session updates; their behavior is outside
-this controller contract. No global setting implementation is proposed here.
+The parser retains LOCAL syntax, and the direct command classifier returns an
+explicit unimplemented-scope error for it. LOCAL controller integration,
+DEFAULT expressions, aliases, prepared forms and compound SET semantics remain
+separate verification work. The input view retains compound keyword context and
+per-name qualifiers independently; it does not apply their values. Global or
+persistent forms must not be silently converted into session updates; their
+behavior is outside this controller contract. No global setting implementation
+is proposed here.
 
 ## Reference boundaries and state transitions
 

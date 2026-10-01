@@ -1,5 +1,6 @@
 pub mod charset;
 pub mod compatibility;
+pub mod input;
 pub mod prepared_stmts;
 pub mod sql_mode;
 pub mod state;
@@ -13,6 +14,11 @@ pub use charset::{
 pub use compatibility::{
     CharsetInfo, MYSQL8_COMPATIBILITY_PROFILE, MysqlCharset, MysqlCompatibilityProfile,
     MysqlStorageEngine,
+};
+pub use input::{
+    SessionInputError, SystemVariableAssignment, SystemVariableAssignments, SystemVariableForm,
+    SystemVariableRead, classify_mysql_system_variable_read, classify_mysql_transaction_setting,
+    mysql_system_variable_assignments,
 };
 pub use prepared_stmts::{
     PreparedStatement, PreparedStatementError, PreparedStatementLimits, PreparedStatementRegistry,
