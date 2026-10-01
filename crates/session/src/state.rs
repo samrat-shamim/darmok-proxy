@@ -3,6 +3,14 @@ use std::collections::HashMap;
 use darmok_types::value::Value;
 
 use crate::compatibility::MysqlCompatibilityProfile;
+use crate::transaction::{
+    AutocommitSetting, FrontendTransactionAccess, FrontendTransactionCommand,
+    TransactionCommandStage, TransactionSettings, TransactionSettingsError,
+    TransactionSettingsSnapshot, UnconfirmedTransactionCommand,
+};
+use crate::variables::{
+    SessionVariableError, SessionVariableStore, canonical_name, is_transaction_variable,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WarningLevel {
@@ -28,18 +36,6 @@ pub struct SessionWarning {
     pub message: String,
 }
 
-/// Tracks the lifecycle of a transaction within a session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TransactionState {
-    /// No active transaction.
-    #[default]
-    Idle,
-    /// A transaction is in progress.
-    Active,
-    /// The transaction has encountered an error and must be rolled back.
-    Failed,
-}
-
 /// Fields from session state relevant for translation cache fingerprinting.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TranslationFingerprint {
@@ -51,11 +47,11 @@ pub struct TranslationFingerprint {
     pub character_set_connection: String,
     pub character_set_results: String,
     pub timezone: String,
-    pub transaction_isolation: String,
+    pub transactions: TransactionSettingsSnapshot,
 }
 
 /// Per-connection session state that mirrors what a MySQL client expects.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct SessionState {
     pub connection_id: u32,
     pub database: Option<String>,
@@ -65,10 +61,7 @@ pub struct SessionState {
     pub collation: String,
     pub timezone: String,
     pub sql_mode: String,
-    /// MySQL transaction isolation level (default "READ-COMMITTED").
-    pub transaction_isolation: String,
-    pub autocommit: bool,
-    pub transaction_state: TransactionState,
+    transactions: TransactionSettings,
     pub client_capabilities: u32,
     pub last_insert_id: u64,
     pub affected_rows: u64,
@@ -76,8 +69,9 @@ pub struct SessionState {
     pub warnings: u16,
     pub found_rows: u64,
     pub warning_stack: Vec<SessionWarning>,
-    /// Storage for session-level system variables (e.g. `@@sql_mode`).
-    pub system_variables: HashMap<String, Value>,
+    /// Canonical nontransaction variable values only. Transaction variables
+    /// cannot be independently inserted or changed through the generic store.
+    system_variables: HashMap<String, Value>,
 }
 
 impl Default for SessionState {
@@ -91,9 +85,7 @@ impl Default for SessionState {
             collation: default_collation.collation.to_owned(),
             timezone: profile.default_time_zone.to_owned(),
             sql_mode: profile.default_sql_mode.to_owned(),
-            transaction_isolation: profile.default_transaction_isolation.to_owned(),
-            autocommit: true,
-            transaction_state: TransactionState::default(),
+            transactions: TransactionSettings::new(profile.default_transaction_characteristics),
             client_capabilities: 0,
             last_insert_id: 0,
             affected_rows: 0,
@@ -116,48 +108,60 @@ impl SessionState {
     }
 
     /// Extract session fields relevant for translation cache fingerprinting.
-    pub fn translation_fingerprint(&self) -> TranslationFingerprint {
+    pub fn translation_fingerprint(&self) -> Result<TranslationFingerprint, SessionVariableError> {
+        let transactions = self.transactions.snapshot()?;
         let profile = MysqlCompatibilityProfile::default_mysql8();
-        TranslationFingerprint {
+        Ok(TranslationFingerprint {
             database: self.database.clone(),
             sql_mode: self.sql_mode.clone(),
             charset_id: self.charset_id,
             collation: self.collation.clone(),
-            character_set_client: self
-                .system_variable_string_or_default("character_set_client", profile.default_charset),
+            character_set_client: self.system_variable_string_or_default(
+                "character_set_client",
+                profile.default_charset,
+            )?,
             character_set_connection: self.system_variable_string_or_default(
                 "character_set_connection",
                 profile.default_charset,
-            ),
+            )?,
             character_set_results: self.system_variable_string_or_default(
                 "character_set_results",
                 profile.default_charset,
-            ),
+            )?,
             timezone: self.timezone.clone(),
-            transaction_isolation: self.transaction_isolation.clone(),
+            transactions,
+        })
+    }
+
+    fn system_variable_string_or_default(
+        &self,
+        name: &str,
+        default: &str,
+    ) -> Result<String, SessionVariableError> {
+        match self.system_variables.get(name) {
+            Some(Value::String(value)) => Ok(value.to_string()),
+            None => Ok(default.to_owned()),
+            Some(_) => Err(SessionVariableError::NonStringTranslationValue(
+                name.to_owned(),
+            )),
         }
     }
 
-    pub fn system_variable_string_or_default(&self, name: &str, default: &str) -> String {
-        match self.system_variables.get(name) {
-            Some(Value::String(value)) => value.to_string(),
-            Some(Value::Bool(value)) => {
-                if *value {
-                    "1".to_owned()
-                } else {
-                    "0".to_owned()
-                }
-            }
-            Some(Value::Int(value)) => value.to_string(),
-            Some(Value::UInt(value)) => value.to_string(),
-            Some(Value::Float(value)) => value.to_string(),
-            Some(Value::Decimal(value)) => value.to_string(),
-            Some(Value::Bytes(value)) => String::from_utf8_lossy(value).into_owned(),
-            Some(Value::Null) | None => default.to_owned(),
-            Some(Value::Date { .. } | Value::Time { .. } | Value::DateTime { .. }) => {
-                default.to_owned()
-            }
-        }
+    pub fn transaction_settings(
+        &self,
+    ) -> Result<TransactionSettingsSnapshot, TransactionSettingsError> {
+        self.transactions.snapshot()
+    }
+
+    pub fn stage_transaction_command(
+        &mut self,
+        command: FrontendTransactionCommand,
+    ) -> Result<TransactionCommandStage<'_>, TransactionSettingsError> {
+        self.transactions.stage(command)
+    }
+
+    pub fn unconfirmed_transaction_command(&self) -> Option<UnconfirmedTransactionCommand> {
+        self.transactions.unconfirmed()
     }
 
     pub fn clear_warning_stack(&mut self) {
@@ -190,6 +194,38 @@ impl SessionState {
     }
 }
 
+impl SessionVariableStore for SessionState {
+    fn get_system_var(&self, name: &str) -> Result<Option<Value>, SessionVariableError> {
+        let canonical = canonical_name(name)?;
+        let state = self.transactions.snapshot()?;
+        if is_transaction_variable(&canonical) {
+            return Ok(Some(match canonical.as_str() {
+                "transaction_isolation" => {
+                    Value::String(state.defaults.isolation.variable_label().into())
+                }
+                "transaction_read_only" => Value::UInt(u64::from(
+                    state.defaults.access == FrontendTransactionAccess::ReadOnly,
+                )),
+                "autocommit" => {
+                    Value::UInt(u64::from(state.autocommit == AutocommitSetting::Enabled))
+                }
+                _ => unreachable!("canonical transaction variable checked above"),
+            }));
+        }
+        Ok(self.system_variables.get(&canonical).cloned())
+    }
+
+    fn set_system_var(&mut self, name: &str, value: Value) -> Result<(), SessionVariableError> {
+        let canonical = canonical_name(name)?;
+        self.transactions.snapshot()?;
+        if is_transaction_variable(&canonical) {
+            return Err(SessionVariableError::TransactionCommandRequired);
+        }
+        self.system_variables.insert(canonical, value);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,12 +249,17 @@ mod tests {
         assert_eq!(state.collation, profile.default_collation);
         assert_eq!(state.timezone, profile.default_time_zone);
         assert_eq!(state.sql_mode, profile.default_sql_mode);
+        let transactions = state.transaction_settings().unwrap();
         assert_eq!(
-            state.transaction_isolation,
-            profile.default_transaction_isolation
+            transactions.defaults,
+            profile.default_transaction_characteristics
         );
-        assert!(state.autocommit);
-        assert_eq!(state.transaction_state, TransactionState::Idle);
+        assert_eq!(transactions.autocommit, AutocommitSetting::Enabled);
+        assert_eq!(transactions.active, None);
+        assert_eq!(
+            transactions.next,
+            crate::transaction::NextTransactionCharacteristics::default()
+        );
         assert_eq!(state.client_capabilities, 0);
         assert_eq!(state.last_insert_id, 0);
         assert_eq!(state.affected_rows, 0);
@@ -237,12 +278,15 @@ mod tests {
         left.collation = "utf8mb4_unicode_ci".to_owned();
         left.timezone = "+00:00".to_owned();
         left.sql_mode = "ANSI_QUOTES,STRICT_TRANS_TABLES".to_owned();
-        left.transaction_isolation = "READ-COMMITTED".to_owned();
+        let mut right = SessionState::new(7);
+        right.database = left.database.clone();
+        right.charset_id = left.charset_id;
+        right.collation = left.collation.clone();
+        right.timezone = left.timezone.clone();
+        right.sql_mode = left.sql_mode.clone();
 
-        let right = left.clone();
-
-        let left_fingerprint = left.translation_fingerprint();
-        let right_fingerprint = right.translation_fingerprint();
+        let left_fingerprint = left.translation_fingerprint().unwrap();
+        let right_fingerprint = right.translation_fingerprint().unwrap();
 
         assert_eq!(left_fingerprint, right_fingerprint);
         assert_eq!(
@@ -254,19 +298,16 @@ mod tests {
     #[test]
     fn translation_fingerprint_includes_rewritten_charset_variables() {
         let mut left = SessionState::new(7);
-        let mut right = left.clone();
+        let mut right = SessionState::new(7);
 
-        left.system_variables.insert(
-            "character_set_results".to_owned(),
-            Value::String("utf8mb4".into()),
-        );
-        right.system_variables.insert(
-            "character_set_results".to_owned(),
-            Value::String("binary".into()),
-        );
+        left.set_system_var("character_set_results", Value::String("utf8mb4".into()))
+            .unwrap();
+        right
+            .set_system_var("character_set_results", Value::String("binary".into()))
+            .unwrap();
 
-        let left_fingerprint = left.translation_fingerprint();
-        let right_fingerprint = right.translation_fingerprint();
+        let left_fingerprint = left.translation_fingerprint().unwrap();
+        let right_fingerprint = right.translation_fingerprint().unwrap();
 
         assert_ne!(left_fingerprint, right_fingerprint);
         assert_ne!(

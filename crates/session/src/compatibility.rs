@@ -1,5 +1,9 @@
 use darmok_types::mysql_const;
 
+use crate::transaction::{
+    FrontendIsolation, FrontendTransactionAccess, TransactionCharacteristics,
+};
+
 /// One authoritative MySQL compatibility profile for the proxy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MysqlCompatibilityProfile {
@@ -10,7 +14,7 @@ pub struct MysqlCompatibilityProfile {
     pub default_collation: &'static str,
     pub default_sql_mode: &'static str,
     pub default_time_zone: &'static str,
-    pub default_transaction_isolation: &'static str,
+    pub default_transaction_characteristics: TransactionCharacteristics,
     pub max_allowed_packet: u64,
     pub wait_timeout_seconds: u64,
     pub interactive_timeout_seconds: u64,
@@ -61,7 +65,10 @@ pub static MYSQL8_COMPATIBILITY_PROFILE: MysqlCompatibilityProfile = MysqlCompat
     default_collation: "utf8mb4_general_ci",
     default_sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
     default_time_zone: "UTC",
-    default_transaction_isolation: "READ-COMMITTED",
+    default_transaction_characteristics: TransactionCharacteristics {
+        isolation: FrontendIsolation::RepeatableRead,
+        access: FrontendTransactionAccess::ReadWrite,
+    },
     max_allowed_packet: 67_108_864,
     wait_timeout_seconds: 28_800,
     interactive_timeout_seconds: 28_800,

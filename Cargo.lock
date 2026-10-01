@@ -264,6 +264,7 @@ name = "darmok-session"
 version = "0.1.0"
 dependencies = [
  "darmok-types",
+ "serde_json",
  "thiserror",
 ]
 
