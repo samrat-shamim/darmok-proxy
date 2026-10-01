@@ -462,3 +462,53 @@ async fn set_controller_autocommit_commit_has_native_table_effect_and_then_setti
     );
     let _ = backend.dispose().await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn set_controller_unsupported_default_fails_admission_before_settings_or_commit() {
+    let mut backend = connect_backend().await;
+    setup(&backend, "CREATE TEMP TABLE set_support (id integer PRIMARY KEY, n integer NOT NULL); INSERT INTO set_support VALUES (0,0)").await;
+    let (mut state, mut globals) = set_fixture();
+    globals.sql_modes = SqlModes::empty().with(SqlMode::PadCharToFullLength);
+    let before = state.translation_fingerprint().unwrap();
+    let (outcome, bytes) = set_request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET autocommit=0, sql_mode=DEFAULT",
+    )
+    .await;
+    set_error(outcome, &bytes, SetSqlError::Unsupported);
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
+    set_success(
+        set_request(&mut state, &mut backend, &globals, "SET autocommit=0")
+            .await
+            .0,
+    );
+    fixture_start(&mut state, &mut backend).await;
+    setup(&backend, "UPDATE set_support SET n=7 WHERE id=0").await;
+    let before = state.translation_fingerprint().unwrap();
+    let (outcome, bytes) = set_request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET autocommit=1, sql_mode=DEFAULT",
+    )
+    .await;
+    set_error(outcome, &bytes, SetSqlError::Unsupported);
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
+    assert_eq!(
+        backend.state(),
+        NativeBackendState::Ready(TransactionState::Transaction)
+    );
+    fixture_rollback(&mut state, &mut backend).await;
+    assert_eq!(
+        client(&backend)
+            .query_one("SELECT n FROM set_support WHERE id=0", &[])
+            .await
+            .unwrap()
+            .get::<_, i32>(0),
+        0
+    );
+    let _ = backend.dispose().await.unwrap();
+}

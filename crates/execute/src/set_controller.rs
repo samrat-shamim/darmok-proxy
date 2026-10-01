@@ -94,7 +94,7 @@ enum TypedValue {
 }
 #[derive(Debug, Clone, Copy)]
 enum PlannedValue {
-    Default,
+    Default(TypedValue),
     Checked(TypedValue),
 }
 #[derive(Debug, Clone, Copy)]
@@ -151,7 +151,7 @@ pub async fn execute_mysql_set<W: AsyncWrite + Unpin>(
         Ok(actions) => {
             let mut error = None;
             for action in actions {
-                if let Err(sql_error) = apply_action(&mut stage, backend, globals, action).await? {
+                if let Err(sql_error) = apply_action(&mut stage, backend, action).await? {
                     error = Some(sql_error);
                     break;
                 }
@@ -247,7 +247,9 @@ fn admit_set(
         }
         let value = if matches!(input.value, Expr::Identifier(name) if name.quote_style.is_none() && name.value.eq_ignore_ascii_case("DEFAULT"))
         {
-            PlannedValue::Default
+            // Implementation support is an admission gate even for DEFAULT.
+            // The active-next check still belongs to its update position.
+            PlannedValue::Default(default_value(globals, input.variable)?)
         } else {
             let value = coerce(input.variable, evaluate(state, globals, input.value)?)?;
             check_phase(input.variable, form, value, before)?;
@@ -455,20 +457,25 @@ fn default_value(
     globals: &ServerSetValues,
     variable: SessionVariable,
 ) -> Result<TypedValue, SetSqlError> {
-    coerce(
-        variable,
-        match global_value(globals, variable)? {
-            Value::String(value) => EvaluatedValue::String(Cow::Owned(value.into())),
-            Value::UInt(value) => EvaluatedValue::Unsigned(value),
-            _ => return Err(SetSqlError::Unsupported),
-        },
-    )
+    Ok(match variable {
+        SessionVariable::SqlMode => {
+            if mode_warning_needed(globals.sql_modes) {
+                return Err(SetSqlError::Unsupported);
+            }
+            TypedValue::Modes(globals.sql_modes)
+        }
+        SessionVariable::TransactionIsolation => {
+            TypedValue::Isolation(globals.transactions.isolation)
+        }
+        SessionVariable::TransactionReadOnly => TypedValue::Access(globals.transactions.access),
+        SessionVariable::Autocommit => TypedValue::Autocommit(globals.autocommit),
+        _ => return Err(SetSqlError::Unsupported),
+    })
 }
 
 async fn apply_action(
     stage: &mut SessionSetStage<'_>,
     backend: &mut NativeBackend,
-    globals: &ServerSetValues,
     action: SetAction,
 ) -> Result<Result<(), SetSqlError>, SetExecutionError> {
     let SetAction::Variable {
@@ -484,7 +491,7 @@ async fn apply_action(
     };
     let value = match value {
         PlannedValue::Checked(value) => value,
-        PlannedValue::Default => match default_value(globals, variable).and_then(|value| {
+        PlannedValue::Default(value) => match (|| {
             check_phase(
                 variable,
                 form,
@@ -495,7 +502,7 @@ async fn apply_action(
                     .transactions,
             )?;
             Ok(value)
-        }) {
+        })() {
             Ok(value) => value,
             Err(error) => return Ok(Err(error)),
         },

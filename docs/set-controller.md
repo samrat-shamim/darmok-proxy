@@ -16,15 +16,18 @@ update next choices. These distinctions follow the reviewed
 Values are selected string/boolean/integer literals, ON/OFF and reads of these
 four variables with ordinary session or global scope. Server global values are
 an explicitly supplied `ServerSetValues` authority. DEFAULT reads that authority
-at its ordered update position, including late checks; it does not use ambient
-PostgreSQL defaults. Global writes are not implemented. Numeric mode assignments
+from the immutable values supplied for this command; its transaction-state
+checks run at its ordered update position. It does not use ambient PostgreSQL
+defaults. Global writes are not implemented. Numeric mode assignments
 support zero and the observed four/ANSI_QUOTES value; other numeric mode masks
 fail explicitly. Warning-producing SQL modes, general coercion, functions,
 arithmetic, user variables, subqueries, prepared forms and other settings are
 unimplemented and return an explicit 1235/42000 error before ordinary updates.
 
-All ordinary expressions read pre-update values, and all ordinary checks precede
-updates. An ordinary invalid value or active next-choice failure prevents every
+Support for every expression/value, including DEFAULT, is checked before effects.
+This prevents an unsupported DEFAULT from following an irreversible native
+commit. All ordinary expressions read pre-update values, and all ordinary
+semantic checks precede updates. An ordinary invalid value or active next-choice failure prevents every
 update. DEFAULT checks instead run in update order: a later 1568/25001 leaves an
 earlier confirmed mode change in place, while a first DEFAULT failure prevents
 later updates. A known SQL error is encoded, sent, recorded as an error diagnostic
@@ -59,10 +62,11 @@ separate gates.
 ## Verification boundary
 
 Two ordinary guard tests verify retained partial outcomes and unavailable
-authorities. Nine new required native-owner tests exercise parsed SET inputs,
+authorities. Ten new required native-owner tests exercise parsed SET inputs,
 scope/next choices, pre-update reads, ordinary validation, DEFAULT error order,
 retained PostgreSQL data and rollback, global DEFAULT authority, selected
-coercions, response bytes, and a native autocommit commit with lasting data.
+coercions, response bytes, a native autocommit commit with lasting data, and
+unsupported DEFAULT admission before changes or commit.
 They are selected controller postconditions derived from the reference corpus,
 not execution of all nineteen complete MySQL scripts through a proxy.
 
