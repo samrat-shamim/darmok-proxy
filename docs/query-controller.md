@@ -17,8 +17,8 @@ These rules follow the pinned MySQL 8.4.11 grammar, revision
 kept outside the Apache distribution. The parser is not a complete MySQL
 grammar validator, and support remains limited to the selected SET shapes.
 
-The complete command is parsed before any effect. A statement batch or any
-other statement returns 1235/42000 before an earlier SET can update settings or
+The complete command is parsed before any effect. A successfully parsed batch or any
+other parsed statement returns 1235/42000 before an earlier SET can update settings or
 commit a transaction. Batch execution is unimplemented regardless of client
 capabilities; empty/comment-only input is also explicitly unimplemented.
 A parser failure returns 1064/42000 with project wording. General MySQL error
@@ -48,7 +48,13 @@ observations for the assignment operators, pre-update reads and both direct
 characteristic orders. Its unchanged observer and required CI step preserve
 version/image identity, exact output and completion/cleanup receipts. These
 observations certify the stock expectation, not a full differential run through
-a proxy. Current local verification evidence is recorded in the release plan.
+a proxy. At `042b374a89121b025c701d30fdd94d967edfba5a`, all fourteen native groups
+pass on PostgreSQL 17.11 and 18.6, both workspace suites and strict local checks
+pass, and independent passive source review has no unresolved finding. The
+review audited saved execution receipts without independently running tests.
+Stock observations remain bound to clean `29ab912`; the one-file correction
+changes only a foreign-dialect classifier test. Exact commands, environments,
+counts and evidence boundaries are recorded in the release plan.
 
 The command decodes one owned SQL string using the existing protocol decoder
 and parses it once. Parsing creates tokens and the statement AST; admission

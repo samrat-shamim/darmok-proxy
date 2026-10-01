@@ -399,9 +399,34 @@ complete release gate runs once on the final candidate.
   SQL diagnostics. Ten native SET groups use the real query source path and
   four new groups declare source/mode/batch postconditions; four new stock
   observations declare ordinary operator/characteristic expectations.
-  Current-revision execution, independent review and exact receipts are pending.
-  This does not establish a runnable frontend loop, row results, real-driver
-  compatibility or M2/M4 completion. Security and compiler work remain excluded.
+  At `042b374a89121b025c701d30fdd94d967edfba5a`, fourteen required native
+  groups pass on PostgreSQL 17.11 and 18.6. Exact commands are the selected
+  native command listed above, both workspace commands, strict Clippy,
+  formatting, repository boundary checks and
+  `git diff --check b8ef2af0662308b0d5f4243fd8e0b53782c9e538..HEAD`.
+  All eight exit 0. Workspace counts are 1,651/1,644 passing with 36 ignored;
+  ignored groups are not counted as passing. Both mandatory Cargo environment
+  variables use the task toolchain/shared target. Actual command, clean source,
+  tree, environment, fixture port, exit and hashed streams are preserved in
+  `logs/query-dispatch-support-*.json` outside the distribution. The serial
+  verification wrapper also exits 0. The initial compile/name collision,
+  inherited foreign-dialect fixture failure and unconfigured boundary-helper
+  attempt remain separate failed draft receipts, never relabeled as passing.
+  At clean `29ab912cc852ab5f8076cc7ad7231a4af09864a4`, stock MySQL 8.4.11
+  source observations pass all four cases, fifteen processes and cleanup,
+  each with exit 0. The observer and corpus are unchanged by the correction.
+  This certifies stock expectations rather than full proxy differential behavior.
+  Independent passive review found no additional runtime defect and confirmed
+  R1, the original classifier fixture parsing PostgreSQL SNAPSHOT as MySQL.
+  The one-file correction uses PostgreSqlDialect for foreign forms; followup
+  review closes R1 at `042b374` with no new finding. The original finding and
+  failed workspace observation remain tied to `29ab912`. Reviewers verified
+  saved author receipts offline; they did not independently run Cargo or SQL.
+  A subsequent documentation leaf leaves every nondocument byte identical to
+  the verified/reviewed code revision. This does not establish a runnable
+  frontend loop, row results, real-driver compatibility or M2/M4 completion.
+  Fresh account CI and merging remain blocked. Security and compiler work remain
+  excluded.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
