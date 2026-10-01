@@ -1,71 +1,56 @@
-use darmok_types::error::{ExecutionError, ProxyError, Result};
 use darmok_types::value::Value;
+use thiserror::Error;
 
-use crate::state::SessionState;
+use crate::transaction::TransactionSettingsError;
 
-/// Trait for reading and writing MySQL session-level system variables.
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum SessionVariableError {
+    #[error("unknown canonical session variable '{0}'")]
+    UnknownName(String),
+    #[error("scoped SQL references require semantic classification")]
+    ScopedReference,
+    #[error("transaction settings require the staged command API")]
+    TransactionCommandRequired,
+    #[error(transparent)]
+    TransactionOutcome(#[from] TransactionSettingsError),
+    #[error("session variable '{0}' requires a string for translation identity")]
+    NonStringTranslationValue(String),
+}
+
+/// Internal canonical session names, not SQL variable expressions. SQL scopes
+/// and transaction SET forms must be classified before this interface is used.
+/// Transaction reads derive from typed state; mutations use staged commands.
 pub trait SessionVariableStore {
-    /// Retrieve a system variable by name (case-insensitive lookup recommended).
-    fn get_system_var(&self, name: &str) -> Option<Value>;
-
-    /// Set a system variable. Returns an error if the variable is read-only or
-    /// the value is invalid.
-    fn set_system_var(&mut self, name: &str, value: Value) -> Result<()>;
+    fn get_system_var(&self, name: &str) -> Result<Option<Value>, SessionVariableError>;
+    fn set_system_var(&mut self, name: &str, value: Value) -> Result<(), SessionVariableError>;
 }
 
-impl SessionVariableStore for SessionState {
-    fn get_system_var(&self, name: &str) -> Option<Value> {
-        self.system_variables
-            .get(&normalize_system_var_name(name))
-            .cloned()
+pub(crate) fn canonical_name(name: &str) -> Result<String, SessionVariableError> {
+    let canonical = name.trim().to_ascii_lowercase();
+    if canonical.starts_with('@') || canonical.contains('.') {
+        return Err(SessionVariableError::ScopedReference);
     }
-
-    fn set_system_var(&mut self, name: &str, value: Value) -> Result<()> {
-        let normalized = normalize_system_var_name(name);
-        if !is_declared_system_var(&normalized) {
-            return Err(ProxyError::execution(
-                ExecutionError::UnknownSystemVariable(normalized),
-            ));
-        }
-
-        self.system_variables.insert(normalized, value);
-        Ok(())
+    if !is_declared_system_var(&canonical) {
+        return Err(SessionVariableError::UnknownName(canonical));
     }
+    Ok(canonical)
 }
 
-fn normalize_system_var_name(name: &str) -> String {
-    let mut normalized = name
-        .trim()
-        .trim_matches('`')
-        .to_ascii_lowercase()
-        .replace('-', "_");
-
-    for prefix in [
-        "@@session.",
-        "@@local.",
-        "@@global.",
-        "@@",
-        "session.",
-        "local.",
-        "global.",
-    ] {
-        if let Some(stripped) = normalized.strip_prefix(prefix) {
-            normalized = stripped.to_owned();
-            break;
-        }
-    }
-
-    normalized
+pub(crate) fn is_transaction_variable(name: &str) -> bool {
+    matches!(
+        name,
+        "autocommit" | "transaction_isolation" | "transaction_read_only"
+    )
 }
 
 fn is_declared_system_var(name: &str) -> bool {
     matches!(
         name,
         "autocommit"
+            | "transaction_isolation"
+            | "transaction_read_only"
             | "sql_mode"
             | "time_zone"
-            | "transaction_isolation"
-            | "tx_isolation"
             | "default_storage_engine"
             | "storage_engine"
             | "foreign_key_checks"
@@ -102,99 +87,71 @@ mod tests {
     use crate::state::SessionState;
 
     #[test]
-    fn session_state_gets_and_sets_system_variables() {
+    fn canonical_nontransaction_values_remain_available() {
         let mut state = SessionState::new(11);
-
-        // The store is name-agnostic; these cover the session variable names
-        // referenced elsewhere in the Darmok MySQL-to-PostgreSQL proxy.
-        let cases = vec![
-            ("sql_mode", Value::String("STRICT_TRANS_TABLES".into())),
-            ("autocommit", Value::Bool(true)),
-            (
-                "transaction_isolation",
-                Value::String("READ-COMMITTED".into()),
-            ),
-            ("tx_isolation", Value::String("READ-COMMITTED".into())),
-            ("time_zone", Value::String("UTC".into())),
-            ("character_set_client", Value::String("utf8mb4".into())),
-            ("character_set_connection", Value::String("utf8mb4".into())),
-            ("character_set_results", Value::String("utf8mb4".into())),
-            (
-                "collation_connection",
-                Value::String("utf8mb4_general_ci".into()),
-            ),
-            (
-                "collation_server",
-                Value::String("utf8mb4_general_ci".into()),
-            ),
-            (
-                "collation_database",
-                Value::String("utf8mb4_general_ci".into()),
-            ),
-            ("version", Value::String("8.4.0-darmok-0.1.0".into())),
-            (
-                "version_comment",
-                Value::String("Darmok MySQL-to-PostgreSQL proxy".into()),
-            ),
-        ];
-
-        for (name, value) in &cases {
-            assert_eq!(state.get_system_var(name), None);
-            state.set_system_var(name, value.clone()).unwrap();
-            assert_eq!(state.get_system_var(name), Some(value.clone()));
-        }
-
-        assert_eq!(state.system_variables.len(), cases.len());
-    }
-
-    #[test]
-    fn system_variable_store_normalizes_declared_names() {
-        let mut state = SessionState::new(13);
-
         state
-            .set_system_var(
-                "@@SESSION.Transaction-Isolation",
-                Value::String("SERIALIZABLE".into()),
-            )
-            .unwrap();
-
-        assert_eq!(
-            state.get_system_var("transaction_isolation"),
-            Some(Value::String("SERIALIZABLE".into()))
-        );
-        assert!(state.system_variables.contains_key("transaction_isolation"));
-    }
-
-    #[test]
-    fn system_variable_store_rejects_undeclared_names() {
-        let mut state = SessionState::new(14);
-
-        let error = state
-            .set_system_var("unknown_system_var", Value::Int(1))
-            .unwrap_err();
-
-        assert_eq!(
-            error.mysql_error_code,
-            darmok_types::mysql_const::error_code::ER_UNKNOWN_SYSTEM_VARIABLE
-        );
-        assert_eq!(state.system_variables.len(), 0);
-    }
-
-    #[test]
-    fn setting_a_system_variable_overwrites_the_previous_value() {
-        let mut state = SessionState::new(12);
-
-        state
-            .set_system_var("sql_mode", Value::String("STRICT_TRANS_TABLES".into()))
+            .set_system_var("SQL_MODE", Value::String("STRICT_TRANS_TABLES".into()))
             .unwrap();
         state
             .set_system_var("sql_mode", Value::String("ANSI_QUOTES".into()))
             .unwrap();
-
         assert_eq!(
-            state.get_system_var("sql_mode"),
+            state.get_system_var("sql_mode").unwrap(),
             Some(Value::String("ANSI_QUOTES".into()))
         );
-        assert_eq!(state.system_variables.len(), 1);
+    }
+
+    #[test]
+    fn transaction_values_cannot_create_map_duplicates() {
+        let mut state = SessionState::new(12);
+        for name in [
+            "autocommit",
+            "transaction_isolation",
+            "transaction_read_only",
+        ] {
+            assert_eq!(
+                state.set_system_var(name, Value::Int(0)),
+                Err(SessionVariableError::TransactionCommandRequired)
+            );
+        }
+        assert_eq!(
+            state.get_system_var("autocommit").unwrap(),
+            Some(Value::UInt(1))
+        );
+        assert_eq!(
+            state.get_system_var("transaction_isolation").unwrap(),
+            Some(Value::String("REPEATABLE-READ".into()))
+        );
+        assert_eq!(
+            state.get_system_var("transaction_read_only").unwrap(),
+            Some(Value::UInt(0))
+        );
+    }
+
+    #[test]
+    fn canonical_store_does_not_erase_sql_scope_or_accept_aliases() {
+        let mut state = SessionState::new(13);
+        for name in [
+            "@@SESSION.transaction_isolation",
+            "@@transaction_isolation",
+            "global.transaction_isolation",
+        ] {
+            assert_eq!(
+                state.set_system_var(name, Value::String("SERIALIZABLE".into())),
+                Err(SessionVariableError::ScopedReference)
+            );
+        }
+        assert!(matches!(
+            state.get_system_var("tx_isolation"),
+            Err(SessionVariableError::UnknownName(_))
+        ));
+        assert!(matches!(
+            state.set_system_var("unknown_system_var", Value::Int(1)),
+            Err(SessionVariableError::UnknownName(_))
+        ));
+        assert_eq!(
+            state.get_system_var("transaction_isolation").unwrap(),
+            Some(Value::String("REPEATABLE-READ".into()))
+        );
     }
 }

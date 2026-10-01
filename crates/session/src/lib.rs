@@ -2,6 +2,7 @@ pub mod charset;
 pub mod compatibility;
 pub mod prepared_stmts;
 pub mod state;
+pub mod transaction;
 pub mod variables;
 
 pub use charset::{
@@ -15,7 +16,13 @@ pub use compatibility::{
 pub use prepared_stmts::{
     PreparedStatement, PreparedStatementError, PreparedStatementLimits, PreparedStatementRegistry,
 };
-pub use state::{
-    SessionState, SessionWarning, TransactionState, TranslationFingerprint, WarningLevel,
+pub use state::{SessionState, SessionWarning, TranslationFingerprint, WarningLevel};
+pub use transaction::{
+    AutocommitSetting, FrontendIsolation, FrontendTransactionAccess, FrontendTransactionBoundary,
+    FrontendTransactionCommand, NamedTransactionCharacteristic, NextTransactionCharacteristics,
+    TransactionCharacteristicUpdate, TransactionCharacteristics, TransactionCommandPhaseError,
+    TransactionCommandStage, TransactionCompletion, TransactionSettingAssignment,
+    TransactionSettingsError, TransactionSettingsSnapshot, TransactionVariableAssignmentForm,
+    UnconfirmedTransactionCommand,
 };
-pub use variables::SessionVariableStore;
+pub use variables::{SessionVariableError, SessionVariableStore};

@@ -1,25 +1,27 @@
 # Frontend transaction settings
 
-Status: **controller design; not implemented or certified**. The existing
-`darmok-session` fields and variable store are extraction scaffolding. This
-contract defines their replacement before a frontend controller can use the
+Status: **typed setting/staging component implemented; frontend controller and
+transaction equivalence pending**. `darmok-session` owns typed transaction
+choices and ordered command stages. It does not classify or execute SQL,
+validate native receipts, encode output or map frontend choices to the
 [native transaction choices](native-transactions.md).
 
-## Why the current representation cannot be the controller
+## Why the inherited representation was replaced
 
-`SessionState` stores an isolation string separately from a mutable variable
-map. Updating one does not update the other. `SessionVariableStore` removes
-scope and `@@` prefixes before storing a value, so distinct assignment forms
-become the same operation. Neither representation distinguishes the session
-default, a one-transaction override or the settings of an active transaction.
-There is also no typed access-mode state. The inherited Read Committed default
-does not match the pinned stock fixture's Repeatable Read default.
+The extracted `SessionState` stored an isolation string separately from a mutable
+variable map. Updating one did not update the other. Its variable normalizer
+removed scope and `@@` prefixes, erasing assignment distinctions. It had neither
+typed access choices nor separate session, next and active characteristics.
+The inherited Read Committed default also differed from the pinned stock
+fixture's Repeatable Read default.
 
 Adding another map entry or deriving active settings from PostgreSQL defaults
-would retain these ambiguities. The replacement must have one typed source of
-truth with explicit lifetimes. It must also distinguish a frontend transaction
-start from a native transaction opened internally for execution and recovery.
-An internal BEGIN cannot itself consume a frontend one-transaction override.
+would retain these ambiguities. The replacement uses one private typed source
+of truth with explicit lifetimes, removing the old public string, autocommit
+boolean, lifecycle enum and transaction map entries. It distinguishes a
+frontend start from a native transaction opened internally for execution and
+recovery. Native BEGIN and ReadyForQuery are not inputs to this component and
+cannot themselves consume a frontend next override.
 
 The [fourteen stock cases](mysql-transaction-characteristics.md) provide finite
 reference observations. They do not establish a complete command classifier,
@@ -27,7 +29,7 @@ an error matrix or backend equivalence.
 
 ## State and representation
 
-The planned controller owns these separate values privately:
+The state component owns these separate values privately:
 
 | Value | Meaning | Lifetime |
 | --- | --- | --- |
@@ -49,17 +51,24 @@ means use its current session default. Preserve the MySQL Read Uncommitted
 identity when classifying input. It must never become a native Read Committed
 alias. A recognized frontend label is not an admitted backend behavior.
 
-The intended initial defaults are Repeatable Read, Read Write and autocommit
-one, matching the pinned stock fixture. This is a planned replacement of the
-inherited default, not a statement about the current library. Runtime startup
-must not obtain these choices from ambient PostgreSQL configuration.
+The library's initial defaults are Repeatable Read, Read Write and autocommit
+one, matching the pinned stock fixture. Runtime startup must not obtain these
+choices from ambient PostgreSQL configuration.
 
-Reads of confirmed session defaults must derive from this same state. Do not
-keep transaction values in the generic variable map, allow independent public
-field mutation or accept a caller-supplied native Ready state as a frontend
-completion. Unqualified variable reads, aliases and other read scopes need
-their own declared observation and wire metadata before support; the existing
-scope normalizer cannot decide their meaning.
+`transaction_settings()` returns an immutable copy of settled choices.
+Canonical internal reads of `transaction_isolation`, `transaction_read_only`
+and `autocommit` derive from that same state; their generic setter returns an
+error. The generic map is private and stores only declared nontransaction names.
+`SessionState` cannot be cloned to escape a borrowed command stage.
+
+The canonical variable interface accepts internal names, not SQL expressions:
+it rejects scoped references and the old `tx_isolation` alias. Its isolation
+value is a string and its access/autocommit values are internal unsigned zero/
+one values. These representations do not certify MySQL result types, signedness
+or packet metadata. Unqualified SQL reads, aliases and other scopes still need
+their own classification, observations and wire evidence. Nontransaction
+variable values and other extracted session fields remain scaffolding rather
+than an implemented SQL session controller.
 
 ## Preserve assignment form until semantic classification
 
@@ -68,7 +77,7 @@ The stock corpus and MySQL's
 [scope table](https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html)
 distinguish these ordinary forms:
 
-| Input | Planned state target |
+| Input | Typed target after classification |
 | --- | --- |
 | SET SESSION TRANSACTION ... | Named session defaults |
 | SET TRANSACTION ... | Named next-transaction choices |
@@ -88,9 +97,11 @@ assignments are also separate verification work. Global or persistent forms
 must not be silently converted into session updates; their behavior is outside
 this controller contract. No global setting implementation is proposed here.
 
-## Reference boundaries and planned transitions
+## Reference boundaries and state transitions
 
 The following table maps the existing finite observations to requirements.
+The Rust logical traces check the setting pair and defaults only; the data,
+error, event and wire requirements listed here remain distinct gates.
 Case names identify entries in
 `tests/reference/mysql_transaction_characteristics.json`.
 
@@ -166,25 +177,83 @@ state. Original errors and cleanup failures must remain distinguishable.
 START while already active, autocommit transitions and supported DDL need their
 own ordered command controllers because preceding work may commit. The thirteen
 [recovery cases](transaction-reference.md) establish finite successful/error
-boundaries for those operations; this document does not add an implementation
-or expand their supported syntax. Session settings cannot bypass those
-controllers by changing a boolean or map entry directly.
+boundaries for those operations. The state component can stage an active START
+as commit then start, and an active autocommit-zero to one change as commit then
+assignment. It does not perform or validate those commits. DDL is not represented
+by its typed commands. Session settings cannot bypass the eventual controllers
+by changing a boolean or map entry directly.
+
+## Borrowed command stages and known partial outcomes
+
+`stage_transaction_command()` selects at most two ordered frontend boundaries
+without applying them. The guard exclusively borrows the state. Dropping it
+before submission leaves confirmed choices, pending overrides and translation
+identity unchanged. `mark_submitted()` must be called once before any operation
+can produce command effects; it does not submit a native request.
+
+`record_confirmed_frontend_boundary()` applies only the next staged boundary.
+A known start consumes pending choices and publishes the selected active pair
+inside the retained history. A known end clears active choices. Each known
+boundary remains recorded if a later boundary or output is unconfirmed; a known
+preceding commit cannot be undone by discarding the proposed following start.
+Unexpected, premature or repeated phase reports are retained and cannot be
+overridden by later reports. Matching all boundaries still requires
+`finish_success_with_validated_output()` before the settled snapshot, canonical
+variable interface or translation fingerprint becomes available again.
+
+These receipt and success methods assert a trusted caller contract. They do not
+prove native completion, semantic admission or encoding. Dropping a submitted
+guard or failing settlement retains `UnconfirmedTransactionCommand`, including
+the before/last-confirmed states, remaining boundary and phase error. There is
+no reset/reuse API. A future controller must dispose of an unconfirmed native/
+frontend session; an error packet alone cannot settle this success-only stage.
+Statement failures and confirmed recovery need their own verified outcome path.
+
+The initial command vocabulary covers named session/next assignments, the four
+declared variable forms, explicit and implicit starts, a successful autocommit
+statement, active commit/rollback with an explicit chain choice, and the finite
+autocommit boundaries above. Commands requiring an absent or wrong frontend
+state fail before staging.
+Autocommit setting changes during an active transaction whose setting is already
+one are deliberately rejected as unverified, including repeated one. Completion
+without an active transaction, compound SET, DEFAULT, completion_type, RELEASE,
+client savepoints and failed statement transitions are not implemented by this
+vocabulary. No SQL syntax is supported merely because it has a typed command.
 
 ## Implementation and verification gate
 
-Replace the inherited string/map/lifecycle duplication as one deliberate
-change. Do not add a second model beside it or preserve a string-setter shim.
-Derive reads and any relevant translation identity from the authoritative
-confirmed/staged state; a cache fingerprint is not a catalog-validity lease.
-Typed state should store fixed-size choices rather than allocate isolation
-strings on each command. Selection should add no configuration/readback query
-to the existing explicit native BEGIN. These are design costs; round trips,
-allocations and throughput require measurements on the actual controller.
+The string/map/lifecycle replacement has no setter shim. The translation
+fingerprint includes the complete confirmed transaction snapshot: defaults,
+independent pending choices, active pair and autocommit. It returns an error for
+unsettled outcomes. Explicit NULL or other nonstring charset values also return
+an identity error instead of silently using the profile default; absent values
+retain the declared initial default. SQL NULL charset behavior remains pending.
+A fingerprint is not a catalog-validity lease or a completed session controller.
 
-Before claiming implemented behavior, require:
+Choices, plans and transaction snapshots are fixed-size copies, with no isolation
+string allocation, native query or lock added by this component. Canonical name
+normalization and the internal isolation `Value::String` read still allocate;
+the typed snapshot/label API avoids that string materialization. Other fingerprint
+strings are still cloned. More state dimensions can create legitimate cache
+misses when choices change. Actual hit rates, allocations, requests, latency and
+throughput remain unmeasured and require the integrated controller workload.
 
-1. State transitions independently checked against the declared finite
-   reference outcomes, including partial updates and later transactions.
+The required `cargo test -p darmok-session --locked` suite includes fourteen
+manual typed traces over the unchanged stock characteristic corpus. They compare
+forty-one selected isolation/access pairs and their session defaults/autocommit,
+plus derived canonical reads. The successful autocommit trace compares its
+completed pair without treating MySQL's retained event as currently active.
+These tests supply trusted boundaries in memory; they neither parse nor execute
+the corpus SQL and do not check event identity, native receipts, data, SQL error
+codes, locks, snapshots or packets. Separate ordinary phase tests cover prepared
+abandonment, known partial outcomes and unavailable state after unconfirmed
+submission. Stock corpora and observer remain unchanged.
+
+Before claiming frontend controller behavior, require:
+
+1. Independent review of the state projection and actual controller against
+   declared finite reference outcomes, including partial updates and later
+   transactions; in-memory boundary assertions cannot certify the controller.
 2. Ordinary reference cases for newly supported SET/read forms, actual failing
    start/statement boundaries, completion variants and default expressions.
 3. The actual frontend controller integrated with exclusive native ownership,

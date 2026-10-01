@@ -253,6 +253,22 @@ complete release gate runs once on the final candidate.
   refine the controller's settings requirements; no controller, native snapshot/
   lock equivalence, catalog validity or M2/M4 gate is implemented by them.
 
+- The [typed transaction setting/staging component](frontend-transactions.md)
+  replaces the extracted public string/boolean/lifecycle duplication. It owns
+  session defaults, independent next overrides, active choices and autocommit,
+  and derives canonical transaction-variable reads and translation identity.
+  Borrowed stages retain ordered known boundaries and refuse settled reads or
+  reuse after an unconfirmed submitted command. Receipt/output methods assert
+  a trusted caller contract; no native operation or encoder is verified by them.
+  Fourteen manual Rust traces compare forty-one five-field logical settings
+  projections against the unchanged stock characteristic corpus, alongside
+  ordinary phase/identity tests. Run them with
+  `cargo test -p darmok-session --locked`; exact revisions, commands and logs
+  are retained with development/CI receipts. SQL classification, integrated
+  execution/recovery, wire metadata, native isolation mapping, snapshots, locks,
+  catalog validity, performance and M2/M4 remain pending. No authentication,
+  TLS, authorization, security or adversarial/resource work is added.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

@@ -1,6 +1,6 @@
 # Stock MySQL transaction characteristics
 
-Status: **finite stock reference evidence; frontend policy is not implemented**.
+Status: **finite stock reference evidence; integrated frontend policy pending**.
 The fourteen cases in `tests/reference/mysql_transaction_characteristics.json`
 observe transaction characteristics on the pinned MySQL 8.4 fixture. They are
 separate from the thirteen [recovery cases](transaction-reference.md).
@@ -59,9 +59,13 @@ updates, pending next updates and the choices of a confirmed active transaction.
 A single isolation string or an ambient PostgreSQL default does not supply that
 policy. The [native choices](native-transactions.md) are a separate component;
 MySQL READ UNCOMMITTED is not established by PostgreSQL's READ COMMITTED alias.
-The planned [frontend controller contract](frontend-transactions.md) maps these
-finite observations to settings lifetimes and records the remaining outcome
-boundaries. It is not an implemented session policy.
+The [frontend transaction contract](frontend-transactions.md) maps these finite
+observations to settings lifetimes. Its typed state/staging component is
+implemented and checks a five-field logical settings projection through manual
+Rust traces. Those traces supply trusted boundaries without executing SQL or
+validating event identity, native receipts, data, errors or wire metadata. The
+actual classifier, execution controller and remaining outcome boundaries are
+still pending; this does not establish an integrated session policy.
 
 ## Running and retaining evidence
 

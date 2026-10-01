@@ -8,3 +8,6 @@ repository.workspace = true
 [dependencies]
 darmok-types = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"
