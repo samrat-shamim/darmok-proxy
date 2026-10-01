@@ -88,7 +88,8 @@ connection. A cleanup failure must preserve both the original error and the
 cleanup outcome. It cannot be swallowed, changed into success, or followed by
 an optimistic pool return.
 
-For an autocommit operation, begin an explicit backend transaction before
+For an autocommit operation, begin an explicit backend transaction with
+[declared native characteristics](native-transactions.md) before
 preparation/catalog-dependent work. Keep it open through output validation.
 Commit only after confirmed statement completion and successful output
 validation. On a recoverable statement error, roll back the transaction and
