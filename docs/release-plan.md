@@ -328,6 +328,18 @@ complete release gate runs once on the final candidate.
   This does not implement session mode changes, value coercion, native effects, SQL
   admission, output, catalog coherence, performance or M2/M4.
 
+- The [stock SET semantics fixture](mysql-set-semantics.md) declares nineteen
+  ordinary cases for keyword/per-name scope, pre-update expression reads,
+  DEFAULT timing, selected coercion and validation/update failure effects.
+  The unchanged observer and four earlier corpora remain intact. An initial
+  eighteen-case draft completed fourteen cases, then failed on expected JSON
+  integer/boolean types; its real failure and cleanup are preserved. The
+  corrected corpus and a separate required CI step are prepared; local native
+  validation and independent review remain pending. GitHub Actions is disabled
+  for the personal account, so fresh CI and merging remain pending. This does
+  not implement a SET controller, native effects, output or any M2/M4 or release
+  gate. Security-related work remains deferred.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

@@ -267,10 +267,10 @@
       "expected_errors": [],
       "effect_sql": "SELECT JSON_OBJECT('mode_is_global',@@session.sql_mode=@@global.sql_mode,'isolation_is_global',@@session.transaction_isolation=@@global.transaction_isolation,'read_only_is_global',@@session.transaction_read_only=@@global.transaction_read_only,'autocommit_is_global',@@session.autocommit=@@global.autocommit);",
       "expected_effect": {
-        "mode_is_global": 1,
-        "isolation_is_global": 1,
-        "read_only_is_global": 1,
-        "autocommit_is_global": 1
+        "mode_is_global": true,
+        "isolation_is_global": true,
+        "read_only_is_global": true,
+        "autocommit_is_global": true
       }
     },
     {
@@ -317,6 +317,25 @@
       "expected_effect": {
         "mode": "ANSI_QUOTES",
         "isolation": "READ-UNCOMMITTED",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "read-only-default-update-error-retains-earlier-mode",
+      "sql": "START TRANSACTION;\nSET SESSION sql_mode='ANSI_QUOTES', @@transaction_read_only=DEFAULT;\nROLLBACK;",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ANSI_QUOTES', @@transaction_read_only=DEFAULT;",
+          "occurrence": 1,
+          "code": 1568,
+          "sqlstate": "25001"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES",
+        "isolation": "REPEATABLE-READ",
         "read_only": 0,
         "autocommit": 1
       }
