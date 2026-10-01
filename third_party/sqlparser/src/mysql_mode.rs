@@ -1,4 +1,5 @@
-// Modified for Darmok: neutral description and explicit alloc imports for no_std builds.
+// Modified for Darmok: neutral description, alloc imports, and removal of raw
+// SQL-mode string coercion. Callers supply their validated grammar projection.
 // Original extension attribution is retained in NOTICE.
 // Licensed under Apache-2.0 (extension to sqlparser-rs)
 
@@ -283,62 +284,11 @@ pub fn parse_mysql_sql(sql: &str, flags: MySqlModeFlags) -> Result<Vec<Statement
     parse_mysql_with_mode(sql, flags)
 }
 
-/// Parse a sql_mode string (e.g. "ANSI_QUOTES,NO_BACKSLASH_ESCAPES") into flags.
-pub fn parse_sql_mode(sql_mode: &str) -> MySqlModeFlags {
-    let mut flags = MySqlModeFlags::empty();
-    for part in sql_mode.split(',') {
-        match part.trim().to_uppercase().as_str() {
-            "ANSI_QUOTES" => flags.insert(MySqlModeFlags::ANSI_QUOTES),
-            "NO_BACKSLASH_ESCAPES" => flags.insert(MySqlModeFlags::NO_BACKSLASH_ESCAPES),
-            "PIPES_AS_CONCAT" => flags.insert(MySqlModeFlags::PIPES_AS_CONCAT),
-            "IGNORE_SPACE" => flags.insert(MySqlModeFlags::IGNORE_SPACE),
-            "HIGH_NOT_PRECEDENCE" | "NO_FIELD_OPTIONS" => {
-                flags.insert(MySqlModeFlags::HIGH_NOT_PRECEDENCE);
-            }
-            "REAL_AS_FLOAT" => flags.insert(MySqlModeFlags::REAL_AS_FLOAT),
-            "ANSI" => {
-                flags.insert(MySqlModeFlags::ANSI_QUOTES);
-                flags.insert(MySqlModeFlags::PIPES_AS_CONCAT);
-                flags.insert(MySqlModeFlags::REAL_AS_FLOAT);
-            }
-            _ => {} // Ignore unknown modes (STRICT_TRANS_TABLES, etc.)
-        }
-    }
-    flags
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::{Expr, SelectItem, SetExpr, Statement, Value};
     use crate::parser::Parser;
-
-    #[test]
-    fn parse_empty_mode() {
-        assert_eq!(parse_sql_mode(""), MySqlModeFlags::empty());
-    }
-
-    #[test]
-    fn parse_ansi_quotes() {
-        let flags = parse_sql_mode("ANSI_QUOTES");
-        assert!(flags.contains(MySqlModeFlags::ANSI_QUOTES));
-        assert!(!flags.contains(MySqlModeFlags::NO_BACKSLASH_ESCAPES));
-    }
-
-    #[test]
-    fn parse_multiple_modes() {
-        let flags = parse_sql_mode("ANSI_QUOTES,NO_BACKSLASH_ESCAPES,STRICT_TRANS_TABLES");
-        assert!(flags.contains(MySqlModeFlags::ANSI_QUOTES));
-        assert!(flags.contains(MySqlModeFlags::NO_BACKSLASH_ESCAPES));
-    }
-
-    #[test]
-    fn parse_ansi_composite() {
-        let flags = parse_sql_mode("ANSI");
-        assert!(flags.contains(MySqlModeFlags::ANSI_QUOTES));
-        assert!(flags.contains(MySqlModeFlags::PIPES_AS_CONCAT));
-        assert!(flags.contains(MySqlModeFlags::REAL_AS_FLOAT));
-    }
 
     #[test]
     fn lexer_mode_from_flags() {

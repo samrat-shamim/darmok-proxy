@@ -1,4 +1,4 @@
-// Modified for Darmok: simplify equivalent match guards for the pinned toolchain.
+// Modified for Darmok: simplify match guards and remove raw mode-string parsing.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -45,7 +45,7 @@ use crate::ast::{
 };
 use crate::dialect::*;
 use crate::keywords::{Keyword, ALL_KEYWORDS};
-use crate::mysql_mode::{parse_sql_mode, MySqlModeFlags};
+use crate::mysql_mode::MySqlModeFlags;
 use crate::tokenizer::*;
 use sqlparser::parser::ParserState::ColumnDefinition;
 
@@ -561,15 +561,6 @@ impl<'a> Parser<'a> {
     ) -> Result<Vec<Statement>, ParserError> {
         let dialect = ModeAwareMySqlDialect::new(mode_flags);
         Self::parse_sql(&dialect, sql)
-    }
-
-    /// Convenience method to parse SQL using a MySQL dialect configured from
-    /// a raw `sql_mode` string such as `ANSI_QUOTES,NO_BACKSLASH_ESCAPES`.
-    pub fn parse_mysql_sql_with_mode_string(
-        sql: &str,
-        sql_mode: &str,
-    ) -> Result<Vec<Statement>, ParserError> {
-        Self::parse_mysql_sql_with_flags(sql, parse_sql_mode(sql_mode))
     }
 
     /// Parses the given `sql` into an Abstract Syntax Tree (AST), returning

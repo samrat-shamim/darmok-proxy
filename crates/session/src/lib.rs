@@ -1,6 +1,7 @@
 pub mod charset;
 pub mod compatibility;
 pub mod prepared_stmts;
+pub mod sql_mode;
 pub mod state;
 pub mod transaction;
 pub mod variables;
@@ -16,6 +17,7 @@ pub use compatibility::{
 pub use prepared_stmts::{
     PreparedStatement, PreparedStatementError, PreparedStatementLimits, PreparedStatementRegistry,
 };
+pub use sql_mode::{SqlMode, SqlModeNamesError, SqlModes};
 pub use state::{SessionState, SessionWarning, TranslationFingerprint, WarningLevel};
 pub use transaction::{
     AutocommitSetting, FrontendIsolation, FrontendTransactionAccess, FrontendTransactionBoundary,
@@ -25,4 +27,6 @@ pub use transaction::{
     TransactionSettingsError, TransactionSettingsSnapshot, TransactionVariableAssignmentForm,
     UnconfirmedTransactionCommand,
 };
-pub use variables::{SessionVariableError, SessionVariableStore};
+pub use variables::{
+    SessionVariable, SessionVariableError, SessionVariableReader, VariableWritePath,
+};

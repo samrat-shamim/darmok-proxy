@@ -1,5 +1,7 @@
 use darmok_types::mysql_const;
 
+use crate::sql_mode::SqlModes;
+
 use crate::transaction::{
     FrontendIsolation, FrontendTransactionAccess, TransactionCharacteristics,
 };
@@ -12,7 +14,7 @@ pub struct MysqlCompatibilityProfile {
     pub version_compile_os: &'static str,
     pub default_charset: &'static str,
     pub default_collation: &'static str,
-    pub default_sql_mode: &'static str,
+    pub default_sql_modes: SqlModes,
     pub default_time_zone: &'static str,
     pub default_transaction_characteristics: TransactionCharacteristics,
     pub max_allowed_packet: u64,
@@ -60,10 +62,10 @@ pub struct MysqlStorageEngine {
 pub static MYSQL8_COMPATIBILITY_PROFILE: MysqlCompatibilityProfile = MysqlCompatibilityProfile {
     server_version: concat!("8.4.0-darmok-", env!("CARGO_PKG_VERSION")),
     version_comment: "Darmok MySQL-to-PostgreSQL proxy",
-    version_compile_os: "Linux",
+    version_compile_os: std::env::consts::OS,
     default_charset: "utf8mb4",
     default_collation: "utf8mb4_general_ci",
-    default_sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
+    default_sql_modes: SqlModes::MYSQL84_DEFAULT,
     default_time_zone: "UTC",
     default_transaction_characteristics: TransactionCharacteristics {
         isolation: FrontendIsolation::RepeatableRead,

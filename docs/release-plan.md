@@ -269,6 +269,22 @@ complete release gate runs once on the final candidate.
   catalog validity, performance and M2/M4 remain pending. No authentication,
   TLS, authorization, security or adversarial/resource work is added.
 
+- The [canonical variable/SQL-mode model](session-variable-values.md) removes
+  the remaining generic value map, public text/mode fields and duplicate warning
+  counter. Canonical reads, parser projection and translation identity use one
+  typed full mode set; other setting paths are read-only or unimplemented.
+  The standalone parser's string helpers that discarded mode information are
+  removed.
+  A third required stock corpus declares fourteen ordinary mode-value cases
+  using the unchanged observer, with a separate CI step and receipt artifact;
+  both existing transaction corpora remain unchanged. Manual Rust projections,
+  ordinary model/parser/identity tests and compile-fail examples run with
+  `cargo test -p darmok-session --locked`. Exact candidate/check/review/CI
+  records are retained outside the distribution. SQL assignment/scoping,
+  warnings, native effects, actual mode query/write semantics, reset/encoding,
+  catalog validity, performance and M2/M4 remain pending. Security-related work
+  remains deferred.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

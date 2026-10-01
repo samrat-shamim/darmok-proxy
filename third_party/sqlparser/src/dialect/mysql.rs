@@ -1,4 +1,4 @@
-// Modified for Darmok: place production helpers before the test module.
+// Modified for Darmok: order helpers and remove the raw SQL-mode string factory.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -24,7 +24,7 @@ use crate::{
     ast::{BinaryOperator, CastKind, DataType, Expr, LockTable, LockTableType, Statement},
     dialect::Dialect,
     keywords::Keyword,
-    mysql_mode::{parse_sql_mode, MySqlLexerMode, MySqlModeFlags},
+    mysql_mode::{MySqlLexerMode, MySqlModeFlags},
     parser::{Parser, ParserError},
     tokenizer::Token,
 };
@@ -43,10 +43,8 @@ const RESERVED_FOR_TABLE_ALIAS_MYSQL: &[Keyword] = &[
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MySqlDialect {}
 
-/// A MySQL dialect wrapper that applies session `sql_mode` flags.
-///
-/// This keeps the existing zero-sized [`MySqlDialect`] API stable while
-/// allowing callers to opt into session-aware parsing.
+/// A MySQL dialect wrapper that consumes syntactic mode flags. The caller
+/// validates its full SQL-mode value and supplies the grammar projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModeAwareMySqlDialect {
@@ -63,11 +61,6 @@ impl ModeAwareMySqlDialect {
     /// Create a mode-aware MySQL dialect from parsed mode flags.
     pub const fn new(mode_flags: MySqlModeFlags) -> Self {
         Self { mode_flags }
-    }
-
-    /// Create a mode-aware MySQL dialect from a raw `sql_mode` string.
-    pub fn from_sql_mode(sql_mode: &str) -> Self {
-        Self::new(parse_sql_mode(sql_mode))
     }
 
     /// Return the configured session mode flags.
@@ -531,10 +524,12 @@ mod tests {
 
     #[test]
     fn ansi_quotes_mode_parses_identifiers() {
-        let stmt =
-            Parser::parse_mysql_sql_with_mode_string(r#"SELECT "col" FROM "tbl""#, "ANSI_QUOTES")
-                .unwrap()
-                .remove(0);
+        let stmt = Parser::parse_mysql_sql_with_flags(
+            r#"SELECT "col" FROM "tbl""#,
+            MySqlModeFlags::from_bits(MySqlModeFlags::ANSI_QUOTES),
+        )
+        .unwrap()
+        .remove(0);
 
         let Statement::Query(query) = stmt else {
             panic!("expected query statement");
@@ -573,10 +568,12 @@ mod tests {
         let default_stmt = Parser::parse_mysql_sql("SELECT 'a' || 'b'")
             .unwrap()
             .remove(0);
-        let concat_stmt =
-            Parser::parse_mysql_sql_with_mode_string("SELECT 'a' || 'b'", "PIPES_AS_CONCAT")
-                .unwrap()
-                .remove(0);
+        let concat_stmt = Parser::parse_mysql_sql_with_flags(
+            "SELECT 'a' || 'b'",
+            MySqlModeFlags::from_bits(MySqlModeFlags::PIPES_AS_CONCAT),
+        )
+        .unwrap()
+        .remove(0);
 
         let Expr::BinaryOp { op, .. } = only_select_expr(&default_stmt) else {
             panic!("expected binary operator");
