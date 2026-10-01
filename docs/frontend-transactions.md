@@ -273,7 +273,7 @@ Before claiming frontend controller behavior, require:
    replay or unsupported-isolation fallback.
 
 The catalog installation choice and
-[savepoint-lock blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15)
+[savepoint-lock blocker #15](https://github.com/samrat-shamim/darmok-proxy/issues/15)
 remain open. A pure state model, fixed BEGIN string or stock label observation
 cannot close these gates. M2/M4 are incomplete. Security-related work remains
 deferred; this contract concerns SQL transaction characteristics only.

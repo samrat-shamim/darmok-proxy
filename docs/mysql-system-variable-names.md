@@ -4,7 +4,7 @@
 MySQL 8.4 cases for system-variable name syntax. The required CI job runs the
 unchanged stock observer with the pinned reference image and preserves a
 separate `mysql-system-variable-names` artifact. This fixture is a prerequisite
-for the parser correction in [issue #25](https://github.com/duotronic-ai/darmok-proxy/issues/25).
+for the parser correction in [issue #25](https://github.com/samrat-shamim/darmok-proxy/issues/25).
 It does not execute the proxy.
 
 Each case resets the session mode, performs its declared setting statements,

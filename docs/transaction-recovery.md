@@ -76,7 +76,7 @@ Neither a matching table value nor a confirmed native transaction state proves
 the frontend lock contract. The NOWAIT errors are observations of conflict, not
 a proposed cross-engine error-code mapping or a timeout-policy test.
 
-[Blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15) tracks the
+[Blocker #15](https://github.com/samrat-shamim/darmok-proxy/issues/15) tracks the
 required mechanism and end-to-end proof. Reacquiring locks after rollback leaves
 an observable gap. Replacing row locks with broad relation locks changes
 contention. Removing native statement scopes loses recovery, while converting
