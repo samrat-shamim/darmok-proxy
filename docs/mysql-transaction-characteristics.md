@@ -47,6 +47,9 @@ updates, pending next updates and the choices of a confirmed active transaction.
 A single isolation string or an ambient PostgreSQL default does not supply that
 policy. The [native choices](native-transactions.md) are a separate component;
 MySQL READ UNCOMMITTED is not established by PostgreSQL's READ COMMITTED alias.
+The planned [frontend controller contract](frontend-transactions.md) maps these
+finite observations to settings lifetimes and records the remaining outcome
+boundaries. It is not an implemented session policy.
 
 ## Running and retaining evidence
 

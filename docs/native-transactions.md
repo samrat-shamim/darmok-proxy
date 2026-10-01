@@ -60,5 +60,7 @@ statement execution. A future frontend controller must select characteristics
 from verified session policy and retain the scope through output validation.
 The [stock MySQL characteristic fixture](mysql-transaction-characteristics.md)
 observes session/next/active lifetimes separately; it does not establish native
-transaction equivalence. M2/M4 and release gates remain pending.
+transaction equivalence. The [frontend controller design](frontend-transactions.md)
+keeps these lifetimes separate from native control completion and lists its
+unverified start/failure boundaries. M2/M4 and release gates remain pending.
 Security-related work remains deferred.
