@@ -58,4 +58,7 @@ These fixtures do not prove MySQL snapshots, lock retention, frontend SET/BEGIN
 semantics, status flags, error classification, catalog validity or admitted
 statement execution. A future frontend controller must select characteristics
 from verified session policy and retain the scope through output validation.
-M2/M4 and release gates remain pending. Security-related work remains deferred.
+The [stock MySQL characteristic fixture](mysql-transaction-characteristics.md)
+observes session/next/active lifetimes separately; it does not establish native
+transaction equivalence. M2/M4 and release gates remain pending.
+Security-related work remains deferred.

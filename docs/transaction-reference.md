@@ -3,7 +3,10 @@
 Status: **required finite MySQL reference suite; actual proxy verification is
 pending**. The corpus and runner live in `tests/reference/` and need only this
 checkout, Python 3 and Docker with the selected existing MySQL container/image.
-Missing dependencies or incomplete observations fail the required check.
+The observer requires an explicit corpus; the eleven
+[transaction-characteristic cases](mysql-transaction-characteristics.md) use
+the same mechanism with separate SQL/data and evidence. Missing dependencies or
+incomplete observations fail the required check.
 
 The thirteen cases preserve the earlier transaction observations: duplicate-key,
 CHECK, NOT NULL and missing-column errors with prior/next writes; complete
@@ -37,6 +40,7 @@ the checkout:
 python3 tests/reference/observe_mysql_transactions.py \
   --container mysql-reference-84 \
   --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 \
+  --corpus tests/reference/mysql_transactions.json \
   --evidence-dir /tmp/darmok-mysql-transaction-reference
 ```
 
@@ -56,8 +60,9 @@ three local metadata commands. Case requests add one constant marker SELECT;
 these are test costs, not a proxy performance measurement.
 
 CI provisions the pinned MySQL service and runs this suite as a separate required
-job. It retains the receipts as the `mysql-transaction-reference` Actions
-artifact, including failed observations. Existing PostgreSQL 17/18 fixture jobs
+job. It runs both declared corpora and retains their receipts as separate
+`mysql-transaction-reference` and `mysql-transaction-characteristics` Actions
+artifacts, including failed observations. Existing PostgreSQL 17/18 fixture jobs
 remain separate. Driver, wire, lock/snapshot, catalog-validity, complete recovery
 classification and release gates remain pending. See the
 [frontend recovery contract](transaction-recovery.md).

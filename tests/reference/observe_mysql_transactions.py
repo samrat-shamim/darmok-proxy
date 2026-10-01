@@ -240,9 +240,10 @@ def main():
     parser.add_argument("--image", required=True)
     parser.add_argument("--user", default="root")
     parser.add_argument("--evidence-dir", type=Path, required=True)
+    parser.add_argument("--corpus", type=Path, required=True)
     args = parser.parse_args()
     require("MYSQL_PWD" in os.environ, "Set MYSQL_PWD for the stock fixture")
-    corpus_path = Path(__file__).with_name("mysql_transactions.json")
+    corpus_path = args.corpus
     corpus = load_corpus(corpus_path)
     return Observer(args, corpus_path, corpus).observe()
 
