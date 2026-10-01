@@ -434,6 +434,134 @@
           "session_autocommit": 1
         }
       }
+    },
+    {
+      "name": "reverse-next-updates-preserve-pending-access",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ WRITE;\nSET TRANSACTION READ ONLY;\nSET TRANSACTION ISOLATION LEVEL READ COMMITTED;\nSTART TRANSACTION;\nSET @first = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0,
+          "session_autocommit": 1
+        },
+        "second": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0,
+          "session_autocommit": 1
+        }
+      }
+    },
+    {
+      "name": "explicit-access-discards-overridden-next-with-distinct-defaults",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ WRITE;\nSET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION READ WRITE;\nSET @override_to_write = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @after_write_override = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;\nSTART TRANSACTION READ ONLY;\nSET @override_to_read = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @after_read_override = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('override_to_write',CAST(@override_to_write AS JSON),'after_write_override',CAST(@after_write_override AS JSON),'override_to_read',CAST(@override_to_read AS JSON),'after_read_override',CAST(@after_read_override AS JSON));",
+      "expected_effect": {
+        "override_to_write": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0,
+          "session_autocommit": 1
+        },
+        "after_write_override": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0,
+          "session_autocommit": 1
+        },
+        "override_to_read": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 1,
+          "session_autocommit": 1
+        },
+        "after_read_override": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ ONLY",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 1,
+          "session_autocommit": 1
+        }
+      }
+    },
+    {
+      "name": "qualified-session-assignments-update-named-defaults-not-active",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ WRITE;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @@SESSION.transaction_read_only=0;\nSET @defaults=JSON_OBJECT('isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only);\nSTART TRANSACTION;\nSET @first = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET @@SESSION.transaction_isolation='READ-COMMITTED';\nSET @@SESSION.transaction_read_only=1;\nSET @after_session_update = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nCOMMIT;\nSTART TRANSACTION;\nSET @third = (SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'state',e.STATE,'ended',e.END_EVENT_ID IS NOT NULL,'autocommit',e.AUTOCOMMIT,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only,'session_autocommit',@@session.autocommit) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('defaults',CAST(@defaults AS JSON),'first',CAST(@first AS JSON),'after_session_update',CAST(@after_session_update AS JSON),'second',CAST(@second AS JSON),'third',CAST(@third AS JSON));",
+      "expected_effect": {
+        "defaults": {
+          "isolation": "REPEATABLE-READ",
+          "read_only": 0
+        },
+        "first": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0,
+          "session_autocommit": 1
+        },
+        "after_session_update": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1,
+          "session_autocommit": 1
+        },
+        "second": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1,
+          "session_autocommit": 1
+        },
+        "third": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY",
+          "state": "ACTIVE",
+          "ended": false,
+          "autocommit": "NO",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1,
+          "session_autocommit": 1
+        }
+      }
     }
   ]
 }

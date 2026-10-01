@@ -243,6 +243,16 @@ complete release gate runs once on the final candidate.
   unverified. This is a design prerequisite; no controller, session support,
   admitted execution or M2/M4 gate is implemented by it.
 
+- Three further stock characteristic cases distinguish reverse partial-update
+  order, clearing explicitly overridden next access in both directions using
+  distinct defaults, and @@SESSION assignments between/inside transactions.
+  The corpus now has fourteen cases and forty-one event captures, using twenty
+  SQL clients, two read-only inspections and three metadata processes. Its
+  original eleven cases, setup/reset SQL, observer and required CI workflow are
+  unchanged, as is the thirteen-case recovery corpus. These finite observations
+  refine the controller's settings requirements; no controller, native snapshot/
+  lock equivalence, catalog validity or M2/M4 gate is implemented by them.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 
