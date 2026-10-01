@@ -75,8 +75,11 @@ PostgreSQL BEGIN is explicitly configured for the test and is not a certified
 MySQL isolation mapping. The native table DML is private fixture setup, never
 a public arbitrary-SQL API. The test does not establish a start controller,
 catalog leases, row admission, isolation/locking equivalence or real MySQL driver
-compatibility. Both PostgreSQL 17/18 and independent review must pass before
-this component is treated as reviewed. Required CI remains blocked by the
+compatibility. At `d5626740bd583af7f284d236485241ac1cfc8391`, all ten groups
+pass on PostgreSQL 17.11 and 18.6. Independent passive review found an unsupported
+DEFAULT admission gap in the initial implementation, then confirmed its
+correction at this revision with no new concrete finding. Source review does
+not constitute independent dynamic database evidence. Required CI remains blocked by the
 recorded personal-account Actions condition; no merge/release is justified by
 local results alone.
 
