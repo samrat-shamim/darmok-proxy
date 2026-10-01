@@ -335,7 +335,7 @@ complete release gate runs once on the final candidate.
   eighteen-case draft completed fourteen cases, then failed on expected JSON
   integer/boolean types; its real failure and cleanup are preserved. The
   corrected corpus passes all nineteen cases on pinned MySQL 8.4.11 Linux arm64
-  at `0cd781a6e6fe46a11b337ea5ad009e38eafc7b60`: the outer observer and all thirty
+  at `f7bf9fa0dc1394226cf019fa48bd88cb8f28722b`: the outer observer and all thirty
   child commands exit 0, seven errors have exact attribution, twenty-five SQL
   markers match, and final database absence is 0. Schema, diff and repository
   boundary checks pass. Exact source, command, environment and evidence hashes
@@ -344,11 +344,12 @@ complete release gate runs once on the final candidate.
   prepared. Independent review found that the LOCAL case reused its reset
   access value and did not distinguish scope inheritance. Its followup changes
   the bare value and requires both defaults and both transactions to retain the
-  update; followup native validation and review remain pending. GitHub Actions
+  update. All nineteen followup native cases pass. Independent followup review
+  confirms resolution with seven passing offline groups and no new finding;
+  the original ten-group review and finding remain preserved. GitHub Actions
   is disabled for the personal account, so fresh CI and merging remain pending.
-  This does
-  not implement a SET controller, native effects, output or any M2/M4 or release
-  gate. Security-related work remains deferred.
+  This does not implement a SET controller, native effects, output or any M2/M4
+  or release gate. Security-related work remains deferred.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

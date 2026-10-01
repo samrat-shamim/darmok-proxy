@@ -96,7 +96,7 @@ returned JSON booleans. Its actual failure, unrun cases and successful cleanup
 remain preserved. The corrected corpus retains the observed boolean types and
 adds the companion read-only DEFAULT failure case.
 
-At revision `0cd781a6e6fe46a11b337ea5ad009e38eafc7b60`, the command above
+At revision `f7bf9fa0dc1394226cf019fa48bd88cb8f28722b`, the command above
 completed all nineteen cases on the pinned stock MySQL 8.4.11 Linux arm64
 fixture. The outer observer exited 0. Its thirty child processes exited 0:
 twenty-five SQL clients, two image/container identity inspections and three
@@ -112,9 +112,13 @@ Independent review identified that the LOCAL case assigned the access value
 already established by reset. That case could not distinguish an inherited
 session update from a next-only update or no change. The corrected case changes
 the later bare value from 0 to 1 and requires both defaults and both successive
-transactions to retain Read Only. Followup native validation and independent
-review remain pending. Actions is disabled for the personal account, so fresh
-CI and merging remain pending.
+transactions to retain Read Only. The full nineteen-case followup run at the
+revision above passes, including those distinct LOCAL effects. Independent
+followup review confirms that the correction resolves the finding; seven
+offline assertion groups pass with no new finding. The original ten-group
+review and its finding remain preserved at their earlier revision. Neither
+review executes the proxy or runs the native fixture. Actions is disabled
+for the personal account, so fresh CI and merging remain pending.
 
 Reference SQL includes session-local assignments, finite transaction controls
 and ordinary data operations; it changes no global configuration. These checks
