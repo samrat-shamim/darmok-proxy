@@ -2,13 +2,12 @@
 // Active frontend starts are trusted fixture setup, not a start-controller or
 // native isolation equivalence claim. Private DML setup is not a public API.
 use super::*;
-use crate::{ServerSetValues, SetOutcome, SetSqlError, execute_mysql_set};
-use darmok_protocol::CapabilityFlags;
+use crate::{QueryOutcome, QuerySqlError, ServerSetValues, SetSqlError, execute_query_command};
+use darmok_protocol::{CapabilityFlags, Command};
 use darmok_session::{
     AutocommitSetting, FrontendIsolation, FrontendTransactionAccess, FrontendTransactionCommand,
     SessionState, SqlMode, SqlModes, TransactionCharacteristics, TransactionCompletion,
 };
-use sqlparser::{ast::Statement, mysql_mode::parse_mysql_with_mode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn set_fixture() -> (SessionState, ServerSetValues) {
@@ -30,13 +29,12 @@ async fn set_request(
     backend: &mut NativeBackend,
     globals: &ServerSetValues,
     sql: &str,
-) -> (SetOutcome, Vec<u8>) {
-    let parsed = parse_mysql_with_mode(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
-    let [Statement::Set(input)] = parsed.as_slice() else {
-        panic!("one SET expected")
-    };
+) -> (QueryOutcome, Vec<u8>) {
+    let mut payload = vec![darmok_protocol::constants::COM_QUERY];
+    payload.extend_from_slice(sql.as_bytes());
+    let command = Command::decode(&payload, state.client_capabilities).unwrap();
     let (mut writer, mut reader) = tokio::io::duplex(1024);
-    let outcome = execute_mysql_set(state, backend, globals, input, 7, &mut writer)
+    let outcome = execute_query_command(state, backend, globals, &command, 7, &mut writer)
         .await
         .unwrap();
     writer.shutdown().await.unwrap();
@@ -47,16 +45,20 @@ async fn set_request(
         usize::from(bytes[0]) | (usize::from(bytes[1]) << 8) | (usize::from(bytes[2]) << 16),
         bytes.len() - 4
     );
-    assert!(state.unconfirmed_set_command().is_none());
+    assert!(state.unconfirmed_command().is_none());
     (outcome, bytes)
 }
 
-fn set_success(outcome: SetOutcome) {
-    assert!(matches!(outcome, SetOutcome::Success(_)), "{outcome:?}");
+fn set_success(outcome: QueryOutcome) {
+    assert!(matches!(outcome, QueryOutcome::Success(_)), "{outcome:?}");
 }
 
-fn set_error(outcome: SetOutcome, bytes: &[u8], expected: SetSqlError) {
-    assert!(matches!(outcome, SetOutcome::SqlError { error, .. } if error == expected));
+fn set_error(outcome: QueryOutcome, bytes: &[u8], expected: SetSqlError) {
+    query_error(outcome, bytes, QuerySqlError::Set(expected));
+}
+
+fn query_error(outcome: QueryOutcome, bytes: &[u8], expected: QuerySqlError) {
+    assert!(matches!(outcome, QueryOutcome::SqlError { error, .. } if error == expected));
     assert_eq!(bytes[4], 0xff);
     assert_eq!(u16::from_le_bytes([bytes[5], bytes[6]]), expected.code());
     assert_eq!(
@@ -70,6 +72,181 @@ fn set_error(outcome: SetOutcome, bytes: &[u8], expected: SetSqlError) {
             expected.sql_state()[4]
         ]
     );
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_source_colon_and_mixed_assignments_preserve_setting_semantics() {
+    let mut backend = connect_backend().await;
+    for (sql, modes, isolation) in [
+        (
+            "SET SESSION sql_mode := 'ANSI_QUOTES', autocommit := 0, transaction_isolation := 'READ-COMMITTED', transaction_read_only := 1",
+            "ANSI_QUOTES",
+            FrontendIsolation::ReadCommitted,
+        ),
+        (
+            "SET @@LOCAL.sql_mode := 4, @@SESSION.autocommit := 0, @@SESSION.transaction_isolation := 'SERIALIZABLE', @@SESSION.transaction_read_only := 1",
+            "ANSI_QUOTES",
+            FrontendIsolation::Serializable,
+        ),
+        (
+            "SET sql_mode := 'ANSI_QUOTES', sql_mode = @@SESSION.sql_mode, autocommit := 0, transaction_read_only = @@session.autocommit",
+            "PIPES_AS_CONCAT",
+            FrontendIsolation::RepeatableRead,
+        ),
+    ] {
+        let (mut state, globals) = set_fixture();
+        set_success(
+            set_request(
+                &mut state,
+                &mut backend,
+                &globals,
+                "SET sql_mode='PIPES_AS_CONCAT'",
+            )
+            .await
+            .0,
+        );
+        set_success(set_request(&mut state, &mut backend, &globals, sql).await.0);
+        assert_eq!(state.sql_modes().unwrap().canonical_names(), modes);
+        let settings = state.transaction_settings().unwrap();
+        assert_eq!(settings.defaults.isolation, isolation);
+        assert_eq!(
+            settings.defaults.access,
+            FrontendTransactionAccess::ReadOnly
+        );
+        assert_eq!(settings.autocommit, AutocommitSetting::Disabled);
+        assert_eq!(settings.next.isolation, None);
+        assert_eq!(settings.next.access, None);
+    }
+    let _ = backend.dispose().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_source_transaction_characteristics_support_both_orders() {
+    let mut backend = connect_backend().await;
+    let (mut state, globals) = set_fixture();
+    for (sql, isolation, access) in [
+        (
+            "SET LOCAL TRANSACTION READ ONLY, ISOLATION LEVEL READ COMMITTED",
+            FrontendIsolation::ReadCommitted,
+            FrontendTransactionAccess::ReadOnly,
+        ),
+        (
+            "SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE",
+            FrontendIsolation::Serializable,
+            FrontendTransactionAccess::ReadWrite,
+        ),
+    ] {
+        set_success(set_request(&mut state, &mut backend, &globals, sql).await.0);
+        let settings = state.transaction_settings().unwrap();
+        assert_eq!(settings.defaults.isolation, isolation);
+        assert_eq!(settings.defaults.access, access);
+        assert_eq!(settings.next.isolation, None);
+        assert_eq!(settings.next.access, None);
+    }
+    let _ = backend.dispose().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_source_uses_the_current_mode_for_each_command() {
+    let mut backend = connect_backend().await;
+    let (mut state, globals) = set_fixture();
+    set_success(
+        set_request(
+            &mut state,
+            &mut backend,
+            &globals,
+            "SET sql_mode=\"ANSI_QUOTES\"",
+        )
+        .await
+        .0,
+    );
+    let before = state.translation_fingerprint().unwrap();
+    // Under ANSI_QUOTES this is an identifier expression, outside the selected
+    // evaluator, rather than the string literal accepted by the prior command.
+    let (outcome, bytes) = set_request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET sql_mode=\"PIPES_AS_CONCAT\"",
+    )
+    .await;
+    set_error(outcome, &bytes, SetSqlError::Unsupported);
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
+    set_success(
+        set_request(&mut state, &mut backend, &globals, "SET sql_mode=''")
+            .await
+            .0,
+    );
+    set_success(
+        set_request(
+            &mut state,
+            &mut backend,
+            &globals,
+            "SET sql_mode=\"PIPES_AS_CONCAT\"",
+        )
+        .await
+        .0,
+    );
+    assert_eq!(
+        state.sql_modes().unwrap().canonical_names(),
+        "PIPES_AS_CONCAT"
+    );
+    assert_eq!(state.error_count(), 0);
+    let _ = backend.dispose().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_source_rejects_unimplemented_statements_and_batches_before_commit() {
+    let mut backend = connect_backend().await;
+    setup(&backend, "CREATE TEMP TABLE query_batch(id integer PRIMARY KEY,n integer); INSERT INTO query_batch VALUES(0,0)").await;
+    let (mut state, globals) = set_fixture();
+    let before = state.translation_fingerprint().unwrap();
+    let (outcome, bytes) = set_request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SELECT @@session.sql_mode",
+    )
+    .await;
+    query_error(outcome, &bytes, QuerySqlError::UnsupportedStatement);
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
+    assert_eq!(state.error_count(), 1);
+    assert_eq!(state.row_count, -1);
+    set_success(
+        set_request(&mut state, &mut backend, &globals, "SET autocommit=0")
+            .await
+            .0,
+    );
+    fixture_start(&mut state, &mut backend).await;
+    setup(&backend, "UPDATE query_batch SET n=7 WHERE id=0").await;
+    let before = state.translation_fingerprint().unwrap();
+    let (outcome, bytes) = set_request(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET autocommit=1; SET sql_mode='ANSI_QUOTES'",
+    )
+    .await;
+    query_error(outcome, &bytes, QuerySqlError::UnsupportedStatement);
+    assert_eq!(state.translation_fingerprint().unwrap(), before);
+    assert_eq!(
+        backend.state(),
+        NativeBackendState::Ready(TransactionState::Transaction)
+    );
+    fixture_rollback(&mut state, &mut backend).await;
+    assert_eq!(
+        client(&backend)
+            .query_one("SELECT n FROM query_batch WHERE id=0", &[])
+            .await
+            .unwrap()
+            .get::<_, i32>(0),
+        0
+    );
+    let _ = backend.dispose().await.unwrap();
 }
 
 fn fixture_frontend_command(state: &mut SessionState, command: FrontendTransactionCommand) {

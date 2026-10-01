@@ -1,4 +1,4 @@
-//! One outcome boundary for an entire SET, including known partial effects.
+//! One command outcome boundary for setting effects and SQL diagnostics.
 //! Methods recording effects assert the execution controller's receipt contract.
 //! They do not submit native SQL or send a response.
 
@@ -8,32 +8,32 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SetSettingsSnapshot {
+pub struct CommandSettingsSnapshot {
     pub sql_modes: SqlModes,
     pub transactions: TransactionSettingsSnapshot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UnconfirmedSetCommand {
-    pub before: SetSettingsSnapshot,
-    pub last_confirmed: SetSettingsSnapshot,
+pub struct UnconfirmedCommand {
+    pub before: CommandSettingsSnapshot,
+    pub last_confirmed: CommandSettingsSnapshot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PendingSetCommand {
-    pub before: SetSettingsSnapshot,
+pub(crate) struct PendingCommand {
+    pub before: CommandSettingsSnapshot,
 }
 
-/// Exclusively holds session state until the complete SET response is sent.
+/// Exclusively holds command settings until its complete response is sent.
 /// Dropping the stage retains known effects and prevents session reuse.
 #[derive(Debug)]
-pub struct SessionSetStage<'a> {
+pub struct SessionCommandStage<'a> {
     pub(crate) state: &'a mut SessionState,
 }
 
-impl SessionSetStage<'_> {
-    pub fn settings(&self) -> Result<SetSettingsSnapshot, TransactionSettingsError> {
-        Ok(SetSettingsSnapshot {
+impl SessionCommandStage<'_> {
+    pub fn settings(&self) -> Result<CommandSettingsSnapshot, TransactionSettingsError> {
+        Ok(CommandSettingsSnapshot {
             sql_modes: self.state.sql_modes,
             transactions: self.state.transactions.snapshot()?,
         })
@@ -88,7 +88,7 @@ impl SessionSetStage<'_> {
             .next_frontend_boundary()
             .expect("setting has a boundary");
         stage.record_confirmed_frontend_boundary(boundary)?;
-        // The encompassing SET guard still prevents all public session reads.
+        // The encompassing command guard still prevents all public session reads.
         // No intermediate assignment is certified as a completed SQL command.
         stage.finish_known_effects()?;
         Ok(())
@@ -111,29 +111,31 @@ impl SessionSetStage<'_> {
     }
 
     /// Call after the controller has encoded and sent either the success
-    /// response or the known SQL error response for this entire statement.
-    pub fn finish_with_sent_output(self) -> Result<SetSettingsSnapshot, TransactionSettingsError> {
+    /// response or the known SQL error response for this entire command.
+    pub fn finish_with_sent_output(
+        self,
+    ) -> Result<CommandSettingsSnapshot, TransactionSettingsError> {
         let snapshot = self.settings()?;
-        self.state.pending_set = None;
+        self.state.pending_command = None;
         Ok(snapshot)
     }
 }
 
 impl SessionState {
-    pub fn stage_set_command(&mut self) -> Result<SessionSetStage<'_>, TransactionSettingsError> {
+    pub fn stage_command(&mut self) -> Result<SessionCommandStage<'_>, TransactionSettingsError> {
         self.ensure_settled()?;
-        let before = SetSettingsSnapshot {
+        let before = CommandSettingsSnapshot {
             sql_modes: self.sql_modes,
             transactions: self.transactions.snapshot()?,
         };
-        self.pending_set = Some(PendingSetCommand { before });
-        Ok(SessionSetStage { state: self })
+        self.pending_command = Some(PendingCommand { before });
+        Ok(SessionCommandStage { state: self })
     }
 
-    pub fn unconfirmed_set_command(&self) -> Option<UnconfirmedSetCommand> {
-        self.pending_set.map(|stage| UnconfirmedSetCommand {
+    pub fn unconfirmed_command(&self) -> Option<UnconfirmedCommand> {
+        self.pending_command.map(|stage| UnconfirmedCommand {
             before: stage.before,
-            last_confirmed: SetSettingsSnapshot {
+            last_confirmed: CommandSettingsSnapshot {
                 sql_modes: self.sql_modes,
                 transactions: self.transactions.last_confirmed(),
             },

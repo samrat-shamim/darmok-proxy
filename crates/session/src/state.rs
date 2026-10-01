@@ -78,7 +78,7 @@ pub struct SessionState {
     time_zone: &'static str,
     pub(crate) sql_modes: SqlModes,
     pub(crate) transactions: TransactionSettings,
-    pub(crate) pending_set: Option<crate::set_command::PendingSetCommand>,
+    pub(crate) pending_command: Option<crate::command_stage::PendingCommand>,
     pub client_capabilities: u32,
     pub last_insert_id: u64,
     pub affected_rows: u64,
@@ -98,7 +98,7 @@ impl Default for SessionState {
             time_zone: profile.default_time_zone,
             sql_modes: profile.default_sql_modes,
             transactions: TransactionSettings::new(profile.default_transaction_characteristics),
-            pending_set: None,
+            pending_command: None,
             client_capabilities: 0,
             last_insert_id: 0,
             affected_rows: 0,
@@ -171,7 +171,7 @@ impl SessionState {
     }
 
     pub(crate) fn ensure_settled(&self) -> Result<(), TransactionSettingsError> {
-        if self.pending_set.is_some() {
+        if self.pending_command.is_some() {
             return Err(TransactionSettingsError::UnsettledOutcome);
         }
         self.transactions.snapshot()?;

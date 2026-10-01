@@ -1,4 +1,4 @@
-// Modified for Darmok: Parse MySQL sigil, scope and contextual variable-name quoting.
+// Modified for Darmok: Parse MySQL variable names, SET operators and characteristics.
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
 // and preserve transaction-setting syntax and keyword scope.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15216,6 +15216,19 @@ impl<'a> Parser<'a> {
             .map(SetAssignmentTarget::ObjectName)
     }
 
+    /// MySQL uses `=` or `:=`; other dialects retain `=` or `TO`.
+    fn parse_set_assignment_operator(&mut self) -> bool {
+        if self.consume_token(&Token::Eq) {
+            return true;
+        }
+        let dialect = self.dialect;
+        if dialect_is!(dialect is MySqlDialect) {
+            self.consume_token(&Token::Assignment)
+        } else {
+            self.parse_keyword(Keyword::TO)
+        }
+    }
+
     /// Parse a single SET statement assignment `var = expr`.
     fn parse_set_assignment(&mut self) -> Result<SetAssignment, ParserError> {
         let scope = self.parse_context_modifier();
@@ -15231,7 +15244,7 @@ impl<'a> Parser<'a> {
             self.parse_set_assignment_target()?
         };
 
-        if !(self.consume_token(&Token::Eq) || self.parse_keyword(Keyword::TO)) {
+        if !self.parse_set_assignment_operator() {
             return self.expected_ref("assignment operator", self.peek_token_ref());
         }
 
@@ -15262,7 +15275,7 @@ impl<'a> Parser<'a> {
         if self.parse_keywords(&[Keyword::TIME, Keyword::ZONE])
             || self.parse_keyword(Keyword::TIMEZONE)
         {
-            if self.consume_token(&Token::Eq) || self.parse_keyword(Keyword::TO) {
+            if self.parse_set_assignment_operator() {
                 return Ok(Set::SingleAssignment {
                     scope,
                     hivevar,
@@ -15304,6 +15317,14 @@ impl<'a> Parser<'a> {
             })
             .into());
         } else if self.parse_keyword(Keyword::TRANSACTION) {
+            let dialect = self.dialect;
+            if dialect_is!(dialect is MySqlDialect) {
+                return Ok(Set::SetTransaction(SetTransaction::Direct {
+                    scope,
+                    modes: self.parse_mysql_set_transaction_modes()?,
+                })
+                .into());
+            }
             if self.parse_keyword(Keyword::SNAPSHOT) {
                 let snapshot_id = self.parse_value()?;
                 return Ok(Set::SetTransaction(SetTransaction::Snapshot {
@@ -15386,7 +15407,7 @@ impl<'a> Parser<'a> {
             SetTargets::One(self.parse_set_assignment_target()?)
         };
 
-        if self.consume_token(&Token::Eq) || self.parse_keyword(Keyword::TO) {
+        if self.parse_set_assignment_operator() {
             let stmt = match variables {
                 SetTargets::One(var) => Set::SingleAssignment {
                     scope,
@@ -15408,7 +15429,13 @@ impl<'a> Parser<'a> {
             return self.parse_set_session_params();
         };
 
-        self.expected_ref("equals sign or TO", self.peek_token_ref())
+        let dialect = self.dialect;
+        let expected = if dialect_is!(dialect is MySqlDialect) {
+            "equals sign or :="
+        } else {
+            "equals sign or TO"
+        };
+        self.expected_ref(expected, self.peek_token_ref())
     }
 
     /// Parse session parameter assignments after `SET` when no `=` or `TO` is present.
@@ -19227,13 +19254,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a list of transaction modes
-    pub fn parse_transaction_modes(&mut self) -> Result<Vec<TransactionMode>, ParserError> {
-        let mut modes = vec![];
-        let mut required = false;
-        loop {
-            let mode = if self.parse_keywords(&[Keyword::ISOLATION, Keyword::LEVEL]) {
-                let iso_level = if self.parse_keywords(&[Keyword::READ, Keyword::UNCOMMITTED]) {
+    fn parse_transaction_mode(&mut self) -> Result<Option<TransactionMode>, ParserError> {
+        Ok(
+            if self.parse_keywords(&[Keyword::ISOLATION, Keyword::LEVEL]) {
+                let level = if self.parse_keywords(&[Keyword::READ, Keyword::UNCOMMITTED]) {
                     TransactionIsolationLevel::ReadUncommitted
                 } else if self.parse_keywords(&[Keyword::READ, Keyword::COMMITTED]) {
                     TransactionIsolationLevel::ReadCommitted
@@ -19244,23 +19268,73 @@ impl<'a> Parser<'a> {
                 } else if self.parse_keyword(Keyword::SNAPSHOT) {
                     TransactionIsolationLevel::Snapshot
                 } else {
-                    self.expected_ref("isolation level", self.peek_token_ref())?
+                    return self.expected_ref("isolation level", self.peek_token_ref());
                 };
-                TransactionMode::IsolationLevel(iso_level)
+                Some(TransactionMode::IsolationLevel(level))
             } else if self.parse_keywords(&[Keyword::READ, Keyword::ONLY]) {
-                TransactionMode::AccessMode(TransactionAccessMode::ReadOnly)
+                Some(TransactionMode::AccessMode(TransactionAccessMode::ReadOnly))
             } else if self.parse_keywords(&[Keyword::READ, Keyword::WRITE]) {
-                TransactionMode::AccessMode(TransactionAccessMode::ReadWrite)
+                Some(TransactionMode::AccessMode(
+                    TransactionAccessMode::ReadWrite,
+                ))
+            } else {
+                None
+            },
+        )
+    }
+
+    /// MySQL SET requires one characteristic, optionally followed by the other
+    /// kind with a comma. Its four isolation levels do not include SNAPSHOT.
+    /// START TRANSACTION and other dialects keep their separate list grammar.
+    fn parse_mysql_set_transaction_modes(&mut self) -> Result<Vec<TransactionMode>, ParserError> {
+        let Some(first) = self.parse_transaction_mode()? else {
+            return self.expected_ref("transaction characteristic", self.peek_token_ref());
+        };
+        if first == TransactionMode::IsolationLevel(TransactionIsolationLevel::Snapshot) {
+            return self.expected_ref("MySQL isolation level", self.peek_token_ref());
+        }
+        let mut modes = vec![first];
+        if self.consume_token(&Token::Comma) {
+            let Some(second) = self.parse_transaction_mode()? else {
+                return self.expected_ref("transaction characteristic", self.peek_token_ref());
+            };
+            let distinct = matches!(
+                (first, second),
+                (
+                    TransactionMode::AccessMode(_),
+                    TransactionMode::IsolationLevel(_)
+                ) | (
+                    TransactionMode::IsolationLevel(_),
+                    TransactionMode::AccessMode(_)
+                )
+            );
+            if !distinct
+                || second == TransactionMode::IsolationLevel(TransactionIsolationLevel::Snapshot)
+            {
+                return self.expected_ref(
+                    "the other transaction characteristic",
+                    self.peek_token_ref(),
+                );
+            }
+            modes.push(second);
+        }
+        Ok(modes)
+    }
+
+    /// Parse a list of transaction modes using the shared non-SET grammar.
+    pub fn parse_transaction_modes(&mut self) -> Result<Vec<TransactionMode>, ParserError> {
+        let mut modes = vec![];
+        let mut required = false;
+        loop {
+            let mode = if let Some(mode) = self.parse_transaction_mode()? {
+                mode
             } else if required {
-                self.expected_ref("transaction mode", self.peek_token_ref())?
+                return self.expected_ref("transaction mode", self.peek_token_ref());
             } else {
                 break;
             };
             modes.push(mode);
-            // ANSI requires a comma after each transaction mode, but
-            // PostgreSQL, for historical reasons, does not. We follow
-            // PostgreSQL in making the comma optional, since that is strictly
-            // more general.
+            // PostgreSQL permits omission of the separator in this grammar.
             required = self.consume_token(&Token::Comma);
         }
         Ok(modes)

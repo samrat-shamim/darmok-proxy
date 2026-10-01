@@ -390,6 +390,19 @@ complete release gate runs once on the final candidate.
   disabled, so this work cannot merge or complete M2/M4 or a release gate.
   Security-related work and the compiler draft remain excluded.
 
+- The [selected COM_QUERY controller](query-controller.md) admits original
+  decoded query SQL using current session modes and dispatches one SET to its
+  private evaluator. There is no public constructed-AST execution entry point.
+  MySQL SET accepts `=`/`:=` and direct characteristics in either order; other
+  dialects retain their grammar. Known unsupported statements/batches return
+  SQL errors before effects. The outcome guard now also names command-level
+  SQL diagnostics. Ten native SET groups use the real query source path and
+  four new groups declare source/mode/batch postconditions; four new stock
+  observations declare ordinary operator/characteristic expectations.
+  Current-revision execution, independent review and exact receipts are pending.
+  This does not establish a runnable frontend loop, row results, real-driver
+  compatibility or M2/M4 completion. Security and compiler work remain excluded.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

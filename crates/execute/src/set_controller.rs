@@ -1,23 +1,18 @@
 //! Executes the admitted, catalog-independent SET subset. Transaction starts,
 //! row execution and native/frontend isolation equivalence are separate gates.
 
-use crate::{NativeBackend, NativeBackendError, NativeBackendState};
-use bytes::{Bytes, BytesMut};
-use darmok_protocol::{CapabilityFlags, ErrPacket, OkPacket, RawPacket, StatusFlags};
+use crate::{NativeBackend, QueryExecutionError};
 use darmok_session::{
     AutocommitSetting, FrontendIsolation, FrontendTransactionAccess,
-    NamedTransactionCharacteristic, SessionSetStage, SessionState, SessionVariable,
-    SessionVariableReader, SetSettingsSnapshot, SqlMode, SqlModes, SystemVariableAssignment,
-    SystemVariableForm, TransactionCharacteristics, TransactionSettingAssignment,
-    TransactionSettingsError, TransactionVariableAssignmentForm,
+    NamedTransactionCharacteristic, SessionCommandStage, SessionState, SessionVariable,
+    SessionVariableReader, SqlMode, SqlModes, SystemVariableAssignment, SystemVariableForm,
+    TransactionCharacteristics, TransactionSettingAssignment, TransactionVariableAssignmentForm,
     classify_mysql_system_variable_read, classify_mysql_transaction_setting,
     mysql_system_variable_assignments,
 };
-use darmok_types::{error::ProxyError, value::Value};
+use darmok_types::value::Value;
 use sqlparser::ast::{ContextModifier, Expr, Set, Value as Literal};
 use std::borrow::Cow;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio_postgres::TransactionState;
 
 /// Explicit server authority for global reads and SESSION DEFAULT. There is
 /// no ambient PostgreSQL lookup, invented DEFAULT, or global setting writer.
@@ -60,31 +55,6 @@ impl SetSqlError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SetOutcome {
-    Success(SetSettingsSnapshot),
-    SqlError {
-        error: SetSqlError,
-        settings: SetSettingsSnapshot,
-    },
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum SetExecutionError {
-    #[error(transparent)]
-    Settings(#[from] TransactionSettingsError),
-    #[error("frontend/native transaction ownership differs: {0:?}")]
-    NativeState(NativeBackendState),
-    #[error("SET output requires protocol 4.1 without session tracking")]
-    OutputContract,
-    #[error(transparent)]
-    Native(#[from] NativeBackendError),
-    #[error(transparent)]
-    Encode(#[from] ProxyError),
-    #[error("SET response write failed: {0}")]
-    Output(#[from] std::io::Error),
-}
-
 #[derive(Debug, Clone, Copy)]
 enum TypedValue {
     Modes(SqlModes),
@@ -113,111 +83,27 @@ enum EvaluatedValue<'a> {
     Null,
 }
 
-/// No table, function, user-variable or subquery expression is admitted here.
-/// Those need SQL execution/admission and catalog validity. Ordinary values
-/// are evaluated and checked before any effect; DEFAULT is checked at its
-/// ordered update position. Output and native errors require caller disposal;
-/// dropping the borrowed SET stage retains effects and prevents session reuse.
-pub async fn execute_mysql_set<W: AsyncWrite + Unpin>(
-    state: &mut SessionState,
+/// A pure admission result. It cannot be constructed outside this module.
+pub(crate) struct SetPlan(Vec<SetAction>);
+
+pub(crate) async fn apply_set(
+    stage: &mut SessionCommandStage<'_>,
     backend: &mut NativeBackend,
-    globals: &ServerSetValues,
-    input: &Set,
-    response_sequence: u8,
-    output: &mut W,
-) -> Result<SetOutcome, SetExecutionError> {
-    let before = state.transaction_settings()?;
-    let expected = if before.active.is_some() {
-        TransactionState::Transaction
-    } else {
-        TransactionState::Idle
-    };
-    if backend.state() != NativeBackendState::Ready(expected) {
-        return Err(SetExecutionError::NativeState(backend.state()));
-    }
-    let capabilities = CapabilityFlags::from_bits_retain(state.client_capabilities);
-    // Tracking declarations and change blocks belong to a separate controller.
-    // Accepting them here would silently omit requested setting observations.
-    if !capabilities.contains(CapabilityFlags::CLIENT_PROTOCOL_41)
-        || capabilities.contains(CapabilityFlags::CLIENT_SESSION_TRACK)
-    {
-        return Err(SetExecutionError::OutputContract);
-    }
-    let planned = admit_set(state, globals, input);
-    let mut stage = state.stage_set_command()?;
-    stage.clear_diagnostics();
-    let error = match planned {
-        Err(error) => Some(error),
-        Ok(actions) => {
-            let mut error = None;
-            for action in actions {
-                if let Err(sql_error) = apply_action(&mut stage, backend, action).await? {
-                    error = Some(sql_error);
-                    break;
-                }
-            }
-            error
+    plan: SetPlan,
+) -> Result<Result<(), SetSqlError>, QueryExecutionError> {
+    for action in plan.0 {
+        if let Err(error) = apply_action(stage, backend, action).await? {
+            return Ok(Err(error));
         }
-    };
-    let mut payload = BytesMut::new();
-    if let Some(error) = error {
-        stage.record_sql_error(error.code(), error.message());
-        ErrPacket {
-            error_code: error.code(),
-            sql_state: error.sql_state(),
-            message: Bytes::from_static(error.message().as_bytes()),
-        }
-        .encode(&mut payload);
-    } else {
-        stage.record_sql_success();
-        let settings = stage.settings()?;
-        let mut flags = StatusFlags::empty();
-        flags.set(
-            StatusFlags::SERVER_STATUS_AUTOCOMMIT,
-            settings.transactions.autocommit == AutocommitSetting::Enabled,
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_IN_TRANS,
-            settings.transactions.active.is_some(),
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_IN_TRANS_READONLY,
-            settings
-                .transactions
-                .active
-                .is_some_and(|active| active.access == FrontendTransactionAccess::ReadOnly),
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_NO_BACKSLASH_ESCAPES,
-            settings.sql_modes.contains(SqlMode::NoBackslashEscapes),
-        );
-        OkPacket {
-            affected_rows: 0,
-            last_insert_id: 0,
-            status_flags: flags,
-            warnings: 0,
-            info: Bytes::new(),
-            session_state_changes: None,
-        }
-        .encode(&mut payload, capabilities)?;
     }
-    let packet = RawPacket::new(response_sequence, payload.freeze())?;
-    let mut encoded = BytesMut::with_capacity(packet.encoded_len()?);
-    packet.encode_into(&mut encoded)?;
-    output.write_all(&encoded).await?;
-    output.flush().await?;
-    let settings = stage.finish_with_sent_output()?;
-    Ok(match error {
-        Some(error) => SetOutcome::SqlError { error, settings },
-        None => SetOutcome::Success(settings),
-    })
+    Ok(Ok(()))
 }
 
-fn admit_set(
+pub(crate) fn admit_set(
     state: &SessionState,
     globals: &ServerSetValues,
     input: &Set,
-) -> Result<Vec<SetAction>, SetSqlError> {
+) -> Result<SetPlan, SetSqlError> {
     let before = state
         .transaction_settings()
         .map_err(|_| SetSqlError::Unsupported)?;
@@ -229,7 +115,7 @@ fn admit_set(
         {
             return Err(SetSqlError::NextChoicesDuringActive);
         }
-        return Ok(vec![SetAction::Transaction(assignment)]);
+        return Ok(SetPlan(vec![SetAction::Transaction(assignment)]));
     }
     let inputs = mysql_system_variable_assignments(input).map_err(|_| SetSqlError::Unsupported)?;
     let mut actions = Vec::new();
@@ -261,7 +147,7 @@ fn admit_set(
             value,
         });
     }
-    Ok(actions)
+    Ok(SetPlan(actions))
 }
 
 fn assignment_form(
@@ -474,10 +360,10 @@ fn default_value(
 }
 
 async fn apply_action(
-    stage: &mut SessionSetStage<'_>,
+    stage: &mut SessionCommandStage<'_>,
     backend: &mut NativeBackend,
     action: SetAction,
-) -> Result<Result<(), SetSqlError>, SetExecutionError> {
+) -> Result<Result<(), SetSqlError>, QueryExecutionError> {
     let SetAction::Variable {
         variable,
         form,
