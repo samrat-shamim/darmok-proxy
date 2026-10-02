@@ -1,6 +1,6 @@
 // Darmok extension, licensed under Apache-2.0.
 
-//! Immutable MySQL AST and lexical projection provenance from one parse.
+//! Immutable MySQL AST and lexical expression provenance from one parse.
 //! Source slices are never reconstructed from Display or a second SQL lexer.
 
 #[cfg(not(feature = "std"))]
@@ -8,7 +8,7 @@ use alloc::{vec, vec::Vec};
 use core::{fmt, ops::Range};
 
 use crate::{
-    ast::{Query, Select, SetExpr, Statement, ValueWithSpan},
+    ast::{Query, Select, Set, SetExpr, Statement, ValueWithSpan},
     dialect::ModeAwareMySqlDialect,
     mysql_mode::MySqlModeFlags,
     parser::{Parser, ParserError},
@@ -41,16 +41,24 @@ pub struct SourceSelect<'a> {
     numbers: &'a [(Span, Range<usize>)],
 }
 
+/// A SET borrow bound to the same parse that owns its numeric source ranges.
+#[derive(Debug, Clone, Copy)]
+pub struct SourceSet<'a> {
+    input: &'a Set,
+    sql: &'a str,
+    numbers: &'a [(Span, Range<usize>)],
+}
+
 /// Missing or ambiguous parser provenance is an internal contract error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ProjectionSourceError;
+pub struct SourceProvenanceError;
 
-impl fmt::Display for ProjectionSourceError {
+impl fmt::Display for SourceProvenanceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("SELECT projection source does not match its immutable parse")
+        f.write_str("MySQL expression source does not match its immutable parse")
     }
 }
-impl core::error::Error for ProjectionSourceError {}
+impl core::error::Error for SourceProvenanceError {}
 
 /// Distinguishes unsupported source shapes, SQL syntax errors and internal
 /// provenance failures.
@@ -61,15 +69,15 @@ pub enum MySqlSourceParseError {
     /// The original SQL could not be parsed.
     Parse(ParserError),
     /// Parser-owned source coordinates could not be resolved.
-    Source(ProjectionSourceError),
+    Source(SourceProvenanceError),
 }
 impl From<ParserError> for MySqlSourceParseError {
     fn from(error: ParserError) -> Self {
         Self::Parse(error)
     }
 }
-impl From<ProjectionSourceError> for MySqlSourceParseError {
-    fn from(error: ProjectionSourceError) -> Self {
+impl From<SourceProvenanceError> for MySqlSourceParseError {
+    fn from(error: SourceProvenanceError) -> Self {
         Self::Source(error)
     }
 }
@@ -92,9 +100,21 @@ impl ParsedMySqlSource<'_> {
         &self.statements
     }
 
+    /// Bind only a single SET to its original numeric tokens.
+    pub fn single_set(&self) -> Option<SourceSet<'_>> {
+        let [Statement::Set(input)] = self.statements.as_slice() else {
+            return None;
+        };
+        Some(SourceSet {
+            input,
+            sql: self.sql,
+            numbers: &self.numbers,
+        })
+    }
+
     /// Bind a single direct SELECT to its captured source. Other statement or
     /// set-expression shapes return None, rather than an approximate SELECT.
-    pub fn single_select(&self) -> Result<Option<SourceSelect<'_>>, ProjectionSourceError> {
+    pub fn single_select(&self) -> Result<Option<SourceSelect<'_>>, SourceProvenanceError> {
         let [Statement::Query(query)] = self.statements.as_slice() else {
             return Ok(None);
         };
@@ -105,9 +125,9 @@ impl ParsedMySqlSource<'_> {
             .projections
             .iter()
             .filter(|source| source.select == select.select_token.0.span);
-        let source = sources.next().ok_or(ProjectionSourceError)?;
+        let source = sources.next().ok_or(SourceProvenanceError)?;
         if sources.next().is_some() || source.items.len() != select.projection.len() {
-            return Err(ProjectionSourceError);
+            return Err(SourceProvenanceError);
         }
         Ok(Some(SourceSelect {
             query,
@@ -131,24 +151,44 @@ impl<'a> SourceSelect<'a> {
     }
 
     /// Complete item spelling, including parentheses, operators and aliases.
-    pub fn item_source(self, index: usize) -> Result<&'a str, ProjectionSourceError> {
-        let range = self.items.get(index).ok_or(ProjectionSourceError)?;
-        self.sql.get(range.clone()).ok_or(ProjectionSourceError)
+    pub fn item_source(self, index: usize) -> Result<&'a str, SourceProvenanceError> {
+        let range = self.items.get(index).ok_or(SourceProvenanceError)?;
+        self.sql.get(range.clone()).ok_or(SourceProvenanceError)
     }
 
     /// Original numeric token, including zeros or exponent spelling that an
     /// optional BigDecimal AST representation may normalize away.
-    pub fn number_source(self, value: &ValueWithSpan) -> Result<&'a str, ProjectionSourceError> {
-        let index = self
-            .numbers
-            .binary_search_by_key(&value.span, |(span, _)| *span)
-            .map_err(|_| ProjectionSourceError)?;
-        let (_, range) = &self.numbers[index];
-        self.sql.get(range.clone()).ok_or(ProjectionSourceError)
+    pub fn number_source(self, value: &ValueWithSpan) -> Result<&'a str, SourceProvenanceError> {
+        number_source(self.sql, self.numbers, value)
     }
 }
 
-/// Parse once with current MySQL modes and retain complete projection spelling.
+impl<'a> SourceSet<'a> {
+    /// Original SET clauses and expressions, without a detached mutable AST.
+    pub fn input(self) -> &'a Set {
+        self.input
+    }
+
+    /// Preserve the original numeric token family across AST feature builds.
+    pub fn number_source(self, value: &ValueWithSpan) -> Result<&'a str, SourceProvenanceError> {
+        number_source(self.sql, self.numbers, value)
+    }
+}
+
+fn number_source<'a>(
+    sql: &'a str,
+    numbers: &[(Span, Range<usize>)],
+    value: &ValueWithSpan,
+) -> Result<&'a str, SourceProvenanceError> {
+    let index = numbers
+        .binary_search_by_key(&value.span, |(span, _)| *span)
+        .map_err(|_| SourceProvenanceError)?;
+    let (_, range) = &numbers[index];
+    sql.get(range.clone()).ok_or(SourceProvenanceError)
+}
+
+/// Parse once with current MySQL modes and retain complete projection spelling
+/// and numeric tokens for single SET statements.
 /// Token coordinates count Unicode characters, not bytes. Convert all captured
 /// endpoints together in one character walk after sorting them; never rescan a
 /// long source line for each projection. The AST-only path does not allocate
@@ -177,7 +217,7 @@ pub fn parse_mysql_source(
     parser.projection_source = Some(vec![]);
     let statements = parser.parse_statements()?;
     let captured = parser.projection_source.take().expect("capture enabled");
-    let numbers = if captured.is_empty() {
+    let numbers = if captured.is_empty() && !matches!(statements.as_slice(), [Statement::Set(_)]) {
         vec![]
     } else {
         parser.numeric_source_spans()
@@ -204,7 +244,7 @@ pub fn parse_mysql_source(
     })
 }
 
-fn byte_ranges(sql: &str, spans: &[Span]) -> Result<Vec<Range<usize>>, ProjectionSourceError> {
+fn byte_ranges(sql: &str, spans: &[Span]) -> Result<Vec<Range<usize>>, SourceProvenanceError> {
     if spans.is_empty() {
         return Ok(vec![]);
     }
@@ -238,7 +278,7 @@ fn byte_ranges(sql: &str, spans: &[Span]) -> Result<Vec<Range<usize>>, Projectio
         }
     }
     if next != endpoints.len() {
-        return Err(ProjectionSourceError);
+        return Err(SourceProvenanceError);
     }
     Ok(offsets
         .chunks_exact(2)
@@ -249,6 +289,26 @@ fn byte_ranges(sql: &str, spans: &[Span]) -> Result<Vec<Range<usize>>, Projectio
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn set_numeric_tokens_retain_family_zeros_and_unicode_coordinates() {
+        let parsed = parse_mysql_source(
+            "SET /* hé */ completion_type=1e0, autocommit=00, sql_mode=0.0,\n transaction_isolation=.0, transaction_read_only=0.",
+            MySqlModeFlags::empty(),
+        )
+        .unwrap();
+        let source = parsed.single_set().unwrap();
+        let Set::MultipleAssignments { assignments } = source.input() else {
+            panic!("one original compound SET");
+        };
+        for (assignment, expected) in assignments.iter().zip(["1e0", "00", "0.0", ".0", "0."]) {
+            let crate::ast::Expr::Value(value) = &assignment.value else {
+                panic!("original numeric value");
+            };
+            assert_eq!(source.number_source(value).unwrap(), expected);
+        }
+        assert_eq!(assignments.len(), 5);
+    }
 
     #[test]
     fn lexical_items_retain_wrappers_spaces_comments_and_unicode() {

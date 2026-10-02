@@ -2,6 +2,7 @@
 //! The parser uses the settled session's current mode on every command.
 
 use crate::select_controller::{SelectAdmissionError, SelectPlan};
+use crate::set_controller::SetAdmissionError;
 use crate::{
     NativeBackend, NativeBackendError, NativeBackendState, SelectSqlError, ServerSetValues,
     SetSqlError, TransactionSqlError,
@@ -18,7 +19,7 @@ use darmok_session::{
 use darmok_types::error::ProxyError;
 use sqlparser::{
     ast::Statement,
-    source::{MySqlSourceParseError, ProjectionSourceError, parse_mysql_source},
+    source::{MySqlSourceParseError, SourceProvenanceError, parse_mysql_source},
 };
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_postgres::TransactionState;
@@ -87,7 +88,7 @@ pub enum QueryExecutionError {
     #[error("query output requires protocol 4.1 without session tracking or optional metadata")]
     OutputContract,
     #[error(transparent)]
-    Source(#[from] ProjectionSourceError),
+    Source(#[from] SourceProvenanceError),
     #[error(transparent)]
     Native(#[from] NativeBackendError),
     #[error(transparent)]
@@ -141,9 +142,14 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
     let parsed = parse_mysql_source(sql, state.sql_modes()?.parser_flags());
     let planned = match &parsed {
         Ok(parsed) => match parsed.statements() {
-            [Statement::Set(input)] => crate::set_controller::admit_set(state, globals, input)
-                .map(QueryPlan::Set)
-                .map_err(QuerySqlError::Set),
+            [Statement::Set(_)] => {
+                let source = parsed.single_set().ok_or(SourceProvenanceError)?;
+                match crate::set_controller::admit_set(state, globals, source) {
+                    Ok(plan) => Ok(QueryPlan::Set(plan)),
+                    Err(SetAdmissionError::Sql(error)) => Err(QuerySqlError::Set(error)),
+                    Err(SetAdmissionError::Source(error)) => return Err(error.into()),
+                }
+            }
             [
                 input @ (Statement::StartTransaction { .. }
                 | Statement::Commit { .. }

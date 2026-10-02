@@ -148,7 +148,7 @@ fn confirmed_start_is_retained_when_output_outcome_is_unconfirmed() {
 }
 
 #[test]
-fn active_start_commits_before_starting_with_changed_defaults() {
+fn active_start_retains_pair_then_nonchained_end_uses_changed_defaults() {
     let mut state = SessionState::new(4);
     begin(&mut state);
     settle(
@@ -171,17 +171,29 @@ fn active_start_commits_before_starting_with_changed_defaults() {
     assert_eq!(
         stage.next_frontend_boundary(),
         Some(FrontendTransactionBoundary::Started(choices(
-            Serializable,
-            ReadOnly
+            RepeatableRead,
+            ReadWrite
         )))
     );
     stage
         .record_confirmed_frontend_boundary(FrontendTransactionBoundary::Started(choices(
-            Serializable,
-            ReadOnly,
+            RepeatableRead,
+            ReadWrite,
         )))
         .unwrap();
     stage.finish_success_with_validated_output().unwrap();
+    assert_eq!(
+        state.transaction_settings().unwrap().active,
+        Some(choices(RepeatableRead, ReadWrite))
+    );
+    settle(
+        &mut state,
+        FrontendTransactionCommand::Complete {
+            completion: Commit,
+            chain: false,
+        },
+    );
+    begin(&mut state);
     assert_eq!(
         state.transaction_settings().unwrap().active,
         Some(choices(Serializable, ReadOnly))

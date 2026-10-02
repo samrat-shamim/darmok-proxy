@@ -11,7 +11,10 @@ use darmok_session::{
     mysql_system_variable_assignments,
 };
 use darmok_types::value::Value;
-use sqlparser::ast::{ContextModifier, Expr, Set, Value as Literal};
+use sqlparser::{
+    ast::{ContextModifier, Expr, Set, Value as Literal},
+    source::{SourceProvenanceError, SourceSet},
+};
 use std::borrow::Cow;
 
 /// Explicit server authority for global reads and SESSION DEFAULT. There is
@@ -53,6 +56,22 @@ impl SetSqlError {
                 "Transaction characteristics can't be changed while a transaction is in progress"
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SetAdmissionError {
+    Sql(SetSqlError),
+    Source(SourceProvenanceError),
+}
+impl From<SetSqlError> for SetAdmissionError {
+    fn from(error: SetSqlError) -> Self {
+        Self::Sql(error)
+    }
+}
+impl From<SourceProvenanceError> for SetAdmissionError {
+    fn from(error: SourceProvenanceError) -> Self {
+        Self::Source(error)
     }
 }
 
@@ -104,8 +123,9 @@ pub(crate) async fn apply_set(
 pub(crate) fn admit_set(
     state: &SessionState,
     globals: &ServerSetValues,
-    input: &Set,
-) -> Result<SetPlan, SetSqlError> {
+    source: SourceSet<'_>,
+) -> Result<SetPlan, SetAdmissionError> {
+    let input = source.input();
     let before = state
         .transaction_settings()
         .map_err(|_| SetSqlError::Unsupported)?;
@@ -115,7 +135,7 @@ pub(crate) fn admit_set(
         if matches!(assignment, TransactionSettingAssignment::NextTransaction(_))
             && before.active.is_some()
         {
-            return Err(SetSqlError::NextChoicesDuringActive);
+            return Err(SetSqlError::NextChoicesDuringActive.into());
         }
         return Ok(SetPlan(vec![SetAction::Transaction(assignment)]));
     }
@@ -132,7 +152,7 @@ pub(crate) fn admit_set(
                 | SessionVariable::TransactionIsolation
                 | SessionVariable::TransactionReadOnly
         ) {
-            return Err(SetSqlError::Unsupported);
+            return Err(SetSqlError::Unsupported.into());
         }
         let value = if matches!(input.value, Expr::Identifier(name) if name.quote_style.is_none() && name.value.eq_ignore_ascii_case("DEFAULT"))
         {
@@ -140,7 +160,10 @@ pub(crate) fn admit_set(
             // The active-next check still belongs to its update position.
             PlannedValue::Default(default_value(globals, input.variable)?)
         } else {
-            let value = coerce(input.variable, evaluate(state, globals, input.value)?)?;
+            let value = coerce(
+                input.variable,
+                evaluate(state, globals, source, input.value)?,
+            )?;
             check_phase(input.variable, form, value, before)?;
             PlannedValue::Checked(value)
         };
@@ -199,8 +222,9 @@ fn check_phase(
 fn evaluate<'a>(
     state: &SessionState,
     globals: &ServerSetValues,
+    source: SourceSet<'a>,
     expression: &'a Expr,
-) -> Result<EvaluatedValue<'a>, SetSqlError> {
+) -> Result<EvaluatedValue<'a>, SetAdmissionError> {
     Ok(match expression {
         Expr::Value(value) => match &value.value {
             Literal::SingleQuotedString(value) | Literal::DoubleQuotedString(value) => {
@@ -208,13 +232,14 @@ fn evaluate<'a>(
             }
             Literal::Boolean(value) => EvaluatedValue::Boolean(*value),
             Literal::Null => EvaluatedValue::Null,
-            Literal::Number(value, false) => EvaluatedValue::Unsigned(
-                value
-                    .to_string()
-                    .parse()
-                    .map_err(|_| SetSqlError::Unsupported)?,
-            ),
-            _ => return Err(SetSqlError::Unsupported),
+            Literal::Number(_, false) => {
+                let original = source.number_source(value)?;
+                if original.is_empty() || !original.bytes().all(|byte| byte.is_ascii_digit()) {
+                    return Err(SetSqlError::Unsupported.into());
+                }
+                EvaluatedValue::Unsigned(original.parse().map_err(|_| SetSqlError::Unsupported)?)
+            }
+            _ => return Err(SetSqlError::Unsupported.into()),
         },
         Expr::Identifier(name)
             if name.quote_style.is_none()
@@ -237,7 +262,7 @@ fn evaluate<'a>(
                     | SessionVariable::TransactionIsolation
                     | SessionVariable::TransactionReadOnly
             ) {
-                return Err(SetSqlError::Unsupported);
+                return Err(SetSqlError::Unsupported.into());
             }
             let value = if read.form == SystemVariableForm::Qualified(ContextModifier::Global) {
                 global_value(globals, read.variable)?
@@ -249,10 +274,10 @@ fn evaluate<'a>(
             match value {
                 Value::String(value) => EvaluatedValue::String(Cow::Owned(value.into())),
                 Value::UInt(value) => EvaluatedValue::Unsigned(value),
-                _ => return Err(SetSqlError::Unsupported),
+                _ => return Err(SetSqlError::Unsupported.into()),
             }
         }
-        _ => return Err(SetSqlError::Unsupported),
+        _ => return Err(SetSqlError::Unsupported.into()),
     })
 }
 

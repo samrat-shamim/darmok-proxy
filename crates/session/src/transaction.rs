@@ -182,10 +182,13 @@ impl TransactionSettingsSnapshot {
                 [Some(Boundary::SettingsAssigned(assignment)), None]
             }
             FrontendTransactionCommand::BeginExplicit { access } => {
-                if current.active.is_some() {
+                if let Some(active) = current.active {
                     [
                         Some(Boundary::Ended(TransactionCompletion::Commit)),
-                        Some(start(access)),
+                        Some(Boundary::Started(TransactionCharacteristics {
+                            isolation: active.isolation,
+                            access: access.unwrap_or(active.access),
+                        })),
                     ]
                 } else {
                     [Some(start(access)), None]

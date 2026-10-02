@@ -37,7 +37,7 @@
       "effect_sql": "SELECT JSON_OBJECT('replacement',CAST(@replacement AS JSON),'ids',(SELECT GROUP_CONCAT(id ORDER BY id) FROM items));",
       "expected_effect": {
         "replacement": {
-          "isolation": "SERIALIZABLE",
+          "isolation": "REPEATABLE READ",
           "access": "READ ONLY"
         },
         "ids": "0,3"
@@ -328,6 +328,246 @@
         "value_10": "RELEASE",
         "default": "NO_CHAIN",
         "global": "NO_CHAIN"
+      }
+    },
+    {
+      "name": "replacement-default-ro-begin",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nBEGIN;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-ro-start",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-ro-start-ro",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION READ ONLY;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-ro-start-rw",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION READ WRITE;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ WRITE"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-rw-begin",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nBEGIN;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-rw-start",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-rw-start-ro",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION READ ONLY;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
+      }
+    },
+    {
+      "name": "replacement-default-rw-start-rw",
+      "sql": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION READ WRITE;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
+      }
+    },
+    {
+      "name": "replacement-next-explicit-access-begin",
+      "sql": "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSTART TRANSACTION READ WRITE;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nBEGIN;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
+      }
+    },
+    {
+      "name": "replacement-next-start-explicit-access",
+      "sql": "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE;\nBEGIN;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;\nSET @future=(SELECT JSON_OBJECT('isolation',REPLACE(@@session.transaction_isolation,'-',' '),'access',IF(@@session.transaction_read_only,'READ ONLY','READ WRITE')));\nSTART TRANSACTION READ ONLY;\nSET @replacement=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;\nBEGIN;\nSET @after_completion=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE) FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK AND NO CHAIN;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'future',CAST(@future AS JSON),'replacement',CAST(@replacement AS JSON),'after_completion',CAST(@after_completion AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE"
+        },
+        "future": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        },
+        "replacement": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY"
+        },
+        "after_completion": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY"
+        }
       }
     }
   ]

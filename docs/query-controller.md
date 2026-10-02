@@ -78,6 +78,12 @@ Local SELECT implementation and its current validation boundary are documented
 in [query-results.md](query-results.md). The prior SET results above remain
 revision-bound evidence; they do not certify subsequent code.
 
+Selected SET values now retain original numeric token provenance through a
+private immutable source witness. Decimal/exponent forms fail before any effect
+regardless of the optional parser numeric representation. SELECT continues to
+use its own projection witness from that same parse; no secondary lexer or AST
+formatting supplies either admission path.
+
 The [source transaction controller](query-transactions.md) additionally admits
 selected original START/BEGIN/COMMIT/ROLLBACK inputs. Its whole ordered native
 plan is admitted before effects, and nested transaction receipts remain under

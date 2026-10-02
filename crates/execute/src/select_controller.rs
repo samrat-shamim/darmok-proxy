@@ -16,7 +16,7 @@ use sqlparser::{
         ContextModifier, Expr, GroupByExpr, Query, Select, SelectFlavor, SelectItem, UnaryOperator,
         Value as Literal,
     },
-    source::{ProjectionSourceError, SourceSelect},
+    source::{SourceProvenanceError, SourceSelect},
 };
 
 use crate::ServerSetValues;
@@ -56,7 +56,7 @@ impl SelectSqlError {
 
 pub(crate) enum SelectAdmissionError {
     Sql(SelectSqlError),
-    Source(ProjectionSourceError),
+    Source(SourceProvenanceError),
     Settings(TransactionSettingsError),
 }
 impl From<SelectSqlError> for SelectAdmissionError {
@@ -64,8 +64,8 @@ impl From<SelectSqlError> for SelectAdmissionError {
         Self::Sql(error)
     }
 }
-impl From<ProjectionSourceError> for SelectAdmissionError {
-    fn from(error: ProjectionSourceError) -> Self {
+impl From<SourceProvenanceError> for SelectAdmissionError {
+    fn from(error: SourceProvenanceError) -> Self {
         Self::Source(error)
     }
 }

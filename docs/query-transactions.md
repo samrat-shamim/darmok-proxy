@@ -13,7 +13,7 @@ executor remain pending.
 commas. Repeating identical access is valid. Contradictory access, START
 isolation syntax, `BEGIN TRANSACTION`, completion `TRANSACTION`/`TRAN` keywords,
 standalone `END`, reordered clauses and completion clauses on ROLLBACK TO are
-MySQL syntax errors. `BEGIN` and `BEGIN WORK` use pending choices/defaults.
+MySQL syntax errors. Idle `BEGIN` and `BEGIN WORK` use pending choices/defaults.
 The parser retains `WITH CONSISTENT SNAPSHOT`; admission rejects it with 1235
 before any implicit commit. Its snapshot and warning behavior is not simulated.
 
@@ -37,11 +37,15 @@ failed-start recovery and general row statements remain outside this component.
 ## Ordered boundaries
 
 Admission and staging share `TransactionSettingsSnapshot::plan_command`, a
-pure fixed-size plan. START precedence is explicit access, pending access,
-then default access; isolation uses pending isolation or its default. A
-confirmed start consumes both pending choices. START inside an active
-transaction first commits the old transaction, then begins the admitted new
-pair. Both controls are admitted before that preceding commit can occur.
+pure fixed-size plan. For an idle start, access precedence is explicit access,
+pending access, then default access; isolation uses pending isolation or its
+default. A confirmed start consumes both pending choices. START or BEGIN inside
+an active transaction first commits the old transaction, then begins with its
+active isolation and access; explicit START access overrides only access.
+Changed session defaults apply after a later nonchained completion, rather than
+to that replacement. Both native controls are admitted before the preceding
+commit can occur. Planning uses the active pair even if a future default is
+READ UNCOMMITTED; an idle start with that unsupported default still fails.
 
 Completion without chaining clears active and pending choices, even when
 already idle. Idle chained completion selects the pending/default pair before
@@ -65,15 +69,18 @@ contract. No recovery or reusable state is invented.
 
 ## Finite evidence and remaining gates
 
-`mysql_query_transactions.json` declares sixteen ordinary stock reference
+`mysql_query_transactions.json` declares twenty-six ordinary stock reference
 cases, including data effects, active/idle chaining, completion defaults,
-negative overrides, enum coercions and exact syntax-error attribution.
+negative overrides, enum coercions, replacement origins/access variants and
+exact syntax-error attribution.
 `mysql_completion_type_columns.json` declares two CLI field descriptions.
 Existing reference corpora and observers retain their bytes.
 
-Eight required native fixture groups invoke the public decoded query path on
+Ten required native fixture groups invoke the public decoded query path on
 both PostgreSQL versions, inspect encoded responses/native settings and check
-private fixture data effects. Private setup DML is not an implemented public
+private fixture data effects. All ten groups also run with the optional
+BigDecimal parser feature, so numeric SET admission is checked in both builds.
+Private setup DML is not an implemented public
 write path. Two in-memory guard tests check retained whole-command and partial
 transaction histories; they are not native or transport receipts.
 Fresh committed verification and independent review evidence are recorded in
@@ -82,7 +89,14 @@ the [release plan](release-plan.md); no gate closes from fixture declarations.
 Planning copies at most two steps and snapshots without allocation or locks.
 Idle nonchained completion adds no native request; ordinary start/active end
 uses one, and active replacement/chaining uses two ordered requests. Existing
-response buffers and parser allocations remain. No cache or automatic replay
+response buffers and parser allocations remain. SET numeric values now borrow
+the same original token spans as SELECT through an immutable `SourceSet`.
+Digit-only unsigned integer tokens are admitted; decimal/exponent forms return
+1235 consistently before effects. A compound unsupported numeric assignment
+cannot follow an autocommit commit. Missing provenance remains an internal
+error. Numeric SET adds token-span/range vectors and one sorted-endpoint Unicode
+walk; nonnumeric SET has no numeric range allocations or native requests.
+No cache or automatic replay
 is added. Measured latency, allocations, contention and cache behavior remain
 open integrated-workload gates, as do real drivers, both end-to-end examples,
 native/created schemas, row execution, catalog validity, snapshots and locks.

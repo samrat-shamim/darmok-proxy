@@ -136,7 +136,7 @@ Case names identify entries in
 | explicit-access-discards-overridden-next-with-distinct-defaults | In both observed access directions, explicit START overrides the pending access, then the later transaction uses the distinct session access |
 | qualified-session-assignments-update-named-defaults-not-active | A named @@SESSION access update supersedes pending access while retaining pending isolation; active choices stay unchanged after default updates and two later starts use those defaults |
 
-Compose a proposed start per characteristic: explicit supported START choice,
+Compose an idle start per characteristic: explicit supported START choice,
 then pending next choice, then session default. This precedence is established
 for access by the finite explicit-start case; it is not a license to invent
 START isolation syntax. Consumption removes the pending choices for that
@@ -146,6 +146,12 @@ retention. The distinct-defaults case now checks both override directions and
 the later restoration of session access. This establishes those finite
 transitions, not all command or failure variants.
 Do not reset the entire session pair when only one named default is updated.
+
+An active START/BEGIN replacement retains the preceding active isolation and
+access after its implicit commit; explicit START access overrides only access.
+Changed defaults become effective after a later nonchained completion. The
+[source controller corpus](query-transactions.md) separately observes both
+default-origin and next-origin replacements.
 
 Chaining derives its new pair from the preceding active pair, as documented
 for [COMMIT and ROLLBACK](https://dev.mysql.com/doc/refman/8.4/en/commit.html).
@@ -209,7 +215,7 @@ can produce command effects; it does not submit a native request.
 
 `record_confirmed_frontend_boundary()` applies only the next staged boundary.
 A known start consumes pending choices and publishes the selected active pair
-inside the retained history. A known end clears active and pending choices; a chain already captured its
+inside the retained history. A known end clears active and pending choices; a chain or replacement already captured its
 next pair during planning. Each known
 boundary remains recorded if a later boundary or output is unconfirmed; a known
 preceding commit cannot be undone by discarding the proposed following start.

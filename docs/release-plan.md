@@ -619,8 +619,11 @@ can commit. READ UNCOMMITTED, consistent snapshots and release completion fail
 explicitly before effects. Table execution, the owning frontend loop, RELEASE,
 full transaction equivalence and M2/M4 remain pending.
 
-Sixteen new ordinary stock cases, two completion-type field declarations, eight
+Twenty-six new ordinary stock cases, two completion-type field declarations, ten
 required native controller groups and two nested guard tests declare the finite
 verification scope. Required CI consumes the new corpora and native fixture
-module. Fresh committed results and independent review have not yet been recorded
+module in default and BigDecimal builds. Active replacements retain their
+preceding pair with explicit access overriding only access; changed defaults
+apply after a later nonchained completion. Original SET numeric tokens supply
+consistent whole-command admission across those builds. Fresh committed results and independent review have not yet been recorded
 for this component; declarations and dirty exploratory checks close no gates.

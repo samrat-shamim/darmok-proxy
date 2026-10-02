@@ -229,13 +229,13 @@ pub(crate) async fn apply_transaction(
         }
         match step.control {
             Control::Begin(spec) => {
-                backend.begin(spec).await?;
+                let _receipt = backend.begin(spec).await?;
             }
             Control::Commit => {
-                backend.commit().await?;
+                let _receipt = backend.commit().await?;
             }
             Control::Rollback => {
-                backend.rollback().await?;
+                let _receipt = backend.rollback().await?;
             }
             Control::IdleCompletion => {}
         }

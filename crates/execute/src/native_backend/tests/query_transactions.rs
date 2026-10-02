@@ -646,14 +646,9 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         3,
     )
     .await;
-    sql_error(
-        &mut state,
-        &mut backend,
-        &globals,
-        "START TRANSACTION",
-        QuerySqlError::Transaction(TransactionSqlError::UnsupportedIsolation),
-    )
-    .await;
+    // Replacement retains the supported active pair, rather than the future
+    // READ UNCOMMITTED default. Its preceding commit is real and lasting.
+    ok(&mut state, &mut backend, &globals, "START TRANSACTION", 3).await;
     assert_eq!(
         state
             .transaction_settings()
@@ -664,9 +659,7 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         FrontendIsolation::ReadCommitted
     );
     assert_eq!(values(&backend).await, [7]);
-    // Chaining uses the admitted active pair, even with an unsupported future default.
-    ok(&mut state, &mut backend, &globals, "ROLLBACK AND CHAIN", 3).await;
-    assert!(values(&backend).await.is_empty());
+    setup(&backend, "INSERT INTO owned_values VALUES(8)").await;
     for sql in [
         "START TRANSACTION WITH CONSISTENT SNAPSHOT",
         "START TRANSACTION READ ONLY, WITH CONSISTENT SNAPSHOT",
@@ -690,6 +683,11 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         )
         .await;
     }
+    // Rejected controls did not commit8. Chain rollback removes only that work,
+    // retains committed7 and still starts with the supported active pair.
+    assert_eq!(values(&backend).await, [7, 8]);
+    ok(&mut state, &mut backend, &globals, "ROLLBACK AND CHAIN", 3).await;
+    assert_eq!(values(&backend).await, [7]);
     for sql in [
         "BEGIN TRANSACTION",
         "START TRANSACTION ISOLATION LEVEL SERIALIZABLE",
@@ -752,6 +750,212 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         2,
     )
     .await;
+    assert_eq!(values(&backend).await, [7]);
+    sql_error(
+        &mut state,
+        &mut backend,
+        &globals,
+        "BEGIN",
+        QuerySqlError::Transaction(TransactionSqlError::UnsupportedIsolation),
+    )
+    .await;
+    ok(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED, READ ONLY",
+        2,
+    )
+    .await;
+    sql_error(
+        &mut state,
+        &mut backend,
+        &globals,
+        "COMMIT AND CHAIN NO RELEASE",
+        QuerySqlError::Transaction(TransactionSqlError::UnsupportedIsolation),
+    )
+    .await;
+    let _ = backend.dispose().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 native-owner CI step"]
+async fn query_transactions_replacement_retains_active_pair_then_restores_future_defaults() {
+    let mut backend = connect_backend().await;
+    for (access, short, future) in [
+        ("READ ONLY", "ro", "READ WRITE"),
+        ("READ WRITE", "rw", "READ ONLY"),
+    ] {
+        for (replacement, suffix) in [
+            ("BEGIN", "begin"),
+            ("START TRANSACTION", "start"),
+            ("START TRANSACTION READ ONLY", "start-ro"),
+            ("START TRANSACTION READ WRITE", "start-rw"),
+        ] {
+            replacement_case(
+                &mut backend,
+                &format!("replacement-default-{short}-{suffix}"),
+                &format!("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED, {access}"),
+                "START TRANSACTION",
+                future,
+                replacement,
+            )
+            .await;
+        }
+    }
+    for (name, next_access, first, replacement) in [
+        (
+            "replacement-next-explicit-access-begin",
+            "READ ONLY",
+            "START TRANSACTION READ WRITE",
+            "BEGIN",
+        ),
+        (
+            "replacement-next-start-explicit-access",
+            "READ WRITE",
+            "BEGIN",
+            "START TRANSACTION READ ONLY",
+        ),
+    ] {
+        replacement_case(
+            &mut backend,
+            name,
+            &format!("SET TRANSACTION ISOLATION LEVEL READ COMMITTED, {next_access}"),
+            first,
+            "READ ONLY",
+            replacement,
+        )
+        .await;
+    }
+    let _ = backend.dispose().await.unwrap();
+}
+
+async fn replacement_case(
+    backend: &mut NativeBackend,
+    name: &str,
+    initial_setting: &str,
+    first_start: &str,
+    future_access: &str,
+    replacement: &str,
+) {
+    let (mut state, globals) = fixture();
+    let expected = reference(name);
+    let flags = |pair: &serde_json::Value| {
+        if pair["access"] == "READ ONLY" {
+            8195
+        } else {
+            3
+        }
+    };
+    ok(&mut state, backend, &globals, initial_setting, 2).await;
+    ok(
+        &mut state,
+        backend,
+        &globals,
+        first_start,
+        flags(&expected["first"]),
+    )
+    .await;
+    active_pair(&state, backend, &expected["first"]).await;
+    ok(
+        &mut state,
+        backend,
+        &globals,
+        &format!("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, {future_access}"),
+        flags(&expected["first"]),
+    )
+    .await;
+    let future = state.transaction_settings().unwrap().defaults;
+    assert_eq!(future.isolation, FrontendIsolation::Serializable);
+    assert_eq!(
+        future.access == FrontendTransactionAccess::ReadOnly,
+        expected["future"]["access"] == "READ ONLY"
+    );
+    ok(
+        &mut state,
+        backend,
+        &globals,
+        replacement,
+        flags(&expected["replacement"]),
+    )
+    .await;
+    active_pair(&state, backend, &expected["replacement"]).await;
+    assert_eq!(state.transaction_settings().unwrap().defaults, future);
+    ok(&mut state, backend, &globals, "ROLLBACK AND NO CHAIN", 2).await;
+    ok(
+        &mut state,
+        backend,
+        &globals,
+        "BEGIN",
+        flags(&expected["after_completion"]),
+    )
+    .await;
+    active_pair(&state, backend, &expected["after_completion"]).await;
+    ok(&mut state, backend, &globals, "ROLLBACK AND NO CHAIN", 2).await;
+}
+
+#[tokio::test]
+#[ignore = "required by the PostgreSQL 17/18 default and BigDecimal CI steps"]
+async fn query_transactions_set_numeric_admission_uses_original_tokens_before_commit() {
+    let mut backend = connect_backend().await;
+    setup(&backend, "CREATE TEMP TABLE owned_values(n integer)").await;
+    let (mut state, globals) = fixture();
+    for variable in [
+        "sql_mode",
+        "autocommit",
+        "transaction_isolation",
+        "transaction_read_only",
+        "completion_type",
+    ] {
+        for token in ["0.0", "0e0", ".0", "0.", "1e0", "1.0"] {
+            sql_error(
+                &mut state,
+                &mut backend,
+                &globals,
+                &format!("SET /* hé */ {variable}={token}"),
+                QuerySqlError::Set(SetSqlError::Unsupported),
+            )
+            .await;
+        }
+    }
+    ok(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET /* hé */ sql_mode=000, autocommit=001, completion_type=000,\n transaction_isolation=001, transaction_read_only=000",
+        2,
+    )
+    .await;
+    assert_eq!(state.sql_modes().unwrap(), SqlModes::empty());
+    assert_eq!(
+        state.transaction_settings().unwrap().defaults.isolation,
+        FrontendIsolation::ReadCommitted
+    );
+    ok(&mut state, &mut backend, &globals, "SET autocommit=0", 0).await;
+    ok(&mut state, &mut backend, &globals, "BEGIN", 1).await;
+    setup(&backend, "INSERT INTO owned_values VALUES(9)").await;
+    sql_error(
+        &mut state,
+        &mut backend,
+        &globals,
+        "SET autocommit=1, completion_type=1e0",
+        QuerySqlError::Set(SetSqlError::Unsupported),
+    )
+    .await;
+    assert_eq!(values(&backend).await, [9]);
+    assert_eq!(
+        state.transaction_settings().unwrap().autocommit,
+        AutocommitSetting::Disabled
+    );
+    ok(
+        &mut state,
+        &mut backend,
+        &globals,
+        "ROLLBACK AND NO CHAIN",
+        0,
+    )
+    .await;
     assert!(values(&backend).await.is_empty());
+    ok(&mut state, &mut backend, &globals, "SET autocommit=1", 2).await;
     let _ = backend.dispose().await.unwrap();
 }
