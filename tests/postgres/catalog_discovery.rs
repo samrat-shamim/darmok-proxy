@@ -588,7 +588,10 @@ async fn describe_does_not_read_and_portal_resume_is_historical() {
         .unwrap();
     let statement = reader.prepare(SHOW).await.unwrap();
     let portal = reader
-        .bind_described_builtin(&statement, &[])
+        .bind_described_builtin(
+            &statement,
+            std::iter::empty::<&(dyn tokio_postgres::types::ToSql + Sync)>(),
+        )
         .await
         .unwrap();
     assert_eq!(portal.ready_state(), TransactionState::Transaction);
