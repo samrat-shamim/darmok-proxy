@@ -174,7 +174,7 @@ async fn query_results_exact_numbers_match_reference_rows_and_both_eof_forms() {
             assert_eq!(state.affected_rows, 0);
             assert_eq!(state.last_insert_id, 29);
             assert_eq!(
-                u64::from(state.warning_count()),
+                u64::try_from(state.warning_count()).unwrap(),
                 case["warning_count"].as_u64().unwrap()
             );
             assert_eq!(state.transaction_settings().unwrap(), before);
