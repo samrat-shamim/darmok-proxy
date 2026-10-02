@@ -20,8 +20,9 @@ is deliberately restricted
 to a fresh connection: it cannot roll back another caller's existing work. It
 adds one protocol round trip per connection and provides an observed idle state
 without changing the connector's startup processing. A missing SET tag or other
-initialization failure is an error; the uncertain owner is disposed and is not
-returned to its caller.
+initialization failure is an error; the uncertain owner is dropped and is not
+returned to its caller. Drop requests local driver abortion without awaiting
+termination; construction failure supplies no disposal or server rollback receipt.
 
 The owner is neither clonable nor shareable as an independent SQL handle.
 Transaction methods require a mutable borrow. Its Debug output contains the

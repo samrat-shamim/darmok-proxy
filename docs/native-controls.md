@@ -110,7 +110,10 @@ Required ordinary PostgreSQL 17/18 fixtures cover successful controls and table
 effects, aborted and deferred-error commits, repeated savepoint recovery,
 partial recovery failure, missing/extra/empty outcomes, chained finishes and
 errors before a control tag. A ninth fixture checks untouched, partially and
-completely consumed streams and Pending-only polling. These fixtures do not
+completely consumed streams and Pending-only polling. The initialization fixture
+additionally requires both ROLLBACK and SET, confirms rollback of earlier fixture
+effects, and rejects either missing tag or an extra SET despite idle readiness.
+These fixtures do not
 verify transport interruption,
 connection ownership or MySQL semantics. Security-related work and
 adversarial/resource stress verification remain deferred at the user's request.

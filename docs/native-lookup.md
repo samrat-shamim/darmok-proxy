@@ -14,8 +14,9 @@ On a fresh connection, `NativeBackend::connect` submits the fixed request
 `ROLLBACK; SET search_path = pg_catalog`. The control checker requires both tags,
 in order, and idle ReadyForQuery before the owner is returned. A partial or
 failed initialization leaves the owner uncertain; construction returns an error
-and owner Drop disposes its private driver. Idle readiness after ROLLBACK alone
-does not certify the lookup setting.
+and owner Drop requests driver abortion and drops the client. It does not await
+driver termination or return a disposal receipt. Idle readiness after ROLLBACK
+alone does not certify the lookup setting.
 
 Both commands share the existing initialization request. There is still one
 control round trip per connection, with a static SQL string and two checked
