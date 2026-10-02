@@ -367,10 +367,13 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 								query_env, dest, completion);
 		if (writer)
 		{
-			/* The final transaction keeps its fence through native invalidation
-			 * publication and transaction-lock cleanup. */
-			if (IsTransactionState())
-				take_writer_transaction_lock();
+			/* An internally committing utility can return with catalog changes
+			 * in a new final transaction. Its publication needs a new generation
+			 * as well as a fence: the intermediate committed facts may already
+			 * be cached. Ordinary utilities already own both in this transaction.
+			 * Keep the fence through native invalidation and lock cleanup. */
+			if (IsTransactionState() && !writer_transaction_lock)
+				before_catalog_change();
 		}
 	}
 	PG_FINALLY();
@@ -450,7 +453,7 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 	if (!IsTransactionBlock())
 		ereport(ERROR,
 				(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-				 errmsg("a catalog lease requires an explicit transaction")));
+				 errmsg("a catalog lease requires a transaction block")));
 	if (lease.active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),

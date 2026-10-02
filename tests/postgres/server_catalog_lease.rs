@@ -214,6 +214,64 @@ async fn lease_identity_requires_a_transaction_and_checked_lifecycle() {
 }
 
 #[tokio::test]
+async fn implicit_simple_request_lease_expires_at_request_commit() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let reader_pid = pid(&reader).await;
+    let handle = |messages: &[tokio_postgres::SimpleQueryMessage]| {
+        messages
+            .iter()
+            .find_map(|message| match message {
+                tokio_postgres::SimpleQueryMessage::Row(row) if row.len() == 6 => Some((
+                    row.get(0).unwrap().parse::<i64>().unwrap(),
+                    row.get(3).unwrap().parse::<i64>().unwrap(),
+                )),
+                _ => None,
+            })
+            .expect("the request must return the actual lease handle")
+    };
+    let messages = reader
+        .simple_query("SELECT * FROM darmok_server.begin_catalog_lease(); SELECT 1")
+        .await
+        .unwrap();
+    let (expired_id, backend) = handle(&messages);
+    no_fence(&observer, reader_pid).await;
+    let error = reader
+        .query_one(CHECK_LEASE, &[&expired_id, &backend])
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.code(),
+        Some(&SqlState::OBJECT_NOT_IN_PREREQUISITE_STATE)
+    );
+    // BEGIN within a multi-statement request promotes the native block to an
+    // explicit one. That lease remains available to the next protocol request.
+    let messages = reader
+        .simple_query(
+            "BEGIN READ ONLY; SELECT * FROM darmok_server.begin_catalog_lease(); SELECT 1",
+        )
+        .await
+        .unwrap();
+    let (live_id, same_backend) = handle(&messages);
+    assert!(live_id > expired_id);
+    assert_eq!(same_backend, backend);
+    wait_fence(&observer, reader_pid, "ShareLock", true).await;
+    reader
+        .query_one(CHECK_LEASE, &[&live_id, &backend])
+        .await
+        .unwrap();
+    reader
+        .query_one(END_LEASE, &[&live_id, &backend])
+        .await
+        .unwrap();
+    reader.batch_execute("COMMIT").await.unwrap();
+    no_fence(&observer, reader_pid).await;
+    close(reader, reader_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
 async fn readers_coexist_with_dml_and_fence_external_metadata_variants() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;

@@ -39,8 +39,12 @@ The fixed acquisition query is:
 SELECT * FROM darmok_server.begin_catalog_lease();
 ```
 
-It requires an explicit transaction, allows one active lease per backend, and
-returns six non-NULL fields:
+It requires a PostgreSQL transaction block, allows one active lease per backend,
+and returns six non-NULL fields. An explicit `BEGIN` block can span requests.
+A multi-statement simple query also creates an implicit block; a lease acquired
+there expires at the request's native commit and cannot span requests. A single
+standalone acquisition fails. The owning proxy executor must use an explicit
+transaction for its separate acquisition, execution and release requests.
 
 | Field | Native type | Meaning |
 | --- | --- | --- |
@@ -91,7 +95,11 @@ acquiring its fence. An aborted DDL attempt may advance the generation without
 changing committed facts; this is a conservative cache miss.
 
 Internally committing utilities, including concurrent index creation, receive a
-writer fence at each pre-commit publication. Readers can run between phases and
+writer fence and generation advance at each publication. Internal commits are
+fenced by the pre-commit callback; a new final transaction still open when the
+utility returns receives both before the outer commit. Thus the committed
+ready-but-invalid index and its final valid state have distinct cache identities.
+Readers can run between phases and
 see PostgreSQL's committed intermediate catalog state. Holding one exclusive
 session fence across all phases is incorrect: the utility can wait for an old
 reader snapshot while that reader waits for the fence. The publication boundary
