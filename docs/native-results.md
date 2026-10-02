@@ -21,6 +21,10 @@ them from a native RowDescription. In particular, a catalog column's NOT NULL
 constraint is not a proof that a projected value is non-NULL. A NULL value
 contradicting supplied NOT NULL metadata fails at row encoding.
 
+The [native scalar metadata mapper](native-metadata.md) can derive type,
+charset, width, decimals and representation flags from reported types/modifiers.
+It does not supply those semantic identities or establish a dependency lease.
+
 All nineteen supported [native scalar types](native-values.md) have an explicit
 output representation:
 
@@ -114,6 +118,6 @@ explicit recovery and success followed by confirmed finish. They observe the
 Execute request's completion and readiness before owner finish/recovery. They
 prove native data effects only, not MySQL
 lock retention or an admitted public executor. Catalog execution validity,
-generated result metadata, session timezone semantics, stock differential
+complete semantic result definitions, session timezone semantics, stock differential
 formatting, table SQL, driver workloads and executable integration remain
 pending. Security work remains outside the user-requested scope.

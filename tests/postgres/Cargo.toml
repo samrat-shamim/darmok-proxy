@@ -45,6 +45,10 @@ name = "native_results"
 path = "native_results.rs"
 
 [[test]]
+name = "native_metadata"
+path = "native_metadata.rs"
+
+[[test]]
 name = "native_lookup"
 path = "native_lookup.rs"
 
