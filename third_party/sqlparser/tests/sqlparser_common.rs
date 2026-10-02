@@ -1,4 +1,4 @@
-// Modified for Darmok: Use typed SET assignment targets in ordinary assertions.
+// Modified for Darmok: Use typed SET targets and dialect-specific SET grammar.
 // Modified for Darmok: test transaction-setting syntax and keyword scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -9143,10 +9143,11 @@ fn parse_start_transaction() {
 
 #[test]
 fn parse_set_transaction() {
-    // SET TRANSACTION shares transaction mode parsing code with START
-    // TRANSACTION, so no need to duplicate the tests here. We just do a quick
-    // sanity check.
-    match verified_stmt("SET TRANSACTION READ ONLY, READ WRITE, ISOLATION LEVEL SERIALIZABLE") {
+    // The permissive upstream list is not MySQL's SET characteristic grammar.
+    let dialects = all_dialects_except(|d| d.is::<MySqlDialect>());
+    match dialects
+        .verified_stmt("SET TRANSACTION READ ONLY, READ WRITE, ISOLATION LEVEL SERIALIZABLE")
+    {
         Statement::Set(Set::SetTransaction(SetTransaction::Direct { modes, scope })) => {
             assert_eq!(
                 modes,
@@ -9293,7 +9294,8 @@ fn parse_set_variable() {
         );
     }
 
-    one_statement_parses_to("SET SOMETHING TO '1'", "SET SOMETHING = '1'");
+    all_dialects_except(|d| d.is::<MySqlDialect>())
+        .one_statement_parses_to("SET SOMETHING TO '1'", "SET SOMETHING = '1'");
 }
 
 #[test]
@@ -9366,7 +9368,8 @@ fn parse_set_time_zone() {
         _ => unreachable!(),
     }
 
-    one_statement_parses_to("SET TIME ZONE TO 'UTC'", "SET TIMEZONE = 'UTC'");
+    all_dialects_except(|d| d.is::<MySqlDialect>())
+        .one_statement_parses_to("SET TIME ZONE TO 'UTC'", "SET TIMEZONE = 'UTC'");
 }
 
 #[test]

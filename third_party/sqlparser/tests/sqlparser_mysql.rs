@@ -1,4 +1,4 @@
-// Modified for Darmok: Distinguish typed MySQL variables from generic-dialect identifiers.
+// Modified for Darmok: Parse typed MySQL variables and SET assignment alternatives.
 // Modified for Darmok: verify SHOW INDEX aliases against their canonical form.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -672,6 +672,24 @@ fn parse_set_variables() {
             values: vec![Expr::value(number("1"))],
         })
     );
+}
+
+#[test]
+fn parse_set_colon_assignments() {
+    for (sql, canonical) in [
+        ("SET autocommit := 0", "SET autocommit = 0"),
+        ("SET LOCAL autocommit := 0", "SET LOCAL autocommit = 0"),
+        (
+            "SET @@SESSION.autocommit := 0",
+            "SET @@SESSION.autocommit = 0",
+        ),
+        (
+            "SET SESSION sql_mode := 'ANSI_QUOTES', autocommit = 0",
+            "SET SESSION sql_mode = 'ANSI_QUOTES', autocommit = 0",
+        ),
+    ] {
+        mysql().one_statement_parses_to(sql, canonical);
+    }
 }
 
 #[test]

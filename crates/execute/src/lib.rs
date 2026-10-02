@@ -1,6 +1,6 @@
 //! Native representations, prepared checks, borrowed bindings, observed
-//! controls and exclusively owned transaction scopes. Semantically admitted
-//! statement execution and wire metadata remain gates.
+//! controls, exclusively owned transaction scopes and source-admitted selected
+//! COM_QUERY SET execution. Row execution and wire metadata remain gates.
 
 mod native_backend;
 mod native_control;
@@ -9,6 +9,7 @@ mod native_statement;
 mod native_transaction;
 mod native_value;
 mod numeric;
+mod query_controller;
 mod set_controller;
 
 pub use native_backend::{
@@ -23,6 +24,7 @@ pub use native_param::{NativeParamError, NativeParamUtc};
 pub use native_statement::{NativeBindingsUtc, NativeStatementError, NativeStatementUtc};
 pub use native_transaction::{NativeIsolation, NativeTransactionAccess, NativeTransactionSpec};
 pub use native_value::{NativeValueError, decode_native_row_utc};
-pub use set_controller::{
-    ServerSetValues, SetExecutionError, SetOutcome, SetSqlError, execute_mysql_set,
+pub use query_controller::{
+    QueryExecutionError, QueryOutcome, QuerySqlError, execute_query_command,
 };
+pub use set_controller::{ServerSetValues, SetSqlError};

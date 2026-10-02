@@ -4,9 +4,13 @@
 use darmok_session::*;
 use sqlparser::ast::{ContextModifier, Expr, SelectItem, Set, SetExpr, SetTransaction, Statement};
 use sqlparser::mysql_mode::{MySqlModeFlags, parse_mysql_with_mode};
+use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
 fn set(sql: &str) -> Set {
-    let mut statements = parse_mysql_with_mode(sql, MySqlModeFlags::empty()).unwrap();
+    one_set(parse_mysql_with_mode(sql, MySqlModeFlags::empty()).unwrap())
+}
+
+fn one_set(mut statements: Vec<Statement>) -> Set {
     assert_eq!(statements.len(), 1);
     let Statement::Set(input) = statements.remove(0) else {
         panic!("expected SET");
@@ -178,8 +182,15 @@ fn additional_transaction_scopes_and_source_forms_are_explicit_inputs() {
         transaction("SET LOCAL TRANSACTION READ ONLY"),
         transaction("SET SESSION TRANSACTION READ ONLY")
     );
-    let Set::SetTransaction(input) = set("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
-    else {
+    // Foreign AST forms remain classifier inputs without certifying MySQL
+    // grammar. Their source must be parsed in the dialect that defines them.
+    let Set::SetTransaction(input) = one_set(
+        Parser::parse_sql(
+            &PostgreSqlDialect {},
+            "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY",
+        )
+        .unwrap(),
+    ) else {
         panic!("expected characteristics form")
     };
     assert!(matches!(
@@ -193,7 +204,13 @@ fn additional_transaction_scopes_and_source_forms_are_explicit_inputs() {
         classify_mysql_transaction_setting(&input),
         Err(SessionInputError::UnsupportedTransactionSyntax)
     );
-    let Set::SetTransaction(input) = set("SET TRANSACTION SNAPSHOT '000003A1-1'") else {
+    let Set::SetTransaction(input) = one_set(
+        Parser::parse_sql(
+            &PostgreSqlDialect {},
+            "SET TRANSACTION SNAPSHOT '000003A1-1'",
+        )
+        .unwrap(),
+    ) else {
         panic!("expected snapshot form")
     };
     assert!(matches!(

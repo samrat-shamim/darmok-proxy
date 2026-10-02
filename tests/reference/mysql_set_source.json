@@ -1,0 +1,40 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "CREATE TABLE source_fixture(id integer PRIMARY KEY) ENGINE=InnoDB;",
+  "reset_sql": "SET autocommit=1;\nSET SESSION sql_mode='';\nSET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ WRITE;",
+  "cases": [
+    {
+      "name": "colon-assignments-with-session-keyword",
+      "sql": "SET SESSION sql_mode := 'ANSI_QUOTES', autocommit := 0, transaction_isolation := 'READ-COMMITTED', transaction_read_only := 1;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'autocommit',@@session.autocommit,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only);",
+      "expected_effect": {"mode":"ANSI_QUOTES","autocommit":0,"isolation":"READ-COMMITTED","read_only":1}
+    },
+    {
+      "name": "colon-assignments-with-qualified-names",
+      "sql": "SET @@LOCAL.sql_mode := 4, @@SESSION.autocommit := 0, @@SESSION.transaction_isolation := 'SERIALIZABLE', @@SESSION.transaction_read_only := 1;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'autocommit',@@session.autocommit,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only);",
+      "expected_effect": {"mode":"ANSI_QUOTES","autocommit":0,"isolation":"SERIALIZABLE","read_only":1}
+    },
+    {
+      "name": "mixed-operators-retain-pre-update-reads",
+      "sql": "SET sql_mode='PIPES_AS_CONCAT';\nSET sql_mode := 'ANSI_QUOTES', sql_mode = @@SESSION.sql_mode, autocommit := 0, transaction_read_only = @@session.autocommit;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'autocommit',@@session.autocommit,'read_only',@@session.transaction_read_only);",
+      "expected_effect": {"mode":"PIPES_AS_CONCAT","autocommit":0,"read_only":1}
+    },
+    {
+      "name": "transaction-characteristics-in-both-orders",
+      "sql": "SET LOCAL TRANSACTION READ ONLY, ISOLATION LEVEL READ COMMITTED;\nSET @first=JSON_OBJECT('isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only);\nSET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ WRITE;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',JSON_OBJECT('isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only));",
+      "expected_effect": {"first":{"isolation":"READ-COMMITTED","read_only":1},"second":{"isolation":"SERIALIZABLE","read_only":0}}
+    }
+  ]
+}

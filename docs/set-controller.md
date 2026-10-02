@@ -1,9 +1,11 @@
 # SET execution
 
-`darmok-execute::execute_mysql_set` integrates a catalog-independent SET subset
+The internal SET evaluator integrates a catalog-independent SET subset
 with session state, exclusive native ownership, native commit confirmation and
 an encoded response sent through `AsyncWrite`. It is a library component; there
-is no runnable proxy, frontend dispatcher or complete transaction controller.
+is no runnable proxy or complete transaction controller. The
+[selected query controller](query-controller.md) admits original COM_QUERY SQL
+with the current session mode before calling this evaluator.
 
 The supported variables are `sql_mode`, `autocommit`, `transaction_isolation`
 and `transaction_read_only`. Bare names inherit SESSION/LOCAL keyword scope;
@@ -34,7 +36,7 @@ later updates. A known SQL error is encoded, sent, recorded as an error diagnost
 and settled without erasing those effects. Error message wording is project
 wording; exact stock text is not certified.
 
-One `SessionSetStage` retains the statement outcome across all assignments. It
+One `SessionCommandStage` retains the statement outcome across all assignments. It
 keeps authoritative setting reads and translation identity unavailable until
 the complete success/error response is encoded, written and flushed. Abandoning
 that stage retains before/last-confirmed settings and prevents reuse. Its model
