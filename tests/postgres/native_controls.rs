@@ -59,6 +59,75 @@ async fn values(client: &Client, table: &str) -> Vec<i32> {
 }
 
 #[tokio::test]
+async fn initialization_requires_rollback_and_fixed_lookup_setting_in_one_complete_request() {
+    let (client, connection) = client().await;
+    client
+        .batch_execute("SET search_path = public, pg_catalog; BEGIN; CREATE TEMP TABLE initialization_values(n integer); INSERT INTO initialization_values VALUES(1)")
+        .await
+        .unwrap();
+    success(
+        &client,
+        "ROLLBACK; SET search_path = pg_catalog",
+        NativeControl::Initialize,
+    )
+    .await;
+    let row = client
+        .query_one("SELECT pg_catalog.current_setting('search_path'), pg_catalog.to_regclass('pg_temp.initialization_values') IS NULL", &[])
+        .await
+        .unwrap();
+    assert_eq!(row.get::<_, String>(0), "pg_catalog");
+    assert!(row.get::<_, bool>(1));
+    let failure = control(&client, "ROLLBACK", NativeControl::Initialize)
+        .await
+        .unwrap_err();
+    assert_eq!(failure.matched_tags(), 1);
+    assert_eq!(failure.ready_state(), Some(TransactionState::Idle));
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::MissingTags {
+            expected: 2,
+            matched: 1
+        })
+    );
+    let failure = control(
+        &client,
+        "SET search_path = pg_catalog",
+        NativeControl::Initialize,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(failure.matched_tags(), 0);
+    assert_eq!(failure.ready_state(), Some(TransactionState::Idle));
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::Tag {
+            position: 0,
+            expected: Some("ROLLBACK"),
+            actual: "SET".to_owned()
+        })
+    );
+    let failure = control(
+        &client,
+        "ROLLBACK; SET search_path = pg_catalog; SET search_path = public",
+        NativeControl::Initialize,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(failure.matched_tags(), 2);
+    assert_eq!(failure.ready_state(), Some(TransactionState::Idle));
+    assert_eq!(
+        failure.mismatch(),
+        Some(&NativeControlMismatch::Tag {
+            position: 2,
+            expected: None,
+            actual: "SET".to_owned()
+        })
+    );
+    drop(client);
+    connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn individual_controls_confirm_expected_tags_states_and_table_effects() {
     let (client, connection) = client().await;
     client

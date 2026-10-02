@@ -45,6 +45,10 @@ name = "native_results"
 path = "native_results.rs"
 
 [[test]]
+name = "native_lookup"
+path = "native_lookup.rs"
+
+[[test]]
 name = "backend_completion"
 path = "backend_completion.rs"
 

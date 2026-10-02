@@ -60,6 +60,14 @@ external DDL. Its exact algorithm remains an unresolved M2/M4 design gate.
 Reusable catalog-dependent plans stay disabled until it is implemented and
 verified. Bypassing a cache does not by itself satisfy this live execution gate.
 
+The owner establishes a [fixed configured lookup context](native-lookup.md)
+after startup. Application relations must still use exact qualified native
+names. Qualification and unchanged path text do not prove binding stability:
+native re-analysis, including after implicit temporary namespace creation, can
+return a same-shaped replacement with a cached old column origin. The validity
+algorithm must account for lookup context and all dependency identities rather
+than treating row-description comparison as an execution lease.
+
 The connection owner is the only backend SQL boundary. It tracks the current
 outer transaction and active statement/stream; callers cannot interleave a
 raw COMMIT or another command on the same connection. A newly created owner

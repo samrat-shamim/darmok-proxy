@@ -3,10 +3,12 @@ use std::{error::Error as StdError, fmt};
 use futures_util::StreamExt;
 use tokio_postgres::{CommandEvent, CommandEventStream, Error, TransactionState};
 
-/// Expected observations for the owner's known internal transaction controls.
+/// Expected observations for the owner's known internal controls.
 /// This is not SQL admission, connection ownership or savepoint identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeControl {
+    /// Fresh-connection ROLLBACK followed by the owner's fixed lookup setting.
+    Initialize,
     Begin,
     Commit,
     Rollback,
@@ -20,6 +22,7 @@ pub enum NativeControl {
 impl NativeControl {
     pub fn expected_tags(self) -> &'static [&'static str] {
         match self {
+            Self::Initialize => &["ROLLBACK", "SET"],
             Self::Begin => &["BEGIN"],
             Self::Commit => &["COMMIT"],
             Self::Rollback | Self::RollbackTo => &["ROLLBACK"],
@@ -31,7 +34,7 @@ impl NativeControl {
 
     pub fn expected_state(self) -> TransactionState {
         match self {
-            Self::Commit | Self::Rollback => TransactionState::Idle,
+            Self::Initialize | Self::Commit | Self::Rollback => TransactionState::Idle,
             Self::Begin
             | Self::Savepoint
             | Self::RollbackTo

@@ -1,4 +1,4 @@
-# Native transaction-control completion
+# Native internal-control completion
 
 `darmok-execute::check_native_control` checks a request's observed native control
 outcome. It consumes the connector's [command events](backend-completion.md);
@@ -11,6 +11,7 @@ The caller chooses one fixed expectation for its known internal control:
 
 | `NativeControl` | Exact command tags, in order | Final ReadyForQuery state |
 | --- | --- | --- |
+| `Initialize` | `ROLLBACK`, `SET` | Idle |
 | `Begin` | `BEGIN` | Transaction |
 | `Commit` | `COMMIT` | Idle |
 | `Rollback` | `ROLLBACK` | Idle |
@@ -25,6 +26,12 @@ private fields and is constructed only after those checks. A command tag alone
 cannot construct it. These expectations cover the owner's ordinary internal
 controls, without `AND CHAIN`, transaction-prepared operations or arbitrary
 batches.
+
+`Initialize` describes the owner's fixed fresh-connection request
+`ROLLBACK; SET search_path = pg_catalog`. A tag cannot identify which setting a
+caller changed. The [owner](native-backend.md) submits that exact SQL privately;
+an arbitrary SET with matching tags is not a certified lookup context. Neither
+this expectation nor the checker can adopt another caller's connection.
 
 The connector records whether the stream has yielded any event or terminal
 error. Passing a partially or completely consumed stream fails with
@@ -103,7 +110,10 @@ Required ordinary PostgreSQL 17/18 fixtures cover successful controls and table
 effects, aborted and deferred-error commits, repeated savepoint recovery,
 partial recovery failure, missing/extra/empty outcomes, chained finishes and
 errors before a control tag. A ninth fixture checks untouched, partially and
-completely consumed streams and Pending-only polling. These fixtures do not
+completely consumed streams and Pending-only polling. The initialization fixture
+additionally requires both ROLLBACK and SET, confirms rollback of earlier fixture
+effects, and rejects either missing tag or an extra SET despite idle readiness.
+These fixtures do not
 verify transport interruption,
 connection ownership or MySQL semantics. Security-related work and
 adversarial/resource stress verification remain deferred at the user's request.

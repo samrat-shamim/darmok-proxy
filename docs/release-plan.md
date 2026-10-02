@@ -946,3 +946,69 @@ A documentation leaf preserves every other entry from the final fixture revision
 This is not semantic admission, generated metadata, catalog execution validity,
 or a public row executor. M2/M4, hosted CI, merge and release remain incomplete;
 security work and compiler PR4 remain excluded, and the full goal remains active.
+
+### Native lookup context local evidence
+
+`feat/native-lookup-context` implements the [native lookup contract](native-lookup.md).
+Fresh owners submit fixed `ROLLBACK; SET search_path = pg_catalog` in one request,
+requiring exact ROLLBACK/SET tags and idle readiness. Startup lookup options no
+longer determine application schema resolution. Qualified native names remain
+explicit inputs; implicit temporary namespaces still affect PostgreSQL lookup.
+This is an initialization prerequisite, not catalog execution validity.
+
+Revision `093da6f724e8751248c32ae9feb48e8d641fc507`, tree
+`813556a12fa397a9318adc545276ff525bdf99b3`, passes all twenty sequential local
+matrix checks. PostgreSQL 17.11 and 18.6 each pass four native lookup and ten
+control groups, plus 55 ordinary owner groups with twelve filtered tests.
+Three abandoned/dropped-control fixtures are explicitly excluded from those
+owner invocations. BigDecimal variants additionally pass ten transaction and
+eight TCP groups per backend, with 57/59 filtered. Three new owner lookup
+fixtures also pass in the initial targeted PostgreSQL 17 invocation.
+
+Workspace all-features/default pass 1669/1662 tests, with 65 ignored across
+38/37 summaries. Strict all-targets/all-features Clippy, format, repository
+boundaries and diff pass. Rust/Cargo are 1.96.0 on macOS 26.0.1 arm64; both
+backends use UTF8 and max_identifier_length 63. Required database fixtures fail
+when their disposable database environment is absent. No new transport
+interruption, lock-retention, security or resource-stress probes were run.
+
+The native command selects `--test native_lookup --test native_controls` in
+`cargo test -p darmok-postgres-tests --locked`. Ordinary owner checks use
+`cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored`
+with the three exact exclusions recorded in their argv. BigDecimal commands
+select `native_backend::tests::query_transactions` or `::frontend_loop` with
+`--features sqlparser/bigdecimal`. Workspace commands exclude
+`darmok-postgres-tests`; the all-features variant adds `--all-features`.
+
+Evidence is outside the distribution under `.darmok-work/logs/lookup-093da6f-*`.
+Each receipt records exact argv, source/tree/status, both mandatory Cargo
+environment values, port, timing, actual exit and raw stream hashes. The author
+audit passes, binds 28 terminal receipts and verifies 27 nonoverlapping child
+intervals; the aggregate matrix parent is counted separately. The 89-file
+`lookup-093da6f-code-evidence.json` manifest has SHA256
+`0b79962ac5cc75f49c4cea0077e43bd49989589b51b059b6e026e3ca02392635`.
+Prior row-output evidence and review seals, publication facts and the recorded
+hosted CI condition remain unchanged.
+
+Two native probe failures remain actual101: `9bcdecf` passes two groups and
+fails an assumed rebind after schema replacement; `31d4a5e` passes three and
+fails an assumed rebind after observing the intermediate rename. `efc31d4`
+corrects these assertions to distinguish unchanged context from an explicit
+path change or temporary namespace creation; all four native groups pass.
+The final fixtures inspect actual tableoid separately from cached column
+origin, demonstrating why matching row descriptions cannot prove identity.
+A separate helper-copy assumption failure is bookkeeping only and occurred
+before any file mutation; it is preserved in
+`lookup-audit-helper-assumption-failure.json`.
+
+Independent passive review finds no functional code defect and requests a
+wording correction: owner Drop requests local driver abortion and drops its
+client without awaiting termination. The documentation leaf makes that
+guarantee explicit; it supplies no new code-test receipt. Review runs no
+Cargo, SQL, network or security work.
+
+Semantic admission, the complete catalog-validity algorithm, public table
+execution, reusable plans, executable integration, real drivers and measured
+performance remain pending. M2/M4, required hosted CI, merge and release remain
+incomplete; security work and compiler PR4 remain excluded, and the full goal
+remains active.

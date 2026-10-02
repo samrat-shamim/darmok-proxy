@@ -96,6 +96,12 @@ retain both an earlier name and its earlier definition after external DDL
 commits. Read Committed resolves the replacement object afresh on the next call.
 Neither API establishes an execution lease or protects a later SQL statement.
 
+The owner's [fixed lookup context](native-lookup.md) is a separate prerequisite.
+Ordinary native fixtures demonstrate that explicit path changes and implicit
+temporary namespace creation can rebind a prepared qualified query while the
+driver's cached column origin remains unchanged. A matching cached description
+does not close the catalog-to-execution gap.
+
 This deliberately leaves reusable catalog-dependent plans disabled. A fresh
 read handles ordinary changes between calls, including renamed or recreated
 objects and rolled-back DDL; it does not certify concurrent translation and
