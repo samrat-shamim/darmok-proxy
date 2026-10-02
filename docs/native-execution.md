@@ -119,7 +119,7 @@ required lock semantics.
 
 The [frontend recovery contract](transaction-recovery.md) separates those
 categories, records ordinary stock data/lock observations and retains
-[blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15). In particular,
+[blocker #15](https://github.com/samrat-shamim/darmok-proxy/issues/15). In particular,
 earlier InnoDB participation changes savepoint lock retention; no universal
 retention rule or native control receipt supplies frontend transaction support.
 

@@ -10,7 +10,8 @@ documentation. Deferred gates cannot count as release certification.
 
 ## Decisions
 
-- Name: Darmok; repository: `darmok-proxy`; executable: `darmok`.
+- Name: Darmok; repository: [darmok-proxy](https://github.com/samrat-shamim/darmok-proxy);
+  executable: `darmok`.
 - License: Apache-2.0. First release: experimental 0.1.0.
 - Equal support goals: MySQL applications and MySQL clients over native
   PostgreSQL schemas.
@@ -89,8 +90,9 @@ complete release gate runs once on the final candidate.
 
 ## Current evidence
 
-- The repository has an Apache-2.0 license and a feature branch for foundation
-  work. It remains private while the extraction is incomplete.
+- The Apache-2.0 source repository is public under
+  [samrat-shamim](https://github.com/samrat-shamim/darmok-proxy).
+  Extraction is incomplete and no runnable proxy or release candidate exists.
 - The initial source and parser revisions are pinned in an external work log.
 - The original workspace baseline completed on Rust 1.96.0/macOS arm64 with
   Docker PostgreSQL tests: **1,425 passed, 1 failed, 2 ignored**. No database skip
@@ -98,28 +100,28 @@ complete release gate runs once on the final candidate.
   capture integration path excluded from Darmok; it does not certify or block
   a Darmok feature. Full source pins, commands, failure details and hashed logs
   are preserved in the external extraction work log.
-- [Foundation PR #1](https://github.com/duotronic-ai/darmok-proxy/pull/1) passed
+- [Foundation PR #1](https://github.com/samrat-shamim/darmok-proxy/pull/1) passed
   fresh Linux/macOS CI and independent review: 1,499 all-feature tests/doctests,
   1,492 default-feature tests/doctests, seven explicitly ignored upstream
   formatting cases, strict Clippy, formatting, repository boundaries, and
   minimal/std-only/visitor-only feature builds. It is merged.
-- [Generic libraries PR #3](https://github.com/duotronic-ai/darmok-proxy/pull/3)
+- [Generic libraries PR #3](https://github.com/samrat-shamim/darmok-proxy/pull/3)
   is merged. The types, wire protocol and session libraries passed independent
   review, Linux/macOS CI, 1,595 all-feature tests/doctests, 1,588 default-feature
   tests/doctests, seven ignored upstream formatting cases, and one mandatory
   schema fixture on each PostgreSQL version. Domain allocation/trust state is
   removed and schemas preserve their exact names. This is component evidence,
   not certification of authentication or session semantics.
-- The [compiler draft](https://github.com/duotronic-ai/darmok-proxy/pull/4) carries
+- The [compiler draft](https://github.com/samrat-shamim/darmok-proxy/pull/4) carries
   explicit AST binding layouts. It is not merged or certified for execution.
-- [Native values PR #5](https://github.com/duotronic-ai/darmok-proxy/pull/5) is
+- [Native values PR #5](https://github.com/samrat-shamim/darmok-proxy/pull/5) is
   merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588 default
   tests/doctests with seven ignored upstream formatting cases. Six required
   fixtures passed on each PostgreSQL version. Ordinary correctness review found
   no remaining decoder defect. Global temporal sentinels and implicit
   fallback-to-text coercion variants are removed. The [value contract](native-values.md)
   records the supported representations.
-- [Native parameters PR #6](https://github.com/duotronic-ai/darmok-proxy/pull/6)
+- [Native parameters PR #6](https://github.com/samrat-shamim/darmok-proxy/pull/6)
   is merged. Linux/macOS CI passed 1,595 all-feature tests/doctests and 1,588
   default tests/doctests with seven ignored upstream formatting cases. Twelve
   required fixtures passed on each PostgreSQL version: one schema, six value
@@ -137,7 +139,7 @@ complete release gate runs once on the final candidate.
   definitions does not certify these gates.
 - Native prepared descriptions are checked before execution by
   `darmok-execute::NativeStatementUtc`.
-  [PR #8](https://github.com/duotronic-ai/darmok-proxy/pull/8) is merged as
+  [PR #8](https://github.com/samrat-shamim/darmok-proxy/pull/8) is merged as
   `479f9e82a07f2736bf64ce95fefb3bea8ca06c0e`. Linux/macOS CI passed 1,595
   all-feature and 1,588 default-feature tests/doctests with seven ignored
   upstream cases; 25 required fixtures passed on each PostgreSQL version.
@@ -148,7 +150,7 @@ complete release gate runs once on the final candidate.
   write outputs, domain types, borrowed bindings and description/value errors.
   This component does not supply a runnable executor or catalog coherence.
 - Inherited runtime semantic risks are tracked in
-  [release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
+  [release blocker #2](https://github.com/samrat-shamim/darmok-proxy/issues/2).
 - No SQL compatibility, authentication, routing, or performance gate has passed.
 - The [statement execution contract](native-execution.md) defines the next
   functional engine boundary: owned rollback scopes through decoding/encoding,
@@ -201,7 +203,7 @@ complete release gate runs once on the final candidate.
   a savepoint before the first table operation is a separately observed variant.
   Failed initial expectations and runner setup attempts remain frozen. The
   required lock mechanism is tracked in
-  [blocker #15](https://github.com/duotronic-ai/darmok-proxy/issues/15). These are
+  [blocker #15](https://github.com/samrat-shamim/darmok-proxy/issues/15). These are
   stock reference observations, not proxy equivalence, driver, performance or
   release certification. M2/M4 and the installation choice remain pending.
 - The [stock transaction reference fixture](transaction-reference.md) distributes
@@ -295,6 +297,20 @@ complete release gate runs once on the final candidate.
   stock corpora remain unchanged. Coercion, scope-specific values, native
   effects, syntax admission, output integration, performance and M2/M4 remain
   pending. Security-related work remains deferred.
+
+- The [stock system-variable name fixture](mysql-system-variable-names.md)
+  declares nineteen ordinary MySQL 8.4 cases for backticks, scoped quoted-text reads,
+  ANSI_QUOTES, scoped and bare assignments, whitespace, case-insensitive names
+  and quoted columns that resemble variables. It uses the unchanged observer
+  with twenty-five SQL clients, two inspections and three metadata processes, and
+  a separate required CI step/artifact. Existing corpora remain unchanged.
+  Parser correction is pending in [issue #25](https://github.com/samrat-shamim/darmok-proxy/issues/25).
+  The initial draft completed eight cases, then rejected an immediate
+  single-quoted read; its failure, unrun cases and cleanup remain preserved.
+  Exact source, command, review and CI records are retained outside the
+  distribution. This fixture does not execute the proxy or complete syntax
+  admission, native effects, catalog validity or M2/M4 gates. Security-related
+  work remains deferred.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

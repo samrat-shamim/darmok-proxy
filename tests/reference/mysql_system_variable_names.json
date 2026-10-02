@@ -1,0 +1,189 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "SET SESSION sql_mode=DEFAULT;",
+  "reset_sql": "SET SESSION sql_mode=DEFAULT;",
+  "cases": [
+    {
+      "name": "unqualified-backtick-read",
+      "sql": "SET SESSION sql_mode='';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@`sql_mode`);",
+      "expected_effect": {
+        "mode": ""
+      }
+    },
+    {
+      "name": "qualified-backtick-reads",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('session',@@SESSION.`sql_mode`,'local',@@LOCAL.`sql_mode`,'global',@@GLOBAL.`sql_mode`);",
+      "expected_effect": {
+        "session": "ANSI_QUOTES",
+        "local": "ANSI_QUOTES",
+        "global": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "unqualified-backtick-assignment",
+      "sql": "SET @@`sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "session-backtick-assignment",
+      "sql": "SET @@SESSION.`sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "local-backtick-assignment",
+      "sql": "SET @@LOCAL.`sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "bare-backtick-assignment",
+      "sql": "SET `sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "keyword-session-backtick-assignment",
+      "sql": "SET SESSION `sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "keyword-local-backtick-assignment",
+      "sql": "SET LOCAL `sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "ansi-bare-double-quoted-assignment",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';\nSET \"sql_mode\"='ANSI_QUOTES,NO_BACKSLASH_ESCAPES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES"
+      }
+    },
+    {
+      "name": "ansi-session-double-quoted-assignment",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';\nSET @@SESSION.\"sql_mode\"='ANSI_QUOTES,NO_BACKSLASH_ESCAPES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES"
+      }
+    },
+    {
+      "name": "ansi-qualified-double-quoted-identifier-reads",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('session',@@SESSION.\"sql_mode\",'local',@@LOCAL.\"sql_mode\",'global',@@GLOBAL.\"sql_mode\");",
+      "expected_effect": {
+        "session": "ANSI_QUOTES",
+        "local": "ANSI_QUOTES",
+        "global": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+      }
+    },
+    {
+      "name": "backtick-column-lookalike",
+      "sql": "SET SESSION sql_mode='';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@sql_mode,'column_value',`@@sql_mode`) FROM (SELECT 'column' AS `@@sql_mode`) AS cols;",
+      "expected_effect": {
+        "mode": "",
+        "column_value": "column"
+      }
+    },
+    {
+      "name": "space-around-qualified-read-dot",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION . `sql_mode`);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "space-around-qualified-assignment-dot",
+      "sql": "SET @@SESSION . `sql_mode`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "ordinary-unquoted-control",
+      "sql": "SET @@sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@sql_mode);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "ansi-double-quoted-column-lookalike",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@sql_mode,'column_value',\"@@sql_mode\") FROM (SELECT 'column' AS \"@@sql_mode\") AS cols;",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES",
+        "column_value": "column"
+      }
+    },
+    {
+      "name": "backtick-name-case-insensitivity",
+      "sql": "SET @@`SQL_MODE`='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@`SQL_MODE`);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "session-single-quoted-text-read",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.'sql_mode');",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES"
+      }
+    },
+    {
+      "name": "session-double-quoted-text-read",
+      "sql": "SET SESSION sql_mode='';",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@SESSION.\"sql_mode\");",
+      "expected_effect": {
+        "mode": ""
+      }
+    }
+  ]
+}

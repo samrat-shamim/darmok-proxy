@@ -24,10 +24,10 @@ authors = [
     "Apache DataFusion <dev@datafusion.apache.org>",
     "Darmok contributors",
 ]
-homepage = "https://github.com/duotronic-ai/darmok-proxy"
+homepage = "https://github.com/samrat-shamim/darmok-proxy"
 documentation = "https://docs.rs/sqlparser/"
 keywords = ["sql", "parser", "mysql", "postgresql"]
-repository = "https://github.com/duotronic-ai/darmok-proxy"
+repository = "https://github.com/samrat-shamim/darmok-proxy"
 license = "Apache-2.0"
 include = [
     "src/**/*.rs",

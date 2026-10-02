@@ -74,4 +74,4 @@ it does not supply a reusable catalog generation or execution validity lease.
 Session-variable, charset/collation, engine, temporal and transaction behavior
 still requires semantic certification. Inherited metadata must not become an
 advertised support claim without that work. The known issues are tracked in
-[release blocker #2](https://github.com/duotronic-ai/darmok-proxy/issues/2).
+[release blocker #2](https://github.com/samrat-shamim/darmok-proxy/issues/2).
