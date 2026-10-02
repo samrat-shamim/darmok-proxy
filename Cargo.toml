@@ -9,6 +9,7 @@ members = [
     "crates/session",
     "crates/execute",
     "crates/catalog",
+    "crates/cli",
     "tests/postgres",
 ]
 
@@ -36,3 +37,4 @@ tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
 tokio-postgres = { version = "=0.7.18", path = "third_party/tokio-postgres" }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+clap = { version = "=4.6.7", features = ["derive"] }

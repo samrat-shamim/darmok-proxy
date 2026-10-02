@@ -59,6 +59,7 @@ Target commands:
 ```text
 darmok config check --config darmok.toml
 darmok init --database-url-env DARMOK_ADMIN_DATABASE_URL
+darmok schema verify --database-url-env DARMOK_ADMIN_DATABASE_URL
 darmok doctor --config darmok.toml
 darmok serve --config darmok.toml
 darmok --version
@@ -71,6 +72,13 @@ serialized and transactional where PostgreSQL permits, versioned, and
 idempotent only when the existing installation matches. A name conflict,
 unexpected object, partial installation, or incompatible version is an error.
 No automatic destructive repair or pre-release migration framework is added.
+
+`schema verify` checks an existing installation in one explicitly selected
+physical database without creating or repairing objects. This command is
+deliberately independent of the future logical route graph: setup operators can
+verify a database before configuring the serving proxy. It is not a substitute
+for `doctor` or runtime admission. `init`, `schema verify`, help and version are
+implemented by the [CLI component](cli.md); the other commands remain pending.
 
 Runtime roles receive only the grants they need. Fully qualify helper
 references, constrain any privileged function's `search_path`, revoke unsafe

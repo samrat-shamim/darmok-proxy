@@ -3,9 +3,11 @@
 This component installs and verifies version 1 of the functional `darmok`
 schema in one physical PostgreSQL database. `NativeBackend::initialize_schema`
 and `verify_schema` use the existing exclusive connection owner. They expose
-no caller SQL or raw client. CLI wiring, configuration, credentials, grants,
-routing, `serve` admission and the executable remain pending. This receipt
-certifies functional artifacts, not privilege policy or runtime readiness.
+no caller SQL or raw client. The [CLI component](cli.md) now wraps these
+operations with `init` and `schema verify` in a real `darmok` executable.
+Configuration, credentials, grants, routing and `serve` admission remain
+pending. This library receipt establishes functional artifacts, not privilege
+policy or runtime readiness; process evidence is recorded separately.
 
 Both operations require confirmed idle. They reject an existing transaction
 before submission and never commit or roll back a caller's outer work. Each
@@ -13,7 +15,9 @@ submits one fixed batch: explicit read-committed, non-deferrable `BEGIN`, a
 manifest `DO`, and `COMMIT`. Initialization uses read-write access; verification
 uses read-only access. Success requires exactly `BEGIN`, `DO`, `COMMIT` and
 observed idle `ReadyForQuery`. It does not distinguish newly created from
-already present artifacts. No command-line success is claimed by this library.
+already present artifacts. The CLI waits for this outcome and local driver
+disposal before printing success; the library receipt alone cannot establish a
+command-line result.
 
 The manifest takes a database-scoped transaction advisory lock using the fixed
 signed key `4922526098346491905`. Initializers take it exclusively; verifiers

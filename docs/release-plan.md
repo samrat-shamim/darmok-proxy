@@ -30,7 +30,7 @@ documentation. Deferred gates cannot count as release certification.
 | M0 | Pin and inventory the starting implementation; establish baseline; write contracts | Reproducible source inventory and test results, documented inherited failures, architecture and scope contracts | Complete; baseline has one recorded failure |
 | M1 | Independent workspace, vendored parser, package names, licensing and CI | Fresh checkout builds and tests without another repository or private dependency; upstream notices preserved | Complete |
 | M2 | Extract the generic translation and execution engine | All application assumptions and allocation/capture/control-plane dependencies removed; both minimal end-to-end examples pass | In progress; component extraction only |
-| M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | Pending |
+| M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | In progress; explicit initialization executable component only |
 | M4 | SQL, types, metadata, transaction/session/prepared/cache correctness | Every advertised construct has executable evidence; external DDL and native schema tests pass | Pending |
 | M5 | Drivers, adversarial inputs, concurrency and performance | Required driver and differential matrices, fuzz smoke, resource limits, isolation and cancellation tests, reproducible benchmarks pass | Pending |
 | M6 | Documentation, artifacts, independent review and publication | Exact candidate passes all gates; fresh artifact examples pass; review resolved; PR merged; signed/checksummed release artifacts published | Pending |
@@ -1402,3 +1402,132 @@ from the recorded runtime checks. Required hosted CI, public table/catalog-valid
 execution, executable integration, real drivers, measured performance, merge,
 release and M2/M3/M4/full-goal completion remain pending. Security work,
 compiler PR4, resource stress and forced interruption remain excluded.
+
+### Standalone setup executable component
+
+The `darmok-cli` package now builds the real `darmok` executable with `init`,
+`schema verify`, help and version. The explicit environment input must select a
+physical database; no default database is inferred. The command invokes the
+existing native owner and reviewed version-1 manifest, awaits disposal and
+preserves ordinary failure/rollback outcomes. It adds no schema SQL, automatic
+repair, raw SQL escape, credential policy or serving-path admission. The
+[command contract](cli.md) records the deliberate addition of independent
+schema verification before logical route configuration.
+
+The independent initial source review found no functional defect and noted
+that positive process coverage used URI inputs only. The followup fixture adds
+successful keyword/value initialization and verification of the same explicitly
+selected nondefault database, preserving catalog/application snapshots and
+ordinary connection closure. This is coverage strengthening, not a production
+bug fix or new credential policy. Its exact committed results are separate from
+the original candidate and its frozen evidence.
+
+Three offline process groups and three required database process groups are
+implemented. Future pinned PostgreSQL17/18 CI explicitly invokes the latter and
+always preserves their child receipts. Exact committed candidate checks and
+independent review are recorded separately after verification; draft process
+checks are development evidence only. The new README documents building and
+running the setup commands while making clear that proxy serving and release
+readiness are still pending.
+
+This advances M3 initialization and the standalone executable path. It does not
+complete M2/M3/M4 or the full goal. Configuration/routing, complete functional
+SQL/catalog admission, `serve`, real-driver matrices, measured performance,
+release artifacts and the final release remain required. Hosted CI remains
+blocked by the existing personal-account condition: no CI polling/retry,
+account actions, merge or release are performed. Authentication, TLS, grants,
+security review, compiler PR4, resource stress and forced interruption remain
+excluded.
+
+### Standalone setup executable local evidence
+
+The final tested code revision is
+`6c0f3e899687e5cf4bf27c17d1178d0e643f3250`, tree
+`d30e82956723e92049d9a64b8a17275d8399a13f`. Its production CLI/native owner,
+schema manifest, dependency lock and CI entry points are unchanged from initial
+candidate `9b3b2ff3c92a637063494a1daaa3a16a87a08046`, tree
+`3df496c467b084d48892ea869523734dba53abb4`. The four-path correction adds
+positive keyword-format fixture coverage, receipt metadata and the two component
+documents. It does not repair a runtime defect or implement credential policy.
+
+Both clean candidates execute their own 15-command local matrix with actual0
+for every command. The final matrix is:
+
+| Check | Final executed result |
+| --- | --- |
+| CLI required process groups, PG17/18 | 3 passed,0 failed/ignored each;23 actual children each:11 exits0,12 expected exits1 |
+| Existing native schema groups, PG17/18 | 9 passed,0 failed/ignored each;71 filtered |
+| Workspace all/default features | 1679/1672 passed,0 failed;79 ignored;42/41 summaries |
+| Workspace and vendored connector Clippy | Both strict commands0 |
+| Parser minimal/std/visitor | Three commands0 |
+| Formatting, repository boundaries, diff | Three commands0 |
+| Optimized `darmok` build | `cargo build -p darmok-cli --release --locked`,actual0 |
+
+The three offline process groups are included in each workspace run and record
+16 children each:5 exits0,5 expected exits1,6 expected usage exits2. Required
+database groups use four disposable databases per major; the ordinary missing
+database case never creates another. The two new keyword children on each major
+have actual0, exact success text/empty stderr, `keyword_value` metadata and the
+same explicit nondefault database as URI initialization. Catalog/application
+snapshot preservation and ordinary server connection closure are asserted by
+the process tests. All disposable CLI databases are confirmed removed by fresh
+post-run readers. This establishes physical selection, not authorized aliases.
+
+All Cargo invocations and Cargo-spawning helpers use
+`RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup` and
+`CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target`.
+`logs/cli-6c0f3e8-matrix.json` and its child receipts retain exact argv, committed
+head/tree, environment, timestamps, actual exits and hashed raw streams.
+`logs/cli-6c0f3e8-environment-facts-v3.json` binds15 fresh readers0 to
+Rust/Cargo1.96.0, macOS26.0.1 arm64, Clap4.6.7 and pinned PostgreSQL17.11/18.6
+UTF8/max identifier63 images, versions and cleanup observations. Per-reader
+sidecars preserve actual statuses and stdout/stderr separately.
+
+The final optimized binary is copied into an immutable development artifact.
+Its SHA256 is
+`90955f6f647b1b8146726136c9dfe64c9f980d5c4dbfb87548dd0fac399dcaf6`.
+Three artifact readers exit0: native arm64 file identity, help and version;
+the last two execute from an empty working directory. This checks loading and
+offline CLI behavior only. It supplies no optimized database-command, serving,
+Linux artifact, benchmark or release certification.
+
+The original environment observer actual1 is retained. It compared a tagged
+configured image reference with Docker's tagless `RepoDigests` representation;
+the corrected immutable observer checks the exact configured reference, local
+image identity and normalized repository digest. This was evidence bookkeeping,
+not a failed product check. Eight original raw-reader pairs are preserved;
+that failed observer did not persist individual child status sidecars or final
+aggregate facts. The corrected baseline/final observers each record15 actual0
+reader sidecars. No past status is rewritten or inferred as a new execution.
+
+The final author audit `logs/cli-6c0f3e8-author-audit-v1.json` exits0, SHA256
+`5503051b313b922e9e55edc0df307a7945890e648d64353a580c5e371ea34899`.
+It binds45 terminal author receipts and43 nonaggregate sequential intervals;
+two nested matrix parents are counted separately. The1755-file
+`logs/cli-6c0f3e8-code-evidence-manifest-v1.json` has SHA256
+`ed397fde508c6175e1dfad32ea0bffe66f77a86fe466e9591a25a8435fff5d12`.
+`logs/cli-6c0f3e8-author-facts-v1.json` has SHA256
+`4cbe785cf38ec8d93296940adf5641337ec52afc90b9fc228dcfa8a9dc6165f1`.
+This preserves the1373-file initial CLI graph, its metadata failure, original
+889-file binary evidence, PR42 publication and unchanged account-blocker anchors.
+
+Independent passive source review records39 Git commands0 on the initial
+candidate and21 Git commands0 on the corrected source/evidence. Both final
+invocations exit0; neither executes Cargo, SQL, Docker, binaries or network
+checks. The original nonblocking C1 keyword coverage observation closes only at
+the corrected revision using its four actual successful child receipts. No
+functional finding remains. The final report SHA256 is
+`545097a83d09cc1ff846775e61508f5ddffd11033582faa41c6a0f8f8c48123b`,
+seal `8536545fb935e086480f567f9fee100833392caccba3ca8e0e04fdebfe01bb13`,
+and separate actual invocation
+`c8e82656f85995ae59a357ecc5fbb8089fa2a765fefb16742137d9db82150f36`.
+
+The final evidence leaf changes only this release record and `docs/cli.md`.
+Its parent/tree, unchanged runtime entries, preserved evidence and passive leaf
+review are proved separately. Runtime executions remain pinned to the code
+revision above. M3 initialization/executable progress is concrete; the full
+milestone and goal remain open. Hosted CI, public table/catalog validity,
+configuration/routing, `serve`, real drivers, measured performance, complete
+artifacts, merge and release remain pending. No CI polling/retry or account
+action is performed; security work, compiler PR4, resource stress and forced
+interruption remain excluded.
