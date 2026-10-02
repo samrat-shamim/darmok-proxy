@@ -16,7 +16,7 @@ use sqlparser::{
         ContextModifier, Expr, GroupByExpr, Query, Select, SelectFlavor, SelectItem, UnaryOperator,
         Value as Literal,
     },
-    source::{ProjectionSourceError, SourceSelect},
+    source::{SourceProvenanceError, SourceSelect},
 };
 
 use crate::ServerSetValues;
@@ -56,7 +56,7 @@ impl SelectSqlError {
 
 pub(crate) enum SelectAdmissionError {
     Sql(SelectSqlError),
-    Source(ProjectionSourceError),
+    Source(SourceProvenanceError),
     Settings(TransactionSettingsError),
 }
 impl From<SelectSqlError> for SelectAdmissionError {
@@ -64,8 +64,8 @@ impl From<SelectSqlError> for SelectAdmissionError {
         Self::Sql(error)
     }
 }
-impl From<ProjectionSourceError> for SelectAdmissionError {
-    fn from(error: ProjectionSourceError) -> Self {
+impl From<SourceProvenanceError> for SelectAdmissionError {
+    fn from(error: SourceProvenanceError) -> Self {
         Self::Source(error)
     }
 }
@@ -425,7 +425,11 @@ fn variable(
                 .read_variable(read.variable)
                 .map_err(|_| SelectSqlError::Unsupported)?
         }
-        Var::Autocommit | Var::TransactionIsolation | Var::TransactionReadOnly | Var::SqlMode => {
+        Var::Autocommit
+        | Var::CompletionType
+        | Var::TransactionIsolation
+        | Var::TransactionReadOnly
+        | Var::SqlMode => {
             if global {
                 crate::set_controller::global_value(globals, read.variable)
                     .map_err(|_| SelectSqlError::Unsupported)?
@@ -477,6 +481,7 @@ mod tests {
                 transactions: MysqlCompatibilityProfile::default_mysql8()
                     .default_transaction_characteristics,
                 autocommit: AutocommitSetting::Enabled,
+                completion_type: darmok_session::FrontendCompletionType::NoChain,
             },
         )
     }

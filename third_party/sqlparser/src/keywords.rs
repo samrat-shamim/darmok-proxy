@@ -1,3 +1,4 @@
+// Modified for Darmok: recognize the MySQL consistent-snapshot keyword.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -250,6 +251,7 @@ define_keywords!(
     CONNECTION,
     CONNECTOR,
     CONNECT_BY_ROOT,
+    CONSISTENT,
     CONSTRAINT,
     CONTACT,
     CONTAINS,

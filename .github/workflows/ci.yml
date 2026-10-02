@@ -83,6 +83,8 @@ jobs:
         run: cargo test -p darmok-postgres-tests --locked
       - name: Required native owner database unit fixtures
         run: cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
+      - name: Required BigDecimal original-source SET and transaction fixtures
+        run: cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::query_transactions -- --ignored
 
   mysql-reference:
     name: MySQL 8.4 reference
@@ -118,6 +120,29 @@ jobs:
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
           --corpus tests/reference/mysql_query_results.json
           --evidence-dir '${{ runner.temp }}/mysql-query-results-reference'
+      - name: Required stock query transaction observations
+        run: >-
+          python3 tests/reference/observe_mysql_transactions.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_query_transactions.json
+          --evidence-dir '${{ runner.temp }}/mysql-query-transactions-reference'
+      - name: Required stock completion-type column observations
+        run: >-
+          python3 tests/reference/observe_mysql_query_results.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_completion_type_columns.json
+          --evidence-dir '${{ runner.temp }}/mysql-completion-type-reference'
+      - name: Preserve query transaction reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-query-transactions-reference
+          path: |
+            ${{ runner.temp }}/mysql-query-transactions-reference
+            ${{ runner.temp }}/mysql-completion-type-reference
+          if-no-files-found: error
       - name: Preserve SELECT reference receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

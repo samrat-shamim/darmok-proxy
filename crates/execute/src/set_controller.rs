@@ -3,7 +3,7 @@
 
 use crate::{NativeBackend, QueryExecutionError};
 use darmok_session::{
-    AutocommitSetting, FrontendIsolation, FrontendTransactionAccess,
+    AutocommitSetting, FrontendCompletionType, FrontendIsolation, FrontendTransactionAccess,
     NamedTransactionCharacteristic, SessionCommandStage, SessionState, SessionVariable,
     SessionVariableReader, SqlMode, SqlModes, SystemVariableAssignment, SystemVariableForm,
     TransactionCharacteristics, TransactionSettingAssignment, TransactionVariableAssignmentForm,
@@ -11,7 +11,10 @@ use darmok_session::{
     mysql_system_variable_assignments,
 };
 use darmok_types::value::Value;
-use sqlparser::ast::{ContextModifier, Expr, Set, Value as Literal};
+use sqlparser::{
+    ast::{ContextModifier, Expr, Set, Value as Literal},
+    source::{SourceProvenanceError, SourceSet},
+};
 use std::borrow::Cow;
 
 /// Explicit server authority for global reads and SESSION DEFAULT. There is
@@ -21,6 +24,7 @@ pub struct ServerSetValues {
     pub sql_modes: SqlModes,
     pub transactions: TransactionCharacteristics,
     pub autocommit: AutocommitSetting,
+    pub completion_type: FrontendCompletionType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,12 +59,29 @@ impl SetSqlError {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum SetAdmissionError {
+    Sql(SetSqlError),
+    Source(SourceProvenanceError),
+}
+impl From<SetSqlError> for SetAdmissionError {
+    fn from(error: SetSqlError) -> Self {
+        Self::Sql(error)
+    }
+}
+impl From<SourceProvenanceError> for SetAdmissionError {
+    fn from(error: SourceProvenanceError) -> Self {
+        Self::Source(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum TypedValue {
     Modes(SqlModes),
     Isolation(FrontendIsolation),
     Access(FrontendTransactionAccess),
     Autocommit(AutocommitSetting),
+    CompletionType(FrontendCompletionType),
 }
 #[derive(Debug, Clone, Copy)]
 enum PlannedValue {
@@ -102,8 +123,9 @@ pub(crate) async fn apply_set(
 pub(crate) fn admit_set(
     state: &SessionState,
     globals: &ServerSetValues,
-    input: &Set,
-) -> Result<SetPlan, SetSqlError> {
+    source: SourceSet<'_>,
+) -> Result<SetPlan, SetAdmissionError> {
+    let input = source.input();
     let before = state
         .transaction_settings()
         .map_err(|_| SetSqlError::Unsupported)?;
@@ -113,7 +135,7 @@ pub(crate) fn admit_set(
         if matches!(assignment, TransactionSettingAssignment::NextTransaction(_))
             && before.active.is_some()
         {
-            return Err(SetSqlError::NextChoicesDuringActive);
+            return Err(SetSqlError::NextChoicesDuringActive.into());
         }
         return Ok(SetPlan(vec![SetAction::Transaction(assignment)]));
     }
@@ -125,11 +147,12 @@ pub(crate) fn admit_set(
         if !matches!(
             input.variable,
             SessionVariable::SqlMode
+                | SessionVariable::CompletionType
                 | SessionVariable::Autocommit
                 | SessionVariable::TransactionIsolation
                 | SessionVariable::TransactionReadOnly
         ) {
-            return Err(SetSqlError::Unsupported);
+            return Err(SetSqlError::Unsupported.into());
         }
         let value = if matches!(input.value, Expr::Identifier(name) if name.quote_style.is_none() && name.value.eq_ignore_ascii_case("DEFAULT"))
         {
@@ -137,7 +160,10 @@ pub(crate) fn admit_set(
             // The active-next check still belongs to its update position.
             PlannedValue::Default(default_value(globals, input.variable)?)
         } else {
-            let value = coerce(input.variable, evaluate(state, globals, input.value)?)?;
+            let value = coerce(
+                input.variable,
+                evaluate(state, globals, source, input.value)?,
+            )?;
             check_phase(input.variable, form, value, before)?;
             PlannedValue::Checked(value)
         };
@@ -196,8 +222,9 @@ fn check_phase(
 fn evaluate<'a>(
     state: &SessionState,
     globals: &ServerSetValues,
+    source: SourceSet<'a>,
     expression: &'a Expr,
-) -> Result<EvaluatedValue<'a>, SetSqlError> {
+) -> Result<EvaluatedValue<'a>, SetAdmissionError> {
     Ok(match expression {
         Expr::Value(value) => match &value.value {
             Literal::SingleQuotedString(value) | Literal::DoubleQuotedString(value) => {
@@ -205,18 +232,22 @@ fn evaluate<'a>(
             }
             Literal::Boolean(value) => EvaluatedValue::Boolean(*value),
             Literal::Null => EvaluatedValue::Null,
-            Literal::Number(value, false) => EvaluatedValue::Unsigned(
-                value
-                    .to_string()
-                    .parse()
-                    .map_err(|_| SetSqlError::Unsupported)?,
-            ),
-            _ => return Err(SetSqlError::Unsupported),
+            Literal::Number(_, false) => {
+                let original = source.number_source(value)?;
+                if original.is_empty() || !original.bytes().all(|byte| byte.is_ascii_digit()) {
+                    return Err(SetSqlError::Unsupported.into());
+                }
+                EvaluatedValue::Unsigned(original.parse().map_err(|_| SetSqlError::Unsupported)?)
+            }
+            _ => return Err(SetSqlError::Unsupported.into()),
         },
         Expr::Identifier(name)
             if name.quote_style.is_none()
                 && (name.value.eq_ignore_ascii_case("ON")
-                    || name.value.eq_ignore_ascii_case("OFF")) =>
+                    || name.value.eq_ignore_ascii_case("OFF")
+                    || ["NO_CHAIN", "CHAIN"]
+                        .into_iter()
+                        .any(|value| name.value.eq_ignore_ascii_case(value))) =>
         {
             EvaluatedValue::String(Cow::Borrowed(&name.value))
         }
@@ -226,11 +257,12 @@ fn evaluate<'a>(
             if !matches!(
                 read.variable,
                 SessionVariable::SqlMode
+                    | SessionVariable::CompletionType
                     | SessionVariable::Autocommit
                     | SessionVariable::TransactionIsolation
                     | SessionVariable::TransactionReadOnly
             ) {
-                return Err(SetSqlError::Unsupported);
+                return Err(SetSqlError::Unsupported.into());
             }
             let value = if read.form == SystemVariableForm::Qualified(ContextModifier::Global) {
                 global_value(globals, read.variable)?
@@ -242,10 +274,10 @@ fn evaluate<'a>(
             match value {
                 Value::String(value) => EvaluatedValue::String(Cow::Owned(value.into())),
                 Value::UInt(value) => EvaluatedValue::Unsigned(value),
-                _ => return Err(SetSqlError::Unsupported),
+                _ => return Err(SetSqlError::Unsupported.into()),
             }
         }
-        _ => return Err(SetSqlError::Unsupported),
+        _ => return Err(SetSqlError::Unsupported.into()),
     })
 }
 
@@ -263,6 +295,9 @@ pub(crate) fn global_value(
         )),
         SessionVariable::Autocommit => {
             Value::UInt(u64::from(globals.autocommit == AutocommitSetting::Enabled))
+        }
+        SessionVariable::CompletionType => {
+            Value::String(globals.completion_type.variable_label().into())
         }
         _ => return Err(SetSqlError::Unsupported),
     })
@@ -294,6 +329,22 @@ fn boolean(value: EvaluatedValue<'_>) -> Result<bool, SetSqlError> {
 
 fn coerce(variable: SessionVariable, value: EvaluatedValue<'_>) -> Result<TypedValue, SetSqlError> {
     Ok(match variable {
+        SessionVariable::CompletionType => TypedValue::CompletionType(match value {
+            EvaluatedValue::String(value) => [
+                FrontendCompletionType::NoChain,
+                FrontendCompletionType::Chain,
+                FrontendCompletionType::Release,
+            ]
+            .into_iter()
+            .find(|choice| choice.variable_label().eq_ignore_ascii_case(&value))
+            .ok_or(SetSqlError::WrongValue)?,
+            EvaluatedValue::Unsigned(0) => FrontendCompletionType::NoChain,
+            EvaluatedValue::Unsigned(1) => FrontendCompletionType::Chain,
+            EvaluatedValue::Unsigned(2) => FrontendCompletionType::Release,
+            EvaluatedValue::Boolean(false) => FrontendCompletionType::NoChain,
+            EvaluatedValue::Boolean(true) => FrontendCompletionType::Chain,
+            _ => return Err(SetSqlError::WrongValue),
+        }),
         SessionVariable::Autocommit => TypedValue::Autocommit(if boolean(value)? {
             AutocommitSetting::Enabled
         } else {
@@ -355,6 +406,7 @@ fn default_value(
         }
         SessionVariable::TransactionReadOnly => TypedValue::Access(globals.transactions.access),
         SessionVariable::Autocommit => TypedValue::Autocommit(globals.autocommit),
+        SessionVariable::CompletionType => TypedValue::CompletionType(globals.completion_type),
         _ => return Err(SetSqlError::Unsupported),
     })
 }
@@ -394,6 +446,7 @@ async fn apply_action(
         },
     };
     match value {
+        TypedValue::CompletionType(value) => stage.apply_completion_type(value)?,
         TypedValue::Modes(value) => stage.apply_sql_modes(value),
         TypedValue::Isolation(value) => {
             stage.apply_transaction_assignment(TransactionSettingAssignment::Variable {

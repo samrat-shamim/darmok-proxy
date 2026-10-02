@@ -605,3 +605,103 @@ fresh boundary/diff checks and a separate Git tree proof. Code/test receipts
 retain their original `1cf9377` source identity. No M2/M4, driver, measured
 performance, fresh CI, merge or release gate is closed by these additions.
 Security-related work and the separate compiler draft remain excluded.
+
+
+## Original-source transaction-controller component
+
+The [source transaction contract](query-transactions.md) connects public decoded
+COM_QUERY controls to shared canonical planning, checked native controls and
+one response guard. The parser preserves absent/negative completion clauses and
+uses MySQL start/completion grammar. Completion policy is canonical and explicit;
+idle completion, active/idle chaining and commit-before-replacement have distinct
+ordered boundaries. Every proposed native start is admitted before prior work
+can commit. READ UNCOMMITTED, consistent snapshots and release completion fail
+explicitly before effects. Table execution, the owning frontend loop, RELEASE,
+full transaction equivalence and M2/M4 remain pending.
+
+Twenty-six new ordinary stock cases, two completion-type field declarations, ten
+required native controller groups and two nested guard tests declare the finite
+verification scope. Required CI consumes the new corpora and native fixture
+module in default and BigDecimal builds. Active replacements retain their
+preceding pair with explicit access overriding only access; changed defaults
+apply after a later nonchained completion. Original SET numeric tokens supply
+consistent whole-command admission across those builds. Fresh results and the
+independent review below bind this component to its committed code revision;
+declarations and dirty exploratory checks close no gates.
+
+
+### Verified code and finite scope
+
+At clean `bd31f7b345200ff0d7e797c4c6f6fb6fd4c08074`, tree
+`82c74ba8b776b8c750dcd2098ec5eaa8750c184d`, all twenty-one planned local
+checks and the containing matrix command exit 0. The separate focused reserved
+RELEASE roundtrip also passes. Rust/Cargo are 1.96.0; the fixtures are PostgreSQL
+17.11 on port32769, PostgreSQL18.6 on port32768 and pinned MySQL8.4.11. Every
+Cargo invocation and Cargo-spawning helper uses both task overrides:
+
+```sh
+RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup
+CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target
+```
+
+| Check at the code revision | Actual result |
+| --- | --- |
+| Transaction module, default and `sqlparser/bigdecimal`, each PostgreSQL version | Four runs, ten groups passed each; no failed or ignored selected group |
+| Existing SET and SELECT modules, each PostgreSQL version | Four runs, fourteen SET and six SELECT groups passed per version |
+| Workspace tests/doctests, all features | 1,669 passed, zero failed, 52 ignored; required selected native groups ran separately |
+| Workspace tests/doctests, default features | 1,662 passed, zero failed, 52 ignored |
+| Strict workspace/all-targets/all-features and vendored connector Clippy | Both exit0 with `-D warnings` |
+| Parser without defaults, with std, and with visitor | Three checks exit0 |
+| Formatting, repository boundaries, diff and tool/fixture versions | Four checks exit0 |
+| Stock transaction observer, new corpus | 26 completed cases, 37 actual child exits0, 19 exact error/code/state/physical-line observations, cleanup remaining0 |
+| Stock completion metadata observer | One case, two field descriptions, four actual child exits0 |
+
+The workspace commands exclude `darmok-postgres-tests`; their success is not a
+new database integration result for that package. Native commands use
+`cargo test -p darmok-execute --lib --locked native_backend::tests::<module> -- --ignored`;
+transaction feature runs additionally use `--features sqlparser/bigdecimal`.
+Workspace commands are `cargo test --workspace --exclude darmok-postgres-tests
+--locked`, with `--all-features` for the all-feature run. Exact argv, clean
+revision/tree, environment, fixture ports, real exits and raw stream hashes are
+in `.darmok-work/logs/query-transactions-bd31f7b-*.json`. The sequential matrix
+and its audit verify eighteen nonoverlapping Cargo/helper intervals and current
+corpus/observer identities. Both observers retain their original implementation;
+other reference corpora retain their Git entries. CLI metadata observations are
+separate from the native fixtures' encoded library output and from real drivers.
+
+The original `b301ec3` review found active replacement selecting changed defaults
+(F1), numeric SET admission using normalized AST Display (F2), and a strict
+Clippy must-use failure (V1). Their old failures remain frozen. The corrected
+shared planner retains active characteristics through replacement; original
+numeric source admission applies to all five selected SET variables before any
+commit, in both numeric feature builds. Three native receipts are explicitly
+bound after checked completion. Fresh reference runs also exposed reserved
+RELEASE SET spelling; the selected reservation now belongs to the MySQL prefix
+hook. The earlier corpus, missing-import, cross-dialect and test-roundtrip
+failures remain earlier-revision evidence, never relabelled as final passes.
+
+Independent passive correction review at the exact code revision closes
+F1/F2/V1 and identifies no new runtime blocker. It independently audits author
+commands and raw hashes, rather than rerunning Cargo or SQL. Its remaining D1
+request-cost wording is corrected in this documentation leaf: numeric source
+provenance adds no native request, while a supported SET may still need its
+existing autocommit commit. Review report/facts/seal live under
+`.darmok-work/logs/review-query-transactions-bd31f7b-*`; the seal SHA256 is
+`052b498de61a3548117951c3a3bce1634facf339a10dc3af67f2e6ca3cd15e8d`.
+The original review and incomplete intermediate capture remain distinct.
+
+`.darmok-work/logs/query-transactions-code-evidence.json` binds 288 saved evidence
+files, including local receipts, current stock observations, original failures
+and review seals. Its SHA256 is
+`86fcd9b395d0b39a82163d9a1ba4d902b333554fee005e3edbbea197124352c2`.
+These artifacts remain outside the distribution. A documentation leaf must
+preserve every non-document Git entry from the verified code revision; these
+execution receipts retain their original code identity.
+
+This selected library component does not close M2/M4, runnable frontend/table
+execution, RELEASE ownership, failed-start recovery, full reserved grammar,
+catalog validity, native/created-schema workloads, real drivers, SQL/snapshot/
+lock equivalence or measured performance. Required hosted CI remains unavailable
+under the separately recorded personal-account Actions condition; local results
+justify neither merge nor release. Security and other excluded work remain
+outside this component. The full goal remains active.

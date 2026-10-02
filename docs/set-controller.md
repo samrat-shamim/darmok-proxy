@@ -7,8 +7,8 @@ is no runnable proxy or complete transaction controller. The
 [selected query controller](query-controller.md) admits original COM_QUERY SQL
 with the current session mode before calling this evaluator.
 
-The supported variables are `sql_mode`, `autocommit`, `transaction_isolation`
-and `transaction_read_only`. Bare names inherit SESSION/LOCAL keyword scope;
+The supported variables are `sql_mode`, `autocommit`, `transaction_isolation`,
+`transaction_read_only` and `completion_type`. Bare names inherit SESSION/LOCAL keyword scope;
 per-name qualifiers apply only to that name. Unqualified `@@` transaction
 assignments target next choices independently of keyword context. Direct
 `SET [SESSION|LOCAL] TRANSACTION` updates defaults; unqualified direct settings
@@ -16,7 +16,7 @@ update next choices. These distinctions follow the reviewed
 [stock observations](mysql-set-semantics.md).
 
 Values are selected string/boolean/integer literals, ON/OFF and reads of these
-four variables with ordinary session or global scope. Server global values are
+five variables with ordinary session or global scope. Server global values are
 an explicitly supplied `ServerSetValues` authority. DEFAULT reads that authority
 from the immutable values supplied for this command; its transaction-state
 checks run at its ordered update position. It does not use ambient PostgreSQL
@@ -25,6 +25,14 @@ support zero and the observed four/ANSI_QUOTES value; other numeric mode masks
 fail explicitly. Warning-producing SQL modes, general coercion, functions,
 arithmetic, user variables, subqueries, prepared forms and other settings are
 unimplemented and return an explicit 1235/42000 error before ordinary updates.
+
+Numeric values are read through an immutable original-source `SourceSet` borrow.
+Only digit-only unsigned integer tokens are admitted; decimal/exponent spelling
+returns 1235 consistently with or without BigDecimal. AST formatting cannot
+normalize an unsupported numeric family into an accepted integer. Source-range
+failures remain internal errors. The required source transaction fixtures cover
+all five variables, Unicode coordinates, leading zeros and compound admission
+before an autocommit commit on both PostgreSQL versions and parser builds.
 
 Support for every expression/value, including DEFAULT, is checked before effects.
 This prevents an unsupported DEFAULT from following an irreversible native
@@ -48,6 +56,11 @@ An active autocommit-zero to one change first confirms native COMMIT and idle
 ReadyForQuery, then records the frontend end and setting change. A native idle
 state alone cannot stand in for that receipt. Unknown native/output outcomes
 remain errors requiring disposal, without invented recovery or DML replay.
+Quoted completion-type labels, bare NO_CHAIN/CHAIN, integers 0/1/2 and booleans derive from one typed
+transaction setting. The [transaction controller](query-transactions.md) resolves
+explicit completion clauses against it; release completion remains an explicit
+unsupported result.
+
 Changes while a frontend transaction is active with autocommit already enabled
 remain explicitly unimplemented under the existing transaction contract.
 
@@ -87,7 +100,9 @@ local results alone.
 
 Local setting updates add no native request, native cache lookup or lock. A
 required active autocommit commit adds one native control request. The plan uses
-one vector of fixed-size actions; string literals borrow the AST, canonical
+one vector of fixed-size actions; original numeric tokens borrow parser-owned
+ranges, with token-span/range vectors and one Unicode walk for numeric SET.
+String literals borrow the AST, canonical
 variable string reads allocate, and response payload/framing use byte buffers.
 There is no new duplicate mutable mode/transaction authority. End-to-end cache
 hit rate, allocation/latency/throughput measurements and controller performance

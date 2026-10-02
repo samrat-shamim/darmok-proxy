@@ -3,8 +3,10 @@
 //! They do not submit native SQL or send a response.
 
 use crate::{
-    AutocommitSetting, FrontendTransactionCommand, SessionState, SqlModes, TransactionCompletion,
-    TransactionSettingAssignment, TransactionSettingsError, TransactionSettingsSnapshot,
+    AutocommitSetting, FrontendCompletionType, FrontendTransactionBoundary,
+    FrontendTransactionCommand, SessionState, SqlModes, TransactionCommandStage,
+    TransactionCompletion, TransactionSettingAssignment, TransactionSettingsError,
+    TransactionSettingsSnapshot,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +80,24 @@ impl SessionCommandStage<'_> {
         self.apply_local_command(FrontendTransactionCommand::SetAutocommit(setting))
     }
 
+    pub fn apply_completion_type(
+        &mut self,
+        setting: FrontendCompletionType,
+    ) -> Result<(), TransactionSettingsError> {
+        self.apply_local_command(FrontendTransactionCommand::SetCompletionType(setting))
+    }
+
+    /// Holds ordered model boundaries inside this command's output guard.
+    /// Settling effects through this borrow cannot settle the SQL response.
+    pub fn stage_transaction(
+        &mut self,
+        command: FrontendTransactionCommand,
+    ) -> Result<SessionTransactionStage<'_>, TransactionSettingsError> {
+        Ok(SessionTransactionStage {
+            stage: self.state.transactions.stage(command)?,
+        })
+    }
+
     fn apply_local_command(
         &mut self,
         command: FrontendTransactionCommand,
@@ -126,6 +146,35 @@ impl SessionCommandStage<'_> {
         let snapshot = self.settings()?;
         self.state.pending_command = None;
         Ok(snapshot)
+    }
+}
+
+/// A nested transaction stage can confirm native controls while the enclosing
+/// command continues to prohibit public session reads and reuse through output.
+#[derive(Debug)]
+pub struct SessionTransactionStage<'a> {
+    stage: TransactionCommandStage<'a>,
+}
+
+impl SessionTransactionStage<'_> {
+    pub fn next_frontend_boundary(&self) -> Option<FrontendTransactionBoundary> {
+        self.stage.next_frontend_boundary()
+    }
+    pub fn mark_submitted(&mut self) -> Result<(), TransactionSettingsError> {
+        self.stage.mark_submitted()
+    }
+    pub fn record_confirmed_frontend_boundary(
+        &mut self,
+        boundary: FrontendTransactionBoundary,
+    ) -> Result<(), TransactionSettingsError> {
+        self.stage.record_confirmed_frontend_boundary(boundary)
+    }
+    /// Requires every staged boundary's semantic receipt. The encompassing
+    /// guard remains pending until it confirms the whole response was sent.
+    pub fn finish_confirmed_effects(
+        self,
+    ) -> Result<TransactionSettingsSnapshot, TransactionSettingsError> {
+        self.stage.finish_known_effects()
     }
 }
 

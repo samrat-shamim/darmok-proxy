@@ -41,7 +41,7 @@ guessed defaults.
 
 | Value source | Implemented model reads | Mutation path |
 | --- | --- | --- |
-| Typed transaction state | autocommit, transaction_isolation, transaction_read_only | Existing staged transaction command API |
+| Typed transaction state | autocommit, transaction_isolation, transaction_read_only, completion_type | Existing staged transaction command API |
 | Full SQL-mode set | sql_mode | `set_sql_modes` with a validated `SqlModes` |
 | Immutable initial text settings | time_zone, character_set_client/connection/results, collation_connection | Unimplemented |
 | Build/profile identity | version, version_comment, version_compile_os | Read-only |

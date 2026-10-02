@@ -20,6 +20,7 @@ fn set_fixture() -> (SessionState, ServerSetValues) {
             access: FrontendTransactionAccess::ReadWrite,
         },
         autocommit: AutocommitSetting::Enabled,
+        completion_type: darmok_session::FrontendCompletionType::NoChain,
     };
     (state, globals)
 }

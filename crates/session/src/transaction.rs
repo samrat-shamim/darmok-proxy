@@ -95,6 +95,25 @@ pub enum TransactionCompletion {
     Rollback,
 }
 
+/// Canonical session completion policy. Explicit SQL clauses override the
+/// corresponding policy choice; implicit commits never consult this setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FrontendCompletionType {
+    NoChain,
+    Chain,
+    Release,
+}
+
+impl FrontendCompletionType {
+    pub fn variable_label(self) -> &'static str {
+        match self {
+            Self::NoChain => "NO_CHAIN",
+            Self::Chain => "CHAIN",
+            Self::Release => "RELEASE",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FrontendTransactionCommand {
     Assign(TransactionSettingAssignment),
@@ -108,6 +127,7 @@ pub enum FrontendTransactionCommand {
         chain: bool,
     },
     SetAutocommit(AutocommitSetting),
+    SetCompletionType(FrontendCompletionType),
 }
 
 /// Semantic frontend actions, never a PostgreSQL readiness state. A native
@@ -118,6 +138,7 @@ pub enum FrontendTransactionBoundary {
     Started(TransactionCharacteristics),
     Ended(TransactionCompletion),
     AutocommitAssigned(AutocommitSetting),
+    CompletionTypeAssigned(FrontendCompletionType),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -133,6 +154,96 @@ pub struct TransactionSettingsSnapshot {
     pub next: NextTransactionCharacteristics,
     pub active: Option<TransactionCharacteristics>,
     pub autocommit: AutocommitSetting,
+    pub completion_type: FrontendCompletionType,
+}
+
+impl TransactionSettingsSnapshot {
+    /// Pure boundary planning shared by admission and authoritative staging.
+    /// No effect or native receipt is established by a returned plan.
+    pub fn plan_command(
+        self,
+        command: FrontendTransactionCommand,
+    ) -> Result<[Option<FrontendTransactionBoundary>; 2], TransactionSettingsError> {
+        let current = self;
+        use FrontendTransactionBoundary as Boundary;
+        let start = |access: Option<FrontendTransactionAccess>| {
+            Boundary::Started(TransactionCharacteristics {
+                isolation: current.next.isolation.unwrap_or(current.defaults.isolation),
+                access: access
+                    .or(current.next.access)
+                    .unwrap_or(current.defaults.access),
+            })
+        };
+        let boundaries = match command {
+            FrontendTransactionCommand::Assign(assignment) => {
+                if assignment.target().0 && current.active.is_some() {
+                    return Err(TransactionSettingsError::NextChoicesDuringActive);
+                }
+                [Some(Boundary::SettingsAssigned(assignment)), None]
+            }
+            FrontendTransactionCommand::BeginExplicit { access } => {
+                if let Some(active) = current.active {
+                    [
+                        Some(Boundary::Ended(TransactionCompletion::Commit)),
+                        Some(Boundary::Started(TransactionCharacteristics {
+                            isolation: active.isolation,
+                            access: access.unwrap_or(active.access),
+                        })),
+                    ]
+                } else {
+                    [Some(start(access)), None]
+                }
+            }
+            FrontendTransactionCommand::BeginImplicit => {
+                if current.active.is_some() {
+                    return Err(TransactionSettingsError::AlreadyActive);
+                }
+                if current.autocommit != AutocommitSetting::Disabled {
+                    return Err(TransactionSettingsError::ImplicitStartWithAutocommit);
+                }
+                [Some(start(None)), None]
+            }
+            FrontendTransactionCommand::AutocommitStatement => {
+                if current.active.is_some() {
+                    return Err(TransactionSettingsError::AlreadyActive);
+                }
+                if current.autocommit != AutocommitSetting::Enabled {
+                    return Err(
+                        TransactionSettingsError::AutocommitStatementWithAutocommitDisabled,
+                    );
+                }
+                [
+                    Some(start(None)),
+                    Some(Boundary::Ended(TransactionCompletion::Commit)),
+                ]
+            }
+            FrontendTransactionCommand::Complete { completion, chain } => {
+                let chained = if let Some(active) = current.active {
+                    Boundary::Started(active)
+                } else {
+                    start(None)
+                };
+                [Some(Boundary::Ended(completion)), chain.then_some(chained)]
+            }
+            FrontendTransactionCommand::SetCompletionType(setting) => {
+                [Some(Boundary::CompletionTypeAssigned(setting)), None]
+            }
+            FrontendTransactionCommand::SetAutocommit(setting) => {
+                if current.active.is_some() && current.autocommit == AutocommitSetting::Enabled {
+                    return Err(TransactionSettingsError::UnverifiedAutocommitBoundary);
+                }
+                if current.active.is_some() && setting == AutocommitSetting::Enabled {
+                    [
+                        Some(Boundary::Ended(TransactionCompletion::Commit)),
+                        Some(Boundary::AutocommitAssigned(setting)),
+                    ]
+                } else {
+                    [Some(Boundary::AutocommitAssigned(setting)), None]
+                }
+            }
+        };
+        Ok(boundaries)
+    }
 }
 
 /// A contradictory command-phase report is retained, even if later calls
@@ -204,13 +315,17 @@ pub(crate) struct TransactionSettings {
 }
 
 impl TransactionSettings {
-    pub(crate) fn new(defaults: TransactionCharacteristics) -> Self {
+    pub(crate) fn new(
+        defaults: TransactionCharacteristics,
+        completion_type: FrontendCompletionType,
+    ) -> Self {
         Self {
             confirmed: TransactionSettingsSnapshot {
                 defaults,
                 next: NextTransactionCharacteristics::default(),
                 active: None,
                 autocommit: AutocommitSetting::Enabled,
+                completion_type,
             },
             staged: None,
         }
@@ -249,78 +364,7 @@ impl TransactionSettings {
         command: FrontendTransactionCommand,
     ) -> Result<TransactionCommandStage<'_>, TransactionSettingsError> {
         let current = self.snapshot()?;
-        use FrontendTransactionBoundary as Boundary;
-        let start = |access: Option<FrontendTransactionAccess>| {
-            Boundary::Started(TransactionCharacteristics {
-                isolation: current.next.isolation.unwrap_or(current.defaults.isolation),
-                access: access
-                    .or(current.next.access)
-                    .unwrap_or(current.defaults.access),
-            })
-        };
-        let boundaries = match command {
-            FrontendTransactionCommand::Assign(assignment) => {
-                if assignment.target().0 && current.active.is_some() {
-                    return Err(TransactionSettingsError::NextChoicesDuringActive);
-                }
-                [Some(Boundary::SettingsAssigned(assignment)), None]
-            }
-            FrontendTransactionCommand::BeginExplicit { access } => {
-                if current.active.is_some() {
-                    [
-                        Some(Boundary::Ended(TransactionCompletion::Commit)),
-                        Some(start(access)),
-                    ]
-                } else {
-                    [Some(start(access)), None]
-                }
-            }
-            FrontendTransactionCommand::BeginImplicit => {
-                if current.active.is_some() {
-                    return Err(TransactionSettingsError::AlreadyActive);
-                }
-                if current.autocommit != AutocommitSetting::Disabled {
-                    return Err(TransactionSettingsError::ImplicitStartWithAutocommit);
-                }
-                [Some(start(None)), None]
-            }
-            FrontendTransactionCommand::AutocommitStatement => {
-                if current.active.is_some() {
-                    return Err(TransactionSettingsError::AlreadyActive);
-                }
-                if current.autocommit != AutocommitSetting::Enabled {
-                    return Err(
-                        TransactionSettingsError::AutocommitStatementWithAutocommitDisabled,
-                    );
-                }
-                [
-                    Some(start(None)),
-                    Some(Boundary::Ended(TransactionCompletion::Commit)),
-                ]
-            }
-            FrontendTransactionCommand::Complete { completion, chain } => {
-                let active = current
-                    .active
-                    .ok_or(TransactionSettingsError::NoActiveTransaction)?;
-                [
-                    Some(Boundary::Ended(completion)),
-                    chain.then_some(Boundary::Started(active)),
-                ]
-            }
-            FrontendTransactionCommand::SetAutocommit(setting) => {
-                if current.active.is_some() && current.autocommit == AutocommitSetting::Enabled {
-                    return Err(TransactionSettingsError::UnverifiedAutocommitBoundary);
-                }
-                if current.active.is_some() && setting == AutocommitSetting::Enabled {
-                    [
-                        Some(Boundary::Ended(TransactionCompletion::Commit)),
-                        Some(Boundary::AutocommitAssigned(setting)),
-                    ]
-                } else {
-                    [Some(Boundary::AutocommitAssigned(setting)), None]
-                }
-            }
-        };
+        let boundaries = current.plan_command(command)?;
         self.staged = Some(StagedCommand {
             command,
             before: current,
@@ -368,9 +412,18 @@ impl TransactionSettings {
                 self.confirmed.active = Some(choices);
                 self.confirmed.next = NextTransactionCharacteristics::default();
             }
-            FrontendTransactionBoundary::Ended(_) => self.confirmed.active = None,
+            FrontendTransactionBoundary::Ended(_) => {
+                self.confirmed.active = None;
+                // MySQL nonchained completion resets one-shot choices even
+                // without an active transaction. A staged chain has already
+                // captured its pair before this boundary is applied.
+                self.confirmed.next = NextTransactionCharacteristics::default();
+            }
             FrontendTransactionBoundary::AutocommitAssigned(setting) => {
                 self.confirmed.autocommit = setting
+            }
+            FrontendTransactionBoundary::CompletionTypeAssigned(setting) => {
+                self.confirmed.completion_type = setting
             }
         }
     }

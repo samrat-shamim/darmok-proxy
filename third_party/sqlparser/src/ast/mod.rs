@@ -1,5 +1,6 @@
 // Modified for Darmok: Represent MySQL variable expressions and SET targets explicitly.
 // Modified for Darmok: preserve transaction-setting syntax and keyword scope.
+// Modified for Darmok: retain explicit transaction completion choices and snapshots.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -4298,7 +4299,7 @@ pub enum Statement {
         if_exists: bool,
     },
     /// ```sql
-    /// COMMIT [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ]
+    /// COMMIT [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ] [ [ NO ] RELEASE ]
     /// ```
     /// If `end` is false
     ///
@@ -4307,19 +4308,19 @@ pub enum Statement {
     /// ```
     /// If `end` is true
     Commit {
-        /// `true` when `AND [ NO ] CHAIN` was present.
-        chain: bool,
+        /// Original completion clauses, including explicit negative choices.
+        options: TransactionCompletionOptions,
         /// `true` when this `COMMIT` was parsed as an `END` block terminator.
         end: bool,
         /// Optional transaction modifier for commit semantics.
         modifier: Option<TransactionModifier>,
     },
     /// ```sql
-    /// ROLLBACK [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ] [ TO [ SAVEPOINT ] savepoint_name ]
+    /// ROLLBACK [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ] [ [ NO ] RELEASE ] [ TO [ SAVEPOINT ] savepoint_name ]
     /// ```
     Rollback {
-        /// `true` when `AND [ NO ] CHAIN` was present.
-        chain: bool,
+        /// Original completion clauses, including explicit negative choices.
+        options: TransactionCompletionOptions,
         /// Optional savepoint name to roll back to.
         savepoint: Option<Ident>,
     },
@@ -5914,7 +5915,7 @@ impl fmt::Display for Statement {
                 Ok(())
             }
             Statement::Commit {
-                chain,
+                options,
                 end: end_syntax,
                 modifier,
             } => {
@@ -5923,20 +5924,14 @@ impl fmt::Display for Statement {
                     if let Some(modifier) = *modifier {
                         write!(f, " {modifier}")?;
                     }
-                    if *chain {
-                        write!(f, " AND CHAIN")?;
-                    }
                 } else {
-                    write!(f, "COMMIT{}", if *chain { " AND CHAIN" } else { "" })?;
+                    write!(f, "COMMIT")?;
                 }
+                write!(f, "{options}")?;
                 Ok(())
             }
-            Statement::Rollback { chain, savepoint } => {
-                write!(f, "ROLLBACK")?;
-
-                if *chain {
-                    write!(f, " AND CHAIN")?;
-                }
+            Statement::Rollback { options, savepoint } => {
+                write!(f, "ROLLBACK{options}")?;
 
                 if let Some(savepoint) = savepoint {
                     write!(f, " TO SAVEPOINT {savepoint}")?;
@@ -6656,6 +6651,35 @@ impl Display for BeginTransactionKind {
             BeginTransactionKind::Work => write!(f, "WORK"),
             BeginTransactionKind::Tran => write!(f, "TRAN"),
         }
+    }
+}
+
+/// Syntactic facts, not resolved session policy. `None` differs from an explicit
+/// negative clause when MySQL's `completion_type` supplies a default.
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub struct TransactionCompletionOptions {
+    /// Optional `WORK`, `TRANSACTION` or `TRAN` keyword.
+    pub transaction: Option<BeginTransactionKind>,
+    /// `AND CHAIN` / `AND NO CHAIN`, or no explicit clause.
+    pub chain: Option<bool>,
+    /// MySQL `RELEASE` / `NO RELEASE`, or no explicit clause.
+    pub release: Option<bool>,
+}
+
+impl Display for TransactionCompletionOptions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(transaction) = &self.transaction {
+            write!(f, " {transaction}")?;
+        }
+        if let Some(chain) = self.chain {
+            write!(f, " AND {}CHAIN", if chain { "" } else { "NO " })?;
+        }
+        if let Some(release) = self.release {
+            write!(f, " {}RELEASE", if release { "" } else { "NO " })?;
+        }
+        Ok(())
     }
 }
 
@@ -9017,6 +9041,8 @@ pub enum TransactionMode {
     AccessMode(TransactionAccessMode),
     /// Isolation level for a transaction (e.g. `SERIALIZABLE`).
     IsolationLevel(TransactionIsolationLevel),
+    /// MySQL's `WITH CONSISTENT SNAPSHOT` start characteristic.
+    ConsistentSnapshot,
 }
 
 impl fmt::Display for TransactionMode {
@@ -9025,6 +9051,7 @@ impl fmt::Display for TransactionMode {
         match self {
             AccessMode(access_mode) => write!(f, "{access_mode}"),
             IsolationLevel(iso_level) => write!(f, "ISOLATION LEVEL {iso_level}"),
+            ConsistentSnapshot => write!(f, "WITH CONSISTENT SNAPSHOT"),
         }
     }
 }

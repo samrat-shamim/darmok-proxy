@@ -16,6 +16,7 @@ fn fixture() -> (SessionState, ServerSetValues) {
         transactions: MysqlCompatibilityProfile::default_mysql8()
             .default_transaction_characteristics,
         autocommit: AutocommitSetting::Enabled,
+        completion_type: darmok_session::FrontendCompletionType::NoChain,
     };
     (state, globals)
 }
@@ -38,7 +39,7 @@ async fn request(
     (outcome, output)
 }
 
-fn packets(mut response: &[u8], mut sequence: u8) -> Vec<&[u8]> {
+pub(super) fn packets(mut response: &[u8], mut sequence: u8) -> Vec<&[u8]> {
     let mut result = Vec::new();
     while !response.is_empty() {
         let header = PacketHeader::decode(response).unwrap();
@@ -51,7 +52,7 @@ fn packets(mut response: &[u8], mut sequence: u8) -> Vec<&[u8]> {
     result
 }
 
-fn column(mut payload: &[u8]) -> (Vec<u8>, u16, u32, u8, u16, u8) {
+pub(super) fn column(mut payload: &[u8]) -> (Vec<u8>, u16, u32, u8, u16, u8) {
     assert_eq!(read_lenenc_bytes(&mut payload, "catalog").unwrap(), b"def");
     for name in ["schema", "table", "original table"] {
         assert!(read_lenenc_bytes(&mut payload, name).unwrap().is_empty());

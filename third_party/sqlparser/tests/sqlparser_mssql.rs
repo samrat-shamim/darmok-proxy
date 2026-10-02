@@ -2737,11 +2737,11 @@ fn parse_mssql_tran_shorthand() {
         _ => panic!("Expected StartTransaction, got: {stmt:?}"),
     }
 
-    // COMMIT TRAN normalizes to COMMIT (same as COMMIT TRANSACTION)
-    ms().one_statement_parses_to("COMMIT TRAN", "COMMIT");
+    // COMMIT TRAN retains the explicit transaction keyword.
+    ms().verified_stmt("COMMIT TRAN");
 
-    // ROLLBACK TRAN normalizes to ROLLBACK (same as ROLLBACK TRANSACTION)
-    ms().one_statement_parses_to("ROLLBACK TRAN", "ROLLBACK");
+    // ROLLBACK TRAN retains the explicit transaction keyword.
+    ms().verified_stmt("ROLLBACK TRAN");
 }
 
 #[test]

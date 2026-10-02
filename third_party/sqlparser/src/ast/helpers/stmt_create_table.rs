@@ -1,3 +1,4 @@
+// Modified for Darmok: use typed transaction completion options in fixtures.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -731,7 +732,7 @@ mod tests {
     #[test]
     pub fn test_from_invalid_statement() {
         let stmt = Statement::Commit {
-            chain: false,
+            options: Default::default(),
             end: false,
             modifier: None,
         };

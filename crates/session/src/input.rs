@@ -85,6 +85,9 @@ pub fn classify_mysql_transaction_setting(
                     TransactionAccessMode::ReadWrite => FrontendTransactionAccess::ReadWrite,
                 });
             }
+            TransactionMode::ConsistentSnapshot => {
+                return Err(SessionInputError::UnsupportedTransactionSyntax);
+            }
         }
     }
     let update = match (isolation, access) {

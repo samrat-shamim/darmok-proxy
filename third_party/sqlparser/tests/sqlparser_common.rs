@@ -9048,7 +9048,7 @@ fn parse_start_transaction() {
         //
         // BigQuery: <https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#begin_transaction>
         // Snowflake: <https://docs.snowflake.com/en/sql-reference/sql/begin>
-        d.is::<BigQueryDialect>() || d.is::<SnowflakeDialect>());
+        d.is::<BigQueryDialect>() || d.is::<SnowflakeDialect>() || d.is::<MySqlDialect>());
     match dialects
         .verified_stmt("START TRANSACTION READ ONLY, READ WRITE, ISOLATION LEVEL SERIALIZABLE")
     {
@@ -9374,35 +9374,33 @@ fn parse_set_time_zone() {
 
 #[test]
 fn parse_commit() {
-    match verified_stmt("COMMIT") {
-        Statement::Commit { chain: false, .. } => (),
-        _ => unreachable!(),
+    for (sql, chain) in [
+        ("COMMIT", None),
+        ("COMMIT AND CHAIN", Some(true)),
+        ("COMMIT AND NO CHAIN", Some(false)),
+    ] {
+        let Statement::Commit { options, .. } = verified_stmt(sql) else {
+            panic!("not a commit")
+        };
+        assert_eq!(options.chain, chain);
+        assert_eq!(options.transaction, None);
+        assert_eq!(options.release, None);
     }
-
-    match verified_stmt("COMMIT AND CHAIN") {
-        Statement::Commit { chain: true, .. } => (),
-        _ => unreachable!(),
+    for suffix in ["", " AND CHAIN", " AND NO CHAIN"] {
+        verified_stmt(&format!("COMMIT WORK{suffix}"));
+        all_dialects_except(|d| d.is::<MySqlDialect>())
+            .verified_stmt(&format!("COMMIT TRANSACTION{suffix}"));
     }
-
-    one_statement_parses_to("COMMIT AND NO CHAIN", "COMMIT");
-    one_statement_parses_to("COMMIT WORK AND NO CHAIN", "COMMIT");
-    one_statement_parses_to("COMMIT TRANSACTION AND NO CHAIN", "COMMIT");
-    one_statement_parses_to("COMMIT WORK AND CHAIN", "COMMIT AND CHAIN");
-    one_statement_parses_to("COMMIT TRANSACTION AND CHAIN", "COMMIT AND CHAIN");
-    one_statement_parses_to("COMMIT WORK", "COMMIT");
-    one_statement_parses_to("COMMIT TRANSACTION", "COMMIT");
 }
 
 #[test]
 fn parse_end() {
-    one_statement_parses_to("END AND NO CHAIN", "END");
-    one_statement_parses_to("END WORK AND NO CHAIN", "END");
-    one_statement_parses_to("END TRANSACTION AND NO CHAIN", "END");
-    one_statement_parses_to("END WORK AND CHAIN", "END AND CHAIN");
-    one_statement_parses_to("END TRANSACTION AND CHAIN", "END AND CHAIN");
-    one_statement_parses_to("END WORK", "END");
-    one_statement_parses_to("END TRANSACTION", "END");
-    // MS-SQL syntax
+    let dialects = all_dialects_except(|d| d.is::<MySqlDialect>());
+    for keyword in ["", " WORK", " TRANSACTION"] {
+        for suffix in ["", " AND CHAIN", " AND NO CHAIN"] {
+            dialects.verified_stmt(&format!("END{keyword}{suffix}"));
+        }
+    }
     let dialects = all_dialects_where(|d| d.supports_end_transaction_modifier());
     dialects.verified_stmt("END TRY");
     dialects.verified_stmt("END CATCH");
@@ -9410,51 +9408,32 @@ fn parse_end() {
 
 #[test]
 fn parse_rollback() {
-    match verified_stmt("ROLLBACK") {
-        Statement::Rollback {
-            chain: false,
-            savepoint: None,
-        } => (),
-        _ => unreachable!(),
+    for (sql, chain) in [
+        ("ROLLBACK", None),
+        ("ROLLBACK AND CHAIN", Some(true)),
+        ("ROLLBACK AND NO CHAIN", Some(false)),
+    ] {
+        let Statement::Rollback { options, savepoint } = verified_stmt(sql) else {
+            panic!("not a rollback")
+        };
+        assert_eq!(options.chain, chain);
+        assert_eq!(options.transaction, None);
+        assert_eq!(savepoint, None);
     }
-
-    match verified_stmt("ROLLBACK AND CHAIN") {
-        Statement::Rollback {
-            chain: true,
-            savepoint: None,
-        } => (),
-        _ => unreachable!(),
+    for suffix in ["", " AND CHAIN", " AND NO CHAIN"] {
+        verified_stmt(&format!("ROLLBACK WORK{suffix}"));
+        all_dialects_except(|d| d.is::<MySqlDialect>())
+            .verified_stmt(&format!("ROLLBACK TRANSACTION{suffix}"));
     }
-
-    match verified_stmt("ROLLBACK TO SAVEPOINT test1") {
-        Statement::Rollback {
-            chain: false,
-            savepoint,
-        } => {
-            assert_eq!(savepoint, Some(Ident::new("test1")));
-        }
-        _ => unreachable!(),
-    }
-
-    match verified_stmt("ROLLBACK AND CHAIN TO SAVEPOINT test1") {
-        Statement::Rollback {
-            chain: true,
-            savepoint,
-        } => {
-            assert_eq!(savepoint, Some(Ident::new("test1")));
-        }
-        _ => unreachable!(),
-    }
-
-    one_statement_parses_to("ROLLBACK AND NO CHAIN", "ROLLBACK");
-    one_statement_parses_to("ROLLBACK WORK AND NO CHAIN", "ROLLBACK");
-    one_statement_parses_to("ROLLBACK TRANSACTION AND NO CHAIN", "ROLLBACK");
-    one_statement_parses_to("ROLLBACK WORK AND CHAIN", "ROLLBACK AND CHAIN");
-    one_statement_parses_to("ROLLBACK TRANSACTION AND CHAIN", "ROLLBACK AND CHAIN");
-    one_statement_parses_to("ROLLBACK WORK", "ROLLBACK");
-    one_statement_parses_to("ROLLBACK TRANSACTION", "ROLLBACK");
+    let Statement::Rollback { options, savepoint } = verified_stmt("ROLLBACK TO SAVEPOINT test1")
+    else {
+        panic!("not a rollback")
+    };
+    assert_eq!(options.chain, None);
+    assert_eq!(savepoint, Some(Ident::new("test1")));
     one_statement_parses_to("ROLLBACK TO test1", "ROLLBACK TO SAVEPOINT test1");
-    one_statement_parses_to(
+    let dialects = all_dialects_except(|d| d.is::<MySqlDialect>());
+    dialects.one_statement_parses_to(
         "ROLLBACK AND CHAIN TO test1",
         "ROLLBACK AND CHAIN TO SAVEPOINT test1",
     );
