@@ -1411,12 +1411,16 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
         .unwrap();
     drop(first);
     no_fence(&observer, second_pid).await;
-    no_fence(&observer, late_pid).await;
     // The first native transaction's commit must not clear the second intent.
-    let error = tokio::select! {
-        result = &mut acquisition => panic!("reader escaped a surviving drop intent: {result:?}"),
-        result = tokio::time::timeout(Duration::from_secs(20), &mut second) => result.unwrap().unwrap_err(),
-    };
+    wait_reader_admission(&observer, late_pid).await;
+    // Native abort clears the remaining intent and wakes the reader. The two
+    // clients' responses have no ordering guarantee: both futures may already
+    // be ready when the task next runs. Observe admission while the intent is
+    // live above, then verify the busy error and subsequent reader independently.
+    let error = tokio::time::timeout(Duration::from_secs(20), &mut second)
+        .await
+        .unwrap()
+        .unwrap_err();
     assert_eq!(error.code(), Some(&SqlState::OBJECT_IN_USE));
     drop(second);
     let after = tokio::time::timeout(Duration::from_secs(20), &mut acquisition)

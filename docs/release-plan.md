@@ -1690,6 +1690,15 @@ invalidation from namespace events. The observational fixture now serializes its
 controlled DDL sequences and adds explicit native plan invalidation that proves
 rebinding with an unchanged lookup path; it never treats cached origin as binding
 proof. These test/documentation changes do not alter the server module.
+The next candidate `36dff9e` stops its PostgreSQL17 catalog run with actual
+exit101:20 groups pass and the concurrent-drop fixture fails. That assertion
+incorrectly orders the two independent clients' responses. Native abort clears
+its intent and wakes the reader; the reader result may reach its task before the
+DROP error does. The corrected fixture observes continued reader admission wait
+after the first drop commits, then checks the second drop's native E55006 and
+reader success independently. It retains the exact generation/catalog checks
+and changes no module behavior. The failed command and stopped matrix remain
+preserved; they do not certify the corrected source.
 Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
 prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
 The module does not change server configuration or add routing/auth/grant policy.
