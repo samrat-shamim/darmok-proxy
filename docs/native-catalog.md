@@ -32,8 +32,8 @@ comparisons with the deterministic `pg_catalog."C"` collation verify them.
 The exact check is necessary because converting input to PostgreSQL `name` can
 truncate an overlong string. An overlong input must report a missing pair rather
 than select an object with a truncated spelling. No SQL is generated from names.
-All input and output casts use `pg_catalog.text`: a native schema may define a
-different type named `text`, even before explicitly listed `pg_catalog` in
+All text casts for input arrays and output fields use `pg_catalog.text`: a
+native schema may define a different type named `text`, even before explicitly listed `pg_catalog` in
 `search_path`, without changing the catalog query's parameter/field types.
 That native type still keeps its own declared OID and domain facts in the
 returned definitions. This applies to the shared OID reader as well.
