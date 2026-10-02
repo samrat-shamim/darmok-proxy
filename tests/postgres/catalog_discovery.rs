@@ -417,7 +417,11 @@ async fn prepared_user_ddl_is_observed_before_and_after_native_completion() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = connect(None).await;
     let (writer, writer_driver) = connect(None).await;
-    writer.batch_execute("CREATE TABLE discovery_prepared(id integer); BEGIN; ALTER TABLE discovery_prepared ADD COLUMN later bigint; PREPARE TRANSACTION 'darmok_discovery_ddl'").await.unwrap();
+    writer
+        .batch_execute("CREATE TABLE discovery_prepared(id integer)")
+        .await
+        .unwrap();
+    writer.batch_execute("BEGIN; ALTER TABLE discovery_prepared ADD COLUMN later bigint; PREPARE TRANSACTION 'darmok_discovery_ddl'").await.unwrap();
     reader
         .batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
         .await
@@ -710,12 +714,12 @@ async fn bounded_sequential_one_shot_cost_reports_catalog_size() {
     let sizes = reader.query_one("SELECT (SELECT count(*) FROM pg_catalog.pg_namespace), (SELECT count(*) FROM pg_catalog.pg_class), (SELECT count(*) FROM pg_catalog.pg_attribute), (SELECT count(*) FROM pg_catalog.pg_type)", &[]).await.unwrap();
     let names = [name("public", "discovery_cost")];
     for _ in 0..32 {
-        read(&reader, &names).await;
+        let _ = read(&reader, &names).await;
     }
     let mut times = Vec::with_capacity(128);
     for _ in 0..128 {
         let start = Instant::now();
-        read(&reader, &names).await;
+        let _ = read(&reader, &names).await;
         times.push(start.elapsed().as_nanos());
     }
     times.sort_unstable();
