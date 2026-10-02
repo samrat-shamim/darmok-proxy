@@ -92,6 +92,25 @@ complete release gate runs once on the final candidate.
 
 ## Current evidence
 
+On 2026-10-02, the sixteen reviewed PRs #27–#31 and #33–#43 were
+squash-merged in dependency order at the owner's instruction. The final stack
+merge is `7515ab2db9319303bb4557ba4cd4bd861d4fbcf5`, tree
+`78fdc6304e6c3107aa921d08ca0085e0ab7a3057`. Each child was rebased onto
+its actual merged parent with a guarded branch update; the full rebased and
+merged trees equal the original reviewed trees. No source behavior changed
+while restacking. The external `merge-stack-completed-audit-v1.json` binds all
+sixteen results and409 successful command receipts, SHA256
+`00635b1c3f9b71a295b4d6a4c92429fc415e97a1dee8ae7ab953b1ea64db9e01`.
+The initial dry merge of PR28 failed with documentation conflicts caused by
+squashed ancestry and was aborted; its actual1 receipt remains preserved.
+
+Earlier pending-merge observations below retain their original evidence scope;
+this ledger supersedes their merge status. Review and local source verification
+remain distinct from hosted CI and release certification. No CI polling/retry,
+administrator bypass, account action or release publication was performed.
+Compiler PR4 remains outside the current work scope. Reviewed components now
+follow one cycle: publish the PR, squash-merge it, then start dependent work.
+
 - The Apache-2.0 source repository is public under
   [samrat-shamim](https://github.com/samrat-shamim/darmok-proxy).
   Extraction is incomplete and no runnable proxy or release candidate exists.
@@ -1530,7 +1549,8 @@ review are proved separately. Runtime executions remain pinned to the code
 revision above. M3 initialization/executable progress is concrete; the full
 milestone and goal remain open. Hosted CI, public table/catalog validity,
 configuration/routing, `serve`, real drivers, measured performance, complete
-artifacts, merge and release remain pending. No CI polling/retry or account
+artifacts and release remain pending. The CLI component is merged as recorded
+above. No CI polling/retry or account
 action is performed; security work, compiler PR4, resource stress and forced
 interruption remain excluded.
 
