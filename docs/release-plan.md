@@ -1709,3 +1709,62 @@ observations do not certify this source. Combined explicit module installation/
 verification, fresh leased catalog snapshots, native scope integration, complete
 semantic admission/results, reusable plans, MySQL snapshots/row locks and public
 table execution remain required. M2/M4 and the full release goal stay open.
+
+### Server catalog lease verification
+
+The clean tested revision is `32bbc56f3094e23c71a070dce29f4c56d6eafb77`,
+tree `ceefd195868418fb29f2fd8c9b6fefaa8072d10f`, based on main
+`14ac0abb5a57228d3b600049086fb1b16667bde1`. All 25 serial command checks
+have actual exit 0, as does their enclosing matrix:
+
+| Check | Executed result |
+| --- | --- |
+| Full PostgreSQL package, PostgreSQL 17/18 | 108 passed each, 0 failed/ignored; 14 summaries each, including 21 catalog lease and 5 namespace groups |
+| Ordinary native owner fixtures, PostgreSQL 17/18 | 66 passed each, 0 failed/ignored, 17 filtered |
+| CLI schema process fixtures, PostgreSQL 17/18 | 3 groups each; 23 child processes each: 11 actual 0, 12 expected 1 |
+| BigDecimal query/TCP transaction fixtures, PostgreSQL 17/18 | Four commands, 10 passed each, 0 failed/ignored |
+| Workspace all/default features | 1682/1675 passed, 0 failed, 79 ignored; 42/41 summaries |
+| Formatting, repository boundaries, strict workspace/connector Clippy | Four commands, actual 0 |
+| Parser minimal/std/visitor; module license; installed artifacts | Six commands, actual 0 |
+| Environment and fixture cleanup | Five environment readers actual 0; both servers have 0 prepared transactions, other clients, named lease relations and drop-test databases |
+
+The four disposable profiles run pinned PostgreSQL 17.11/18.6 on Linux arm64
+with `max_prepared_transactions=10` or the native default 0. The enabled
+profiles exercise concurrent prepared DDL, pure DML, mixed row/catalog changes,
+GID reuse, queued preparation/deferred triggers and native completion errors.
+The default profiles independently acquire and release leases. Normal temporary
+backend cleanup covers both the target and an unrelated database. Three forced
+interruption/abandoned-control owner fixtures remain explicitly excluded;
+neither local servers nor client controls are interrupted as failure experiments.
+
+The module images were built at `d4fe45ef6e28c50a9c9bd1481bf7afc4d70468d4`,
+tree `ab27123e3f766229f5e4a0b502d890d5ccca6918`, with actual exit 0 on
+both majors. All eight module build inputs, including C, recipe, SQL/control,
+license and README, match the tested revision exactly. This is explicit build
+reuse, not a claim of a new build at `32bbc56`. The current identity receipt
+binds those inputs to the running images, healthy profiles and installed
+extension version 1.0. Seven installed library/bitcode/SQL/control/document
+hashes are preserved per major; the module's Apache license matches the root.
+The Alpine SDK package closure and other target platforms remain artifact gates.
+
+Rust/Cargo 1.96.0 on macOS 26.0.1 arm64 ran every Cargo command and Cargo-spawning
+helper serially with both scoped `RUSTUP_HOME` and `CARGO_TARGET_DIR`. Immutable
+receipts are under `.darmok-work/logs/catalog-lease-32bbc56-*`; each binds clean
+head/tree, argv, timestamps, actual exit and raw stream hashes. The two workspace
+runs each preserve 16 ordinary CLI children: 5 actual 0, 5 expected 1 and 6
+expected usage 2. Those child outcomes are distinct from top-level check exits.
+The enclosing matrix stdout SHA256 is
+`492aa723a52e5cb22aee30bc70b4c0ef50f55d4dcd0b0461430541cd9e61ef9d`.
+
+The author audit has actual exit 0, stdout SHA256
+`b7f5f3598eed4f234f47733f762c5b8de256a276365970d70afd3563b939fbdd`.
+Its 1186-file manifest has SHA256
+`7331fdd1b785e042b73d12ddcc625ed4508d238aba679cdd72f69e195f491bfa`,
+and facts `2b58f20c0592d3df307c7ee31b2a4a965130dd71f3e05b8fed6e758f00a389be`.
+It binds the current evidence, compiled module inputs, primary sources and
+historical review seals without rewriting earlier failures. Earlier component
+passes, isolated diagnostics and stopped matrices retain their original source
+and scope. Independent final review is required before merging this component.
+The lease primitive does not certify fresh catalog reads, complete native guards,
+semantic admission, table execution, serving, real drivers, cache performance,
+hosted CI or the full release. The goal remains active.
