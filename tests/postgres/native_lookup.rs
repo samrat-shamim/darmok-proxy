@@ -26,11 +26,14 @@ async fn effective_path(client: &Client) -> (Vec<String>, Vec<u32>) {
     (row.get(0), row.get(1))
 }
 
-async fn renamed_schema(
-    path_contains_source: bool,
-    create_temporary_schema: bool,
-    observe_rename: bool,
-) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LookupChange {
+    None,
+    TemporarySchema,
+    ExplicitPath,
+}
+
+async fn renamed_schema(path_contains_source: bool, change: LookupChange) {
     let (owner, owner_driver) = client().await;
     let (ddl, ddl_driver) = client().await;
     let pid: i32 = owner
@@ -74,11 +77,7 @@ async fn renamed_schema(
     ddl.batch_execute(&format!("ALTER SCHEMA {source} RENAME TO {moved}"))
         .await
         .unwrap();
-    let path_during = if observe_rename {
-        Some(effective_path(&owner).await)
-    } else {
-        None
-    };
+    let path_during = effective_path(&owner).await;
     ddl.batch_execute(&format!(
         "CREATE SCHEMA {source}; \
          CREATE TABLE {source}.items(n pg_catalog.int4); \
@@ -94,11 +93,20 @@ async fn renamed_schema(
         .await
         .unwrap()
         .get(0);
-    if create_temporary_schema {
-        owner
-            .batch_execute("CREATE TEMP TABLE lookup_scratch(n pg_catalog.int4)")
-            .await
-            .unwrap();
+    match change {
+        LookupChange::None => {}
+        LookupChange::TemporarySchema => {
+            owner
+                .batch_execute("CREATE TEMP TABLE lookup_scratch(n pg_catalog.int4)")
+                .await
+                .unwrap();
+        }
+        LookupChange::ExplicitPath => {
+            owner
+                .batch_execute("SET search_path = pg_catalog")
+                .await
+                .unwrap();
+        }
     }
     let path_after = effective_path(&owner).await;
     let row = owner.query_one(&statement, &[]).await.unwrap();
@@ -123,11 +131,11 @@ async fn renamed_schema(
     assert_ne!(original_oid, replacement_oid);
     assert_eq!(cached_row_oid, original_oid);
     eprintln!(
-        "lookup observation: source_path={path_contains_source} temp={create_temporary_schema} \
+        "lookup observation: source_path={path_contains_source} change={change:?} \
          before={path_before:?} during={path_during:?} after={path_after:?} \
          original={original_oid} replacement={replacement_oid} cached={cached_row_oid} values={after:?}"
     );
-    let rebinds = (path_contains_source && observe_rename) || create_temporary_schema;
+    let rebinds = change != LookupChange::None;
     let expected_oid = if rebinds {
         replacement_oid
     } else {
@@ -142,6 +150,8 @@ async fn renamed_schema(
         ],
         "path {path_before:?} -> {path_after:?}; cached origin {cached_row_oid}"
     );
+    assert_eq!(path_before, path_during);
+    assert_eq!(path_before != path_after, rebinds);
     if !path_contains_source {
         assert_eq!(path_before.0, ["pg_catalog"]);
         assert_eq!(path_after.0.last().unwrap(), "pg_catalog");
@@ -150,20 +160,20 @@ async fn renamed_schema(
 
 #[tokio::test]
 async fn source_schema_recreation_can_retain_bound_relation_when_path_spelling_is_unchanged() {
-    renamed_schema(true, false, false).await;
+    renamed_schema(true, LookupChange::None).await;
 }
 
 #[tokio::test]
-async fn observing_missing_source_schema_rebinds_same_shape_statement_with_cached_origin() {
-    renamed_schema(true, false, true).await;
+async fn explicit_path_change_rebinds_same_shape_statement_with_cached_origin() {
+    renamed_schema(true, LookupChange::ExplicitPath).await;
 }
 
 #[tokio::test]
 async fn explicit_native_lookup_path_retains_bound_relation_across_schema_rename() {
-    renamed_schema(false, false, true).await;
+    renamed_schema(false, LookupChange::None).await;
 }
 
 #[tokio::test]
 async fn implicit_temporary_namespace_can_rebind_even_with_fixed_path_text() {
-    renamed_schema(false, true, true).await;
+    renamed_schema(false, LookupChange::TemporarySchema).await;
 }
