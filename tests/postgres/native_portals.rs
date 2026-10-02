@@ -588,7 +588,9 @@ async fn suspended_portals_resume_and_negative_limits_fail_before_submission() {
         [vec![Value::Int(1)], vec![Value::Int(2)]]
     );
     let second = execute(&client, &portal, 0).await;
-    assert_eq!(second.tag.as_deref(), Some("SELECT 5"));
+    // Native SELECT completion counts the rows delivered by this Execute,
+    // not the rows already delivered by an earlier suspended Execute.
+    assert_eq!(second.tag.as_deref(), Some("SELECT 3"));
     assert!(!second.suspended && second.errors.is_empty());
     assert_eq!(
         second
@@ -602,6 +604,7 @@ async fn suspended_portals_resume_and_negative_limits_fail_before_submission() {
             vec![Value::Int(5)]
         ]
     );
+    drop(portal);
     // Stream ownership keeps the portal and source statement alive after both
     // external handles are released; only the request is queued before drops.
     let portal = client

@@ -42,6 +42,12 @@ transaction. This API does not implicitly prepare SQL or certify its semantics.
 Checked native bindings can supply the iterator, and native result checks can
 decode its rows. Unsupported frontend cursors remain a separate capability.
 
+The [described portal lane](native-portals.md) separately queues
+Bind/portal Describe/Sync before Execute. `query_portal_events` then supplies
+the same explicit query completion events using that portal's actual columns.
+It retains the portal and source statement while the stream exists. Its row
+limit is native protocol control, not an admitted frontend cursor capability.
+
 `Client::query_typed_builtin_events(sql, typed_parameters)` combines Parse,
 Bind, statement Describe, Execute and Sync in one request for fixed internal
 queries whose outputs have known built-in types. It retains preparation errors
@@ -91,15 +97,16 @@ belongs to this request's completion boundary. It is not a live global state
 lookup: other requests can already be queued or executing on the same Client.
 The future owner must supply exclusivity and validate expected control outcomes.
 
-All three streams are fused after their ReadyForQuery event or terminal `Err`.
+All these streams are fused after their ReadyForQuery event or terminal `Err`.
 `CommandEventStream::has_yielded()` and
 `BuiltinQueryEventStream::has_yielded()` record whether an event or terminal error
 has already been returned. A checker requiring the entire request can reject
 handoff of a partially consumed stream. Pending-only polling does not set the
 flag; it is not an execution, readiness or ownership observation.
 Dropping or stopping a stream supplies no confirmation and performs no owned
-rollback. Rows retain the prepared statement's cached description, not a new
-portal description or catalog freshness proof. Output may precede a later
+rollback. Prepared rows retain the statement's cached description; typed and
+described-portal rows use their respective observed native descriptions.
+Neither supplies full catalog freshness. Output may precede a later
 backend error; output decoding/encoding and frontend success remain inside the
 future owner's rollback/completion boundary.
 
@@ -114,7 +121,8 @@ collects the supplied pairs before Parse, then uses the upstream encoder's
 format and parameter containers for Bind; it avoids a separate parameter-OID
 vector. One local unnamed description owns
 the column names/types and is shared by its rows, with no server statement-close
-request on Drop. The typed and prepared lanes share row/error/completion logic.
+request on Drop. The typed, prepared and described-portal lanes share
+row/error/completion logic.
 These are structural costs, not a measured performance claim.
 
 Eight required fixtures on PostgreSQL 17/18 exercise:

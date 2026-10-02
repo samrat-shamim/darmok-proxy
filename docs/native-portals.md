@@ -82,5 +82,7 @@ Execute. Future pipelining needs its own admission and correctness proof.
 There is one generated name, cleanup handle, immutable description and column
 vector per bound portal, with native names copied once. Rows share the metadata;
 no result-sized buffer, per-row metadata clone, native type query or new object
-lock is introduced by this component. Native planning retains its usual locks.
+lock is introduced by this component. Native planning retains its usual locks;
+the extra request boundary extends the owning transaction and its lock duration
+until Execute and owner finish/recovery complete.
 This is an allocation/round-trip analysis, not measured performance evidence.
