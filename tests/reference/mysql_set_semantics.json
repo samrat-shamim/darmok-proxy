@@ -1,0 +1,344 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "CREATE TABLE items(id integer PRIMARY KEY,n integer) ENGINE=InnoDB;",
+  "reset_sql": "SET autocommit=1;\nSET SESSION sql_mode='';\nSET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ WRITE;\nTRUNCATE TABLE items;\nINSERT INTO items VALUES(0,0);",
+  "cases": [
+    {
+      "name": "session-keyword-carries-to-bare-name-not-unqualified-at",
+      "sql": "SET SESSION sql_mode='', @@transaction_isolation='SERIALIZABLE', transaction_read_only=1;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 1
+        },
+        "second": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ ONLY",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 1
+        }
+      }
+    },
+    {
+      "name": "local-keyword-carries-to-bare-name-not-unqualified-at",
+      "sql": "SET LOCAL transaction_isolation='READ-COMMITTED', @@transaction_isolation='SERIALIZABLE', transaction_read_only=1;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1
+        },
+        "second": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1
+        }
+      }
+    },
+    {
+      "name": "qualified-at-scope-does-not-carry-to-following-names",
+      "sql": "SET @@SESSION.transaction_isolation='READ-COMMITTED', @@transaction_read_only=1, transaction_isolation='REPEATABLE-READ';\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ ONLY",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0
+        },
+        "second": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "default_isolation": "REPEATABLE-READ",
+          "default_read_only": 0
+        }
+      }
+    },
+    {
+      "name": "checked-next-choice-error-prevents-earlier-mode-update",
+      "sql": "START TRANSACTION;\nSET SESSION sql_mode='ANSI_QUOTES', @@transaction_isolation='SERIALIZABLE';\nROLLBACK;",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ANSI_QUOTES', @@transaction_isolation='SERIALIZABLE';",
+          "occurrence": 1,
+          "code": 1568,
+          "sqlstate": "25001"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "inherited-session-keyword-updates-defaults-not-active",
+      "sql": "START TRANSACTION;\nSET SESSION sql_mode='ANSI_QUOTES', transaction_isolation='READ-COMMITTED';\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 0
+        },
+        "second": {
+          "isolation": "READ COMMITTED",
+          "access": "READ WRITE",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 0
+        }
+      }
+    },
+    {
+      "name": "local-transaction-is-session-default-setting",
+      "sql": "START TRANSACTION;\nSET LOCAL TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1
+        },
+        "second": {
+          "isolation": "READ COMMITTED",
+          "access": "READ ONLY",
+          "default_isolation": "READ-COMMITTED",
+          "default_read_only": 1
+        }
+      }
+    },
+    {
+      "name": "duplicate-mode-expression-reads-pre-update-state",
+      "sql": "SET SESSION sql_mode='PIPES_AS_CONCAT';\nSET SESSION sql_mode='ANSI_QUOTES', sql_mode=@@session.sql_mode;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "PIPES_AS_CONCAT",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "cross-variable-expression-reads-pre-update-state",
+      "sql": "SET SESSION autocommit=0, transaction_read_only=@@session.autocommit;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 1,
+        "autocommit": 0
+      }
+    },
+    {
+      "name": "duplicate-isolation-expression-reads-pre-update-state",
+      "sql": "SET SESSION transaction_isolation='READ-COMMITTED';\nSET SESSION transaction_isolation='SERIALIZABLE', transaction_isolation=@@session.transaction_isolation;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "",
+        "isolation": "READ-COMMITTED",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "later-invalid-value-keeps-earlier-model-value",
+      "sql": "SET SESSION sql_mode='PIPES_AS_CONCAT';\nSET SESSION sql_mode='ANSI_QUOTES', transaction_isolation='NOT-AN-ISOLATION';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ANSI_QUOTES', transaction_isolation='NOT-AN-ISOLATION';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "PIPES_AS_CONCAT",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "null-boolean-check-keeps-later-model-value",
+      "sql": "SET SESSION transaction_read_only=NULL, sql_mode='ANSI_QUOTES';",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION transaction_read_only=NULL, sql_mode='ANSI_QUOTES';",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "default-update-error-retains-earlier-mode-and-active-work",
+      "sql": "START TRANSACTION;\nUPDATE items SET n=1 WHERE id=0;\nSET SESSION sql_mode='ANSI_QUOTES', @@transaction_isolation=DEFAULT;\nSET @during=JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'n',(SELECT n FROM items WHERE id=0));\nROLLBACK;",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ANSI_QUOTES', @@transaction_isolation=DEFAULT;",
+          "occurrence": 1,
+          "code": 1568,
+          "sqlstate": "25001"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('during',CAST(@during AS JSON),'mode_after_rollback',@@session.sql_mode,'n_after_rollback',(SELECT n FROM items WHERE id=0));",
+      "expected_effect": {
+        "during": {
+          "mode": "ANSI_QUOTES",
+          "isolation": "REPEATABLE-READ",
+          "n": 1
+        },
+        "mode_after_rollback": "ANSI_QUOTES",
+        "n_after_rollback": 0
+      }
+    },
+    {
+      "name": "first-default-update-error-prevents-later-mode-update",
+      "sql": "SET SESSION sql_mode='PIPES_AS_CONCAT';\nSTART TRANSACTION;\nSET @@transaction_isolation=DEFAULT, SESSION sql_mode='ANSI_QUOTES';\nROLLBACK;",
+      "expected_errors": [
+        {
+          "statement": "SET @@transaction_isolation=DEFAULT, SESSION sql_mode='ANSI_QUOTES';",
+          "occurrence": 1,
+          "code": 1568,
+          "sqlstate": "25001"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "PIPES_AS_CONCAT",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "ordinary-check-error-prevents-earlier-default-update",
+      "sql": "SET SESSION sql_mode=DEFAULT, transaction_read_only=NULL;",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode=DEFAULT, transaction_read_only=NULL;",
+          "occurrence": 1,
+          "code": 1231,
+          "sqlstate": "42000"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "session-default-copies-current-global-values",
+      "sql": "SET SESSION sql_mode='ANSI_QUOTES', transaction_isolation='SERIALIZABLE', transaction_read_only=1, autocommit=0;\nSET SESSION sql_mode=DEFAULT, transaction_isolation=DEFAULT, transaction_read_only=DEFAULT, autocommit=DEFAULT;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode_is_global',@@session.sql_mode=@@global.sql_mode,'isolation_is_global',@@session.transaction_isolation=@@global.transaction_isolation,'read_only_is_global',@@session.transaction_read_only=@@global.transaction_read_only,'autocommit_is_global',@@session.autocommit=@@global.autocommit);",
+      "expected_effect": {
+        "mode_is_global": true,
+        "isolation_is_global": true,
+        "read_only_is_global": true,
+        "autocommit_is_global": true
+      }
+    },
+    {
+      "name": "unqualified-transaction-default-is-next-only",
+      "sql": "SET SESSION transaction_isolation='SERIALIZABLE', transaction_read_only=1;\nSET @@transaction_isolation=DEFAULT, @@transaction_read_only=DEFAULT;\nSTART TRANSACTION;\nSET @first=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;\nSTART TRANSACTION;\nSET @second=(SELECT JSON_OBJECT('isolation',e.ISOLATION_LEVEL,'access',e.ACCESS_MODE,'default_isolation',@@session.transaction_isolation,'default_read_only',@@session.transaction_read_only) FROM performance_schema.events_transactions_current AS e JOIN performance_schema.threads AS t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID());\nROLLBACK;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',CAST(@second AS JSON));",
+      "expected_effect": {
+        "first": {
+          "isolation": "REPEATABLE READ",
+          "access": "READ WRITE",
+          "default_isolation": "SERIALIZABLE",
+          "default_read_only": 1
+        },
+        "second": {
+          "isolation": "SERIALIZABLE",
+          "access": "READ ONLY",
+          "default_isolation": "SERIALIZABLE",
+          "default_read_only": 1
+        }
+      }
+    },
+    {
+      "name": "quoted-boolean-names-and-unquoted-boolean-values",
+      "sql": "SET SESSION autocommit='OFF', transaction_read_only='ON';\nSET @first=JSON_OBJECT('autocommit',@@session.autocommit,'read_only',@@session.transaction_read_only);\nSET SESSION autocommit=TRUE, transaction_read_only=FALSE;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('first',CAST(@first AS JSON),'second',JSON_OBJECT('autocommit',@@session.autocommit,'read_only',@@session.transaction_read_only));",
+      "expected_effect": {
+        "first": {
+          "autocommit": 0,
+          "read_only": 1
+        },
+        "second": {
+          "autocommit": 1,
+          "read_only": 0
+        }
+      }
+    },
+    {
+      "name": "numeric-mode-value-and-isolation-ordinal",
+      "sql": "SET SESSION sql_mode=4, transaction_isolation=0;",
+      "expected_errors": [],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES",
+        "isolation": "READ-UNCOMMITTED",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    },
+    {
+      "name": "read-only-default-update-error-retains-earlier-mode",
+      "sql": "START TRANSACTION;\nSET SESSION sql_mode='ANSI_QUOTES', @@transaction_read_only=DEFAULT;\nROLLBACK;",
+      "expected_errors": [
+        {
+          "statement": "SET SESSION sql_mode='ANSI_QUOTES', @@transaction_read_only=DEFAULT;",
+          "occurrence": 1,
+          "code": 1568,
+          "sqlstate": "25001"
+        }
+      ],
+      "effect_sql": "SELECT JSON_OBJECT('mode',@@session.sql_mode,'isolation',@@session.transaction_isolation,'read_only',@@session.transaction_read_only,'autocommit',@@session.autocommit);",
+      "expected_effect": {
+        "mode": "ANSI_QUOTES",
+        "isolation": "REPEATABLE-READ",
+        "read_only": 0,
+        "autocommit": 1
+      }
+    }
+  ]
+}

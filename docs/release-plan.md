@@ -328,6 +328,29 @@ complete release gate runs once on the final candidate.
   This does not implement session mode changes, value coercion, native effects, SQL
   admission, output, catalog coherence, performance or M2/M4.
 
+- The [stock SET semantics fixture](mysql-set-semantics.md) declares nineteen
+  ordinary cases for keyword/per-name scope, pre-update expression reads,
+  DEFAULT timing, selected coercion and validation/update failure effects.
+  The unchanged observer and four earlier corpora remain intact. An initial
+  eighteen-case draft completed fourteen cases, then failed on expected JSON
+  integer/boolean types; its real failure and cleanup are preserved. The
+  corrected corpus passes all nineteen cases on pinned MySQL 8.4.11 Linux arm64
+  at `f7bf9fa0dc1394226cf019fa48bd88cb8f28722b`: the outer observer and all thirty
+  child commands exit 0, seven errors have exact attribution, twenty-five SQL
+  markers match, and final database absence is 0. Schema, diff and repository
+  boundary checks pass. Exact source, command, environment and evidence hashes
+  are retained outside the distribution. Rust source is unchanged; old Rust
+  results are not fresh checks for this leaf. A separate required CI step is
+  prepared. Independent review found that the LOCAL case reused its reset
+  access value and did not distinguish scope inheritance. Its followup changes
+  the bare value and requires both defaults and both transactions to retain the
+  update. All nineteen followup native cases pass. Independent followup review
+  confirms resolution with seven passing offline groups and no new finding;
+  the original ten-group review and finding remain preserved. GitHub Actions
+  is disabled for the personal account, so fresh CI and merging remain pending.
+  This does not implement a SET controller, native effects, output or any M2/M4
+  or release gate. Security-related work remains deferred.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

@@ -60,6 +60,10 @@ unqualified-@@ form. Their combined transaction target is not guessed.
 Compound scope resolution, expression order, DEFAULT evaluation, coercion,
 warning behavior and atomicity remain controller work.
 
+The separate [stock SET semantics fixture](mysql-set-semantics.md) records
+selected effective scopes, pre-update expression reads and DEFAULT failure
+effects. It supplies controller requirements, not an executable handler.
+
 `classify_mysql_system_variable_read` retains the source expression and its
 unqualified or SESSION/LOCAL/GLOBAL qualifier. It does not call a canonical
 getter: unqualified read lookup and scope availability require their own
