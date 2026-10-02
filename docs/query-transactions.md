@@ -75,7 +75,10 @@ contract. No recovery or reusable state is invented.
 cases, including data effects, active/idle chaining, completion defaults,
 negative overrides, enum coercions, reserved RELEASE syntax, replacement
 origins/access variants and
-exact syntax-error attribution.
+exact syntax-error attribution. The RELEASE expression reservation lives in
+the shared MySQL dialect prefix hook; other dialect grammar is unchanged.
+A complete MySQL reserved-keyword inventory remains an unverified general SQL
+gate.
 `mysql_completion_type_columns.json` declares two CLI field descriptions.
 Existing reference corpora and observers retain their bytes.
 

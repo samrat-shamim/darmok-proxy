@@ -136,11 +136,7 @@ impl Dialect for MySqlDialect {
     }
 
     fn parse_prefix(&self, parser: &mut Parser) -> Option<Result<Expr, ParserError>> {
-        parse_binary_prefix_cast(parser, self.prec_value(super::Precedence::Eq))
-    }
-
-    fn is_reserved_for_identifier(&self, kw: Keyword) -> bool {
-        kw == Keyword::RELEASE || keywords::RESERVED_FOR_IDENTIFIER.contains(&kw)
+        parse_mysql_prefix(parser, self.prec_value(super::Precedence::Eq))
     }
 
     fn parse_infix(
@@ -319,11 +315,7 @@ impl Dialect for ModeAwareMySqlDialect {
     }
 
     fn parse_prefix(&self, parser: &mut Parser) -> Option<Result<Expr, ParserError>> {
-        parse_binary_prefix_cast(parser, self.prec_value(super::Precedence::Eq))
-    }
-
-    fn is_reserved_for_identifier(&self, kw: Keyword) -> bool {
-        MySqlDialect {}.is_reserved_for_identifier(kw)
+        parse_mysql_prefix(parser, self.prec_value(super::Precedence::Eq))
     }
 
     fn get_next_precedence(&self, parser: &Parser) -> Option<Result<u8, ParserError>> {
@@ -441,6 +433,25 @@ impl Dialect for ModeAwareMySqlDialect {
     fn supports_key_column_option(&self) -> bool {
         MySqlDialect {}.supports_key_column_option()
     }
+}
+
+// RELEASE is reserved in MySQL expression spelling. Quoted words bypass this
+// check; qualified trailing words are parsed by the object-name path. Keep the
+// selected grammar in the MySQL hook, without changing other dialects' prefix
+// or failed-special-expression fallback policies.
+fn parse_mysql_prefix(
+    parser: &mut Parser,
+    binary_precedence: u8,
+) -> Option<Result<Expr, ParserError>> {
+    if matches!(&parser.peek_token_ref().token, Token::Word(word)
+        if word.quote_style.is_none() && word.keyword == Keyword::RELEASE)
+    {
+        return Some(parser.expected_ref(
+            "a nonreserved or quoted identifier",
+            parser.peek_token_ref(),
+        ));
+    }
+    parse_binary_prefix_cast(parser, binary_precedence)
 }
 
 fn parse_binary_prefix_cast(
