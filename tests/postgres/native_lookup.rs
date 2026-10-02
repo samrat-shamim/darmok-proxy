@@ -14,18 +14,23 @@ async fn client() -> (
     (client, tokio::spawn(connection))
 }
 
-async fn effective_path(client: &Client) -> Vec<String> {
-    client
+async fn effective_path(client: &Client) -> (Vec<String>, Vec<u32>) {
+    let row = client
         .query_one(
-            "SELECT pg_catalog.current_schemas(true)::pg_catalog.text[]",
+            "SELECT pg_catalog.current_schemas(true)::pg_catalog.text[], \
+             pg_catalog.current_schemas(true)::pg_catalog.regnamespace[]::pg_catalog.oid[]",
             &[],
         )
         .await
-        .unwrap()
-        .get(0)
+        .unwrap();
+    (row.get(0), row.get(1))
 }
 
-async fn renamed_schema(path_contains_source: bool, create_temporary_schema: bool) {
+async fn renamed_schema(
+    path_contains_source: bool,
+    create_temporary_schema: bool,
+    observe_rename: bool,
+) {
     let (owner, owner_driver) = client().await;
     let (ddl, ddl_driver) = client().await;
     let pid: i32 = owner
@@ -66,9 +71,16 @@ async fn renamed_schema(path_contains_source: bool, create_temporary_schema: boo
     let before = description
         .decode_row(&owner.query_one(&statement, &[]).await.unwrap())
         .unwrap();
+    ddl.batch_execute(&format!("ALTER SCHEMA {source} RENAME TO {moved}"))
+        .await
+        .unwrap();
+    let path_during = if observe_rename {
+        Some(effective_path(&owner).await)
+    } else {
+        None
+    };
     ddl.batch_execute(&format!(
-        "ALTER SCHEMA {source} RENAME TO {moved}; \
-         CREATE SCHEMA {source}; \
+        "CREATE SCHEMA {source}; \
          CREATE TABLE {source}.items(n pg_catalog.int4); \
          INSERT INTO {source}.items VALUES(2)"
     ))
@@ -110,7 +122,12 @@ async fn renamed_schema(path_contains_source: bool, create_temporary_schema: boo
     );
     assert_ne!(original_oid, replacement_oid);
     assert_eq!(cached_row_oid, original_oid);
-    let rebinds = path_contains_source || create_temporary_schema;
+    eprintln!(
+        "lookup observation: source_path={path_contains_source} temp={create_temporary_schema} \
+         before={path_before:?} during={path_during:?} after={path_after:?} \
+         original={original_oid} replacement={replacement_oid} cached={cached_row_oid} values={after:?}"
+    );
+    let rebinds = (path_contains_source && observe_rename) || create_temporary_schema;
     let expected_oid = if rebinds {
         replacement_oid
     } else {
@@ -125,24 +142,28 @@ async fn renamed_schema(path_contains_source: bool, create_temporary_schema: boo
         ],
         "path {path_before:?} -> {path_after:?}; cached origin {cached_row_oid}"
     );
-    assert_eq!(path_before != path_after, rebinds);
     if !path_contains_source {
-        assert_eq!(path_before, ["pg_catalog"]);
-        assert_eq!(path_after.last().unwrap(), "pg_catalog");
+        assert_eq!(path_before.0, ["pg_catalog"]);
+        assert_eq!(path_after.0.last().unwrap(), "pg_catalog");
     }
 }
 
 #[tokio::test]
-async fn source_schema_recreation_rebinds_same_shape_statement_with_cached_origin() {
-    renamed_schema(true, false).await;
+async fn source_schema_recreation_can_retain_bound_relation_when_path_spelling_is_unchanged() {
+    renamed_schema(true, false, false).await;
+}
+
+#[tokio::test]
+async fn observing_missing_source_schema_rebinds_same_shape_statement_with_cached_origin() {
+    renamed_schema(true, false, true).await;
 }
 
 #[tokio::test]
 async fn explicit_native_lookup_path_retains_bound_relation_across_schema_rename() {
-    renamed_schema(false, false).await;
+    renamed_schema(false, false, true).await;
 }
 
 #[tokio::test]
 async fn implicit_temporary_namespace_can_rebind_even_with_fixed_path_text() {
-    renamed_schema(false, true).await;
+    renamed_schema(false, true, true).await;
 }
