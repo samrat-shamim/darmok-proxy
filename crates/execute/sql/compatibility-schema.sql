@@ -1,29 +1,29 @@
 DO $darmok_installation$
 DECLARE
-    allow_create constant boolean := true;
-    schema_oid oid;
-    table_oid oid;
-    index_oid oid;
-    row_type_oid oid;
-    array_type_oid oid;
-    function_oids oid[] := ARRAY[]::oid[];
-    function_oid oid;
-    i integer;
-    names constant text[] := ARRAY[
+    allow_create constant pg_catalog.bool := true;
+    schema_oid pg_catalog.oid;
+    table_oid pg_catalog.oid;
+    index_oid pg_catalog.oid;
+    row_type_oid pg_catalog.oid;
+    array_type_oid pg_catalog.oid;
+    function_oids pg_catalog.oid[] := ARRAY[]::pg_catalog.oid[];
+    function_oid pg_catalog.oid;
+    i pg_catalog.int4;
+    names constant pg_catalog.text[] := ARRAY[
         'substring_utf8', 'substring_utf8', 'substring_bytes', 'substring_bytes'
     ];
-    arguments constant text[] := ARRAY[
+    arguments constant pg_catalog.text[] := ARRAY[
         'pg_catalog.text, pg_catalog.int8, pg_catalog.int8',
         'pg_catalog.text, pg_catalog.int8',
         'pg_catalog.bytea, pg_catalog.int8, pg_catalog.int8',
         'pg_catalog.bytea, pg_catalog.int8'
     ];
-    argument_oids constant text[] := ARRAY['25 20 20', '25 20', '17 20 20', '17 20'];
-    returns constant text[] := ARRAY[
+    argument_oids constant pg_catalog.text[] := ARRAY['25 20 20', '25 20', '17 20 20', '17 20'];
+    returns constant pg_catalog.text[] := ARRAY[
         'pg_catalog.text', 'pg_catalog.text', 'pg_catalog.bytea', 'pg_catalog.bytea'
     ];
-    return_oids constant oid[] := ARRAY[25, 25, 17, 17]::oid[];
-    bodies constant text[] := ARRAY[
+    return_oids constant pg_catalog.oid[] := ARRAY[25, 25, 17, 17]::pg_catalog.oid[];
+    bodies constant pg_catalog.text[] := ARRAY[
 $utf8_three$SELECT CASE
     WHEN $2 OPERATOR(pg_catalog.=) 0 OR $3 OPERATOR(pg_catalog.<=) 0
         OR $2 OPERATOR(pg_catalog.<) OPERATOR(pg_catalog.-) n THEN ''::pg_catalog.text

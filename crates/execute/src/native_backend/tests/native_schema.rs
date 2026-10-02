@@ -371,6 +371,32 @@ fn bytes(hex: &str) -> Vec<u8> {
 
 #[tokio::test]
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn native_schema_builtin_types_remain_qualified_with_an_implicit_temporary_namespace() {
+    let mut fixture = Fixture::new().await;
+    setup(&fixture.backend, "CREATE TEMP TABLE type_namespace_anchor(n pg_catalog.int4); CREATE DOMAIN pg_temp.text AS pg_catalog.int4; CREATE DOMAIN pg_temp.oid AS pg_catalog.text; CREATE DOMAIN pg_temp.bool AS pg_catalog.text; CREATE DOMAIN pg_temp.int4 AS pg_catalog.text").await;
+    let row = client(&fixture.backend).query_one(
+        "SELECT pg_catalog.current_setting('search_path'), 'text'::pg_catalog.regtype::pg_catalog.oid, 'pg_catalog.text'::pg_catalog.regtype::pg_catalog.oid", &[]
+    ).await.unwrap();
+    assert_eq!(row.get::<_, String>(0), "pg_catalog");
+    assert_ne!(row.get::<_, u32>(1), row.get::<_, u32>(2));
+    let _ = fixture.backend.initialize_schema().await.unwrap();
+    let before = snapshot(&fixture.backend).await;
+    let data = metadata(&fixture.backend).await;
+    let _ = fixture.backend.verify_schema().await.unwrap();
+    let _ = fixture.backend.initialize_schema().await.unwrap();
+    assert_eq!(snapshot(&fixture.backend).await, before);
+    assert_eq!(metadata(&fixture.backend).await, data);
+    let row = client(&fixture.backend).query_one(
+        "SELECT darmok.substring_utf8('Aé😀Z'::pg_catalog.text, -2::pg_catalog.int8, 1::pg_catalog.int8), darmok.substring_bytes('\\x00ff80'::pg_catalog.bytea, -2::pg_catalog.int8, 1::pg_catalog.int8)", &[]
+    ).await.unwrap();
+    assert_eq!(row.get::<_, String>(0), "😀");
+    assert_eq!(row.get::<_, Vec<u8>>(1), vec![255]);
+    assert_idle(&fixture.backend);
+    fixture.close().await;
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn native_schema_manifest_error_after_creation_rolls_back_all_artifacts() {
     let mut fixture = Fixture::new().await;
     let before = snapshot(&fixture.backend).await;

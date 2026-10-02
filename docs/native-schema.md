@@ -65,7 +65,11 @@ implement frontend coercion, unsigned arguments, warning translation, other
 encodings or grapheme counting. Their reference behavior is MySQL 8.4
 [SUBSTRING](https://dev.mysql.com/doc/refman/8.4/en/string-functions.html#function_substring).
 
-Bodies use qualified built-ins, operators and helper names. They are versioned
+Bodies and manifest declarations use qualified built-in types, functions,
+operators and helper names. An implicit temporary namespace can shadow even
+an unqualified built-in type despite an explicit `pg_catalog` search path;
+qualifying manifest declarations and casts avoids that ordinary resolution
+failure. Function bodies are versioned
 as SQL source strings to permit exact functional comparison across the two
 supported PostgreSQL majors. String-body SQL functions do not provide the
 creation-time dependency tracking of a parsed SQL body; see PostgreSQL's

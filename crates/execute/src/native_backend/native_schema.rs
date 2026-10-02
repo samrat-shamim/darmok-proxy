@@ -4,7 +4,7 @@ use super::{NativeBackend, NativeBackendError, NativeBackendOperation, NativeBac
 use crate::{NativeControl, NativeControlCompletion};
 
 pub(super) const SCHEMA_SQL: &str = include_str!("../../sql/compatibility-schema.sql");
-const CREATE_MARKER: &str = "allow_create constant boolean := true;";
+const CREATE_MARKER: &str = "allow_create constant pg_catalog.bool := true;";
 
 /// Version of the functional schema manifest checked by this component.
 pub const NATIVE_SCHEMA_VERSION: i32 = 1;
@@ -94,7 +94,11 @@ impl NativeBackend {
                 1,
                 "schema manifest must have exactly one creation switch"
             );
-            SCHEMA_SQL.replacen(CREATE_MARKER, "allow_create constant boolean := false;", 1)
+            SCHEMA_SQL.replacen(
+                CREATE_MARKER,
+                "allow_create constant pg_catalog.bool := false;",
+                1,
+            )
         };
         let sql = format!(
             "BEGIN ISOLATION LEVEL READ COMMITTED {access} NOT DEFERRABLE;\n{body}\nCOMMIT"
