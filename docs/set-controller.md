@@ -56,7 +56,7 @@ An active autocommit-zero to one change first confirms native COMMIT and idle
 ReadyForQuery, then records the frontend end and setting change. A native idle
 state alone cannot stand in for that receipt. Unknown native/output outcomes
 remain errors requiring disposal, without invented recovery or DML replay.
-Completion-type labels, integers 0/1/2 and booleans derive from one typed
+Quoted completion-type labels, bare NO_CHAIN/CHAIN, integers 0/1/2 and booleans derive from one typed
 transaction setting. The [transaction controller](query-transactions.md) resolves
 explicit completion clauses against it; release completion remains an explicit
 unsupported result.

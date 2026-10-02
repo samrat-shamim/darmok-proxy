@@ -245,7 +245,7 @@ fn evaluate<'a>(
             if name.quote_style.is_none()
                 && (name.value.eq_ignore_ascii_case("ON")
                     || name.value.eq_ignore_ascii_case("OFF")
-                    || ["NO_CHAIN", "CHAIN", "RELEASE"]
+                    || ["NO_CHAIN", "CHAIN"]
                         .into_iter()
                         .any(|value| name.value.eq_ignore_ascii_case(value))) =>
         {

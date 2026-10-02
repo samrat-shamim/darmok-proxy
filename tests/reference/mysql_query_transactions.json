@@ -167,7 +167,7 @@
     },
     {
       "name": "explicit-no-release-overrides-default",
-      "sql": "SET completion_type=RELEASE;\nSTART TRANSACTION;\nINSERT INTO items VALUES(13,13);\nCOMMIT NO RELEASE;",
+      "sql": "SET completion_type='RELEASE';\nSTART TRANSACTION;\nINSERT INTO items VALUES(13,13);\nCOMMIT NO RELEASE;",
       "expected_errors": [],
       "effect_sql": "SELECT JSON_OBJECT('ids',(SELECT GROUP_CONCAT(id ORDER BY id) FROM items),'completion',@@completion_type,'row_count',ROW_COUNT());",
       "expected_effect": {
@@ -274,8 +274,14 @@
     },
     {
       "name": "completion-type-coercions-and-default",
-      "sql": "SET completion_type=TRUE;\nSET @value_0=@@completion_type;\nSET completion_type=FALSE;\nSET @value_1=@@completion_type;\nSET completion_type=0;\nSET @value_2=@@completion_type;\nSET completion_type=1;\nSET @value_3=@@completion_type;\nSET completion_type=2;\nSET @value_4=@@completion_type;\nSET completion_type='chain';\nSET @value_5=@@completion_type;\nSET completion_type='NO_CHAIN';\nSET @value_6=@@completion_type;\nSET completion_type='RELEASE';\nSET @value_7=@@completion_type;\nSET completion_type=CHAIN;\nSET @value_8=@@completion_type;\nSET completion_type=NO_CHAIN;\nSET @value_9=@@completion_type;\nSET completion_type=RELEASE;\nSET @value_10=@@completion_type;\nSET completion_type='1';\nSET completion_type=ON;\nSET completion_type=OFF;\nSET completion_type=3;\nSET completion_type=NULL;\nSET completion_type='';\nSET completion_type=DEFAULT;",
+      "sql": "SET completion_type=TRUE;\nSET @value_0=@@completion_type;\nSET completion_type=FALSE;\nSET @value_1=@@completion_type;\nSET completion_type=0;\nSET @value_2=@@completion_type;\nSET completion_type=1;\nSET @value_3=@@completion_type;\nSET completion_type=2;\nSET @value_4=@@completion_type;\nSET completion_type='chain';\nSET @value_5=@@completion_type;\nSET completion_type='NO_CHAIN';\nSET @value_6=@@completion_type;\nSET completion_type='RELEASE';\nSET @value_7=@@completion_type;\nSET completion_type=CHAIN;\nSET @value_8=@@completion_type;\nSET completion_type=NO_CHAIN;\nSET @value_9=@@completion_type;\nSET completion_type=RELEASE;\nSET completion_type='1';\nSET completion_type=ON;\nSET completion_type=OFF;\nSET completion_type=3;\nSET completion_type=NULL;\nSET completion_type='';\nSET completion_type=DEFAULT;",
       "expected_errors": [
+        {
+          "statement": "SET completion_type=RELEASE;",
+          "occurrence": 1,
+          "code": 1064,
+          "sqlstate": "42000"
+        },
         {
           "statement": "SET completion_type='1';",
           "occurrence": 1,
@@ -313,7 +319,7 @@
           "sqlstate": "42000"
         }
       ],
-      "effect_sql": "SELECT JSON_OBJECT('value_0',@value_0,'value_1',@value_1,'value_2',@value_2,'value_3',@value_3,'value_4',@value_4,'value_5',@value_5,'value_6',@value_6,'value_7',@value_7,'value_8',@value_8,'value_9',@value_9,'value_10',@value_10,'default',@@completion_type,'global',@@global.completion_type);",
+      "effect_sql": "SELECT JSON_OBJECT('value_0',@value_0,'value_1',@value_1,'value_2',@value_2,'value_3',@value_3,'value_4',@value_4,'value_5',@value_5,'value_6',@value_6,'value_7',@value_7,'value_8',@value_8,'value_9',@value_9,'default',@@completion_type,'global',@@global.completion_type);",
       "expected_effect": {
         "value_0": "CHAIN",
         "value_1": "NO_CHAIN",
@@ -325,7 +331,6 @@
         "value_7": "RELEASE",
         "value_8": "CHAIN",
         "value_9": "NO_CHAIN",
-        "value_10": "RELEASE",
         "default": "NO_CHAIN",
         "global": "NO_CHAIN"
       }

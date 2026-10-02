@@ -23,7 +23,9 @@ and absent/positive/negative RELEASE choices in the AST. This matters because
 canonical `NO_CHAIN`/`CHAIN`/`RELEASE` value. Initial policy comes from the
 compatibility profile; GLOBAL reads and SESSION DEFAULT use explicit
 `ServerSetValues`, without consulting PostgreSQL defaults. Selected SET forms
-accept enum labels, integers 0/1/2, booleans, named defaults and canonical reads.
+accept quoted enum labels, bare NO_CHAIN/CHAIN, integers 0/1/2, booleans,
+named defaults and canonical reads. RELEASE is a reserved MySQL keyword and
+must be quoted as a SET value; unquoted RELEASE is a 1064 syntax error.
 Explicit clauses override their corresponding policy choice independently.
 Implicit commits do not apply completion policy.
 
@@ -71,7 +73,8 @@ contract. No recovery or reusable state is invented.
 
 `mysql_query_transactions.json` declares twenty-six ordinary stock reference
 cases, including data effects, active/idle chaining, completion defaults,
-negative overrides, enum coercions, replacement origins/access variants and
+negative overrides, enum coercions, reserved RELEASE syntax, replacement
+origins/access variants and
 exact syntax-error attribution.
 `mysql_completion_type_columns.json` declares two CLI field descriptions.
 Existing reference corpora and observers retain their bytes.
@@ -103,6 +106,7 @@ native/created schemas, row execution, catalog validity, snapshots and locks.
 M2/M4 and the full release goal remain incomplete. Security work stays deferred.
 
 Primary references: [MySQL transaction controls](https://dev.mysql.com/doc/refman/8.4/en/commit.html)
-and [completion policy](https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html#sysvar_completion_type).
+[completion policy](https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html#sysvar_completion_type)
+and [reserved words](https://dev.mysql.com/doc/refman/8.4/en/keywords.html).
 The pinned stock observations supply the finite idle and coercion cases;
 same-named native controls alone are not equivalence evidence.

@@ -5022,3 +5022,24 @@ fn mysql_transaction_start_uses_mysql_characteristic_grammar() {
         assert!(mysql().parse_sql_statements(sql).is_err(), "{sql}");
     }
 }
+
+#[test]
+fn mysql_release_is_a_reserved_expression_identifier() {
+    for sql in [
+        "SET completion_type='RELEASE'",
+        "SET completion_type=2",
+        "SELECT `RELEASE`",
+        "SELECT t.RELEASE FROM t",
+    ] {
+        mysql().verified_stmt(sql);
+    }
+    for sql in [
+        "SET completion_type=RELEASE",
+        "SET completion_type=(RELEASE)",
+        "SELECT RELEASE",
+    ] {
+        assert!(mysql().parse_sql_statements(sql).is_err(), "{sql}");
+    }
+    // The MySQL reservation must not leak into other dialects.
+    assert!(Parser::parse_sql(&GenericDialect {}, "SELECT RELEASE").is_ok());
+}

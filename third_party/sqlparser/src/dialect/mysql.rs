@@ -1,4 +1,5 @@
 // Modified for Darmok: order helpers and remove the raw SQL-mode string factory.
+// Modified for Darmok: declare RELEASE reserved in MySQL expression identifiers.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -136,6 +137,10 @@ impl Dialect for MySqlDialect {
 
     fn parse_prefix(&self, parser: &mut Parser) -> Option<Result<Expr, ParserError>> {
         parse_binary_prefix_cast(parser, self.prec_value(super::Precedence::Eq))
+    }
+
+    fn is_reserved_for_identifier(&self, kw: Keyword) -> bool {
+        kw == Keyword::RELEASE || keywords::RESERVED_FOR_IDENTIFIER.contains(&kw)
     }
 
     fn parse_infix(
@@ -315,6 +320,10 @@ impl Dialect for ModeAwareMySqlDialect {
 
     fn parse_prefix(&self, parser: &mut Parser) -> Option<Result<Expr, ParserError>> {
         parse_binary_prefix_cast(parser, self.prec_value(super::Precedence::Eq))
+    }
+
+    fn is_reserved_for_identifier(&self, kw: Keyword) -> bool {
+        MySqlDialect {}.is_reserved_for_identifier(kw)
     }
 
     fn get_next_precedence(&self, parser: &Parser) -> Option<Result<u8, ParserError>> {

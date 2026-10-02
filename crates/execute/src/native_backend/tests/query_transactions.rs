@@ -492,7 +492,7 @@ async fn query_transactions_completion_defaults_and_explicit_negative_clauses() 
         &mut state,
         &mut backend,
         &globals,
-        "SET completion_type=RELEASE",
+        "SET completion_type='RELEASE'",
         2,
     )
     .await;
@@ -538,7 +538,6 @@ async fn query_transactions_completion_type_values_reads_and_declared_columns() 
             ("'RELEASE'", FrontendCompletionType::Release),
             ("CHAIN", FrontendCompletionType::Chain),
             ("NO_CHAIN", FrontendCompletionType::NoChain),
-            ("RELEASE", FrontendCompletionType::Release),
         ] {
             // SELECT changes FOUND_ROWS, so reset the fixture's prior result count.
             state.found_rows = 18;
@@ -591,6 +590,14 @@ async fn query_transactions_completion_type_values_reads_and_declared_columns() 
                 }
             );
         }
+        sql_error(
+            &mut state,
+            &mut backend,
+            &globals,
+            "SET completion_type=RELEASE",
+            QuerySqlError::Parse,
+        )
+        .await;
         for value in ["'1'", "ON", "OFF", "3", "NULL", "''"] {
             sql_error(
                 &mut state,
@@ -683,8 +690,8 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         )
         .await;
     }
-    // Rejected controls did not commit8. Chain rollback removes only that work,
-    // retains committed7 and still starts with the supported active pair.
+    // Rejected controls did not commit value8. Chain rollback removes only that work,
+    // retains committed value7 and still starts with the supported active pair.
     assert_eq!(values(&backend).await, [7, 8]);
     ok(&mut state, &mut backend, &globals, "ROLLBACK AND CHAIN", 3).await;
     assert_eq!(values(&backend).await, [7]);

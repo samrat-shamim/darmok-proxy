@@ -3,6 +3,7 @@
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
 // and preserve transaction-setting syntax and keyword scope.
 // Modified for Darmok: use MySQL transaction grammar and retain completion clauses.
+// Modified for Darmok: enforce dialect reservations on expression identifiers.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -1657,6 +1658,12 @@ impl<'a> Parser<'a> {
         w: &Word,
         w_span: Span,
     ) -> Result<Expr, ParserError> {
+        if w.quote_style.is_none() && self.dialect.is_reserved_for_identifier(w.keyword) {
+            return self.expected_ref(
+                "a nonreserved or quoted identifier",
+                self.get_current_token(),
+            );
+        }
         let is_outer_join = self.peek_outer_join_operator();
         match &self.peek_token_ref().token {
             Token::LParen if !is_outer_join => {
