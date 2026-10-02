@@ -8,7 +8,7 @@ is no runnable proxy or complete transaction controller. The
 with the current session mode before calling this evaluator.
 
 The supported variables are `sql_mode`, `autocommit`, `transaction_isolation`
-and `transaction_read_only`. Bare names inherit SESSION/LOCAL keyword scope;
+`transaction_read_only` and `completion_type`. Bare names inherit SESSION/LOCAL keyword scope;
 per-name qualifiers apply only to that name. Unqualified `@@` transaction
 assignments target next choices independently of keyword context. Direct
 `SET [SESSION|LOCAL] TRANSACTION` updates defaults; unqualified direct settings
@@ -16,7 +16,7 @@ update next choices. These distinctions follow the reviewed
 [stock observations](mysql-set-semantics.md).
 
 Values are selected string/boolean/integer literals, ON/OFF and reads of these
-four variables with ordinary session or global scope. Server global values are
+five variables with ordinary session or global scope. Server global values are
 an explicitly supplied `ServerSetValues` authority. DEFAULT reads that authority
 from the immutable values supplied for this command; its transaction-state
 checks run at its ordered update position. It does not use ambient PostgreSQL
@@ -48,6 +48,11 @@ An active autocommit-zero to one change first confirms native COMMIT and idle
 ReadyForQuery, then records the frontend end and setting change. A native idle
 state alone cannot stand in for that receipt. Unknown native/output outcomes
 remain errors requiring disposal, without invented recovery or DML replay.
+Completion-type labels, integers 0/1/2 and booleans derive from one typed
+transaction setting. The [transaction controller](query-transactions.md) resolves
+explicit completion clauses against it; release completion remains an explicit
+unsupported result.
+
 Changes while a frontend transaction is active with autocommit already enabled
 remain explicitly unimplemented under the existing transaction contract.
 

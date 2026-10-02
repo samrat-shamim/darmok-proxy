@@ -97,7 +97,10 @@ impl Default for SessionState {
             text_collation: default_collation,
             time_zone: profile.default_time_zone,
             sql_modes: profile.default_sql_modes,
-            transactions: TransactionSettings::new(profile.default_transaction_characteristics),
+            transactions: TransactionSettings::new(
+                profile.default_transaction_characteristics,
+                profile.default_completion_type,
+            ),
             pending_command: None,
             client_capabilities: 0,
             last_insert_id: 0,
@@ -232,6 +235,7 @@ impl SessionVariableReader for SessionState {
             Var::Autocommit => {
                 Value::UInt(u64::from(state.autocommit == AutocommitSetting::Enabled))
             }
+            Var::CompletionType => Value::String(state.completion_type.variable_label().into()),
             Var::SqlMode => Value::String(self.sql_modes.canonical_names().into()),
             Var::TimeZone => Value::String(self.time_zone.into()),
             Var::CharacterSetClient | Var::CharacterSetConnection | Var::CharacterSetResults => {

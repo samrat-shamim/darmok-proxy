@@ -3,7 +3,7 @@
 
 use crate::{NativeBackend, QueryExecutionError};
 use darmok_session::{
-    AutocommitSetting, FrontendIsolation, FrontendTransactionAccess,
+    AutocommitSetting, FrontendCompletionType, FrontendIsolation, FrontendTransactionAccess,
     NamedTransactionCharacteristic, SessionCommandStage, SessionState, SessionVariable,
     SessionVariableReader, SqlMode, SqlModes, SystemVariableAssignment, SystemVariableForm,
     TransactionCharacteristics, TransactionSettingAssignment, TransactionVariableAssignmentForm,
@@ -21,6 +21,7 @@ pub struct ServerSetValues {
     pub sql_modes: SqlModes,
     pub transactions: TransactionCharacteristics,
     pub autocommit: AutocommitSetting,
+    pub completion_type: FrontendCompletionType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +62,7 @@ enum TypedValue {
     Isolation(FrontendIsolation),
     Access(FrontendTransactionAccess),
     Autocommit(AutocommitSetting),
+    CompletionType(FrontendCompletionType),
 }
 #[derive(Debug, Clone, Copy)]
 enum PlannedValue {
@@ -125,6 +127,7 @@ pub(crate) fn admit_set(
         if !matches!(
             input.variable,
             SessionVariable::SqlMode
+                | SessionVariable::CompletionType
                 | SessionVariable::Autocommit
                 | SessionVariable::TransactionIsolation
                 | SessionVariable::TransactionReadOnly
@@ -216,7 +219,10 @@ fn evaluate<'a>(
         Expr::Identifier(name)
             if name.quote_style.is_none()
                 && (name.value.eq_ignore_ascii_case("ON")
-                    || name.value.eq_ignore_ascii_case("OFF")) =>
+                    || name.value.eq_ignore_ascii_case("OFF")
+                    || ["NO_CHAIN", "CHAIN", "RELEASE"]
+                        .into_iter()
+                        .any(|value| name.value.eq_ignore_ascii_case(value))) =>
         {
             EvaluatedValue::String(Cow::Borrowed(&name.value))
         }
@@ -226,6 +232,7 @@ fn evaluate<'a>(
             if !matches!(
                 read.variable,
                 SessionVariable::SqlMode
+                    | SessionVariable::CompletionType
                     | SessionVariable::Autocommit
                     | SessionVariable::TransactionIsolation
                     | SessionVariable::TransactionReadOnly
@@ -264,6 +271,9 @@ pub(crate) fn global_value(
         SessionVariable::Autocommit => {
             Value::UInt(u64::from(globals.autocommit == AutocommitSetting::Enabled))
         }
+        SessionVariable::CompletionType => {
+            Value::String(globals.completion_type.variable_label().into())
+        }
         _ => return Err(SetSqlError::Unsupported),
     })
 }
@@ -294,6 +304,22 @@ fn boolean(value: EvaluatedValue<'_>) -> Result<bool, SetSqlError> {
 
 fn coerce(variable: SessionVariable, value: EvaluatedValue<'_>) -> Result<TypedValue, SetSqlError> {
     Ok(match variable {
+        SessionVariable::CompletionType => TypedValue::CompletionType(match value {
+            EvaluatedValue::String(value) => [
+                FrontendCompletionType::NoChain,
+                FrontendCompletionType::Chain,
+                FrontendCompletionType::Release,
+            ]
+            .into_iter()
+            .find(|choice| choice.variable_label().eq_ignore_ascii_case(&value))
+            .ok_or(SetSqlError::WrongValue)?,
+            EvaluatedValue::Unsigned(0) => FrontendCompletionType::NoChain,
+            EvaluatedValue::Unsigned(1) => FrontendCompletionType::Chain,
+            EvaluatedValue::Unsigned(2) => FrontendCompletionType::Release,
+            EvaluatedValue::Boolean(false) => FrontendCompletionType::NoChain,
+            EvaluatedValue::Boolean(true) => FrontendCompletionType::Chain,
+            _ => return Err(SetSqlError::WrongValue),
+        }),
         SessionVariable::Autocommit => TypedValue::Autocommit(if boolean(value)? {
             AutocommitSetting::Enabled
         } else {
@@ -355,6 +381,7 @@ fn default_value(
         }
         SessionVariable::TransactionReadOnly => TypedValue::Access(globals.transactions.access),
         SessionVariable::Autocommit => TypedValue::Autocommit(globals.autocommit),
+        SessionVariable::CompletionType => TypedValue::CompletionType(globals.completion_type),
         _ => return Err(SetSqlError::Unsupported),
     })
 }
@@ -394,6 +421,7 @@ async fn apply_action(
         },
     };
     match value {
+        TypedValue::CompletionType(value) => stage.apply_completion_type(value)?,
         TypedValue::Modes(value) => stage.apply_sql_modes(value),
         TypedValue::Isolation(value) => {
             stage.apply_transaction_assignment(TransactionSettingAssignment::Variable {

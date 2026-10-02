@@ -2,6 +2,7 @@
 // and optionally retain complete SELECT item source spans.
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
 // and preserve transaction-setting syntax and keyword scope.
+// Modified for Darmok: use MySQL transaction grammar and retain completion clauses.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19185,7 +19186,11 @@ impl<'a> Parser<'a> {
     pub fn parse_start_transaction(&mut self) -> Result<Statement, ParserError> {
         self.expect_keyword_is(Keyword::TRANSACTION)?;
         Ok(Statement::StartTransaction {
-            modes: self.parse_transaction_modes()?,
+            modes: if self.dialect.is::<MySqlDialect>() {
+                self.parse_mysql_start_transaction_modes()?
+            } else {
+                self.parse_transaction_modes()?
+            },
             begin: false,
             transaction: Some(BeginTransactionKind::Transaction),
             modifier: None,
@@ -19217,16 +19222,24 @@ impl<'a> Parser<'a> {
     /// Parse a 'BEGIN' statement
     pub fn parse_begin(&mut self) -> Result<Statement, ParserError> {
         let modifier = self.parse_transaction_modifier();
-        let transaction =
+        let transaction = if self.dialect.is::<MySqlDialect>() {
+            self.parse_keyword(Keyword::WORK)
+                .then_some(BeginTransactionKind::Work)
+        } else {
             match self.parse_one_of_keywords(&[Keyword::TRANSACTION, Keyword::WORK, Keyword::TRAN])
             {
                 Some(Keyword::TRANSACTION) => Some(BeginTransactionKind::Transaction),
                 Some(Keyword::WORK) => Some(BeginTransactionKind::Work),
                 Some(Keyword::TRAN) => Some(BeginTransactionKind::Tran),
                 _ => None,
-            };
+            }
+        };
         Ok(Statement::StartTransaction {
-            modes: self.parse_transaction_modes()?,
+            modes: if self.dialect.is::<MySqlDialect>() {
+                vec![]
+            } else {
+                self.parse_transaction_modes()?
+            },
             begin: true,
             transaction,
             modifier,
@@ -19284,6 +19297,9 @@ impl<'a> Parser<'a> {
 
     /// Parse an 'END' statement
     pub fn parse_end(&mut self) -> Result<Statement, ParserError> {
+        if self.dialect.is::<MySqlDialect>() {
+            return self.expected_ref("MySQL statement", self.peek_token_ref());
+        }
         let modifier = if !self.dialect.supports_end_transaction_modifier() {
             None
         } else if self.parse_keyword(Keyword::TRY) {
@@ -19294,7 +19310,7 @@ impl<'a> Parser<'a> {
             None
         };
         Ok(Statement::Commit {
-            chain: self.parse_commit_rollback_chain()?,
+            options: self.parse_transaction_completion_options()?,
             end: true,
             modifier,
         })
@@ -19367,6 +19383,43 @@ impl<'a> Parser<'a> {
         Ok(modes)
     }
 
+    /// START allows access and snapshot characteristics, separated by commas.
+    /// Repeating an identical option is valid; contradictory access is not.
+    fn parse_mysql_start_transaction_modes(&mut self) -> Result<Vec<TransactionMode>, ParserError> {
+        let mut modes = vec![];
+        let mut access = None;
+        let mut required = false;
+        loop {
+            let mode =
+                if self.parse_keywords(&[Keyword::WITH, Keyword::CONSISTENT, Keyword::SNAPSHOT]) {
+                    TransactionMode::ConsistentSnapshot
+                } else if self.parse_keywords(&[Keyword::READ, Keyword::ONLY]) {
+                    TransactionMode::AccessMode(TransactionAccessMode::ReadOnly)
+                } else if self.parse_keywords(&[Keyword::READ, Keyword::WRITE]) {
+                    TransactionMode::AccessMode(TransactionAccessMode::ReadWrite)
+                } else if required {
+                    return self.expected_ref("MySQL start characteristic", self.peek_token_ref());
+                } else {
+                    break;
+                };
+            if let TransactionMode::AccessMode(value) = mode {
+                if access.is_some_and(|previous| previous != value) {
+                    return self.expected_ref(
+                        "noncontradictory transaction access",
+                        self.peek_token_ref(),
+                    );
+                }
+                access = Some(value);
+            }
+            modes.push(mode);
+            required = self.consume_token(&Token::Comma);
+            if !required {
+                break;
+            }
+        }
+        Ok(modes)
+    }
+
     /// Parse a list of transaction modes using the shared non-SET grammar.
     pub fn parse_transaction_modes(&mut self) -> Result<Vec<TransactionMode>, ParserError> {
         let mut modes = vec![];
@@ -19389,7 +19442,7 @@ impl<'a> Parser<'a> {
     /// Parse a 'COMMIT' statement
     pub fn parse_commit(&mut self) -> Result<Statement, ParserError> {
         Ok(Statement::Commit {
-            chain: self.parse_commit_rollback_chain()?,
+            options: self.parse_transaction_completion_options()?,
             end: false,
             modifier: None,
         })
@@ -19397,22 +19450,63 @@ impl<'a> Parser<'a> {
 
     /// Parse a 'ROLLBACK' statement
     pub fn parse_rollback(&mut self) -> Result<Statement, ParserError> {
-        let chain = self.parse_commit_rollback_chain()?;
+        let options = self.parse_transaction_completion_options()?;
         let savepoint = self.parse_rollback_savepoint()?;
-
-        Ok(Statement::Rollback { chain, savepoint })
+        if self.dialect.is::<MySqlDialect>()
+            && savepoint.is_some()
+            && (options.chain.is_some() || options.release.is_some())
+        {
+            return self.expected_ref(
+                "ROLLBACK TO without completion clauses",
+                self.peek_token_ref(),
+            );
+        }
+        Ok(Statement::Rollback { options, savepoint })
     }
 
-    /// Parse an optional `AND [NO] CHAIN` clause for `COMMIT` and `ROLLBACK` statements
-    pub fn parse_commit_rollback_chain(&mut self) -> Result<bool, ParserError> {
-        let _ = self.parse_one_of_keywords(&[Keyword::TRANSACTION, Keyword::WORK, Keyword::TRAN]);
-        if self.parse_keyword(Keyword::AND) {
+    /// Preserve absent, positive and negative completion choices separately.
+    pub fn parse_transaction_completion_options(
+        &mut self,
+    ) -> Result<TransactionCompletionOptions, ParserError> {
+        let transaction = if self.dialect.is::<MySqlDialect>() {
+            self.parse_keyword(Keyword::WORK)
+                .then_some(BeginTransactionKind::Work)
+        } else {
+            match self.parse_one_of_keywords(&[Keyword::TRANSACTION, Keyword::WORK, Keyword::TRAN])
+            {
+                Some(Keyword::TRANSACTION) => Some(BeginTransactionKind::Transaction),
+                Some(Keyword::WORK) => Some(BeginTransactionKind::Work),
+                Some(Keyword::TRAN) => Some(BeginTransactionKind::Tran),
+                _ => None,
+            }
+        };
+        let chain = if self.parse_keyword(Keyword::AND) {
             let chain = !self.parse_keyword(Keyword::NO);
             self.expect_keyword_is(Keyword::CHAIN)?;
-            Ok(chain)
+            Some(chain)
         } else {
-            Ok(false)
+            None
+        };
+        let release = if self.dialect.is::<MySqlDialect>() {
+            if self.parse_keyword(Keyword::RELEASE) {
+                Some(true)
+            } else if self.parse_keyword(Keyword::NO) {
+                self.expect_keyword_is(Keyword::RELEASE)?;
+                Some(false)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if chain == Some(true) && release == Some(true) {
+            return self.expected_ref("CHAIN without RELEASE", self.peek_token_ref());
         }
+        Ok(TransactionCompletionOptions {
+            transaction,
+            chain,
+            release,
+        })
     }
 
     /// Parse an optional 'TO SAVEPOINT savepoint_name' clause for ROLLBACK statements

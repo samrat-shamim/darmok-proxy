@@ -605,3 +605,22 @@ fresh boundary/diff checks and a separate Git tree proof. Code/test receipts
 retain their original `1cf9377` source identity. No M2/M4, driver, measured
 performance, fresh CI, merge or release gate is closed by these additions.
 Security-related work and the separate compiler draft remain excluded.
+
+
+## Original-source transaction-controller component
+
+The [source transaction contract](query-transactions.md) connects public decoded
+COM_QUERY controls to shared canonical planning, checked native controls and
+one response guard. The parser preserves absent/negative completion clauses and
+uses MySQL start/completion grammar. Completion policy is canonical and explicit;
+idle completion, active/idle chaining and commit-before-replacement have distinct
+ordered boundaries. Every proposed native start is admitted before prior work
+can commit. READ UNCOMMITTED, consistent snapshots and release completion fail
+explicitly before effects. Table execution, the owning frontend loop, RELEASE,
+full transaction equivalence and M2/M4 remain pending.
+
+Sixteen new ordinary stock cases, two completion-type field declarations, eight
+required native controller groups and two nested guard tests declare the finite
+verification scope. Required CI consumes the new corpora and native fixture
+module. Fresh committed results and independent review have not yet been recorded
+for this component; declarations and dirty exploratory checks close no gates.

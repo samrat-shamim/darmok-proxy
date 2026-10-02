@@ -1,0 +1,27 @@
+{
+  "server_version": "8.4.11",
+  "cases": [
+    {
+      "name": "completion-type-declarations",
+      "sql": "SELECT @@completion_type AS completion, @@global.completion_type AS global_completion;",
+      "columns": [
+        {
+          "name": "completion",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        },
+        {
+          "name": "global_completion",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        }
+      ]
+    }
+  ]
+}

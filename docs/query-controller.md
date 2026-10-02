@@ -3,7 +3,8 @@
 `darmok-execute::execute_query_command` takes a decoded `Command::Query` and
 parses its original SQL with the settled session's current `sql_mode`. It
 dispatches one SET statement to the [selected evaluator](set-controller.md) or
-one local SELECT to the [result controller](query-results.md).
+one local SELECT to the [result controller](query-results.md), or selected
+controls to the [transaction controller](query-transactions.md).
 There is no public execution function accepting a constructed SET AST. The
 pure input classifiers remain syntax views, rather than execution entry points.
 
@@ -11,12 +12,12 @@ The parser recognizes both MySQL SET assignment operators, `=` and `:=`.
 They normalize to the same AST because they have the same assignment semantics.
 The shared `TO` alternative belongs to other dialects. MySQL direct SET
 TRANSACTION uses one characteristic, optionally the other kind after a comma;
-the shared PostgreSQL list grammar still serves other dialects and the existing
-START parser. No source string rewriting or secondary token scan is used.
+the shared PostgreSQL list grammar still serves other dialects. MySQL START
+and completion clauses have their own grammar. No source string rewriting or secondary token scan is used.
 These rules follow the pinned MySQL 8.4.11 grammar, revision
 `99960bf74fa919347e4f4e3ca47672f333d6e91f`; upstream implementation source is
 kept outside the Apache distribution. The parser is not a complete MySQL
-grammar validator, and support remains limited to the selected SET and local SELECT shapes.
+grammar validator, and support remains limited to the selected SET, local SELECT and transaction shapes.
 
 The complete command is parsed before any effect. A successfully parsed batch or any
 other unimplemented parsed statement returns 1235/42000 before an earlier SET can update settings or
@@ -63,12 +64,12 @@ The command decodes one owned SQL string using the existing protocol decoder
 and parses it once. Parsing creates tokens and the statement AST; admission
 builds a vector of fixed-size actions for SET commands. The local SELECT path's
 source/row allocations are documented in [query-results.md](query-results.md).
-There is no new catalog
-lookup, cache invalidation mechanism, lock or native round trip. Only a required
-active autocommit commit sends a native control request. End-to-end performance
+There is no new catalog lookup, cache invalidation mechanism or lock. Local
+setting/result operations add no native request; an active autocommit commit
+sends one. Transaction-control requests are specified in their own contract. End-to-end performance
 measurements remain pending.
 
-Table row execution, transaction starts, prepared execution, catalog coherence, a
+Table row execution, complete transaction behavior, prepared execution, catalog coherence, a
 runnable proxy and real-driver/release gates remain incomplete. Required account
 CI is unavailable under the recorded Actions condition. Security-related work
 and the separate compiler draft remain excluded.
@@ -76,3 +77,9 @@ and the separate compiler draft remain excluded.
 Local SELECT implementation and its current validation boundary are documented
 in [query-results.md](query-results.md). The prior SET results above remain
 revision-bound evidence; they do not certify subsequent code.
+
+The [source transaction controller](query-transactions.md) additionally admits
+selected original START/BEGIN/COMMIT/ROLLBACK inputs. Its whole ordered native
+plan is admitted before effects, and nested transaction receipts remain under
+this same command output guard. RELEASE, consistent snapshots, row execution
+and the owning frontend loop remain pending.

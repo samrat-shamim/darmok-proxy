@@ -1,7 +1,7 @@
 # Frontend transaction settings
 
-Status: **typed setting/staging component and selected SET execution implemented;
-transaction-start/row controllers and transaction equivalence pending**. `darmok-session` owns typed transaction
+Status: **typed setting/staging, selected SET and selected source transaction
+controls implemented; row controllers and transaction equivalence pending**. `darmok-session` owns typed transaction
 choices and ordered command stages. Its separate
 [SQL input component](session-sql-input.md) classifies direct transaction settings
 and retains variable syntax facts.
@@ -39,6 +39,7 @@ The state component owns these separate values privately:
 | Pending next choices | Independently optional isolation/access overrides | Until their verified consuming boundary or a named session update supersedes them |
 | Active choices | Complete pair selected for the current frontend transaction | Until a confirmed frontend end; chaining carries it forward |
 | Autocommit setting | Configured frontend behavior | Until its specified successful setting boundary |
+| Completion type | Default chain/release choices for explicit completion | Until a successful completion-type setting |
 | Pending command outcome | Staged effects and the current confirmed or unconfirmed execution phase | Until that command's outcome is accounted for |
 
 Autocommit one does not mean there is no active transaction: an explicit START
@@ -149,8 +150,10 @@ Do not reset the entire session pair when only one named default is updated.
 Chaining derives its new pair from the preceding active pair, as documented
 for [COMMIT and ROLLBACK](https://dev.mysql.com/doc/refman/8.4/en/commit.html).
 A bare COMMIT/ROLLBACK and completion_type settings are distinct syntax/policy
-cases; the corpus uses explicit AND CHAIN and AND NO CHAIN. RELEASE variants
-and requests without an active transaction remain unverified.
+cases. The [source transaction controller](query-transactions.md) adds a separate
+finite corpus for these forms and idle completion. It retains explicit negative
+clauses and rejects release completion before effects; connection release remains
+pending. The original characteristic corpus retains its explicit chain forms.
 
 Transaction starts must be classified from the admitted command's semantics,
 including transactional object participation. An arbitrary SELECT can call a
@@ -206,7 +209,8 @@ can produce command effects; it does not submit a native request.
 
 `record_confirmed_frontend_boundary()` applies only the next staged boundary.
 A known start consumes pending choices and publishes the selected active pair
-inside the retained history. A known end clears active choices. Each known
+inside the retained history. A known end clears active and pending choices; a chain already captured its
+next pair during planning. Each known
 boundary remains recorded if a later boundary or output is unconfirmed; a known
 preceding commit cannot be undone by discarding the proposed following start.
 Unexpected, premature or repeated phase reports are retained and cannot be
@@ -224,20 +228,20 @@ Statement failures and confirmed recovery need their own verified outcome path.
 
 The initial command vocabulary covers named session/next assignments, the four
 declared variable forms, explicit and implicit starts, a successful autocommit
-statement, active commit/rollback with an explicit chain choice, and the finite
-autocommit boundaries above. Commands requiring an absent or wrong frontend
+statement, commit/rollback with an explicit resolved chain choice, completion-type
+assignments, and the finite autocommit boundaries above. Commands requiring a wrong frontend
 state fail before staging.
 Autocommit setting changes during an active transaction whose setting is already
-one are deliberately rejected as unverified, including repeated one. Completion
-without an active transaction, compound SET, DEFAULT, completion_type, RELEASE,
-client savepoints and failed statement transitions are not implemented by this
-vocabulary. No SQL syntax is supported merely because it has a typed command.
+one are deliberately rejected as unverified, including repeated one. Idle completion and completion-type settings have the separate
+[source controller contract](query-transactions.md). Compound SET and DEFAULT
+belong to the SET controller; RELEASE, client savepoints and failed statement
+transitions remain pending. No SQL syntax is supported merely because it has a typed command.
 
 ## Implementation and verification gate
 
 The string/map/lifecycle replacement has no setter shim. The translation
 fingerprint includes the complete confirmed transaction snapshot: defaults,
-independent pending choices, active pair and autocommit. It returns an error for
+independent pending choices, active pair, autocommit and completion type. It returns an error for
 unsettled outcomes. The [canonical variable model](session-variable-values.md)
 removes generic insertion of NULL or nonstring charset values: text settings
 are immutable initial model values and their mutation path is unimplemented.
@@ -261,7 +265,9 @@ These tests supply trusted boundaries in memory; they neither parse nor execute
 the corpus SQL and do not check event identity, native receipts, data, SQL error
 codes, locks, snapshots or packets. Separate ordinary phase tests cover prepared
 abandonment, known partial outcomes and unavailable state after unconfirmed
-submission. Stock corpora and observer remain unchanged.
+submission. These older corpora and their observer remain unchanged. The separate
+[source controller](query-transactions.md) declares additional ordinary cases
+and required native fixtures; its evidence does not certify the broader gates.
 
 Before claiming frontend controller behavior, require:
 

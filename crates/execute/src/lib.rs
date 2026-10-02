@@ -1,6 +1,6 @@
 //! Native representations, prepared checks, borrowed bindings, observed
 //! controls, exclusively owned transaction scopes and source-admitted selected
-//! COM_QUERY SET and local SELECT execution. Table execution remains a gate.
+//! COM_QUERY SET, transaction controls and local SELECT execution. Table execution remains a gate.
 
 mod exact_number;
 mod native_backend;
@@ -13,6 +13,7 @@ mod numeric;
 mod query_controller;
 mod select_controller;
 mod set_controller;
+mod transaction_controller;
 
 pub use native_backend::{
     NativeBackend, NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError,
@@ -31,3 +32,4 @@ pub use query_controller::{
 };
 pub use select_controller::SelectSqlError;
 pub use set_controller::{ServerSetValues, SetSqlError};
+pub use transaction_controller::TransactionSqlError;

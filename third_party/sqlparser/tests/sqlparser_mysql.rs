@@ -4946,3 +4946,79 @@ fn parse_create_database_with_charset_option_ordering() {
         "CREATE DATABASE mydb DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci",
     );
 }
+
+#[test]
+fn mysql_transaction_completion_preserves_explicit_choices() {
+    for verb in ["COMMIT", "ROLLBACK"] {
+        for work in ["", " WORK"] {
+            for chain in [None, Some(false), Some(true)] {
+                for release in [None, Some(false), Some(true)] {
+                    let mut sql = format!("{verb}{work}");
+                    if let Some(value) = chain {
+                        sql.push_str(if value { " AND CHAIN" } else { " AND NO CHAIN" });
+                    }
+                    if let Some(value) = release {
+                        sql.push_str(if value { " RELEASE" } else { " NO RELEASE" });
+                    }
+                    if chain == Some(true) && release == Some(true) {
+                        assert!(mysql().parse_sql_statements(&sql).is_err());
+                        continue;
+                    }
+                    let options = match mysql().verified_stmt(&sql) {
+                        Statement::Commit { options, .. } | Statement::Rollback { options, .. } => {
+                            options
+                        }
+                        other => panic!("{other:?}"),
+                    };
+                    assert_eq!(options.chain, chain);
+                    assert_eq!(options.release, release);
+                    assert_eq!(
+                        options.transaction,
+                        if work.is_empty() {
+                            None
+                        } else {
+                            Some(BeginTransactionKind::Work)
+                        }
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn mysql_transaction_start_uses_mysql_characteristic_grammar() {
+    for sql in [
+        "BEGIN",
+        "BEGIN WORK",
+        "START TRANSACTION",
+        "START TRANSACTION READ ONLY",
+        "START TRANSACTION READ WRITE",
+        "START TRANSACTION READ ONLY, READ ONLY",
+        "START TRANSACTION WITH CONSISTENT SNAPSHOT",
+        "START TRANSACTION READ ONLY, WITH CONSISTENT SNAPSHOT",
+        "START TRANSACTION WITH CONSISTENT SNAPSHOT, READ WRITE",
+        "START TRANSACTION WITH CONSISTENT SNAPSHOT, WITH CONSISTENT SNAPSHOT",
+    ] {
+        mysql().verified_stmt(sql);
+    }
+    for sql in [
+        "BEGIN TRANSACTION",
+        "BEGIN TRAN",
+        "BEGIN READ ONLY",
+        "START TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+        "START TRANSACTION READ ONLY READ ONLY",
+        "START TRANSACTION READ ONLY, READ WRITE",
+        "START TRANSACTION READ WRITE, READ ONLY",
+        "START TRANSACTION READ ONLY,",
+        "COMMIT TRANSACTION",
+        "ROLLBACK TRAN",
+        "END",
+        "COMMIT NO CHAIN",
+        "ROLLBACK AND CHAIN TO SAVEPOINT name",
+        "ROLLBACK NO RELEASE TO name",
+        "COMMIT RELEASE AND NO CHAIN",
+    ] {
+        assert!(mysql().parse_sql_statements(sql).is_err(), "{sql}");
+    }
+}

@@ -25,6 +25,7 @@ pub enum SessionVariableError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SessionVariable {
     Autocommit,
+    CompletionType,
     TransactionIsolation,
     TransactionReadOnly,
     SqlMode,
@@ -67,8 +68,9 @@ pub enum VariableWritePath {
 }
 
 impl SessionVariable {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::Autocommit,
+        Self::CompletionType,
         Self::TransactionIsolation,
         Self::TransactionReadOnly,
         Self::SqlMode,
@@ -104,6 +106,7 @@ impl SessionVariable {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Autocommit => "autocommit",
+            Self::CompletionType => "completion_type",
             Self::TransactionIsolation => "transaction_isolation",
             Self::TransactionReadOnly => "transaction_read_only",
             Self::SqlMode => "sql_mode",
@@ -151,9 +154,10 @@ impl SessionVariable {
     pub fn write_path(self) -> Result<VariableWritePath, SessionVariableError> {
         match self {
             Self::SqlMode => Ok(VariableWritePath::SqlModes),
-            Self::Autocommit | Self::TransactionIsolation | Self::TransactionReadOnly => {
-                Ok(VariableWritePath::TransactionCommand)
-            }
+            Self::Autocommit
+            | Self::CompletionType
+            | Self::TransactionIsolation
+            | Self::TransactionReadOnly => Ok(VariableWritePath::TransactionCommand),
             Self::Version
             | Self::VersionComment
             | Self::VersionCompileOs

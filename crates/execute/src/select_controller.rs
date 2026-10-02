@@ -425,7 +425,11 @@ fn variable(
                 .read_variable(read.variable)
                 .map_err(|_| SelectSqlError::Unsupported)?
         }
-        Var::Autocommit | Var::TransactionIsolation | Var::TransactionReadOnly | Var::SqlMode => {
+        Var::Autocommit
+        | Var::CompletionType
+        | Var::TransactionIsolation
+        | Var::TransactionReadOnly
+        | Var::SqlMode => {
             if global {
                 crate::set_controller::global_value(globals, read.variable)
                     .map_err(|_| SelectSqlError::Unsupported)?
@@ -477,6 +481,7 @@ mod tests {
                 transactions: MysqlCompatibilityProfile::default_mysql8()
                     .default_transaction_characteristics,
                 autocommit: AutocommitSetting::Enabled,
+                completion_type: darmok_session::FrontendCompletionType::NoChain,
             },
         )
     }

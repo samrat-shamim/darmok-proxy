@@ -4,7 +4,7 @@
 use crate::select_controller::{SelectAdmissionError, SelectPlan};
 use crate::{
     NativeBackend, NativeBackendError, NativeBackendState, SelectSqlError, ServerSetValues,
-    SetSqlError,
+    SetSqlError, TransactionSqlError,
 };
 use bytes::{Bytes, BytesMut};
 use darmok_protocol::{
@@ -30,6 +30,7 @@ pub enum QuerySqlError {
     UnsupportedExecutableComment,
     Set(SetSqlError),
     Select(SelectSqlError),
+    Transaction(TransactionSqlError),
 }
 
 impl QuerySqlError {
@@ -39,6 +40,7 @@ impl QuerySqlError {
             Self::UnsupportedStatement | Self::UnsupportedExecutableComment => 1235,
             Self::Set(error) => error.code(),
             Self::Select(error) => error.code(),
+            Self::Transaction(error) => error.code(),
         }
     }
 
@@ -49,6 +51,7 @@ impl QuerySqlError {
             }
             Self::Set(error) => error.sql_state(),
             Self::Select(error) => error.sql_state(),
+            Self::Transaction(error) => error.sql_state(),
         }
     }
 
@@ -59,6 +62,7 @@ impl QuerySqlError {
             Self::UnsupportedExecutableComment => "MySQL executable comments are not implemented",
             Self::Set(error) => error.message(),
             Self::Select(error) => error.message(),
+            Self::Transaction(error) => error.message(),
         }
     }
 }
@@ -95,9 +99,10 @@ pub enum QueryExecutionError {
 enum QueryPlan {
     Set(crate::set_controller::SetPlan),
     Select(SelectPlan),
+    Transaction(crate::transaction_controller::TransactionPlan),
 }
 
-/// Executes one selected SET or local SELECT from an original decoded query.
+/// Executes one selected SET, transaction control or local SELECT from an original decoded query.
 /// Other statements and batches return an explicit SQL error before effects.
 /// A transport/native error requires caller disposal: no response or recovery
 /// is invented. The caller supplies the response sequence from its wire phase.
@@ -139,6 +144,19 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             [Statement::Set(input)] => crate::set_controller::admit_set(state, globals, input)
                 .map(QueryPlan::Set)
                 .map_err(QuerySqlError::Set),
+            [
+                input @ (Statement::StartTransaction { .. }
+                | Statement::Commit { .. }
+                | Statement::Rollback { .. }),
+            ] => match crate::transaction_controller::admit_transaction(state, input) {
+                Ok(plan) => Ok(QueryPlan::Transaction(plan)),
+                Err(crate::transaction_controller::TransactionAdmissionError::Sql(error)) => {
+                    Err(QuerySqlError::Transaction(error))
+                }
+                Err(crate::transaction_controller::TransactionAdmissionError::Settings(error)) => {
+                    return Err(error.into());
+                }
+            },
             [Statement::Query(_)] => {
                 if let Some(source) = parsed.single_select()? {
                     match crate::select_controller::admit_select(state, globals, source) {
@@ -171,6 +189,10 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
         Ok(QueryPlan::Select(plan)) => {
             stage.record_select_success(1);
             select = Some(plan);
+            None
+        }
+        Ok(QueryPlan::Transaction(plan)) => {
+            crate::transaction_controller::apply_transaction(&mut stage, backend, plan).await?;
             None
         }
     };
