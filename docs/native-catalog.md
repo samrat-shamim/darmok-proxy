@@ -7,6 +7,34 @@ requested relations and each column's domain ancestors are read by one
 parameterized catalog query. A missing relation fails the complete operation;
 an empty request makes no database call. Repeated OIDs are deduplicated.
 
+`read_native_named_relations` additionally resolves literal native schema and
+relation pairs and reads those same definitions in one statement. It takes a
+slice of `NativeRelationName`, and returns a `NamedNativeCatalog`: an immutable
+catalog plus one resolved OID per input request, preserving order and repeats.
+Relations and types remain deduplicated in the catalog maps. The first missing
+pair fails the whole operation with its zero-based request index and exact
+names; callers receive no partial catalog. An empty request performs no I/O.
+
+Schema and relation are separate literal names. This API does not parse SQL
+quoting, split dots, fold case, trim spaces, normalize Unicode or interpret
+logical aliases. It does not consult `search_path` or resolve its metanames.
+For example, `NativeRelationName { schema_name: "Sales", relation_name: "Item.Set" }`
+means the native relation `"Sales"."Item.Set"`. A temporary object needs its
+actual `pg_namespace.nspname`, rather than the `pg_temp` metaname. The caller
+must supply its chosen native namespace; frontend route decisions remain a
+separate contract.
+
+Resolving an OID and then reading definitions in a second statement would let
+ordinary DDL change a name binding between those reads. The named API joins
+`pg_namespace` and `pg_class` inside the same query that reads columns and domain
+ancestors. Native `name` comparisons narrow candidates, and exact text
+comparisons with the deterministic `pg_catalog."C"` collation verify them.
+The exact check is necessary because converting input to PostgreSQL `name` can
+truncate an overlong string. An overlong input must report a missing pair rather
+than select an object with a truncated spelling. No SQL is generated from names.
+These choices follow PostgreSQL's [namespace catalog](https://www.postgresql.org/docs/17/catalog-pg-namespace.html)
+and [deterministic collation behavior](https://www.postgresql.org/docs/17/collation.html#COLLATION-NONDETERMINISTIC).
+
 This component captures native definitions. It does not establish that a native
 type can be translated or encoded for MySQL. Enum, array, range and composite
 type identities remain visible rather than becoming string or scalar substitutes.
@@ -57,6 +85,12 @@ against subsequent DDL. A caller must establish catalog validity and the owning
 connection before reusing facts for an execution plan. OIDs from another
 physical database are not interchangeable.
 
+The named read follows those same rules: both name resolution and definitions
+honor one native snapshot, including the caller's own DDL. Repeatable Read can
+retain both an earlier name and its earlier definition after external DDL
+commits. Read Committed resolves the replacement object afresh on the next call.
+Neither API establishes an execution lease or protects a later SQL statement.
+
 This deliberately leaves reusable catalog-dependent plans disabled. A fresh
 read handles ordinary changes between calls, including renamed or recreated
 objects and rolled-back DDL; it does not certify concurrent translation and
@@ -73,9 +107,27 @@ columns. Output maps hold each relation and declared type once; repeated
 domain rows do not duplicate column/name allocations. No table data is read,
 and no extra lookup is issued per column. There is no benchmark claim yet.
 
+The named API supplies two equally sized typed text arrays in the same connector
+request. The two Rust vectors borrow input strings; names are not copied to
+construct parameters. PostgreSQL deduplicates resolved relation rows before
+column/domain expansion, so repeated requests do not multiply that output.
+SQL assembly uses compile-time constants shared with the OID read. A temporary
+Rust B-tree index borrows returned names and maps the requests back to OIDs in
+O((R + N) log R) comparisons, where R is unique relations and N is requests;
+the retained OID vector is O(N). It adds no cache, listener, application-object
+lock, per-name query or table-data read. Native name predicates allow indexed
+candidate lookups, but the actual planner choice and end-to-end performance
+remain measurement gates.
+
 Required PostgreSQL 17/18 fixtures verify quoted names, native type/domain
 identity, column definitions, temporary objects, relation kinds, and fresh
 reads after ordinary transactional/external DDL and Repeatable Read snapshot
-behavior. MySQL wire metadata and
+behavior. Named fixtures additionally verify exact case/dots/quotes/whitespace,
+distinct Unicode spellings, request ordering/duplicates, missing pairs at each
+position, overlong ASCII/multibyte names, actual temporary namespaces, empty
+relations, no-I/O empty input in an aborted transaction, native error
+propagation, rename/recreation, rollback and shared resolution/fact snapshots.
+The existing quoted-definition, domain and relation-kind fixtures compare named
+and OID results directly. MySQL wire metadata and
 catalog-dependent plan execution remain separate gates. Security-related work
 remains deferred at the user's request.

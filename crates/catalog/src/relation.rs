@@ -14,6 +14,39 @@ pub struct NativeCatalog {
     pub types: BTreeMap<u32, NativeType>,
 }
 
+/// Literal native names, already separated into schema and relation parts.
+///
+/// Neither part is SQL, a logical database alias, or a search-path expression.
+/// Case, dots, quoting characters and Unicode spelling are significant. In
+/// particular, `pg_temp` does not select the connection's temporary namespace;
+/// use that namespace's actual catalog name when requesting a temporary object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NativeRelationName<'a> {
+    pub schema_name: &'a str,
+    pub relation_name: &'a str,
+}
+
+/// Named requests and their native definitions from the same statement snapshot.
+///
+/// The OID list preserves input order and repeated requests. Catalog maps
+/// deduplicate relations and types. This result is not an execution lease.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct NamedNativeCatalog {
+    catalog: NativeCatalog,
+    relation_oids: Vec<u32>,
+}
+
+impl NamedNativeCatalog {
+    pub fn catalog(&self) -> &NativeCatalog {
+        &self.catalog
+    }
+
+    /// One resolved OID per request, in the caller's original order.
+    pub fn relation_oids(&self) -> &[u32] {
+        &self.relation_oids
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeRelation {
     pub oid: u32,
@@ -129,6 +162,15 @@ pub enum CatalogError {
     Postgres(#[from] tokio_postgres::Error),
     #[error("PostgreSQL relation OID {oid} does not exist in this catalog snapshot")]
     MissingRelation { oid: u32 },
+    #[error(
+        "PostgreSQL relation {schema_name:?}.{relation_name:?} at request index {index} does not exist in this catalog snapshot"
+    )]
+    MissingNamedRelation {
+        /// Zero-based index of the first missing request.
+        index: usize,
+        schema_name: String,
+        relation_name: String,
+    },
     #[error("unknown PostgreSQL catalog code {code} in {field}")]
     UnknownCode { field: &'static str, code: i8 },
     #[error("PostgreSQL type OID {oid} is missing from the catalog snapshot")]
@@ -157,6 +199,80 @@ where
     let rows = client
         .query_typed(RELATION_SQL, &[(&relation_oids, Type::OID_ARRAY)])
         .await?;
+    let catalog = decode_catalog(rows)?;
+    for &oid in relation_oids {
+        if !catalog.relations.contains_key(&oid) {
+            return Err(CatalogError::MissingRelation { oid });
+        }
+    }
+    Ok(catalog)
+}
+
+/// Resolve literal native schema/relation pairs and read their definitions in
+/// one typed query. Name lookup and all facts share the caller's SQL snapshot.
+///
+/// A missing pair fails the complete read with its input index; no partial
+/// catalog is returned. Empty input performs no database I/O. Names are not
+/// folded, parsed, normalized, truncated, or resolved through `search_path`.
+/// Snapshot freshness does not protect later statement execution against DDL.
+pub async fn read_native_named_relations<C>(
+    client: &C,
+    relation_names: &[NativeRelationName<'_>],
+) -> Result<NamedNativeCatalog, CatalogError>
+where
+    C: GenericClient + Sync,
+{
+    if relation_names.is_empty() {
+        return Ok(NamedNativeCatalog::default());
+    }
+    let mut schemas = Vec::with_capacity(relation_names.len());
+    let mut names = Vec::with_capacity(relation_names.len());
+    for relation in relation_names {
+        schemas.push(relation.schema_name);
+        names.push(relation.relation_name);
+    }
+    let rows = client
+        .query_typed(
+            NAMED_RELATION_SQL,
+            &[(&schemas, Type::TEXT_ARRAY), (&names, Type::TEXT_ARRAY)],
+        )
+        .await?;
+    let catalog = decode_catalog(rows)?;
+    let mut relation_oids = Vec::with_capacity(relation_names.len());
+    {
+        // Borrow returned names instead of cloning them or scanning the entire
+        // catalog once per request. Drop this index before moving the catalog.
+        let by_name: BTreeMap<_, _> = catalog
+            .relations
+            .values()
+            .map(|relation| {
+                (
+                    NativeRelationName {
+                        schema_name: &relation.schema_name,
+                        relation_name: &relation.name,
+                    },
+                    relation.oid,
+                )
+            })
+            .collect();
+        for (index, name) in relation_names.iter().enumerate() {
+            let Some(&oid) = by_name.get(name) else {
+                return Err(CatalogError::MissingNamedRelation {
+                    index,
+                    schema_name: name.schema_name.to_owned(),
+                    relation_name: name.relation_name.to_owned(),
+                });
+            };
+            relation_oids.push(oid);
+        }
+    }
+    Ok(NamedNativeCatalog {
+        catalog,
+        relation_oids,
+    })
+}
+
+fn decode_catalog(rows: Vec<Row>) -> Result<NativeCatalog, CatalogError> {
     let mut catalog = NativeCatalog::default();
     for row in rows {
         let oid: u32 = row.try_get(0)?;
@@ -176,11 +292,6 @@ where
             if let Entry::Vacant(entry) = catalog.types.entry(type_oid) {
                 entry.insert(type_from_row(&row, type_oid)?);
             }
-        }
-    }
-    for &oid in relation_oids {
-        if !catalog.relations.contains_key(&oid) {
-            return Err(CatalogError::MissingRelation { oid });
         }
     }
     for relation in catalog.relations.values() {
@@ -334,14 +445,12 @@ fn valid_oid(oid: u32) -> Option<u32> {
 // declared domain bases. UNION deduplicates domain ancestors by (relation,
 // attribute, type), without treating arrays or other types as their elements.
 // No deparser or name resolver consults a different catalog snapshot.
-const RELATION_SQL: &str = r#"
-WITH RECURSIVE relations AS (
-    SELECT c.oid, c.relnamespace, n.nspname, c.relname, c.relkind,
-           c.relpersistence, c.relispartition
-    FROM pg_catalog.pg_class AS c
-    JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
-    WHERE c.oid = ANY($1)
-), attributes AS (
+macro_rules! relation_query {
+    ($relations:literal) => {
+        concat!(
+            "WITH RECURSIVE relations AS (",
+            $relations,
+            r#"), attributes AS (
     SELECT a.attrelid, a.attnum, a.attname, a.atttypid, a.atttypmod,
            a.attndims, a.attnotnull, a.atthasdef, a.attidentity,
            a.attgenerated, a.attcollation
@@ -370,4 +479,37 @@ LEFT JOIN column_types AS ct ON ct.relation_oid = r.oid
 LEFT JOIN pg_catalog.pg_type AS t ON t.oid = ct.type_oid
 LEFT JOIN pg_catalog.pg_namespace AS tn ON tn.oid = t.typnamespace
 ORDER BY r.oid, a.attnum, t.oid
-"#;
+"#
+        )
+    };
+}
+
+const RELATION_SQL: &str = relation_query!(
+    r#"
+    SELECT c.oid, c.relnamespace, n.nspname, c.relname, c.relkind,
+           c.relpersistence, c.relispartition
+    FROM pg_catalog.pg_class AS c
+    JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+    WHERE c.oid = ANY($1)
+"#
+);
+
+// Native name equality allows indexed candidate lookups. Casting an input to
+// `name` can truncate it, so the text comparisons separately require an exact
+// match with a deterministic byte collation. DISTINCT prevents duplicate
+// requests from multiplying column/domain output rows.
+const NAMED_RELATION_SQL: &str = relation_query!(
+    r#"
+    SELECT DISTINCT c.oid, c.relnamespace, n.nspname, c.relname, c.relkind,
+           c.relpersistence, c.relispartition
+    FROM pg_catalog.unnest($1::text[], $2::text[])
+         AS requested(schema_name, relation_name)
+    JOIN pg_catalog.pg_namespace AS n
+      ON n.nspname = requested.schema_name::pg_catalog.name
+     AND n.nspname::text COLLATE pg_catalog."C" = requested.schema_name
+    JOIN pg_catalog.pg_class AS c
+      ON c.relnamespace = n.oid
+     AND c.relname = requested.relation_name::pg_catalog.name
+     AND c.relname::text COLLATE pg_catalog."C" = requested.relation_name
+"#
+);

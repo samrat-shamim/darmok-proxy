@@ -33,6 +33,10 @@ name = "native_catalog"
 path = "native_catalog.rs"
 
 [[test]]
+name = "native_named_catalog"
+path = "native_named_catalog.rs"
+
+[[test]]
 name = "native_statements"
 path = "native_statements.rs"
 
