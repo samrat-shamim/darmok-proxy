@@ -1,0 +1,4514 @@
+{
+  "profile": "local-binary-literals-v1",
+  "server_version": "8.4.11",
+  "cases": [
+    {
+      "name": "comments-and-spacing",
+      "sql_mode": "",
+      "sql": "SELECT _binary /* data */ X'41', ( /* data */ 0x041), b'01' /* end */ AS bits",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279202f2a2064617461202a2f205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "28202f2a2064617461202a2f20307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-null-distinction",
+      "sql_mode": "",
+      "sql": "SELECT X'' AS empty_hex, b'' AS empty_bits, X'00' AS zero_byte, NULL AS absent",
+      "columns": [
+        {
+          "name_hex": "656d7074795f686578",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656d7074795f62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7a65726f5f62797465",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616273656e74",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 6,
+          "charset": 63,
+          "width": 0,
+          "flags": 128,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          null
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "wide-byte-values",
+      "sql_mode": "",
+      "sql": "SELECT X'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff' AS all_bytes, 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff AS prefix_bytes",
+      "columns": [
+        {
+          "name_hex": "616c6c5f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7072656669785f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-forms",
+      "sql_mode": "",
+      "sql": "SELECT X'41', x'41', 0x41, 0x4a, X'4a', X'', 0x0, 0x000",
+      "columns": [
+        {
+          "name_hex": "5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783461",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "5827346127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "307830",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3078303030",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "41",
+          "4a",
+          "4a",
+          "",
+          "00",
+          "0000"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-bytes",
+      "sql_mode": "",
+      "sql": "SELECT X'00007F80FF' AS raw, 0x00007f80ff AS same, X'c3a9f09f9880' AS encoded_utf8",
+      "columns": [
+        {
+          "name_hex": "726177",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73616d65",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656e636f6465645f75746638",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 6,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00007f80ff",
+          "00007f80ff",
+          "c3a9f09f9880"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-forms",
+      "sql_mode": "",
+      "sql": "SELECT b'0', B'1', b'01', b'000000001', 0b0, 0b1, 0b01, 0b000000001, b''",
+      "columns": [
+        {
+          "name_hex": "62273027",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "42273127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622730303030303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306230",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306231",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3062303030303030303031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00",
+          "01",
+          "01",
+          "0001",
+          "00",
+          "01",
+          "01",
+          "0001",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-widths",
+      "sql_mode": "",
+      "sql": "SELECT b'11111111', b'111111111', b'1111111111111111111111111111111111111111111111111111111111111111' AS sixty_four, b'11111111111111111111111111111111111111111111111111111111111111111' AS sixty_five, 0b00000000000000001 AS leading_value",
+      "columns": [
+        {
+          "name_hex": "6227313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622731313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f666f7572",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 8,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f66697665",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 9,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6c656164696e675f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "ff",
+          "01ff",
+          "ffffffffffffffff",
+          "01ffffffffffffffff",
+          "000001"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "nested-names",
+      "sql_mode": "",
+      "sql": "SELECT (X'41'), ((x'41')), (0x041), (b'01'), ((0b01)), X'41' AS alias_value, b'01' AS bit_alias",
+      "columns": [
+        {
+          "name_hex": "28582734312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "282878273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28622730312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2828306230312929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616c6961735f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6269745f616c696173",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "plus-identity",
+      "sql_mode": "",
+      "sql": "SELECT +X'41', +(0x041), +b'01', +0b01, +(+(X'41'))",
+      "columns": [
+        {
+          "name_hex": "2b5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b282b2858273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-introducer",
+      "sql_mode": "",
+      "sql": "SELECT _binary X'41', _BINARY 0x41, _binary b'01', _binary 0b01",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f42494e4152592030783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e6172792030623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "01",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "comments-and-spacing",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary /* data */ X'41', ( /* data */ 0x041), b'01' /* end */ AS bits",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279202f2a2064617461202a2f205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "28202f2a2064617461202a2f20307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-null-distinction",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'' AS empty_hex, b'' AS empty_bits, X'00' AS zero_byte, NULL AS absent",
+      "columns": [
+        {
+          "name_hex": "656d7074795f686578",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656d7074795f62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7a65726f5f62797465",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616273656e74",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 6,
+          "charset": 63,
+          "width": 0,
+          "flags": 128,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          null
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "wide-byte-values",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff' AS all_bytes, 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff AS prefix_bytes",
+      "columns": [
+        {
+          "name_hex": "616c6c5f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7072656669785f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-forms",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'41', x'41', 0x41, 0x4a, X'4a', X'', 0x0, 0x000",
+      "columns": [
+        {
+          "name_hex": "5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783461",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "5827346127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "307830",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3078303030",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "41",
+          "4a",
+          "4a",
+          "",
+          "00",
+          "0000"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-bytes",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'00007F80FF' AS raw, 0x00007f80ff AS same, X'c3a9f09f9880' AS encoded_utf8",
+      "columns": [
+        {
+          "name_hex": "726177",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73616d65",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656e636f6465645f75746638",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 6,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00007f80ff",
+          "00007f80ff",
+          "c3a9f09f9880"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-forms",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0', B'1', b'01', b'000000001', 0b0, 0b1, 0b01, 0b000000001, b''",
+      "columns": [
+        {
+          "name_hex": "62273027",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "42273127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622730303030303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306230",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306231",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3062303030303030303031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00",
+          "01",
+          "01",
+          "0001",
+          "00",
+          "01",
+          "01",
+          "0001",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-widths",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'11111111', b'111111111', b'1111111111111111111111111111111111111111111111111111111111111111' AS sixty_four, b'11111111111111111111111111111111111111111111111111111111111111111' AS sixty_five, 0b00000000000000001 AS leading_value",
+      "columns": [
+        {
+          "name_hex": "6227313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622731313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f666f7572",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 8,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f66697665",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 9,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6c656164696e675f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "ff",
+          "01ff",
+          "ffffffffffffffff",
+          "01ffffffffffffffff",
+          "000001"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "nested-names",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT (X'41'), ((x'41')), (0x041), (b'01'), ((0b01)), X'41' AS alias_value, b'01' AS bit_alias",
+      "columns": [
+        {
+          "name_hex": "28582734312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "282878273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28622730312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2828306230312929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616c6961735f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6269745f616c696173",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "plus-identity",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT +X'41', +(0x041), +b'01', +0b01, +(+(X'41'))",
+      "columns": [
+        {
+          "name_hex": "2b5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b282b2858273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-introducer",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'41', _BINARY 0x41, _binary b'01', _binary 0b01",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f42494e4152592030783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e6172792030623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "01",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "comments-and-spacing",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _binary /* data */ X'41', ( /* data */ 0x041), b'01' /* end */ AS bits",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279202f2a2064617461202a2f205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "28202f2a2064617461202a2f20307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-null-distinction",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'' AS empty_hex, b'' AS empty_bits, X'00' AS zero_byte, NULL AS absent",
+      "columns": [
+        {
+          "name_hex": "656d7074795f686578",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656d7074795f62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7a65726f5f62797465",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616273656e74",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 6,
+          "charset": 63,
+          "width": 0,
+          "flags": 128,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          null
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "wide-byte-values",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff' AS all_bytes, 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff AS prefix_bytes",
+      "columns": [
+        {
+          "name_hex": "616c6c5f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7072656669785f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-forms",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'41', x'41', 0x41, 0x4a, X'4a', X'', 0x0, 0x000",
+      "columns": [
+        {
+          "name_hex": "5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783461",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "5827346127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "307830",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3078303030",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "41",
+          "4a",
+          "4a",
+          "",
+          "00",
+          "0000"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-bytes",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'00007F80FF' AS raw, 0x00007f80ff AS same, X'c3a9f09f9880' AS encoded_utf8",
+      "columns": [
+        {
+          "name_hex": "726177",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73616d65",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656e636f6465645f75746638",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 6,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00007f80ff",
+          "00007f80ff",
+          "c3a9f09f9880"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-forms",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT b'0', B'1', b'01', b'000000001', 0b0, 0b1, 0b01, 0b000000001, b''",
+      "columns": [
+        {
+          "name_hex": "62273027",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "42273127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622730303030303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306230",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306231",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3062303030303030303031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00",
+          "01",
+          "01",
+          "0001",
+          "00",
+          "01",
+          "01",
+          "0001",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-widths",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT b'11111111', b'111111111', b'1111111111111111111111111111111111111111111111111111111111111111' AS sixty_four, b'11111111111111111111111111111111111111111111111111111111111111111' AS sixty_five, 0b00000000000000001 AS leading_value",
+      "columns": [
+        {
+          "name_hex": "6227313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622731313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f666f7572",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 8,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f66697665",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 9,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6c656164696e675f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "ff",
+          "01ff",
+          "ffffffffffffffff",
+          "01ffffffffffffffff",
+          "000001"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "nested-names",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT (X'41'), ((x'41')), (0x041), (b'01'), ((0b01)), X'41' AS alias_value, b'01' AS bit_alias",
+      "columns": [
+        {
+          "name_hex": "28582734312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "282878273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28622730312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2828306230312929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616c6961735f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6269745f616c696173",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "plus-identity",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT +X'41', +(0x041), +b'01', +0b01, +(+(X'41'))",
+      "columns": [
+        {
+          "name_hex": "2b5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b282b2858273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-introducer",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _binary X'41', _BINARY 0x41, _binary b'01', _binary 0b01",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f42494e4152592030783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e6172792030623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "01",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "comments-and-spacing",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary /* data */ X'41', ( /* data */ 0x041), b'01' /* end */ AS bits",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279202f2a2064617461202a2f205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "28202f2a2064617461202a2f20307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-null-distinction",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'' AS empty_hex, b'' AS empty_bits, X'00' AS zero_byte, NULL AS absent",
+      "columns": [
+        {
+          "name_hex": "656d7074795f686578",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656d7074795f62697473",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7a65726f5f62797465",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616273656e74",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 6,
+          "charset": 63,
+          "width": 0,
+          "flags": 128,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          null
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "wide-byte-values",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff' AS all_bytes, 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff AS prefix_bytes",
+      "columns": [
+        {
+          "name_hex": "616c6c5f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7072656669785f6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 256,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-forms",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'41', x'41', 0x41, 0x4a, X'4a', X'', 0x0, 0x000",
+      "columns": [
+        {
+          "name_hex": "5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "7827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30783461",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "5827346127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "307830",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3078303030",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "41",
+          "4a",
+          "4a",
+          "",
+          "00",
+          "0000"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "hex-bytes",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'00007F80FF' AS raw, 0x00007f80ff AS same, X'c3a9f09f9880' AS encoded_utf8",
+      "columns": [
+        {
+          "name_hex": "726177",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73616d65",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 5,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "656e636f6465645f75746638",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 6,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00007f80ff",
+          "00007f80ff",
+          "c3a9f09f9880"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-forms",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0', B'1', b'01', b'000000001', 0b0, 0b1, 0b01, 0b000000001, b''",
+      "columns": [
+        {
+          "name_hex": "62273027",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "42273127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622730303030303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306230",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "306231",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "3062303030303030303031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "00",
+          "01",
+          "01",
+          "0001",
+          "00",
+          "01",
+          "01",
+          "0001",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "bit-widths",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'11111111', b'111111111', b'1111111111111111111111111111111111111111111111111111111111111111' AS sixty_four, b'11111111111111111111111111111111111111111111111111111111111111111' AS sixty_five, 0b00000000000000001 AS leading_value",
+      "columns": [
+        {
+          "name_hex": "6227313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "622731313131313131313127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f666f7572",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 8,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "73697874795f66697665",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 9,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6c656164696e675f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "ff",
+          "01ff",
+          "ffffffffffffffff",
+          "01ffffffffffffffff",
+          "000001"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "nested-names",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT (X'41'), ((x'41')), (0x041), (b'01'), ((0b01)), X'41' AS alias_value, b'01' AS bit_alias",
+      "columns": [
+        {
+          "name_hex": "28582734312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "282878273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "28622730312729",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2828306230312929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "616c6961735f76616c7565",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "6269745f616c696173",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "plus-identity",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT +X'41', +(0x041), +b'01', +0b01, +(+(X'41'))",
+      "columns": [
+        {
+          "name_hex": "2b5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b28307830343129",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b30623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2b282b2858273431272929",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 161,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "0041",
+          "01",
+          "01",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "binary-introducer",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'41', _BINARY 0x41, _binary b'01', _binary 0b01",
+      "columns": [
+        {
+          "name_hex": "5f62696e617279205827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f42494e4152592030783431",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e6172792030623031",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "41",
+          "41",
+          "01",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    }
+  ],
+  "syntax_errors": [
+    {
+      "name": "odd-quoted-hex",
+      "sql_mode": "",
+      "sql": "SELECT X'F'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'F'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-hex",
+      "sql_mode": "",
+      "sql": "SELECT X'0G'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'0G'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-hex",
+      "sql_mode": "",
+      "sql": "SELECT X'4\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'4\\1'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-bit",
+      "sql_mode": "",
+      "sql": "SELECT b'0\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0\\1'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-bit",
+      "sql_mode": "",
+      "sql": "SELECT b'02'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'02'' at line 1"
+    },
+    {
+      "name": "quoted-hex-space",
+      "sql_mode": "",
+      "sql": "SELECT X'00 01'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'00 01'' at line 1"
+    },
+    {
+      "name": "quoted-bit-space",
+      "sql_mode": "",
+      "sql": "SELECT b'0 1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0 1'' at line 1"
+    },
+    {
+      "name": "odd-quoted-hex",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'F'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'F'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-hex",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'0G'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'0G'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-hex",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'4\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'4\\1'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-bit",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0\\1'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-bit",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'02'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'02'' at line 1"
+    },
+    {
+      "name": "quoted-hex-space",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'00 01'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'00 01'' at line 1"
+    },
+    {
+      "name": "quoted-bit-space",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0 1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0 1'' at line 1"
+    },
+    {
+      "name": "odd-quoted-hex",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'F'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'F'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-hex",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'0G'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'0G'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-hex",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'4\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'4\\1'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-bit",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT b'0\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0\\1'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-bit",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT b'02'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'02'' at line 1"
+    },
+    {
+      "name": "quoted-hex-space",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT X'00 01'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'00 01'' at line 1"
+    },
+    {
+      "name": "quoted-bit-space",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT b'0 1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0 1'' at line 1"
+    },
+    {
+      "name": "odd-quoted-hex",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'F'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'F'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-hex",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'0G'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'0G'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-hex",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'4\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'4\\1'' at line 1"
+    },
+    {
+      "name": "escaped-quoted-bit",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0\\1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0\\1'' at line 1"
+    },
+    {
+      "name": "invalid-quoted-bit",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'02'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'02'' at line 1"
+    },
+    {
+      "name": "quoted-hex-space",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT X'00 01'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'X'00 01'' at line 1"
+    },
+    {
+      "name": "quoted-bit-space",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT b'0 1'",
+      "kind": "error",
+      "error_code": 1064,
+      "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'0 1'' at line 1"
+    }
+  ],
+  "unsupported": [
+    {
+      "name": "introduced-names",
+      "sql_mode": "",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "686920",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01",
+          "c3a9",
+          "20686920",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "numeric-contexts",
+      "sql_mode": "",
+      "sql": "SELECT -X'41', -b'01', X'41'+0, b'01'+0",
+      "columns": [
+        {
+          "name_hex": "2d5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2d6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "58273431272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 4,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62273031272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 5,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "2d36352e30",
+          "2d312e30",
+          "3635",
+          "31"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "unsupported-charset",
+      "sql_mode": "",
+      "sql": "SELECT _utf8mb4 X'c3a9', _latin1 b'1000001'",
+      "columns": [
+        {
+          "name_hex": "5f757466386d62342058276333613927",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f6c6174696e312062273130303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "c3a9",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "uppercase-hex-prefix",
+      "sql_mode": "",
+      "sql": "SELECT 0X41",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0X41' in 'field list'"
+    },
+    {
+      "name": "uppercase-bit-prefix",
+      "sql_mode": "",
+      "sql": "SELECT 0B01",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0B01' in 'field list'"
+    },
+    {
+      "name": "empty-hex-prefix",
+      "sql_mode": "",
+      "sql": "SELECT 0x",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x' in 'field list'"
+    },
+    {
+      "name": "empty-bit-prefix",
+      "sql_mode": "",
+      "sql": "SELECT 0b",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b' in 'field list'"
+    },
+    {
+      "name": "invalid-hex-tail",
+      "sql_mode": "",
+      "sql": "SELECT 0x41g",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41g' in 'field list'"
+    },
+    {
+      "name": "invalid-bit-tail",
+      "sql_mode": "",
+      "sql": "SELECT 0b012",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b012' in 'field list'"
+    },
+    {
+      "name": "digit-identifier",
+      "sql_mode": "",
+      "sql": "SELECT 0x41_name",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41_name' in 'field list'"
+    },
+    {
+      "name": "escaped-byte-strings",
+      "sql_mode": "",
+      "sql": "SELECT _binary 'a\\0b' AS bytes",
+      "columns": [
+        {
+          "name_hex": "6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "610062"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-names",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "686920",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01",
+          "c3a9",
+          "20686920",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "numeric-contexts",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT -X'41', -b'01', X'41'+0, b'01'+0",
+      "columns": [
+        {
+          "name_hex": "2d5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2d6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "58273431272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 4,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62273031272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 5,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "2d36352e30",
+          "2d312e30",
+          "3635",
+          "31"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "unsupported-charset",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _utf8mb4 X'c3a9', _latin1 b'1000001'",
+      "columns": [
+        {
+          "name_hex": "5f757466386d62342058276333613927",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f6c6174696e312062273130303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "c3a9",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "uppercase-hex-prefix",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0X41",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0X41' in 'field list'"
+    },
+    {
+      "name": "uppercase-bit-prefix",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0B01",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0B01' in 'field list'"
+    },
+    {
+      "name": "empty-hex-prefix",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x' in 'field list'"
+    },
+    {
+      "name": "empty-bit-prefix",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0b",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b' in 'field list'"
+    },
+    {
+      "name": "invalid-hex-tail",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x41g",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41g' in 'field list'"
+    },
+    {
+      "name": "invalid-bit-tail",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0b012",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b012' in 'field list'"
+    },
+    {
+      "name": "digit-identifier",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x41_name",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41_name' in 'field list'"
+    },
+    {
+      "name": "escaped-byte-strings",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary 'a\\0b' AS bytes",
+      "columns": [
+        {
+          "name_hex": "6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "615c3062"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-names",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "686920",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01",
+          "c3a9",
+          "20686920",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "numeric-contexts",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT -X'41', -b'01', X'41'+0, b'01'+0",
+      "columns": [
+        {
+          "name_hex": "2d5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2d6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "58273431272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 4,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62273031272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 5,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "2d36352e30",
+          "2d312e30",
+          "3635",
+          "31"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "unsupported-charset",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _utf8mb4 X'c3a9', _latin1 b'1000001'",
+      "columns": [
+        {
+          "name_hex": "5f757466386d62342058276333613927",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f6c6174696e312062273130303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "c3a9",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "uppercase-hex-prefix",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0X41",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0X41' in 'field list'"
+    },
+    {
+      "name": "uppercase-bit-prefix",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0B01",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0B01' in 'field list'"
+    },
+    {
+      "name": "empty-hex-prefix",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0x",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x' in 'field list'"
+    },
+    {
+      "name": "empty-bit-prefix",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0b",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b' in 'field list'"
+    },
+    {
+      "name": "invalid-hex-tail",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0x41g",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41g' in 'field list'"
+    },
+    {
+      "name": "invalid-bit-tail",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0b012",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b012' in 'field list'"
+    },
+    {
+      "name": "digit-identifier",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT 0x41_name",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41_name' in 'field list'"
+    },
+    {
+      "name": "escaped-byte-strings",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _binary 'a\\0b' AS bytes",
+      "columns": [
+        {
+          "name_hex": "6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 3,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "610062"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-names",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 2,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "686920",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01",
+          "c3a9",
+          "20686920",
+          ""
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "numeric-contexts",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT -X'41', -b'01', X'41'+0, b'01'+0",
+      "columns": [
+        {
+          "name_hex": "2d5827343127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "2d6227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 5,
+          "charset": 63,
+          "width": 17,
+          "flags": 129,
+          "decimals": 0
+        },
+        {
+          "name_hex": "58273431272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 4,
+          "flags": 161,
+          "decimals": 0
+        },
+        {
+          "name_hex": "62273031272b30",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 8,
+          "charset": 63,
+          "width": 5,
+          "flags": 129,
+          "decimals": 0
+        }
+      ],
+      "rows_hex": [
+        [
+          "2d36352e30",
+          "2d312e30",
+          "3635",
+          "31"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "unsupported-charset",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _utf8mb4 X'c3a9', _latin1 b'1000001'",
+      "columns": [
+        {
+          "name_hex": "5f757466386d62342058276333613927",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f6c6174696e312062273130303030303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 45,
+          "width": 4,
+          "flags": 1,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "c3a9",
+          "41"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "uppercase-hex-prefix",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0X41",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0X41' in 'field list'"
+    },
+    {
+      "name": "uppercase-bit-prefix",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0B01",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0B01' in 'field list'"
+    },
+    {
+      "name": "empty-hex-prefix",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x' in 'field list'"
+    },
+    {
+      "name": "empty-bit-prefix",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0b",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b' in 'field list'"
+    },
+    {
+      "name": "invalid-hex-tail",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x41g",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41g' in 'field list'"
+    },
+    {
+      "name": "invalid-bit-tail",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0b012",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0b012' in 'field list'"
+    },
+    {
+      "name": "digit-identifier",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT 0x41_name",
+      "kind": "error",
+      "error_code": 1054,
+      "message": "Unknown column '0x41_name' in 'field list'"
+    },
+    {
+      "name": "escaped-byte-strings",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary 'a\\0b' AS bytes",
+      "columns": [
+        {
+          "name_hex": "6279746573",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 4,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "615c3062"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+// Modified for Darmok: preserve MySQL bit-value literals and their introducers.
 // Modified for Darmok: Parse MySQL variable names, SET operators and characteristics,
 // and optionally retain complete SELECT item source spans.
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
@@ -1667,17 +1668,7 @@ impl<'a> Parser<'a> {
             Token::SingleQuotedString(_)
             | Token::DoubleQuotedString(_)
             | Token::HexStringLiteral(_)
-                if w.value.starts_with('_') =>
-            {
-                Ok(Expr::Prefixed {
-                    prefix: w.to_ident(w_span),
-                    value: self.parse_introduced_string_expr()?.into(),
-                })
-            }
-            // string introducer https://dev.mysql.com/doc/refman/8.0/en/charset-introducer.html
-            Token::SingleQuotedString(_)
-            | Token::DoubleQuotedString(_)
-            | Token::HexStringLiteral(_)
+            | Token::BitStringLiteral(_)
                 if w.value.starts_with('_') =>
             {
                 Ok(Expr::Prefixed {
@@ -1925,7 +1916,8 @@ impl<'a> Parser<'a> {
             | Token::NationalStringLiteral(_)
             | Token::QuoteDelimitedStringLiteral(_)
             | Token::NationalQuoteDelimitedStringLiteral(_)
-            | Token::HexStringLiteral(_) => {
+            | Token::HexStringLiteral(_)
+            | Token::BitStringLiteral(_) => {
                 self.prev_token();
                 Ok(Expr::Value(self.parse_value()?))
             }
@@ -11989,6 +11981,7 @@ impl<'a> Parser<'a> {
                 ok_value(Value::UnicodeStringLiteral(s.to_string()))
             }
             Token::HexStringLiteral(ref s) => ok_value(Value::HexStringLiteral(s.to_string())),
+            Token::BitStringLiteral(ref s) => ok_value(Value::BitStringLiteral(s.to_string())),
             Token::Placeholder(ref s) => ok_value(Value::Placeholder(s.to_string())),
             tok @ Token::Colon | tok @ Token::AtSign => {
                 // 1. Not calling self.parse_identifier(false)?
@@ -12101,6 +12094,9 @@ impl<'a> Parser<'a> {
             )),
             Token::HexStringLiteral(ref s) => Ok(Expr::Value(
                 Value::HexStringLiteral(s.to_string()).with_span(span),
+            )),
+            Token::BitStringLiteral(ref s) => Ok(Expr::Value(
+                Value::BitStringLiteral(s.to_string()).with_span(span),
             )),
             unexpected => self.expected(
                 "a string value",

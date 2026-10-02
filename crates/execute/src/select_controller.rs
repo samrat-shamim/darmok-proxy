@@ -267,6 +267,15 @@ fn evaluate(
                 Expr::Value(value) if matches!(value.value, Literal::Number(_, false)) => {
                     number_cell(source, expr, spelling)
                 }
+                Expr::Value(value)
+                    if matches!(
+                        value.value,
+                        Literal::HexStringLiteral(_) | Literal::BitStringLiteral(_)
+                    ) =>
+                {
+                    evaluate(state, globals, text, source, expr, spelling)
+                }
+                Expr::Prefixed { .. } => evaluate(state, globals, text, source, expr, spelling),
                 Expr::UnaryOp {
                     op: UnaryOperator::Plus | UnaryOperator::Minus,
                     ..
@@ -311,11 +320,49 @@ fn evaluate(
                     flag::NOT_NULL,
                 ))
             }
+            Literal::HexStringLiteral(_) | Literal::BitStringLiteral(_) => {
+                binary_cell(&value.value, spelling, false)
+            }
             _ => Err(SelectSqlError::Unsupported.into()),
         },
+        Expr::Prefixed { prefix, value }
+            if prefix.quote_style.is_none() && prefix.value.eq_ignore_ascii_case("_binary") =>
+        {
+            let Expr::Value(value) = value.as_ref() else {
+                return Err(SelectSqlError::Unsupported.into());
+            };
+            binary_cell(&value.value, spelling, true)
+        }
         Expr::MySqlSystemVariable(_) => variable(state, globals, text, expr, spelling),
         _ => Err(SelectSqlError::Unsupported.into()),
     }
+}
+
+fn binary_cell(
+    literal: &Literal,
+    spelling: &str,
+    introduced: bool,
+) -> Result<Cell, SelectAdmissionError> {
+    let (value, unsigned) = match literal {
+        Literal::HexStringLiteral(digits) => (crate::binary_literal::hex(digits)?, true),
+        Literal::BitStringLiteral(digits) => (crate::binary_literal::bits(digits)?, false),
+        _ => return Err(SelectSqlError::Unsupported.into()),
+    };
+    Ok(Cell {
+        width: u32::try_from(value.len()).map_err(|_| SelectSqlError::Unsupported)?,
+        value: Some(value),
+        name: Bytes::copy_from_slice(spelling.as_bytes()),
+        mysql_type: ty::VAR_STRING,
+        flags: flag::NOT_NULL
+            | flag::BINARY
+            | if unsigned && !introduced {
+                flag::UNSIGNED
+            } else {
+                0
+            },
+        charset: charset::BINARY,
+        decimals: if introduced { 31 } else { 0 },
+    })
 }
 
 fn unwrap_nested(mut expr: &Expr) -> &Expr {
@@ -823,3 +870,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod binary_tests;

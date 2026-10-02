@@ -3,6 +3,7 @@
 //! COM_QUERY SET, transaction controls and local SELECT execution under an owned
 //! TCP command phase. Table execution and the executable remain gates.
 
+mod binary_literal;
 mod exact_number;
 mod frontend_connection;
 mod native_backend;

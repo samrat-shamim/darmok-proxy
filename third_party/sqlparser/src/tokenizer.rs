@@ -1,4 +1,5 @@
 // Modified for Darmok: Keep MySQL double-at sigils separate from variable-name tokens.
+// Modified for Darmok: distinguish validated MySQL hex/bit literals from whole identifiers.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -114,6 +115,8 @@ pub enum Token {
     UnicodeStringLiteral(String),
     /// Hexadecimal string literal: i.e.: X'deadbeef'
     HexStringLiteral(String),
+    /// MySQL bit-value literal: i.e. B'1001' or 0b1001.
+    BitStringLiteral(String),
     /// Comma
     Comma,
     /// Whitespace (space, tab, etc)
@@ -307,6 +310,7 @@ impl fmt::Display for Token {
             Token::EscapedStringLiteral(ref s) => write!(f, "E'{s}'"),
             Token::UnicodeStringLiteral(ref s) => write!(f, "U&'{s}'"),
             Token::HexStringLiteral(ref s) => write!(f, "X'{s}'"),
+            Token::BitStringLiteral(ref s) => write!(f, "B'{s}'"),
             Token::SingleQuotedByteStringLiteral(ref s) => write!(f, "B'{s}'"),
             Token::TripleSingleQuotedByteStringLiteral(ref s) => write!(f, "B'''{s}'''"),
             Token::DoubleQuotedByteStringLiteral(ref s) => write!(f, "B\"{s}\""),
@@ -1098,8 +1102,24 @@ impl<'a> Tokenizer<'a> {
                     }
                     Ok(Some(Token::Whitespace(Whitespace::Newline)))
                 }
-                // BigQuery and MySQL use b or B for byte string literal, Postgres for bit strings
-                b @ 'B' | b @ 'b' if dialect_of!(self is BigQueryDialect | PostgreSqlDialect | MySqlDialect | GenericDialect) =>
+                b @ 'B' | b @ 'b' if dialect_of!(self is MySqlDialect) => {
+                    let start = chars.location();
+                    chars.next();
+                    if chars.peek() == Some(&'\'') {
+                        // Ordinary string escaping must never turn an invalid
+                        // digit spelling into a valid binary value.
+                        let bits = self.tokenize_single_quoted_string(chars, '\'', false)?;
+                        if bits.bytes().any(|b| !matches!(b, b'0' | b'1')) {
+                            return self.tokenizer_error(start, "Invalid MySQL bit literal");
+                        }
+                        Ok(Some(Token::BitStringLiteral(bits)))
+                    } else {
+                        let word = self.tokenize_word(b, chars);
+                        Ok(Some(Token::make_word_owned(word, None)))
+                    }
+                }
+                // Preserve the existing foreign-dialect byte/bit string AST.
+                b @ 'B' | b @ 'b' if dialect_of!(self is BigQueryDialect | PostgreSqlDialect | GenericDialect) =>
                 {
                     chars.next(); // consume
                     match chars.peek() {
@@ -1243,11 +1263,18 @@ impl<'a> Tokenizer<'a> {
                 // The spec only allows an uppercase 'X' to introduce a hex
                 // string, but PostgreSQL, at least, allows a lowercase 'x' too.
                 x @ 'x' | x @ 'X' => {
+                    let start = chars.location();
                     chars.next(); // consume, to check the next char
                     match chars.peek() {
                         Some('\'') => {
                             // X'...' - a <binary string literal>
-                            let s = self.tokenize_single_quoted_string(chars, '\'', true)?;
+                            let mysql = dialect_of!(self is MySqlDialect);
+                            let s = self.tokenize_single_quoted_string(chars, '\'', !mysql)?;
+                            if mysql
+                                && (s.len() % 2 != 0 || s.bytes().any(|b| !b.is_ascii_hexdigit()))
+                            {
+                                return self.tokenizer_error(start, "Invalid MySQL hex literal");
+                            }
                             Ok(Some(Token::HexStringLiteral(s)))
                         }
                         _ => {
@@ -1395,7 +1422,31 @@ impl<'a> Tokenizer<'a> {
                         let s2 = peeking_next_take_while(chars, |ch, next_ch| {
                             ch.is_ascii_hexdigit() || is_number_separator(ch, next_ch)
                         });
+                        if dialect_of!(self is MySqlDialect) {
+                            let tail =
+                                peeking_take_while(chars, |ch| self.dialect.is_identifier_part(ch));
+                            if s2.is_empty() || !tail.is_empty() {
+                                return Ok(Some(Token::make_word_owned(
+                                    format!("0x{s2}{tail}"),
+                                    None,
+                                )));
+                            }
+                        }
                         return Ok(Some(Token::HexStringLiteral(s2)));
+                    }
+
+                    if s == "0" && chars.peek() == Some(&'b') && dialect_of!(self is MySqlDialect) {
+                        chars.next();
+                        let bits = peeking_take_while(chars, |ch| matches!(ch, '0' | '1'));
+                        let tail =
+                            peeking_take_while(chars, |ch| self.dialect.is_identifier_part(ch));
+                        if bits.is_empty() || !tail.is_empty() {
+                            return Ok(Some(Token::make_word_owned(
+                                format!("0b{bits}{tail}"),
+                                None,
+                            )));
+                        }
+                        return Ok(Some(Token::BitStringLiteral(bits)));
                     }
 
                     // match one period

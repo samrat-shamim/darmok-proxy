@@ -44,6 +44,11 @@ Coordinates count Unicode characters. All byte endpoints are resolved in one
 character walk after sorting; numeric lookup uses binary search. Source
 contract failures are explicit caller errors, not AST-rendered label fallbacks.
 
+[Binary literals](query-binary-literals.md) additionally support hex/bit forms
+and their `_binary` introducers, including exact byte values and separate
+declared metadata. Their source, numeric-context and error limits remain distinct
+from ordinary quoted strings.
+
 Declared column metadata is independent of encoded row length. Integers use
 LONGLONG, binary collation, signed/unsigned flags and literal declared widths;
 Exact decimals and promoted integer expressions use NEWDECIMAL with independent

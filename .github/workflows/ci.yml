@@ -95,6 +95,8 @@ jobs:
     services:
       mysql:
         image: mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+        ports:
+          - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: darmok-test
         options: >-
@@ -115,6 +117,25 @@ jobs:
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
           --corpus tests/reference/mysql_transactions.json
           --evidence-dir '${{ runner.temp }}/mysql-transaction-reference'
+      - name: Install pinned binary literal reference client
+        run: |
+          python3 -m venv '${{ runner.temp }}/mysql-binary-client'
+          '${{ runner.temp }}/mysql-binary-client/bin/python' -m pip install -r tests/reference/requirements-mysql-binary.txt
+      - name: Required stock binary literal field and byte observations
+        run: >-
+          '${{ runner.temp }}/mysql-binary-client/bin/python' -B tests/reference/observe_mysql_binary_literals.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --port 3306
+          --corpus crates/execute/fixtures/mysql-binary-literals.json
+          --evidence-dir '${{ runner.temp }}/mysql-binary-literal-reference'
+      - name: Preserve binary literal reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-binary-literal-reference
+          path: ${{ runner.temp }}/mysql-binary-literal-reference
+          if-no-files-found: error
       - name: Required stock local SELECT column observations
         run: >-
           python3 tests/reference/observe_mysql_query_results.py

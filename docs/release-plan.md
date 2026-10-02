@@ -1250,3 +1250,47 @@ Required hosted CI, CLI and runtime integration, complete catalog validity,
 admitted table SQL, real drivers, measured performance, merge and release remain
 pending. M2/M3/M4 and the full goal are not complete. Security work and compiler
 PR4 remain excluded; no hosted CI retry, account action, merge or release ran.
+
+### Original-source binary literal execution
+
+The `feat/native-binary-literals` branch adds distinct MySQL bit tokens/AST
+values, quoted digit validation and complete unquoted-token classification.
+The local SELECT lane emits direct hex/bit byte strings, parentheses/plus/aliases
+and selected `_binary` introducers with stock field metadata. It adds no native
+query or catalog plan. Numeric/coercion, other introducers/quoted binary text,
+COLLATE and public table execution remain explicit unsupported gates. The
+[component contract](query-binary-literals.md) records the exact scope and cost.
+
+A stock standard-client capture from clean `271b4cf` independently records
+MySQL 8.4.11 fields and values under four mode combinations. The selected
+corpus has 40 positive cases/200 fields and cells, 28 syntax cases and 44
+unimplemented contexts/names. Both initial captures remain outside the
+distribution; the first width query used a reserved alias and retains its actual
+SQL error, while the second uses a valid alias. Their process exits are0, not
+claims that all submitted SQL succeeded. PyMySQL distribution1.1.2/module1.4.6
+and Python3.9.6 remain pinned to the existing ordinary fixture client.
+
+Draft checks currently pass two local corpus tests, five parser regressions and
+two PostgreSQL17 command-phase TCP groups with both EOF formats, diagnostics,
+next-setting preservation and earlier outer writes surviving rejected input
+followed by valid results and commit. The repository-local stock observer also
+passes112 observations:40 positive,28 syntax,44 unimplemented reference
+contexts. It checks pinned image identity/content digest and connected fixture
+UUID, and preserves each stock outcome and six actual subprocess exits0. The
+stock result fields come from the pinned standard client; only supported binary
+rows are exact byte observations. This is not an authenticated proxy driver run.
+
+These are dirty-source development receipts under `logs/binary-draft-*`, not
+committed-candidate certification. Three compile attempts retain actual101:
+ambiguous Into at a tokenizer error, test code using mode constants as flags
+and a private token constructor, and a partial test-edit replacement. The
+corrected development checks retain separate actual0 receipts. Every Cargo
+invocation uses the task RUSTUP_HOME/shared CARGO_TARGET_DIR, serially. A fresh
+committed matrix and independent review remain required.
+
+Future MySQL CI declares a pinned standard-client virtual environment, required
+observer and always-run pinned artifact upload. Hosted CI is not polled or
+retried under the existing account blocker. Security, compiler PR4, resource
+stress and forced interruption work remain excluded. M2/M3/M4, catalog execution
+validity, executable integration, real drivers, performance, merge, release and
+the full goal remain incomplete.
