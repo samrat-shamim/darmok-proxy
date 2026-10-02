@@ -82,7 +82,8 @@ kernel performance and frontend SQL admission remain release gates.
 Required private fixtures use distinct disposable databases on PostgreSQL 17
 and 18. They exercise creation, unchanged repeats, read-only verification,
 missing/partial/conflicting installations, definition and metadata drift,
-transactional rollback, preservation of outer work, and the independently
+transactional rollback, preservation of outer work, two ordinary owners
+initializing/verifying one database, and the independently
 captured 810-case stock MySQL 8.4 corpus. This is component evidence; M3 and the
 full release remain open. Exact revision, commands and outcomes are recorded in
 `release-plan.md` after verification.

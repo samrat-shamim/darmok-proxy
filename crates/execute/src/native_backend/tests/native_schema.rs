@@ -88,6 +88,42 @@ fn assert_schema_error(failure: &NativeSchemaFailure, control: NativeControl, me
 
 #[tokio::test]
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn native_schema_two_ordinary_owners_initialize_and_verify_the_same_database() {
+    let mut fixture = Fixture::new().await;
+    let url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
+    let mut config = url.parse::<Config>().unwrap();
+    config.dbname(&fixture.database);
+    let mut second = NativeBackend::connect(&config, NoTls).await.unwrap();
+    let (first_receipt, second_receipt) = tokio::join!(
+        fixture.backend.initialize_schema(),
+        second.initialize_schema()
+    );
+    assert_eq!(first_receipt.unwrap().version(), 1);
+    assert_eq!(second_receipt.unwrap().version(), 1);
+    let before = snapshot(&fixture.backend).await;
+    let data = metadata(&fixture.backend).await;
+    assert_eq!(snapshot(&second).await, before);
+    assert_eq!(metadata(&second).await, data);
+    let (first_receipt, second_receipt) =
+        tokio::join!(fixture.backend.initialize_schema(), second.verify_schema());
+    assert_eq!(
+        first_receipt.unwrap().completion().control(),
+        NativeControl::InitializeSchema
+    );
+    assert_eq!(
+        second_receipt.unwrap().completion().control(),
+        NativeControl::VerifySchema
+    );
+    assert_idle(&fixture.backend);
+    assert_idle(&second);
+    assert_eq!(snapshot(&fixture.backend).await, before);
+    assert_eq!(metadata(&second).await, data);
+    let _ = second.dispose().await.unwrap();
+    fixture.close().await;
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn native_schema_fresh_repeat_and_readonly_verification_preserve_artifacts() {
     let mut fixture = Fixture::new().await;
     setup(&fixture.backend, "SET default_transaction_read_only = on").await;
