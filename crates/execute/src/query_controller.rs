@@ -69,8 +69,10 @@ impl QuerySqlError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QueryOutcome {
+pub(crate) enum QueryOutcome {
     Success(CommandSettingsSnapshot),
+    /// The owning frontend must close after the complete response is flushed.
+    Release(CommandSettingsSnapshot),
     SqlError {
         error: QuerySqlError,
         settings: CommandSettingsSnapshot,
@@ -107,7 +109,7 @@ enum QueryPlan {
 /// Other statements and batches return an explicit SQL error before effects.
 /// A transport/native error requires caller disposal: no response or recovery
 /// is invented. The caller supplies the response sequence from its wire phase.
-pub async fn execute_query_command<W: AsyncWrite + Unpin>(
+pub(crate) async fn execute_query_command<W: AsyncWrite + Unpin>(
     state: &mut SessionState,
     backend: &mut NativeBackend,
     globals: &ServerSetValues,
@@ -186,6 +188,7 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
     let mut stage = state.stage_command()?;
     stage.clear_diagnostics();
     let mut select = None;
+    let mut release = false;
     let error = match planned {
         Err(error) => Some(error),
         Ok(QueryPlan::Set(plan)) => crate::set_controller::apply_set(&mut stage, backend, plan)
@@ -198,6 +201,7 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             None
         }
         Ok(QueryPlan::Transaction(plan)) => {
+            release = plan.release;
             crate::transaction_controller::apply_transaction(&mut stage, backend, plan).await?;
             None
         }
@@ -219,31 +223,13 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
             stage.record_sql_success();
         }
         let settings = stage.settings()?;
-        let mut flags = StatusFlags::empty();
-        flags.set(
-            StatusFlags::SERVER_STATUS_AUTOCOMMIT,
-            settings.transactions.autocommit == AutocommitSetting::Enabled,
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_IN_TRANS,
-            settings.transactions.active.is_some(),
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_IN_TRANS_READONLY,
-            settings
-                .transactions
-                .active
-                .is_some_and(|active| active.access == FrontendTransactionAccess::ReadOnly),
-        );
-        flags.set(
-            StatusFlags::SERVER_STATUS_NO_BACKSLASH_ESCAPES,
-            settings.sql_modes.contains(SqlMode::NoBackslashEscapes),
-        );
+        let flags = session_status_flags(settings);
+        let warnings = stage.statement_condition_count_u16();
         let ok = OkPacket {
             affected_rows: 0,
             last_insert_id: 0,
             status_flags: flags,
-            warnings: 0,
+            warnings,
             info: Bytes::new(),
             session_state_changes: None,
         };
@@ -269,7 +255,7 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
                 ok.encode_ok_as_eof(&mut payload, capabilities)?;
             } else {
                 EofPacket {
-                    warnings: 0,
+                    warnings,
                     status_flags: flags,
                 }
                 .encode(&mut payload);
@@ -284,8 +270,33 @@ pub async fn execute_query_command<W: AsyncWrite + Unpin>(
     let settings = stage.finish_with_sent_output()?;
     Ok(match error {
         Some(error) => QueryOutcome::SqlError { error, settings },
+        None if release => QueryOutcome::Release(settings),
         None => QueryOutcome::Success(settings),
     })
+}
+
+pub(crate) fn session_status_flags(settings: CommandSettingsSnapshot) -> StatusFlags {
+    let mut flags = StatusFlags::empty();
+    flags.set(
+        StatusFlags::SERVER_STATUS_AUTOCOMMIT,
+        settings.transactions.autocommit == AutocommitSetting::Enabled,
+    );
+    flags.set(
+        StatusFlags::SERVER_STATUS_IN_TRANS,
+        settings.transactions.active.is_some(),
+    );
+    flags.set(
+        StatusFlags::SERVER_STATUS_IN_TRANS_READONLY,
+        settings
+            .transactions
+            .active
+            .is_some_and(|active| active.access == FrontendTransactionAccess::ReadOnly),
+    );
+    flags.set(
+        StatusFlags::SERVER_STATUS_NO_BACKSLASH_ESCAPES,
+        settings.sql_modes.contains(SqlMode::NoBackslashEscapes),
+    );
+    flags
 }
 
 fn append_packet(

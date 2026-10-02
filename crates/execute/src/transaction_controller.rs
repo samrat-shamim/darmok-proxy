@@ -21,7 +21,6 @@ pub enum TransactionSqlError {
     Unsupported,
     UnsupportedIsolation,
     ConsistentSnapshot,
-    Release,
 }
 
 impl TransactionSqlError {
@@ -36,7 +35,6 @@ impl TransactionSqlError {
             Self::Unsupported => "This transaction statement is not implemented",
             Self::UnsupportedIsolation => "READ UNCOMMITTED transactions are not implemented",
             Self::ConsistentSnapshot => "WITH CONSISTENT SNAPSHOT is not implemented",
-            Self::Release => "Transaction RELEASE is not implemented",
         }
     }
 }
@@ -74,6 +72,7 @@ struct Step {
 pub(crate) struct TransactionPlan {
     command: FrontendTransactionCommand,
     steps: [Option<Step>; 2],
+    pub(crate) release: bool,
 }
 
 pub(crate) fn admit_transaction(
@@ -81,7 +80,7 @@ pub(crate) fn admit_transaction(
     input: &Statement,
 ) -> Result<TransactionPlan, TransactionAdmissionError> {
     let before = state.transaction_settings()?;
-    let command = match input {
+    let (command, release) = match input {
         Statement::StartTransaction {
             modes,
             begin,
@@ -123,7 +122,7 @@ pub(crate) fn admit_transaction(
                 }
                 access = Some(next);
             }
-            FrontendTransactionCommand::BeginExplicit { access }
+            (FrontendTransactionCommand::BeginExplicit { access }, false)
         }
         Statement::Commit {
             options,
@@ -165,14 +164,18 @@ pub(crate) fn admit_transaction(
         };
         *slot = Some(Step { boundary, control });
     }
-    Ok(TransactionPlan { command, steps })
+    Ok(TransactionPlan {
+        command,
+        steps,
+        release,
+    })
 }
 
 fn completion_command(
     before: TransactionSettingsSnapshot,
     options: &TransactionCompletionOptions,
     completion: TransactionCompletion,
-) -> Result<FrontendTransactionCommand, TransactionSqlError> {
+) -> Result<(FrontendTransactionCommand, bool), TransactionSqlError> {
     if !matches!(options.transaction, None | Some(BeginTransactionKind::Work)) {
         return Err(TransactionSqlError::Unsupported);
     }
@@ -186,10 +189,10 @@ fn completion_command(
     if options.chain == Some(true) && options.release == Some(true) {
         return Err(TransactionSqlError::Unsupported);
     }
-    if release {
-        return Err(TransactionSqlError::Release);
-    }
-    Ok(FrontendTransactionCommand::Complete { completion, chain })
+    Ok((
+        FrontendTransactionCommand::Complete { completion, chain },
+        release,
+    ))
 }
 
 fn native_spec(

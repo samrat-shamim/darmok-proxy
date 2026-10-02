@@ -16,7 +16,8 @@ thiserror = { workspace = true }
 chrono = { workspace = true }
 tokio-postgres = { workspace = true, features = ["with-chrono-0_4"] }
 futures-util = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "net"] }
+tokio-util = { workspace = true }
 
 [dev-dependencies]
 serde_json = "1"

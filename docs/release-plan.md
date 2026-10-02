@@ -705,3 +705,105 @@ lock equivalence or measured performance. Required hosted CI remains unavailable
 under the separately recorded personal-account Actions condition; local results
 justify neither merge nor release. Security and other excluded work remain
 outside this component. The full goal remains active.
+
+
+## Owning TCP command-phase progress
+
+The [connection contract](frontend-connection.md) makes public SQL execution
+consume a real frontend socket, canonical session and exclusive native owner.
+The former borrowed public query function is private, with no transition shim.
+Selected commands run serially; RELEASE confirms native boundaries and flushes
+OK before closure, while normal QUIT/EOF records checked rollback separately
+from local driver disposal. The report never returns a reusable backend.
+
+Sixteen stock lifecycle cases and eight required native TCP fixture groups
+cover independently resolved chain/release policy, NO RELEASE continuation,
+discarded prefetched commands, both EOF forms, current modes, repeated PING
+condition counts, and real post-disconnect table effects/removal. Coalesced
+commands and split client writes are observed; receive chunking is unasserted.
+Expected stock CLI exits1 remain actual exits1. The unchanged transaction
+observer is reused only for identity/setup/effect/cleanup requests; the new
+entry point and helper retain separate source identities. Existing reference
+corpora and observers retain their bytes.
+
+### Verified correction and evidence
+
+The verified code is clean `085236c11077a71e95c29963eaa30084d30e6ce6`, tree
+`c7766571be56c641ffaeb5955ffc6a1b822ebca4`. All twenty-five required local checks
+are satisfied at that exact revision. The initial matrix records twenty-three
+passes, a stock metadata failure before any lifecycle case, and an unrun PING
+observer. Its actual exit remains1: the author omitted the existing disposable
+fixture client environment. A separate two-command continuation supplies that
+existing setting and exits0; its lifecycle and PING children both exit0. No
+product or credential configuration changed, and successful Rust checks were
+not rerun to conceal the observer setup failure.
+
+Rust/Cargo are1.96.0; fixtures are PostgreSQL17.11 on port32769,
+PostgreSQL18.6 on port32768 and pinned MySQL8.4.11. Every Cargo invocation and
+Cargo-spawning helper uses both task overrides:
+
+```sh
+RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup
+CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target
+```
+
+| Check at the corrected code | Actual result |
+| --- | --- |
+| Owning frontend module, default and BigDecimal, each PostgreSQL version | Four runs, eight groups passed each; zero failed or ignored selected group |
+| Prior transaction module, default and BigDecimal, each PostgreSQL version | Four runs, ten groups passed each |
+| Existing SET and SELECT modules, each PostgreSQL version | Four runs, fourteen SET and six SELECT groups passed per version |
+| Workspace tests/doctests, all features / default | 1,669 / 1,662 passed; zero failed, 60 ignored; required native groups ran separately |
+| Strict workspace/all-targets/all-features and connector Clippy | Both exit0 with `-D warnings` |
+| Three minimal parser builds, format, repository boundary, diff and versions | Seven checks exit0 |
+| Stock lifecycle continuation | 16 cases, 43 real CLI children: 29 actual0, 14 expected actual1; acknowledgments/effects/closure verified, disposable database remaining0 |
+| Stock PING continuation, PyMySQL1.1.2 | Four normal cases, eight actual OK payloads; clean0, warning/error1, successful SET reset0; retained conditions checked separately |
+
+Workspace commands exclude `darmok-postgres-tests`; these are not fresh database
+integration results for that package. Native commands use
+`cargo test -p darmok-execute --lib --locked native_backend::tests::<module> -- --ignored`,
+with `--features sqlparser/bigdecimal` in the declared numeric feature runs.
+Workspace commands use `cargo test --workspace --exclude darmok-postgres-tests --locked`,
+plus `--all-features` for that run. Exact argv, source/tree/status, fixture ports,
+mandatory environment, real exits and raw stream hashes are retained under
+`.darmok-work/logs/frontend-loop-085236c-*`. The audit verifies twenty-two
+nonoverlapping Cargo/helper intervals and binds the failed original matrix and
+successful continuation separately. Its facts SHA256 is
+`08bffc2911a355532b50f1aae81ecf00e5d992c417d267370d557b9d6bac0540`.
+
+Original review at `2cb2667` found PING's hardcoded zero count (F1) and
+split-write wording that overstated TCP receive segmentation (D1). Stock
+standard-client raw packets after invalid sql_mode error1231 are
+`00000002000100`; the old idle proxy would encode `00000002000000`.
+The private canonical statement counter now records all condition levels and
+feeds terminal packet warnings. It is separate from the retained list; current
+admitted SQL replaces both, while PING preserves both. No diagnostic-preserving
+SQL form or warning-producing row execution is invented.
+
+A regression-only revision `8ef6db5` records actual101 at the warning bytes:
+`[0,0,0,3,32,0,0]` versus `[0,0,0,3,32,1,0]`. The prior `e7b4e7a` attempt's
+actual101 is retained separately: its invalid BEGIN READ ONLY precondition
+failed with1064 before PING. The valid fixture uses START TRANSACTION READ ONLY.
+The corrected eight-group runs verify repeated PING1, successful SET/SELECT
+clearing0, readonly status and both EOF capabilities. Earlier client-dependency
+and primary-capture failures remain actual failures; PHP query properties are
+not treated as PING packet proof. GPL source references remain external to the
+Apache distribution.
+
+The independent passive correction review closes F1/D1 with no new functional
+finding. It independently audits the source, valid negative and saved raw
+receipts; it runs no Cargo, SQL or network. Reports/facts/seals live under
+`.darmok-work/logs/review-frontend-loop-085236c-*`; its seal SHA256 is
+`d0d6057a581d66c6445c10fb896b06d56b49fe9d70a79ad7da1fb49e252256bb`. The original review remains sealed separately.
+`.darmok-work/logs/frontend-loop-code-evidence.json` binds the original/corrected
+checks, failures, ordinary stock observations and independent reviews; its
+SHA256 is `c97d488aef7558bbd68dba1990476a0240ed03ad230b735f7ba46e55398e80ae`. These artifacts remain outside the distribution.
+A documentation leaf must preserve every nondocument Git entry from the
+verified code; execution receipts retain the original corrected code identity.
+
+This is a post-handshake command-phase library. Executable/listener/handshake
+integration, public table SQL, catalog validity, native/created-schema workloads,
+full authenticated real-driver/diagnostic/snapshot/lock equivalence, measured
+performance, bounded shutdown and M2/M4 remain incomplete. Security work and
+compiler PR4 source remain excluded. Required hosted CI remains unavailable
+under the separately recorded account condition; local component verification
+justifies neither merge nor release. The full goal remains active.

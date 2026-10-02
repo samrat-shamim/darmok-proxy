@@ -233,6 +233,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-postgres",
+ "tokio-util",
 ]
 
 [[package]]
