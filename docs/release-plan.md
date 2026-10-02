@@ -1800,7 +1800,68 @@ native error cleanup and row waits outside catalog leases.
 
 New module builds and current-source verification on PostgreSQL 17/18 with
 enabled/default two-phase settings, the ordinary owner/CLI matrix and independent
-frozen-source review are required before merging. They have not yet certified
-this replacement. Fresh catalog reads, complete native guards, frontend data
-snapshots, table execution, serving, cache performance and release gates remain
+frozen-source review are required before merging. The subsequent entry records
+the replacement's executed checks. Fresh catalog reads, complete native guards,
+frontend data snapshots, table execution, serving, cache performance and release gates remain
 open. Security work and interruption/stress experiments remain excluded.
+
+### Prepared-completion verification
+
+The clean tested and freshly built revision is
+`202166984df7fb00bd0358c04177ef4c15ee3e13`, tree
+`f35ed2e9f98066beeb08611d6d237ddc0a21619d`. Both module builds, all
+13 setup steps and their enclosing command have actual exit 0. The four profiles
+run pinned PostgreSQL 17.11/18.6 with native two-phase settings 10 or 0; no earlier
+module binary is reused to certify the changed C source. Previously healthy,
+inactive profiles were stopped normally only after native checks found no
+prepared transactions or other client backends. Historical quarantines remain
+untouched.
+
+All 25 serial checks and their enclosing matrix have actual exit 0:
+
+| Check | Executed result |
+| --- | --- |
+| Full PostgreSQL package, PostgreSQL 17/18 | 110 passed each, 0 failed/ignored; 14 summaries each, including 23 catalog lease and 5 namespace groups |
+| Ordinary native owner fixtures, PostgreSQL 17/18 | 66 passed each, 0 failed/ignored, 17 filtered |
+| CLI schema process fixtures, PostgreSQL 17/18 | 3 groups each; 23 child processes each: 11 actual 0, 12 expected 1 |
+| BigDecimal query/TCP transaction fixtures, PostgreSQL 17/18 | Four commands, 10 passed each, 0 failed/ignored |
+| Workspace all/default features | 1682/1675 passed, 0 failed, 79 ignored; 42/41 summaries |
+| Formatting, boundaries, strict workspace/connector Clippy | Four commands, actual 0 |
+| Parser minimal/std/visitor; license; installed artifacts | Six commands, actual 0 |
+| Environment and fixture cleanup | Five environment readers actual 0; both primary servers have 0 prepared transactions, other clients, named lease relations and drop-test databases |
+
+Both majors verify native COMMIT and ROLLBACK of a prepared transaction retaining
+the prepared-transaction view's exclusive lock. The finisher first waits on the
+publication fence, then completes and releases the retained view lock. A second
+fixture proves schema-local text equality differs from native equality, then
+finishes case-distinct GIDs with separate commit/rollback catalog outcomes.
+Prepared pure DML and rolled-back child DDL now explicitly wait for catalog
+readers and advance generation. Queued PREPARE remains private; a finish before
+native validity reports the native missing-GID error. Duplicate/reused GIDs,
+top-level and savepoint native errors, active-lease preparation rejection and
+mixed row/catalog transactions retain their ordinary lifecycle checks.
+
+Immutable receipts are under `.darmok-work/logs/catalog-lease-2021669-*`.
+The enclosing matrix stdout SHA256 is
+`b923b456270c0dde915ab5cc7a303f839ab43052a92256cc85a4799e44365d90`;
+the setup enclosure is
+`3485fb9e9ae802a38a0de08dff3beaa10de359e0b9a7e8c86ea44a49796a6424`.
+Every Cargo invocation and Cargo-spawning helper uses the scoped Rustup and
+target directories, serially. Rust/Cargo 1.96.0 on macOS 26.0.1 arm64 ran the
+Rust checks; pinned Linux arm64 builds supply seven installed artifact hashes
+per major. The SDK package closure and other platforms remain artifact gates.
+
+The author audit has actual exit 0, stdout SHA256
+`d8f3bbaac7d72e418f1a35c7fea9185821f79d46c63e95dd1673af9a231c7d89`.
+Its 2194-file manifest has SHA256
+`973e4e6c1bbd0961a977f01cca7abb5bd12cd42b3d6935f6638d6edac9a9f38a`,
+and facts `daf0f13ec81389fff89e4c34a0b3496171b3d6cdf8cd7f15e861473c49ff6697`.
+It preserves the prior successful matrix, failures and superseded review seals
+under their original revisions. Seventeen exact Git source snapshots also have
+actual exit 0 and match the manifest; their receipt SHA256 is
+`b14254af3e995a5b4c516675c38b0435d2adf13fcf189f0ad2af69537c38c299`.
+This documentation leaf adds the executed evidence without changing module or
+fixture inputs. Independent final review is required before component merge.
+These passes do not certify fresh catalog reads, complete native guards, semantic
+admission, table execution, serving, drivers, cache performance, hosted CI or the
+full release. The goal remains active and the user's exclusions remain in force.
