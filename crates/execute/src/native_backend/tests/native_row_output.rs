@@ -6,7 +6,8 @@ use crate::{NativeResultError, NativeResultUtc, NativeRowFormat, NativeStatement
 use bytes::{Bytes, BytesMut};
 use darmok_protocol::ColumnDefinition;
 use darmok_types::mysql_const::{charset, field_type};
-use futures_util::StreamExt;
+use futures_util::{StreamExt, stream::FusedStream};
+use tokio_postgres::QueryEvent;
 
 fn column(kind: u8) -> ColumnDefinition {
     ColumnDefinition {
@@ -70,34 +71,60 @@ async fn later_returning_output_failure_recovers_writes_and_preserves_outer_work
                         field_type::TINY
                     }),
                 ];
-                let result =
-                    NativeResultUtc::new(NativeStatementUtc::new(&statement).unwrap(), &columns)
-                        .unwrap();
-                let rows = client(scope.backend)
-                    .query_raw(&statement, std::iter::empty::<&i32>())
+                let description = NativeStatementUtc::new(&statement).unwrap();
+                let bindings = description.bind(&[]).unwrap();
+                let portal = client(scope.backend)
+                    .bind_described_builtin(bindings.statement(), bindings.parameters())
                     .await
                     .unwrap();
-                futures_util::pin_mut!(rows);
-                let first = rows.next().await.unwrap().unwrap();
-                assert_eq!(first.get::<_, i32>(0), 3);
+                let checked = description.check_portal(&portal).unwrap();
+                let result = NativeResultUtc::from_portal(checked, &columns).unwrap();
+                let mut events = client(scope.backend)
+                    .query_portal_events(&portal, 0)
+                    .unwrap();
                 let mut output = BytesMut::from(b"prefix".as_slice());
-                result.encode_row(&first, format, &mut output).unwrap();
-                assert_eq!(scope.backend.state(), expected_state);
-                let valid_output = output.clone();
-                let second = rows.next().await.unwrap().unwrap();
-                assert_eq!(second.get::<_, i32>(0), 1000);
-                let error = result.encode_row(&second, format, &mut output).unwrap_err();
-                if decode_error {
-                    assert!(matches!(error, NativeResultError::Statement(_)));
-                } else {
-                    assert!(matches!(
-                        error,
-                        NativeResultError::Encoding { column: 1, .. }
-                    ));
+                let mut rows = 0;
+                let mut tag = None;
+                let mut ready = None;
+                while let Some(event) = events.next().await {
+                    assert!(ready.is_none());
+                    assert_eq!(scope.backend.state(), expected_state);
+                    match event.unwrap() {
+                        QueryEvent::Row(row) => {
+                            rows += 1;
+                            assert!(std::ptr::eq(row.columns(), portal.columns().unwrap()));
+                            if rows == 1 {
+                                assert_eq!(row.get::<_, i32>(0), 3);
+                                result.encode_row(&row, format, &mut output).unwrap();
+                            } else {
+                                assert_eq!(rows, 2);
+                                assert_eq!(row.get::<_, i32>(0), 1000);
+                                let valid_output = output.clone();
+                                let error =
+                                    result.encode_row(&row, format, &mut output).unwrap_err();
+                                if decode_error {
+                                    assert!(matches!(error, NativeResultError::Statement(_)));
+                                } else {
+                                    assert!(matches!(
+                                        error,
+                                        NativeResultError::Encoding { column: 1, .. }
+                                    ));
+                                }
+                                assert_eq!(output, valid_output);
+                            }
+                        }
+                        QueryEvent::CommandComplete(value) => {
+                            assert!(tag.is_none());
+                            tag = Some(value);
+                        }
+                        QueryEvent::ReadyForQuery(state) => ready = Some(state),
+                        other => panic!("unexpected {other:?}"),
+                    }
                 }
-                assert_eq!(output, valid_output);
-                assert!(rows.next().await.is_none());
-                assert_eq!(rows.rows_affected(), Some(2));
+                assert!(events.is_terminated());
+                assert_eq!(rows, 2);
+                assert_eq!(tag.as_deref(), Some("SELECT 2"));
+                assert_eq!(ready, Some(TransactionState::Transaction));
                 assert_eq!(scope.backend.state(), expected_state);
                 assert_eq!(
                     values(scope.backend).await,
@@ -107,6 +134,9 @@ async fn later_returning_output_failure_recovers_writes_and_preserves_outer_work
                         vec![1, 3, 1000]
                     }
                 );
+                drop(events);
+                drop(portal);
+                drop(statement);
                 let completion = scope.recover(NativeRecovery::Statement).await.unwrap();
                 assert_eq!(
                     completion.control(),
@@ -183,23 +213,42 @@ async fn returning_rows_are_encoded_before_confirmed_scope_finish() {
                 .await
                 .unwrap();
             let columns = [column(field_type::LONG)];
-            let result =
-                NativeResultUtc::new(NativeStatementUtc::new(&statement).unwrap(), &columns)
-                    .unwrap();
-            let rows = client(scope.backend)
-                .query_raw(&statement, std::iter::empty::<&i32>())
+            let description = NativeStatementUtc::new(&statement).unwrap();
+            let bindings = description.bind(&[]).unwrap();
+            let portal = client(scope.backend)
+                .bind_described_builtin(bindings.statement(), bindings.parameters())
                 .await
                 .unwrap();
-            futures_util::pin_mut!(rows);
-            assert_eq!(rows.rows_affected(), None);
+            let checked = description.check_portal(&portal).unwrap();
+            let result = NativeResultUtc::from_portal(checked, &columns).unwrap();
+            let mut events = client(scope.backend)
+                .query_portal_events(&portal, 0)
+                .unwrap();
+            let mut rows = 0;
+            let mut tag = None;
+            let mut ready = None;
             let mut output = BytesMut::new();
-            while let Some(row) = rows.next().await {
-                result
-                    .encode_row(&row.unwrap(), format, &mut output)
-                    .unwrap();
+            while let Some(event) = events.next().await {
+                assert!(ready.is_none());
                 assert_eq!(scope.backend.state(), expected_state);
+                match event.unwrap() {
+                    QueryEvent::Row(row) => {
+                        rows += 1;
+                        assert!(std::ptr::eq(row.columns(), portal.columns().unwrap()));
+                        result.encode_row(&row, format, &mut output).unwrap();
+                    }
+                    QueryEvent::CommandComplete(value) => {
+                        assert!(tag.is_none());
+                        tag = Some(value);
+                    }
+                    QueryEvent::ReadyForQuery(state) => ready = Some(state),
+                    other => panic!("unexpected {other:?}"),
+                }
             }
-            assert_eq!(rows.rows_affected(), Some(2));
+            assert!(events.is_terminated());
+            assert_eq!(rows, 2);
+            assert_eq!(tag.as_deref(), Some("SELECT 2"));
+            assert_eq!(ready, Some(TransactionState::Transaction));
             assert_eq!(
                 output.as_ref(),
                 if format == NativeRowFormat::Text {
@@ -208,6 +257,9 @@ async fn returning_rows_are_encoded_before_confirmed_scope_finish() {
                     &[0, 0, 3, 0, 0, 0, 0, 0, 4, 0, 0, 0][..]
                 }
             );
+            drop(events);
+            drop(portal);
+            drop(statement);
             let completion = scope.finish().await.unwrap();
             assert_eq!(
                 completion.control(),
