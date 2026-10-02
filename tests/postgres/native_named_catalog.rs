@@ -1,6 +1,6 @@
 use darmok_catalog::{
     CatalogError, NamedNativeCatalog, NativeRelationName, RelationPersistence,
-    read_native_named_relations,
+    TypeKind, read_native_named_relations, read_native_relations,
 };
 use tokio_postgres::{Client, GenericClient, NoTls, error::SqlState, types::Type};
 
@@ -397,4 +397,40 @@ async fn named_resolution_and_facts_honor_the_same_repeatable_read_snapshot() {
     drop(external);
     connection.await.unwrap().unwrap();
     external_connection.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn native_types_named_text_cannot_change_catalog_query_representation() {
+    let (mut client, connection) = database_client().await;
+    let tx = client.transaction().await.unwrap();
+    tx.batch_execute(
+        r#"CREATE SCHEMA "Named Builtins";
+        CREATE DOMAIN "Named Builtins".text AS pg_catalog.int4;
+        CREATE TABLE "Named Builtins".items (
+            native "Named Builtins".text, builtin pg_catalog.text
+        );
+        SET LOCAL search_path TO "Named Builtins", pg_catalog;"#,
+    )
+    .await
+    .unwrap();
+    let named = read_native_named_relations(&tx, &[name("Named Builtins", "items")])
+        .await
+        .unwrap();
+    let oid = named.relation_oids()[0];
+    let relation = &named.catalog().relations[&oid];
+    let domain_oid = relation.columns[0].declared_type_oid;
+    assert_ne!(domain_oid, Type::TEXT.oid());
+    assert_eq!(relation.columns[1].declared_type_oid, Type::TEXT.oid());
+    let domain = &named.catalog().types[&domain_oid];
+    assert_eq!(domain.kind, TypeKind::Domain);
+    assert_eq!(domain.schema_name, "Named Builtins");
+    assert_eq!(domain.name, "text");
+    assert_eq!(domain.domain.unwrap().base_type_oid, Type::INT4.oid());
+    assert_eq!(
+        &read_native_relations(&tx, &[oid]).await.unwrap(),
+        named.catalog()
+    );
+    tx.rollback().await.unwrap();
+    drop(client);
+    connection.await.unwrap().unwrap();
 }
