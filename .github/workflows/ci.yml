@@ -59,7 +59,7 @@ jobs:
             image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     env:
       DARMOK_TEST_DATABASE_URL: postgres://postgres:darmok-test@localhost:5432/darmok_test
-      DARMOK_TEST_TWO_PHASE_DATABASE_URL: postgres://postgres:darmok-test@localhost:5433/darmok_test
+      DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL: postgres://postgres:darmok-test@localhost:5433/darmok_test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -82,43 +82,43 @@ jobs:
             --health-interval 1s --health-timeout 3s --health-retries 30 \
             'darmok-server-test:${{ matrix.version }}' \
             postgres -c shared_preload_libraries=darmok_server \
-            -c max_prepared_transactions=0
-          docker run --detach --name darmok-server-two-phase-test \
+            -c max_prepared_transactions=10
+          docker run --detach --name darmok-server-no-two-phase-test \
             --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=darmok-test \
             --env POSTGRES_DB=darmok_test --publish 127.0.0.1:5433:5432 \
             --health-cmd 'pg_isready -h 127.0.0.1 -U postgres -d darmok_test' \
             --health-interval 1s --health-timeout 3s --health-retries 30 \
             'darmok-server-test:${{ matrix.version }}' \
             postgres -c shared_preload_libraries=darmok_server \
-            -c max_prepared_transactions=10
+            -c max_prepared_transactions=0
           darmok_server_ready=false
           for darmok_attempt in {1..30}; do
             darmok_server_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-test)
-            darmok_two_phase_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-two-phase-test)
-            if [ "$darmok_server_health" = healthy ] && [ "$darmok_two_phase_health" = healthy ]; then
+            darmok_no_two_phase_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-no-two-phase-test)
+            if [ "$darmok_server_health" = healthy ] && [ "$darmok_no_two_phase_health" = healthy ]; then
               darmok_server_ready=true
               break
             fi
-            if [ "$darmok_server_health" = unhealthy ] || [ "$darmok_two_phase_health" = unhealthy ]; then
+            if [ "$darmok_server_health" = unhealthy ] || [ "$darmok_no_two_phase_health" = unhealthy ]; then
               docker logs darmok-server-test
-              docker logs darmok-server-two-phase-test
+              docker logs darmok-server-no-two-phase-test
               exit 1
             fi
             sleep 1
           done
           if [ "$darmok_server_ready" != true ]; then
             docker logs darmok-server-test
-            docker logs darmok-server-two-phase-test
+            docker logs darmok-server-no-two-phase-test
             exit 1
           fi
           docker exec darmok-server-test psql --username postgres --dbname darmok_test \
             --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
             >'${{ runner.temp }}/darmok-server-evidence/install.stdout' \
             2>'${{ runner.temp }}/darmok-server-evidence/install.stderr'
-          docker exec darmok-server-two-phase-test psql --username postgres --dbname darmok_test \
+          docker exec darmok-server-no-two-phase-test psql --username postgres --dbname darmok_test \
             --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
-            >'${{ runner.temp }}/darmok-server-evidence/install-two-phase.stdout' \
-            2>'${{ runner.temp }}/darmok-server-evidence/install-two-phase.stderr'
+            >'${{ runner.temp }}/darmok-server-evidence/install-no-two-phase.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/install-no-two-phase.stderr'
       - name: Required PostgreSQL tests
         run: cargo test -p darmok-postgres-tests --locked
       - name: Preserve server build and diagnostics
@@ -129,11 +129,11 @@ jobs:
             2>'${{ runner.temp }}/darmok-server-evidence/server.stderr'
           docker inspect darmok-server-test \
             >'${{ runner.temp }}/darmok-server-evidence/container.json'
-          docker logs darmok-server-two-phase-test \
-            >'${{ runner.temp }}/darmok-server-evidence/server-two-phase.stdout' \
-            2>'${{ runner.temp }}/darmok-server-evidence/server-two-phase.stderr'
-          docker inspect darmok-server-two-phase-test \
-            >'${{ runner.temp }}/darmok-server-evidence/container-two-phase.json'
+          docker logs darmok-server-no-two-phase-test \
+            >'${{ runner.temp }}/darmok-server-evidence/server-no-two-phase.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/server-no-two-phase.stderr'
+          docker inspect darmok-server-no-two-phase-test \
+            >'${{ runner.temp }}/darmok-server-evidence/container-no-two-phase.json'
       - name: Upload server module evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

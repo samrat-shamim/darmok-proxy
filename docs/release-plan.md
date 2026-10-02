@@ -1644,20 +1644,28 @@ drivers, measured performance, complete artifacts and the final release.
 The project-owned PostgreSQL17/18 module in `postgres/darmok_server` supplies a
 transaction-owned read fence and generation stamp. Its native mechanisms live
 in a separate, versioned `darmok_server` extension namespace; SQL compatibility
-functions remain in `darmok`. The selected initial lease profile requires a
-primary with `max_prepared_transactions=0`, separate from planned MySQL prepared
-statement support. Native 2PC is already outside the advertised first-release
-distributed-transaction scope. This footprint choice is an implementation
-decision, not an additional user approval or a certification of row execution.
+functions remain in `darmok`. Concurrent native PostgreSQL two-phase transactions are required for v0.1 per
+the user's selected footprint. MySQL prepared statements and MySQL XA remain
+separate features; no server-setting restriction substitutes for this native
+concurrency requirement. Security-related work remains deferred.
 
-The [lease contract](server-catalog-lease.md) specifies per-commit catalog
-publication fencing, savepoint ownership, private metadata invalidation,
-cluster/connection identity, the broad DDL contention tradeoff and the two-call
-cost boundary. Holding a session fence across concurrent index phases is
-rejected because it can deadlock old-snapshot waits. Passing a catalog-only
-prepared-DDL fixture does not certify leased row execution; enabled native 2PC
-therefore produces an explicit lease-profile error. The module does not change
-server configuration or add routing/authentication/grant policy.
+The [lease contract](server-catalog-lease.md) now limits the global lease to
+admitted catalog phases. Complete native dependencies are acquired outside the
+lease and retained after it ends, before row execution. This is mandatory for
+prepared transactions that combine DDL in one relation with row locks in another.
+Ordinary metadata publication is fenced at native pre-commit; irreversible shared
+drops use their native object boundary. A session GID gate and transaction marker
+coordinate SQL two-phase preparation/completion without fencing proven pure DML.
+Native invalidation state distinguishes surviving metadata from rolled-back child
+DDL. Exit-time publishers process pending native storage barriers at their narrow
+pre-commit boundary and stop new reader admission while draining current leases.
+
+The earlier candidate `3e21463` passed catalog fixtures but its ordinary native
+owner regression encountered a database-removal/temp-cleanup barrier deadlock.
+That failure remains preserved and blocks acceptance of that revision. Revised
+source must pass both PostgreSQL versions, the default/enabled 2PC settings,
+prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
+The module does not change server configuration or add routing/auth/grant policy.
 
 Required current-revision builds, PostgreSQL fixtures, local command matrix and
 independent review are recorded in the subsequent evidence entry. Earlier draft

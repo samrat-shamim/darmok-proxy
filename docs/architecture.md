@@ -160,9 +160,11 @@ first release. Security-related extension work remains deferred.
 The [server catalog lease](server-catalog-lease.md) supplies the initial
 generation/publication primitive. It uses a separate `darmok_server` namespace
 for native mechanisms and keeps SQL compatibility functions in `darmok`.
-Its first-release lease profile requires a primary server with native two-phase
-transactions disabled (`max_prepared_transactions=0`). MySQL prepared statements
-remain a separate planned protocol feature. Combined explicit initialization/
+The primary-server target supports concurrent native two-phase transactions.
+Global leases cover admitted catalog resolution/validation only; complete native
+dependency guards must be acquired outside the lease and retained through row
+execution after the lease ends. MySQL prepared statements remain a separate
+planned protocol feature. Combined explicit initialization/
 verification, fresh leased catalog snapshots, owning scope integration, cache
 admission and table execution remain required; the primitive alone does not
 close the catalog validity gate.

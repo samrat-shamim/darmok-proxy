@@ -15,18 +15,14 @@ extension has version `1.0`; its namespace is `darmok_server`, separate from the
 SQL compatibility functions in `darmok`. Current `init`/`schema verify` cover only
 the latter. Combined installation and exact module verification remain pending.
 
-Leases require a primary server and `max_prepared_transactions=0`. This is
-PostgreSQL's [default native two-phase transaction setting](https://www.postgresql.org/docs/18/runtime-config-resource.html#GUC-MAX-PREPARED-TRANSACTIONS),
-and is separate from MySQL prepared statements. A prepared DDL transaction can
-retain table locks indefinitely; a leased row execution waiting for that table
-would also block the fenced prepared completion. The selected first-release
-profile excludes that dependency explicitly. Acquisition reports an error when
-native 2PC is enabled and does not change the server configuration. The preloaded
-module still chains native utility hooks in an unleased server with 2PC enabled.
+Leases require a primary server. Concurrent native PostgreSQL two-phase
+transactions are part of the v0.1 target; `max_prepared_transactions` may be
+nonzero. This is separate from MySQL prepared statements and MySQL XA support.
+The module does not change the server configuration.
 
 WAL replay does not execute these utility hooks, so a standby cannot supply
-this coordination mechanism. Counter exhaustion fails before effects; identities
-never wrap. Each server start establishes a new 128-bit random incarnation, and
+this coordination mechanism. Counter exhaustion fails before publication, including before irreversible
+shared-drop effects; identities never wrap. Each server start establishes a new 128-bit random incarnation, and
 each participating backend receives an increasing identifier. Persistent cache
 identities cannot assume generations survive a server restart or reuse a backend
 identifier without its incarnation.
@@ -70,43 +66,122 @@ error. The local catalog generation invalidates private facts on metadata rollba
 or transaction prepare, while metadata-free transactions retain reusable catalog
 identity. Handles and catalog cache identities have different lifetimes.
 
-The future owning executor must hold the lease through catalog resolution,
-prepare/bind, execution and output validation, then end it before finishing the
-native scope. Dropped or failed scopes cannot assert a live lease. This API does
-not grant semantic approval to arbitrary SQL or effectful native functions.
+The global lease covers only admitted catalog resolution and validation. It
+must end before any operation that can wait for user-relation, tuple, transaction
+ID or user locks. PostgreSQL planning can execute user/support functions; planning
+is not inherently safe under this lease. The future admission boundary must prove
+its permitted preparation paths cannot perform those waits.
+
+The required statement sequence is:
+
+1. Read dependencies using fixed, fresh, non-row-locking catalog operations under
+   a discovery lease; then end that lease.
+2. Acquire the complete native relation/object dependency guards outside the
+   global lease. These waits may include prepared transactions.
+3. Reacquire a catalog lease and resolve under a fresh snapshot. Validate that
+   dependencies are closed and unchanged. If another dependency is found, end
+   the lease and restart before effects; never acquire another guard under it.
+4. Prepare and validate only admitted nonblocking paths, then end the global
+   lease before row execution.
+5. Retain the complete dependency guards through execution and output validation.
+
+These guards, fresh reads and semantic admission are still required components.
+The global lease alone cannot protect a running plan. Native object replacements
+without sufficient native locking also need a verified guard integration.
+Dropped or failed scopes cannot assert a live lease.
 
 ## Catalog publication
 
-The module uses a synthetic cluster-wide object lock in PostgreSQL's default lock
-method: database zero, `pg_extension` class, object zero and sub-ID `0x444d`. A
-zero object OID cannot name an extension. The lock is distinct from user advisory
-locks. Readers take `ShareLock`; metadata writers take `ExclusiveLock`.
+The global fence is a synthetic object lock in PostgreSQL's default lock method:
+database zero, `pg_extension` class, object zero and sub-ID `0x444d`. A zero object
+OID cannot name an extension. Readers take `ShareLock`; metadata publishers take
+`ExclusiveLock`. User advisory locks use a separate lock method.
 
-The utility hook fences metadata utilities before their effects and advances the
-generation. Known transaction/session/data-only utilities do not require this
-fence. Unknown utility variants receive the stronger lock; this conservative lock
-classification is not an SQL-admission fallback. Object create/alter/drop hooks
-cover catalog mutations outside an enclosing metadata utility. Existing hooks
-are chained, including object access events unrelated to metadata mutation.
+Ordinary metadata utilities mark the backend's private catalog identity before
+attempting changes. They acquire the global fence at native pre-commit, after
+the utility's normal dependency locks/effects and deferred triggers. The module
+inspects PostgreSQL's pending transactional invalidations through
+[`xactGetCommittedInvalidationMessages`](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/inval.c),
+which does not consume them. Native subabort removes a child's messages. A
+rolled-back child DDL or a no-effect utility does not become a surviving metadata
+publication merely because it was attempted. Private identity may still advance
+conservatively. Ordinary DML without catalog publication takes no writer fence.
 
-A writer keeps the transaction fence through native catalog invalidation
-publication and lock cleanup. A waiting reader consumes invalidations after
-acquiring its fence. An aborted DDL attempt may advance the generation without
-changing committed facts; this is a conservative cache miss.
+The pre-commit callback precedes native ON COMMIT actions. Core temporary-object
+drops are also covered by object hooks after the callback starts. Arbitrary
+extension callbacks that introduce new blocking dependencies after this boundary
+need their own ordering proof and are outside this contract. Physical statistics,
+storage mappings and sequence values are not immutable schema dependencies;
+this mechanism does not freeze those non-MVCC values.
 
-Internally committing utilities, including concurrent index creation, receive a
-writer fence and generation advance at each publication. Internal commits are
-fenced by the pre-commit callback; a new final transaction still open when the
-utility returns receives both before the outer commit. Thus the committed
-ready-but-invalid index and its final valid state have distinct cache identities.
-Readers can run between phases and
-see PostgreSQL's committed intermediate catalog state. Holding one exclusive
-session fence across all phases is incorrect: the utility can wait for an old
-reader snapshot while that reader waits for the fence. The publication boundary
-follows PostgreSQL's [transaction implementation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/transam/xact.c),
-where invalidations precede transaction-lock cleanup. Callbacks after commit do
-not throw or reacquire locks. A catalog-only prepared-transaction fixture is not
-evidence of safe leased row execution through prepared DDL.
+A writer retains its transaction fence through native catalog invalidation and
+lock cleanup. Waiting readers consume invalidations after acquisition. Internal
+commits, including concurrent index phases, each get a new publication generation.
+The final valid-index transition is fenced at the final transaction's pre-commit.
+No session fence spans the old-snapshot waits between phases.
+
+`DROP DATABASE` changes its invalid marker in place before commit. Its native
+drop hook therefore acquires the fence after database lookup/locking and before
+that change. A tablespace drop is likewise fenced at its native drop hook before
+irreversible directory removal. Taking either fence at utility entry would
+reverse the native dependency ordering. Database moves retain native database
+locks across their file-copy and internal commit; their transactional catalog
+publication receives the ordinary commit fence.
+
+## Prepared transactions
+
+PREPARE does not publish metadata and never transfers the global fence. The
+module intentionally transfers a separate default-method object marker keyed by
+physical database, exact native XID and sub-ID `0x444e`. `AccessShareLock` proves
+participation; an additional `RowExclusiveLock` marks pending catalog publication.
+PostgreSQL's native [lock two-phase records](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/lmgr/lock.c)
+persist, transfer and recover these tag/mode pairs. This recovery argument is
+based on native source; the ordinary fixtures do not run restart experiments.
+
+PREPARE, COMMIT PREPARED and ROLLBACK PREPARED acquire a default-method **session**
+gate keyed by a GID hash and sub-ID `0x444f`. It is held through the entire native
+command and released on errors; it is never transferred to a prepared transaction.
+Hash collisions only add serialization. The gate prevents completion and GID
+reuse from changing the target between the exact native `pg_prepared_xacts`
+lookup, conditional XID-marker probes and native completion. A metadata-marked
+completion takes the publication fence; a proven metadata-free one does not.
+An unmarked prepared transaction has no metadata-free proof and receives the
+publication fence. Native database, ownership and busy checks still run.
+
+The creation/completion ordering covers native SQL utility entry. Direct calls
+to `FinishPreparedTransaction` by custom modules bypass that hook and are outside
+the metadata-publication contract. PostgreSQL logical replication also has direct
+native callers; native replication is not a schema/DDL publication integration
+provided by this module.
+
+A prepared transaction can alter table A while holding row locks in unrelated
+B. A query waiting on B while holding the global lease would block completion
+of that transaction. Prelocking B alone does not solve this cycle. Ending the
+global lease before row execution is mandatory even with complete dependencies.
+
+## Backend exit and native barriers
+
+Native temporary-table cleanup runs before the exiting backend retires its
+process-signal slot. Exit suppresses ordinary interrupt handling. A backend
+waiting for the global fence there could prevent a database-removal storage
+barrier from completing while removal owns that same fence.
+
+At the temporary cleanup's pre-commit boundary, after its deletion/storage calls
+have returned, the module uses conditional fence acquisition and absorbs pending
+native process-signal barriers. It requires the original exit interrupt holdoff
+of one and no critical section, and never resets interrupt counters or processes
+cancel/termination requests. This follows the native
+[process-signal barrier](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/ipc/procsignal.c)
+and [storage reentrancy](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/smgr/smgr.c)
+constraints. Other exit-time publication boundaries fail explicitly.
+
+An exiting publisher advertises shared intent while waiting. New lease requests
+wait without holding the global read fence, and recheck intent after acquiring
+it to close the admission race. Existing leases can finish. This prevents new
+readers from starving a conditional writer that is not in the native lock queue.
+A condition variable wakes readers; native exit/error cleanup clears the intent.
+The exceptional exit path has a 100ms timed latch fallback for lock availability;
+ordinary acquisition continues to use the native lock queue.
 
 ## Caller requirements and limits
 
@@ -119,7 +194,7 @@ which this module does not implement.
 The stamp is only one part of a cache key. Physical/backend identity, route,
 schema, SQL mode, charset/collation, time zone, parameter shape, installation
 version and semantic dependencies remain required. Private facts cannot move
-between owners. Prepared plans require the same live lease as text queries.
+between owners. Prepared plans require the same dependency validation as text queries.
 
 This mechanism coordinates ordinary PostgreSQL catalog utilities and native
 object hooks on the supported primary versions. Direct system-catalog DML,
@@ -138,7 +213,11 @@ argument before replacing this mechanism.
 
 The module runs no SQL during acquisition or release. It uses fixed backend
 state, one backend-identity atomic allocation per participating connection,
-ordinary native lock ownership and per-acquisition result allocation. Local
+ordinary native lock ownership and per-acquisition result allocation.
+Two atomic intent reads are added to uncontended acquisition. Publication
+inspection copies pending native invalidations only when present; prepared
+commands add a session gate and fixed native catalog lookup/marker probes,
+without adding SQL to ordinary lease acquisition or release. Local
 lease numbers avoid a shared atomic allocation on every request. Separate fixed
 begin/end queries cost two protocol round trips; an explicit check adds one.
 The bounded sequential fixture measures those two calls, not proxy throughput,
@@ -147,7 +226,9 @@ cache hit rates, catalog-read cost or parallel contention.
 Required native fixtures exercise actual fence grants/waits, simultaneous
 readers, ordinary DML, external relation/schema/function/type/domain/collation
 DDL, drop/recreate, metadata rollback, savepoint ownership, concurrent index
-publication, cross-database hooks and explicit profile errors. Missing module
+publication, cross-database hooks, enabled/default 2PC profiles, prepared DDL/DML,
+rolled-back child DDL, mixed prepared row/catalog changes and normal temp-backend
+exit during database removal. Missing module
 dependencies fail. The Docker build installs the shared library, LLVM bitcode,
 extension SQL/control files and Apache license; SDK tools stay in the build
 stage. Other platform packages, hosted CI execution and the full artifact/

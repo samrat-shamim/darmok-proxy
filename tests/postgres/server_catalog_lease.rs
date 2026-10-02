@@ -301,11 +301,6 @@ async fn readers_coexist_with_dml_and_fence_external_metadata_variants() {
         "ALTER SCHEMA lease_variants RENAME TO lease_variants_renamed",
     ];
     for (index, sql) in variants.iter().enumerate() {
-        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-        observer.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let before = begin(&reader).await;
-        let second = begin(&observer).await;
-        assert_eq!(before.generation, second.generation);
         if index == 0 {
             writer
                 .batch_execute("UPDATE lease_variants.items SET value = 2 WHERE id = 1")
@@ -318,6 +313,11 @@ async fn readers_coexist_with_dml_and_fence_external_metadata_variants() {
                 .get(0);
             assert_eq!(value, 2);
         }
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        observer.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&reader).await;
+        let second = begin(&observer).await;
+        assert_eq!(before.generation, second.generation);
         let ddl = writer.batch_execute(sql);
         tokio::pin!(ddl);
         tokio::select! {
@@ -424,13 +424,12 @@ async fn native_commit_and_rollback_release_unfinished_leases() {
 }
 
 #[tokio::test]
-async fn uncommitted_ddl_and_failed_ddl_hold_or_release_native_writer_ownership() {
+async fn ordinary_ddl_fences_publication_after_native_locks_and_effects() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
     let (writer, writer_driver) = client().await;
     let (observer, observer_driver) = client().await;
     let writer_pid = pid(&writer).await;
-    let reader_pid = pid(&reader).await;
     writer
         .batch_execute("CREATE TABLE lease_writer(id integer)")
         .await
@@ -443,25 +442,32 @@ async fn uncommitted_ddl_and_failed_ddl_hold_or_release_native_writer_ownership(
         .batch_execute("BEGIN; SAVEPOINT child; ALTER TABLE lease_writer ADD COLUMN hidden integer; RELEASE child")
         .await
         .unwrap();
-    wait_fence(&observer, writer_pid, "ExclusiveLock", true).await;
+    no_fence(&observer, writer_pid).await;
     reader.batch_execute("BEGIN").await.unwrap();
-    let mut reading = Box::pin(begin(&reader));
-    tokio::select! {
-        stamp = &mut reading => panic!("lease admitted during uncommitted DDL: {stamp:?}"),
-        () = wait_fence(&observer, reader_pid, "ShareLock", false) => {}
-    }
-    writer.batch_execute("ROLLBACK").await.unwrap();
-    let after = tokio::time::timeout(Duration::from_secs(20), &mut reading)
-        .await
-        .unwrap();
-    drop(reading);
-    assert!(after.generation > before.generation);
+    let during = begin(&reader).await;
+    assert_eq!(during.generation, before.generation);
     let columns: i64 = reader
         .query_one("SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_writer'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[])
         .await
         .unwrap()
         .get(0);
     assert_eq!(columns, 1);
+    let mut committing = Box::pin(writer.batch_execute("COMMIT"));
+    tokio::select! {
+        result = &mut committing => panic!("DDL published through a held catalog lease: {result:?}"),
+        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+    }
+    check(&reader, &during).await;
+    end(&reader, &during).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut committing)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(committing);
+    reader.batch_execute("BEGIN").await.unwrap();
+    let after = begin(&reader).await;
+    assert!(after.generation > before.generation);
     end(&reader, &after).await;
     reader.batch_execute("COMMIT").await.unwrap();
     writer
@@ -520,7 +526,7 @@ async fn own_metadata_mutation_requires_ending_the_lease_first() {
         .await
         .unwrap();
     let changed = begin(&reader).await;
-    assert!(changed.generation > active.generation);
+    assert_eq!(changed.generation, active.generation);
     assert!(changed.local_generation > active.local_generation);
     check(&reader, &changed).await;
     end(&reader, &changed).await;
@@ -713,11 +719,40 @@ async fn concurrent_index_final_valid_transition_has_distinct_generation() {
     );
 }
 
+async fn wait_native_lock(observer: &Client, backend: i32, query_prefix: &str) {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let waiting: bool = observer.query_one(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock' AND starts_with(query, $2))", &[&backend, &query_prefix]
+            ).await.unwrap().get(0);
+            if waiting { return; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.expect("native dependency wait was not observed");
+}
+
+async fn prepared_marker_modes(observer: &Client, gid: &str) -> Vec<String> {
+    observer
+        .query(
+            "SELECT l.mode FROM pg_catalog.pg_locks l JOIN pg_catalog.pg_prepared_xacts p
+         ON l.objid::text = p.transaction::text
+         WHERE l.locktype = 'object' AND l.classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+         AND l.objsubid = 17486 AND l.pid IS NULL AND l.granted AND p.gid = $1
+         ORDER BY l.mode",
+            &[&gid],
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect()
+}
+
 #[tokio::test]
-async fn enabled_native_two_phase_profile_rejects_leases_without_stranding_ddl() {
+async fn default_native_two_phase_setting_also_allows_catalog_leases() {
     let _serial = TEST_SERIAL.lock().await;
-    let url = std::env::var("DARMOK_TEST_TWO_PHASE_DATABASE_URL")
-        .expect("DARMOK_TEST_TWO_PHASE_DATABASE_URL must name a disposable module server with native 2PC enabled");
+    let url = std::env::var("DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL")
+        .expect("DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL must name a disposable module server with native 2PC disabled");
     let (reader, driver) = tokio_postgres::connect(&url, NoTls).await.unwrap();
     let reader_driver = tokio::spawn(driver);
     let enabled: i32 = reader
@@ -728,48 +763,403 @@ async fn enabled_native_two_phase_profile_rejects_leases_without_stranding_ddl()
         .await
         .unwrap()
         .get(0);
-    assert!(enabled >= 1);
+    assert_eq!(enabled, 0);
     reader.batch_execute("BEGIN").await.unwrap();
-    let error = reader.query_one(BEGIN_LEASE, &[]).await.unwrap_err();
-    assert_eq!(error.code(), Some(&SqlState::FEATURE_NOT_SUPPORTED));
-    assert_eq!(
-        error.as_db_error().unwrap().message(),
-        "catalog leases require max_prepared_transactions=0"
-    );
-    reader.batch_execute("ROLLBACK").await.unwrap();
-    no_fence(&reader, pid(&reader).await).await;
-    // The profile error does not rewrite configuration or disable ordinary
-    // native transactions. Global utility hooks must not strand their locks.
-    reader
-        .batch_execute("CREATE TABLE lease_two_phase_profile(id integer)")
+    let stamp = begin(&reader).await;
+    check(&reader, &stamp).await;
+    end(&reader, &stamp).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    close(reader, reader_driver).await;
+}
+
+#[tokio::test]
+async fn prepared_dml_and_rolled_back_child_ddl_do_not_fence_catalog_readers() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (rows, rows_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let enabled: i32 = observer
+        .query_one(
+            "SELECT current_setting('max_prepared_transactions')::integer",
+            &[],
+        )
         .await
-        .unwrap();
-    for (index, outcome) in ["COMMIT", "ROLLBACK"].iter().enumerate() {
-        reader.batch_execute(&format!(
-            "BEGIN; ALTER TABLE lease_two_phase_profile ADD COLUMN change_{index} integer; PREPARE TRANSACTION 'darmok_lease_profile'"
+        .unwrap()
+        .get(0);
+    assert!(
+        enabled >= 2,
+        "required concurrent native 2PC fixture is unavailable"
+    );
+    writer.batch_execute("CREATE TABLE lease_prepared_dml(id integer PRIMARY KEY, value integer); INSERT INTO lease_prepared_dml VALUES (1, 1)").await.unwrap();
+    let rows_pid = pid(&rows).await;
+    for (index, outcome) in ["COMMIT", "ROLLBACK", "COMMIT", "ROLLBACK"]
+        .iter()
+        .enumerate()
+    {
+        let child = if index >= 2 {
+            "SAVEPOINT child; ALTER TABLE lease_prepared_dml ADD COLUMN rolled_back integer; ROLLBACK TO child; RELEASE child;"
+        } else {
+            ""
+        };
+        writer.batch_execute(&format!(
+            "BEGIN; {child} UPDATE lease_prepared_dml SET value = value + 10; PREPARE TRANSACTION 'darmok_prepared_dml'"
         )).await.unwrap();
-        let count: i64 = reader
-            .query_one("SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objid = 0 AND objsubid = 17485", &[])
-            .await.unwrap().get(0);
         assert_eq!(
-            count, 0,
-            "synthetic fences must not transfer to native prepared transactions"
+            prepared_marker_modes(&observer, "darmok_prepared_dml").await,
+            ["AccessShareLock"]
         );
-        reader
-            .batch_execute(&format!("{outcome} PREPARED 'darmok_lease_profile'"))
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let stamp = begin(&reader).await;
+        rows.batch_execute("BEGIN; LOCK TABLE lease_prepared_dml IN ROW EXCLUSIVE MODE")
             .await
             .unwrap();
-        no_fence(&reader, pid(&reader).await).await;
+        let mut updating =
+            Box::pin(rows.batch_execute("UPDATE lease_prepared_dml SET value = value + 1"));
+        tokio::select! {
+            result = &mut updating => panic!("row update did not wait for the prepared native transaction: {result:?}"),
+            () = wait_native_lock(&observer, rows_pid, "UPDATE lease_prepared_dml") => {}
+        }
+        // This row waiter owns no catalog lease. The separate catalog reader
+        // still owns one, and metadata-free prepared completion does not wait.
+        tokio::time::timeout(
+            Duration::from_secs(20),
+            writer.batch_execute(&format!("{outcome} PREPARED 'darmok_prepared_dml'")),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        check(&reader, &stamp).await;
+        tokio::time::timeout(Duration::from_secs(20), &mut updating)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(updating);
+        rows.batch_execute("COMMIT").await.unwrap();
+        end(&reader, &stamp).await;
+        reader.batch_execute("COMMIT; BEGIN").await.unwrap();
+        let after = begin(&reader).await;
+        assert_eq!(after.generation, stamp.generation);
+        end(&reader, &after).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        assert!(
+            prepared_marker_modes(&observer, "darmok_prepared_dml")
+                .await
+                .is_empty()
+        );
     }
-    let columns: i64 = reader.query_one(
-        "SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_two_phase_profile'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[]
-    ).await.unwrap().get(0);
-    assert_eq!(columns, 2);
-    reader
-        .batch_execute("DROP TABLE lease_two_phase_profile")
+    let value: i32 = rows
+        .query_one("SELECT value FROM lease_prepared_dml", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(value, 25);
+    writer
+        .batch_execute("DROP TABLE lease_prepared_dml")
         .await
         .unwrap();
     close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(rows, rows_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn prepared_ddl_fences_completion_and_native_guards_wait_outside_the_lease() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (guarded, guarded_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer
+        .batch_execute("CREATE TABLE lease_prepared_ddl(id integer)")
+        .await
+        .unwrap();
+    let writer_pid = pid(&writer).await;
+    let guarded_pid = pid(&guarded).await;
+    for (index, outcome) in ["COMMIT", "ROLLBACK"].iter().enumerate() {
+        writer.batch_execute(&format!(
+            "BEGIN; ALTER TABLE lease_prepared_ddl ADD COLUMN change_{index} integer; PREPARE TRANSACTION 'darmok_prepared_ddl'"
+        )).await.unwrap();
+        assert_eq!(
+            prepared_marker_modes(&observer, "darmok_prepared_ddl").await,
+            ["AccessShareLock", "RowExclusiveLock"]
+        );
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&reader).await;
+        let old_columns: i64 = reader.query_one(
+            "SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_prepared_ddl'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[]
+        ).await.unwrap().get(0);
+        assert_eq!(old_columns, 1 + index as i64);
+        guarded.batch_execute("BEGIN").await.unwrap();
+        let mut locking =
+            Box::pin(guarded.batch_execute("LOCK TABLE lease_prepared_ddl IN ACCESS SHARE MODE"));
+        tokio::select! {
+            result = &mut locking => panic!("dependency guard escaped prepared DDL: {result:?}"),
+            () = wait_native_lock(&observer, guarded_pid, "LOCK TABLE lease_prepared_ddl") => {}
+        }
+        let finish_sql = format!("{outcome} PREPARED 'darmok_prepared_ddl'");
+        let mut finishing = Box::pin(writer.batch_execute(&finish_sql));
+        tokio::select! {
+            result = &mut finishing => panic!("prepared metadata escaped its publication fence: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+        }
+        check(&reader, &before).await;
+        end(&reader, &before).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(finishing);
+        tokio::time::timeout(Duration::from_secs(20), &mut locking)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(locking);
+        let validated = begin(&guarded).await;
+        assert!(validated.generation > before.generation);
+        check(&guarded, &validated).await;
+        end(&guarded, &validated).await;
+        // Native dependency guard remains; global catalog lease has ended.
+        guarded
+            .query("SELECT * FROM lease_prepared_ddl", &[])
+            .await
+            .unwrap();
+        guarded.batch_execute("COMMIT").await.unwrap();
+        no_fence(&observer, writer_pid).await;
+    }
+    writer
+        .batch_execute("DROP TABLE lease_prepared_ddl")
+        .await
+        .unwrap();
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(guarded, guarded_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn mixed_prepared_metadata_and_unrelated_row_locks_can_finish() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer.batch_execute("CREATE TABLE lease_mixed_catalog(id integer); CREATE TABLE lease_mixed_rows(id integer PRIMARY KEY, value integer); INSERT INTO lease_mixed_rows VALUES (1, 1)").await.unwrap();
+    writer.batch_execute("BEGIN; ALTER TABLE lease_mixed_catalog ADD COLUMN changed integer; UPDATE lease_mixed_rows SET value = 10; PREPARE TRANSACTION 'darmok_prepared_mixed'").await.unwrap();
+    reader
+        .batch_execute("BEGIN; LOCK TABLE lease_mixed_rows IN ROW EXCLUSIVE MODE")
+        .await
+        .unwrap();
+    let stamp = begin(&reader).await;
+    check(&reader, &stamp).await;
+    end(&reader, &stamp).await;
+    let reader_pid = pid(&reader).await;
+    let mut updating =
+        Box::pin(reader.batch_execute("UPDATE lease_mixed_rows SET value = value + 1"));
+    tokio::select! {
+        result = &mut updating => panic!("mixed prepared row lock was not observed: {result:?}"),
+        () = wait_native_lock(&observer, reader_pid, "UPDATE lease_mixed_rows") => {}
+    }
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        writer.batch_execute("COMMIT PREPARED 'darmok_prepared_mixed'"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut updating)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(updating);
+    reader.batch_execute("COMMIT").await.unwrap();
+    let value: i32 = reader
+        .query_one("SELECT value FROM lease_mixed_rows", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(value, 11);
+    writer
+        .batch_execute("DROP TABLE lease_mixed_catalog, lease_mixed_rows")
+        .await
+        .unwrap();
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classification() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (dml, dml_driver) = client().await;
+    let (replacement, replacement_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer.batch_execute("CREATE TABLE lease_gid_catalog(id integer); CREATE TABLE lease_gid_rows(id integer, value integer); INSERT INTO lease_gid_rows VALUES (1, 1)").await.unwrap();
+    writer.batch_execute("BEGIN; ALTER TABLE lease_gid_catalog ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_gid_reused'").await.unwrap();
+    dml.batch_execute(
+        "BEGIN; UPDATE lease_gid_rows SET value = 10; PREPARE TRANSACTION 'darmok_gid_dml'",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        prepared_marker_modes(&observer, "darmok_gid_reused").await,
+        ["AccessShareLock", "RowExclusiveLock"]
+    );
+    assert_eq!(
+        prepared_marker_modes(&observer, "darmok_gid_dml").await,
+        ["AccessShareLock"]
+    );
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let before = begin(&reader).await;
+    let writer_pid = pid(&writer).await;
+    let replacement_pid = pid(&replacement).await;
+    let mut finishing = Box::pin(writer.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"));
+    tokio::select! {
+        result = &mut finishing => panic!("prepared metadata escaped its lease: {result:?}"),
+        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+    }
+    replacement.batch_execute("BEGIN").await.unwrap();
+    let mut replacing =
+        Box::pin(replacement.batch_execute("PREPARE TRANSACTION 'darmok_gid_reused'"));
+    tokio::select! {
+        result = &mut replacing => panic!("GID reused before native completion released its gate: {result:?}"),
+        () = async {
+            tokio::time::timeout(Duration::from_secs(20), async {
+                loop {
+                    let waiting: bool = observer.query_one(
+                        "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1 AND NOT granted)", &[&replacement_pid]
+                    ).await.unwrap().get(0);
+                    if waiting { return; }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }).await.expect("GID serialization wait was not observed");
+        } => {}
+    }
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        dml.batch_execute("COMMIT PREPARED 'darmok_gid_dml'"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    check(&reader, &before).await;
+    end(&reader, &before).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(finishing);
+    tokio::time::timeout(Duration::from_secs(20), &mut replacing)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(replacing);
+    assert_eq!(
+        prepared_marker_modes(&observer, "darmok_gid_reused").await,
+        ["AccessShareLock"]
+    );
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let after = begin(&reader).await;
+    assert!(after.generation > before.generation);
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        replacement.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    check(&reader, &after).await;
+    end(&reader, &after).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    writer
+        .batch_execute("DROP TABLE lease_gid_catalog, lease_gid_rows")
+        .await
+        .unwrap();
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(dml, dml_driver).await;
+    close(replacement, replacement_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn database_removal_and_normal_temp_backend_exit_both_complete() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (temporary, temporary_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer
+        .batch_execute("CREATE DATABASE darmok_lease_drop_barrier")
+        .await
+        .unwrap();
+    temporary
+        .batch_execute(
+            "CREATE TEMP TABLE lease_exit_temp(id integer); INSERT INTO lease_exit_temp VALUES (1)",
+        )
+        .await
+        .unwrap();
+    let temp_pid = pid(&temporary).await;
+    let writer_pid = pid(&writer).await;
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let before = begin(&reader).await;
+    let mut dropping = Box::pin(writer.batch_execute("DROP DATABASE darmok_lease_drop_barrier"));
+    tokio::select! {
+        result = &mut dropping => panic!("database removal escaped the catalog lease: {result:?}"),
+        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+    }
+    close(temporary, temporary_driver).await;
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let waiting: bool = observer.query_one(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1 AND wait_event = 'Extension')", &[&temp_pid]
+            ).await.unwrap().get(0);
+            if waiting { return; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.expect("normal temporary backend exit did not reach its publication wait");
+    check(&reader, &before).await;
+    end(&reader, &before).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut dropping)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(dropping);
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let present: bool = observer
+                .query_one(
+                    "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1)",
+                    &[&temp_pid],
+                )
+                .await
+                .unwrap()
+                .get(0);
+            if !present {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("temporary backend did not complete ordinary cleanup");
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let after = begin(&reader).await;
+    assert!(after.generation > before.generation);
+    let remains: bool = reader.query_one(
+        "SELECT EXISTS (SELECT FROM pg_catalog.pg_database WHERE datname = 'darmok_lease_drop_barrier')", &[]
+    ).await.unwrap().get(0);
+    assert!(!remains);
+    end(&reader, &after).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(observer, observer_driver).await;
 }
 
 #[tokio::test]
@@ -887,7 +1277,7 @@ async fn private_catalog_facts_expire_on_rollback_but_survive_commit() {
     end(&reader, &committed).await;
     reader.batch_execute("COMMIT; BEGIN").await.unwrap();
     let reusable = begin(&reader).await;
-    assert_eq!(reusable.generation, committed.generation);
+    assert!(reusable.generation > committed.generation);
     assert_eq!(reusable.local_generation, committed.local_generation);
     let columns: i64 = reader
         .query_one("SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_private'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[])

@@ -12,8 +12,8 @@ make PG_CONFIG=/path/to/pg_config install
 ```
 
 Add `darmok_server` to `shared_preload_libraries` before starting PostgreSQL.
-Leases require a primary server with `max_prepared_transactions=0`; native
-two-phase transactions are separate from MySQL prepared statements. Then
+Leases require a primary server. Concurrent native two-phase transactions may
+be enabled; they are separate from MySQL prepared statements. Then
 explicitly install in each selected physical database:
 
 ```sql
@@ -37,15 +37,18 @@ Its default command explicitly preloads the module. Override `POSTGRES_IMAGE`
 with the pinned PostgreSQL 17 image from `.github/workflows/ci.yml` for that major.
 Packages for other target platforms and the release artifact gate remain pending.
 
-The API, lock scope, required caller checks and remaining integration work are
+Global leases cover only admitted catalog phases and must end before row
+execution or dependency-lock waits. Full dependency guards and the table
+executor remain required. The API, lock scope, required caller checks and
+remaining integration work are
 specified in [`docs/server-catalog-lease.md`](../../docs/server-catalog-lease.md).
 Run its ordinary native fixtures with a disposable module-enabled database and
-`max_prepared_transactions=0`, plus a second disposable module server with native
-2PC enabled for the explicit profile-error fixture:
+`max_prepared_transactions>=2`, plus a second disposable module server with native
+2PC disabled for the default-setting fixture:
 
 ```sh
 DARMOK_TEST_DATABASE_URL=postgres://postgres:darmok-test@localhost:5432/darmok_test \
-DARMOK_TEST_TWO_PHASE_DATABASE_URL=postgres://postgres:darmok-test@localhost:5433/darmok_test \
+DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL=postgres://postgres:darmok-test@localhost:5433/darmok_test \
   cargo test -p darmok-postgres-tests --test server_catalog_lease --locked -- --nocapture
 ```
 

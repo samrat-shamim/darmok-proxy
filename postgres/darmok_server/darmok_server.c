@@ -1,24 +1,34 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 #include "postgres.h"
 
-#include "access/xact.h"
 #include "access/twophase.h"
+#include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/objectaccess.h"
+#include "catalog/pg_database_d.h"
 #include "catalog/pg_extension_d.h"
+#include "catalog/pg_tablespace_d.h"
+#include "common/hashfn.h"
+#include "executor/spi.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/parsenodes.h"
 #include "port/atomics.h"
+#include "storage/condition_variable.h"
 #include "storage/ipc.h"
+#include "storage/latch.h"
 #include "storage/lock.h"
 #include "storage/lwlock.h"
+#include "storage/procsignal.h"
 #include "storage/shmem.h"
+#include "storage/sinval.h"
 #include "tcop/utility.h"
+#include "utils/builtins.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
 #include "utils/resowner.h"
 #include "utils/snapmgr.h"
+#include "utils/wait_event.h"
 
 #if PG_VERSION_NUM < 170000 || PG_VERSION_NUM >= 190000
 #error "darmok_server requires PostgreSQL 17 or 18"
@@ -34,6 +44,8 @@ PG_FUNCTION_INFO_V1(darmok_end_catalog_lease);
 /* OID zero cannot name an extension. The default lock method is deliberately
  * distinct from user advisory locks. Database zero makes this cluster-wide. */
 #define DARMOK_LOCK_SUBID 0x444d
+#define DARMOK_PREPARED_MARKER_SUBID 0x444e
+#define DARMOK_GID_GATE_SUBID 0x444f
 #define DARMOK_CLUSTER_ID_BYTES 16
 
 typedef struct DarmokShared
@@ -41,6 +53,8 @@ typedef struct DarmokShared
 	unsigned char cluster_id[DARMOK_CLUSTER_ID_BYTES];
 	pg_atomic_uint64 generation;
 	pg_atomic_uint64 next_backend_id;
+	pg_atomic_uint32 pending_exit_writers;
+	ConditionVariable exit_writers_finished;
 } DarmokShared;
 
 typedef struct DarmokLease
@@ -64,6 +78,9 @@ static SubTransactionId writer_subid = InvalidSubTransactionId;
 static ResourceOwner writer_owner = NULL;
 static int writer_depth = 0;
 static bool preparing_transaction = false;
+static bool pre_commit_started = false;
+static bool exit_writer_pending = false;
+static bool exit_cleanup_registered = false;
 static SubTransactionId last_metadata_subid = InvalidSubTransactionId;
 
 static shmem_request_hook_type previous_shmem_request = NULL;
@@ -78,6 +95,29 @@ catalog_tag(void)
 
 	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
 					   DARMOK_LOCK_SUBID);
+	return tag;
+}
+
+static LOCKTAG
+prepared_marker_tag(TransactionId xid)
+{
+	LOCKTAG tag;
+
+	SET_LOCKTAG_OBJECT(tag, MyDatabaseId, ExtensionRelationId, xid,
+					   DARMOK_PREPARED_MARKER_SUBID);
+	return tag;
+}
+
+static LOCKTAG
+gid_gate_tag(const char *gid)
+{
+	LOCKTAG tag;
+	uint32 hash = hash_bytes((const unsigned char *) gid, strlen(gid));
+
+	/* Hash collisions only serialize unrelated commands. The classification
+	 * below uses the exact native GID and XID, never this hash. */
+	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, hash,
+					   DARMOK_GID_GATE_SUBID);
 	return tag;
 }
 
@@ -122,20 +162,37 @@ advance_local(void)
 		local_generation++;
 }
 
-static void
-transaction_lock(LOCKMODE mode, bool acquire, ResourceOwner owner)
+static LockAcquireResult
+transaction_lock_acquire(const LOCKTAG *tag, LOCKMODE mode,
+						 ResourceOwner owner, bool dont_wait)
 {
-	LOCKTAG tag = catalog_tag();
 	ResourceOwner saved = CurrentResourceOwner;
+	LockAcquireResult result = LOCKACQUIRE_NOT_AVAIL;
 
 	/* SQL-function portals have their own resource owners. Put a lease on the
 	 * current transaction owner so a later command can release the same lock. */
 	CurrentResourceOwner = owner;
 	PG_TRY();
 	{
-		if (acquire)
-			(void) LockAcquire(&tag, mode, false, false);
-		else if (!LockRelease(&tag, mode, false))
+		result = LockAcquire(tag, mode, false, dont_wait);
+	}
+	PG_FINALLY();
+	{
+		CurrentResourceOwner = saved;
+	}
+	PG_END_TRY();
+	return result;
+}
+
+static void
+transaction_unlock(const LOCKTAG *tag, LOCKMODE mode, ResourceOwner owner)
+{
+	ResourceOwner saved = CurrentResourceOwner;
+
+	CurrentResourceOwner = owner;
+	PG_TRY();
+	{
+		if (!LockRelease(tag, mode, false))
 		{
 			broken = true;
 			ereport(ERROR,
@@ -151,11 +208,69 @@ transaction_lock(LOCKMODE mode, bool acquire, ResourceOwner owner)
 }
 
 static void
+clear_exit_writer_intent(int code, Datum arg)
+{
+	(void) code;
+	(void) arg;
+	if (exit_writer_pending)
+	{
+		exit_writer_pending = false;
+		Assert(pg_atomic_read_u32(&shared->pending_exit_writers) > 0);
+		pg_atomic_fetch_sub_u32(&shared->pending_exit_writers, 1);
+		ConditionVariableBroadcast(&shared->exit_writers_finished);
+	}
+}
+
+static void
 take_writer_transaction_lock(void)
 {
 	if (!writer_transaction_lock)
 	{
-		transaction_lock(ExclusiveLock, true, CurTransactionResourceOwner);
+		LOCKTAG tag = catalog_tag();
+
+		if (!proc_exit_inprogress)
+			(void) transaction_lock_acquire(&tag, ExclusiveLock,
+										CurTransactionResourceOwner, false);
+		else
+		{
+			/* Native temp cleanup commits from before_shmem_exit, after its
+			 * deletion/storage calls have returned. proc_exit inhibits normal
+			 * interrupt processing; a blocking native lock wait would prevent
+			 * DROP DATABASE's smgr barrier from completing. Only absorb that
+			 * native barrier at this narrow boundary, never inside smgr calls. */
+			if (!pre_commit_started || InterruptHoldoffCount != 1 ||
+				CritSectionCount != 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("unsafe catalog publication boundary during backend exit")));
+			if (!exit_cleanup_registered)
+			{
+				before_shmem_exit(clear_exit_writer_intent, 0);
+				exit_cleanup_registered = true;
+			}
+			pg_atomic_fetch_add_u32(&shared->pending_exit_writers, 1);
+			exit_writer_pending = true;
+			PG_TRY();
+			{
+				for (;;)
+				{
+					ResetLatch(MyLatch);
+					ProcessProcSignalBarrier();
+					if (transaction_lock_acquire(&tag, ExclusiveLock,
+											 CurTransactionResourceOwner, true) !=
+						LOCKACQUIRE_NOT_AVAIL)
+						break;
+					(void) WaitLatch(MyLatch,
+								 WL_LATCH_SET | WL_TIMEOUT | WL_EXIT_ON_PM_DEATH,
+								 100L, PG_WAIT_EXTENSION);
+				}
+			}
+			PG_FINALLY();
+			{
+				clear_exit_writer_intent(0, 0);
+			}
+			PG_END_TRY();
+		}
 		writer_transaction_lock = true;
 		writer_subid = GetCurrentSubTransactionId();
 		writer_owner = CurTransactionResourceOwner;
@@ -163,7 +278,20 @@ take_writer_transaction_lock(void)
 }
 
 static void
-before_catalog_change(void)
+take_prepared_marker(bool metadata)
+{
+	LOCKTAG tag = prepared_marker_tag(GetTopTransactionId());
+
+	if (!LockHeldByMe(&tag, AccessShareLock, false))
+		(void) transaction_lock_acquire(&tag, AccessShareLock,
+									CurTransactionResourceOwner, false);
+	if (metadata && !LockHeldByMe(&tag, RowExclusiveLock, false))
+		(void) transaction_lock_acquire(&tag, RowExclusiveLock,
+									CurTransactionResourceOwner, false);
+}
+
+static void
+note_metadata_attempt(void)
 {
 	require_ready();
 	if (lease.active)
@@ -171,18 +299,103 @@ before_catalog_change(void)
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("end the catalog lease before changing metadata")));
 	last_metadata_subid = GetCurrentSubTransactionId();
-	/* PREPARE does not publish catalog changes. Its later completion is a
-	 * separately fenced utility. Never transfer our synthetic lock to 2PC. */
-	if (preparing_transaction)
-	{
-		advance_local();
-		require_ready();
-		return;
-	}
-	take_writer_transaction_lock();
-	(void) advance_shared(&shared->generation);
 	advance_local();
 	require_ready();
+}
+
+static bool
+has_catalog_publication(void)
+{
+	SharedInvalidationMessage *messages = NULL;
+	bool init_file;
+	int count = xactGetCommittedInvalidationMessages(&messages, &init_file);
+
+	/* This native top-level snapshot does not consume the messages. Native
+	 * subabort has already removed its messages; no false prepared metadata
+	 * marker survives solely because a child DDL attempt was rolled back. */
+	if (messages != NULL)
+		pfree(messages);
+	return count > 0 || init_file;
+}
+
+static void
+publish_catalog_change(void)
+{
+	require_ready();
+	if (lease.active)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("end the catalog lease before publishing metadata")));
+	if (preparing_transaction)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("nontransactional catalog publication cannot be prepared")));
+	if (!writer_transaction_lock)
+	{
+		take_writer_transaction_lock();
+		(void) advance_shared(&shared->generation);
+	}
+}
+
+/* The caller holds the session GID gate across lookup, classification and the
+ * complete native operation. No opaque GXACT fields or TwoPhaseStateLock are
+ * used here. The native command retains its own permission/database checks. */
+static bool
+prepared_has_metadata(const char *gid)
+{
+	Oid argument_type = TEXTOID;
+	Datum argument = CStringGetTextDatum(gid);
+	bool found = false;
+	TransactionId xid = InvalidTransactionId;
+	int result;
+
+	if (SPI_connect() != SPI_OK_CONNECT)
+		elog(ERROR, "could not inspect the native prepared transaction");
+	/* Transaction utility statements need not supply an active snapshot. */
+	PushActiveSnapshot(GetTransactionSnapshot());
+	result = SPI_execute_with_args(
+		"SELECT transaction FROM pg_catalog.pg_prepared_xacts WHERE gid = $1",
+		1, &argument_type, &argument, NULL, true, 2);
+	if (result != SPI_OK_SELECT || SPI_processed > 1)
+		elog(ERROR, "unexpected native prepared transaction lookup result");
+	if (SPI_processed == 1)
+	{
+		bool isnull;
+		Datum value = SPI_getbinval(SPI_tuptable->vals[0],
+									 SPI_tuptable->tupdesc, 1, &isnull);
+
+		if (isnull)
+			elog(ERROR, "native prepared transaction has no transaction identity");
+		xid = DatumGetTransactionId(value);
+		if (!TransactionIdIsNormal(xid))
+			elog(ERROR, "invalid native prepared transaction identity");
+		found = true;
+	}
+	if (SPI_finish() != SPI_OK_FINISH)
+		elog(ERROR, "could not finish native prepared transaction lookup");
+	PopActiveSnapshot();
+	pfree(DatumGetPointer(argument));
+	if (found)
+	{
+		LOCKTAG tag = prepared_marker_tag(xid);
+
+		/* RowExclusive is the metadata bit; AccessShare proves that this
+		 * preparation participated in our classification protocol. */
+		if (transaction_lock_acquire(&tag, ShareLock,
+									CurTransactionResourceOwner, true) ==
+			LOCKACQUIRE_NOT_AVAIL)
+			return true;
+		transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
+		if (transaction_lock_acquire(&tag, AccessExclusiveLock,
+									CurTransactionResourceOwner, true) ==
+			LOCKACQUIRE_NOT_AVAIL)
+			return false;
+		transaction_unlock(&tag, AccessExclusiveLock, CurTransactionResourceOwner);
+		/* An unmarked native transaction has no proof of being metadata-free.
+		 * Fence its completion. Catalog-only readers cannot wait on its rows. */
+		return true;
+	}
+	return false;
 }
 
 static void
@@ -209,6 +422,8 @@ start_shared_memory(void)
 			elog(FATAL, "could not create darmok_server cluster incarnation");
 		pg_atomic_init_u64(&shared->generation, 1);
 		pg_atomic_init_u64(&shared->next_backend_id, 0);
+		pg_atomic_init_u32(&shared->pending_exit_writers, 0);
+		ConditionVariableInit(&shared->exit_writers_finished);
 	}
 	LWLockRelease(AddinShmemInitLock);
 }
@@ -223,8 +438,13 @@ transaction_event(XactEvent event, void *arg)
 			/* A concurrently built index has several transactions. Fence every
 			 * publication, not the waits between phases: holding a session fence
 			 * there would deadlock readers with WaitForOlderSnapshots(). */
-			if (writer_depth > 0)
-				before_catalog_change();
+			pre_commit_started = true;
+			if (has_catalog_publication())
+			{
+				if (last_metadata_subid == InvalidSubTransactionId)
+					note_metadata_attempt();
+				publish_catalog_change();
+			}
 			break;
 		case XACT_EVENT_PRE_PREPARE:
 			if (lease.active)
@@ -232,9 +452,12 @@ transaction_event(XactEvent event, void *arg)
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("end the catalog lease before preparing a transaction")));
 			preparing_transaction = true;
+			take_prepared_marker(has_catalog_publication());
 			if (writer_transaction_lock)
 			{
-				transaction_lock(ExclusiveLock, false, writer_owner);
+				LOCKTAG tag = catalog_tag();
+
+				transaction_unlock(&tag, ExclusiveLock, writer_owner);
 				writer_transaction_lock = false;
 				writer_owner = NULL;
 			}
@@ -256,6 +479,7 @@ transaction_event(XactEvent event, void *arg)
 			writer_owner = NULL;
 			writer_subid = InvalidSubTransactionId;
 			preparing_transaction = false;
+			pre_commit_started = false;
 			last_metadata_subid = InvalidSubTransactionId;
 			break;
 		default:
@@ -309,12 +533,7 @@ catalog_utility(Node *node)
 	switch (nodeTag(node))
 	{
 		case T_TransactionStmt:
-		{
-			TransactionStmt *stmt = (TransactionStmt *) node;
-
-			return stmt->kind == TRANS_STMT_COMMIT_PREPARED ||
-				stmt->kind == TRANS_STMT_ROLLBACK_PREPARED;
-		}
+			return false;
 		case T_VariableSetStmt:
 		case T_VariableShowStmt:
 		case T_ConstraintsSetStmt:
@@ -332,8 +551,8 @@ catalog_utility(Node *node)
 		case T_DiscardStmt:
 			return false;
 		default:
-			/* This is a conservative lock policy, not SQL semantic admission.
-			 * New/extension utility variants receive the stronger fence. */
+			/* Conservatively mark metadata attempts; native transactional
+			 * invalidations decide publication. This is not SQL admission. */
 			return true;
 	}
 }
@@ -347,6 +566,11 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	bool writer = catalog_utility(pstmt->utilityStmt);
 	bool preparing = IsA(pstmt->utilityStmt, TransactionStmt) &&
 		((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_PREPARE;
+	bool finishing = IsA(pstmt->utilityStmt, TransactionStmt) &&
+		(((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_COMMIT_PREPARED ||
+		 ((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_ROLLBACK_PREPARED);
+	LOCKTAG gid_tag;
+	bool gid_gate = preparing || finishing;
 	if (preparing && lease.active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -354,11 +578,22 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 
 	if (writer)
 	{
-		before_catalog_change();
+		note_metadata_attempt();
 		writer_depth++;
+	}
+	if (gid_gate)
+	{
+		gid_tag = gid_gate_tag(((TransactionStmt *) pstmt->utilityStmt)->gid);
+		(void) LockAcquire(&gid_tag, ExclusiveLock, true, false);
 	}
 	PG_TRY();
 	{
+		if (finishing && prepared_has_metadata(
+				((TransactionStmt *) pstmt->utilityStmt)->gid))
+		{
+			note_metadata_attempt();
+			publish_catalog_change();
+		}
 		if (previous_utility)
 			previous_utility(pstmt, query, read_only_tree, context, params,
 							 query_env, dest, completion);
@@ -367,17 +602,18 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 								query_env, dest, completion);
 		if (writer)
 		{
-			/* An internally committing utility can return with catalog changes
-			 * in a new final transaction. Its publication needs a new generation
-			 * as well as a fence: the intermediate committed facts may already
-			 * be cached. Ordinary utilities already own both in this transaction.
-			 * Keep the fence through native invalidation and lock cleanup. */
-			if (IsTransactionState() && !writer_transaction_lock)
-				before_catalog_change();
+			/* An internally committing utility can return in a new transaction.
+			 * Its final changes are fenced by the outer native pre-commit, with
+			 * a new generation, rather than acquiring a fence across phase waits. */
+			if (IsTransactionState() &&
+				last_metadata_subid == InvalidSubTransactionId)
+				note_metadata_attempt();
 		}
 	}
 	PG_FINALLY();
 	{
+		if (gid_gate && !LockRelease(&gid_tag, ExclusiveLock, true))
+			elog(FATAL, "lost the prepared transaction serialization gate");
 		if (writer)
 			writer_depth--;
 	}
@@ -390,9 +626,20 @@ static void
 object_access(ObjectAccessType access, Oid class_id, Oid object_id,
 			  int sub_id, void *arg)
 {
-	if ((access == OAT_POST_CREATE || access == OAT_POST_ALTER ||
-		 access == OAT_DROP) && writer_depth == 0)
-		before_catalog_change();
+	if (access == OAT_POST_CREATE || access == OAT_POST_ALTER || access == OAT_DROP)
+	{
+		if (writer_depth == 0)
+			note_metadata_attempt();
+		if (preparing_transaction)
+			take_prepared_marker(true);
+		else if (pre_commit_started ||
+				 (access == OAT_DROP &&
+				  (class_id == DatabaseRelationId || class_id == TableSpaceRelationId)))
+			/* DROP DATABASE's invalid marker is in-place before commit. These
+			 * drop hooks run after native lookup/locks and before irreversible
+			 * work; never take this fence at ProcessUtility entry. */
+			publish_catalog_change();
+	}
 	if (previous_object_access)
 		previous_object_access(access, class_id, object_id, sub_id, arg);
 }
@@ -442,14 +689,6 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 	bytea *cluster_id;
 
 	require_ready();
-	/* A prepared transaction can retain a relation lock indefinitely. Waiting
-	 * for it while owning our read fence would also block its fenced catalog
-	 * completion. This release requires native 2PC disabled, not a weaker
-	 * generation check or an unbounded wait through that dependency. */
-	if (max_prepared_xacts != 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("catalog leases require max_prepared_transactions=0")));
 	if (!IsTransactionBlock())
 		ereport(ERROR,
 				(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
@@ -458,10 +697,10 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("this backend already owns a catalog lease")));
-	if (writer_depth > 0 || preparing_transaction)
+	if (writer_depth > 0 || preparing_transaction || pre_commit_started)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("a catalog lease cannot start inside a metadata utility")));
+				 errmsg("a catalog lease cannot start during a metadata utility or transaction finalization")));
 	if (next_lease_id >= PG_INT64_MAX)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
@@ -471,7 +710,32 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 	if (get_call_result_type(fcinfo, NULL, &desc) != TYPEFUNC_COMPOSITE)
 		elog(ERROR, "catalog lease requires its declared composite result");
 	desc = BlessTupleDesc(desc);
-	transaction_lock(ShareLock, true, CurTransactionResourceOwner);
+	{
+		LOCKTAG tag = catalog_tag();
+
+		/* An exiting publisher uses conditional acquisition so it can absorb
+		 * native barriers. Stop admitting new readers while that publisher
+		 * drains existing leases, including the race after Share acquisition. */
+		for (;;)
+		{
+			PG_TRY();
+			{
+				while (pg_atomic_read_u32(&shared->pending_exit_writers) != 0)
+					ConditionVariableSleep(&shared->exit_writers_finished,
+									   PG_WAIT_EXTENSION);
+			}
+			PG_FINALLY();
+			{
+				ConditionVariableCancelSleep();
+			}
+			PG_END_TRY();
+			(void) transaction_lock_acquire(&tag, ShareLock,
+										CurTransactionResourceOwner, false);
+			if (pg_atomic_read_u32(&shared->pending_exit_writers) == 0)
+				break;
+			transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
+		}
+	}
 	lease.active = true;
 	lease.id = ++next_lease_id;
 	lease.subid = GetCurrentSubTransactionId();
@@ -510,7 +774,11 @@ Datum
 darmok_end_catalog_lease(PG_FUNCTION_ARGS)
 {
 	(void) require_lease(fcinfo);
-	transaction_lock(ShareLock, false, lease.owner);
+	{
+		LOCKTAG tag = catalog_tag();
+
+		transaction_unlock(&tag, ShareLock, lease.owner);
+	}
 	lease.active = false;
 	lease.owner = NULL;
 	PG_RETURN_VOID();
