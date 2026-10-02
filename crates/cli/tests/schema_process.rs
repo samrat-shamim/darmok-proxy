@@ -110,6 +110,62 @@ impl Fixture {
                 Some("-c default_transaction_read_only=on")
             );
         }
+        self.command_with_settings(label, initialize, settings)
+            .await
+    }
+
+    async fn keyword_command(&self, label: &str, initialize: bool) -> Output {
+        // Convert only the declared private one-host fixture's existing login
+        // into the driver's documented keyword grammar. This is test input,
+        // not a product credential/profile serializer or alternate connector.
+        let config = self.settings.parse::<Config>().unwrap();
+        let [tokio_postgres::config::Host::Tcp(host)] = config.get_hosts() else {
+            panic!("keyword process fixture requires one TCP host");
+        };
+        let [port] = config.get_ports() else {
+            panic!("keyword process fixture requires an explicit port");
+        };
+        let user = config.get_user().expect("fixture user must be explicit");
+        let password = std::str::from_utf8(
+            config
+                .get_password()
+                .expect("fixture password must be explicit"),
+        )
+        .unwrap();
+        let application_name = format!("darmok_cli_child_{}", self.database);
+        let mut settings = [
+            ("host", host.as_str()),
+            ("user", user),
+            ("password", password),
+            ("dbname", self.database.as_str()),
+            ("application_name", application_name.as_str()),
+            ("options", "-c default_transaction_read_only=on"),
+        ]
+        .into_iter()
+        .map(|(key, value)| {
+            format!(
+                "{key}='{}'",
+                value.replace('\\', "\\\\").replace('\'', "\\'")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+        settings.push_str(&format!(" port={port}"));
+        let selected = settings.parse::<Config>().unwrap();
+        assert_eq!(selected.get_dbname(), Some(self.database.as_str()));
+        assert_eq!(selected.get_hosts(), config.get_hosts());
+        assert_eq!(selected.get_ports(), config.get_ports());
+        assert!(selected.get_password() == config.get_password());
+        self.command_with_settings(label, initialize, settings)
+            .await
+    }
+
+    async fn command_with_settings(
+        &self,
+        label: &str,
+        initialize: bool,
+        settings: String,
+    ) -> Output {
         let arguments = if initialize {
             vec!["init", "--database-url-env", SETTINGS_ENV]
         } else {
@@ -216,6 +272,22 @@ async fn fresh_repeat_and_readonly_verification_preserve_application_and_install
         ("fresh-repeat-verify", false),
     ] {
         let output = fixture.command(label, initialize, true).await;
+        assert_success(
+            &output,
+            if initialize {
+                "initialization"
+            } else {
+                "verification"
+            },
+        );
+        assert_eq!(fixture.snapshot().await, installed);
+        assert_eq!(application().await, original_application);
+    }
+    for (label, initialize) in [
+        ("fresh-keyword-init", true),
+        ("fresh-keyword-verify", false),
+    ] {
+        let output = fixture.keyword_command(label, initialize).await;
         assert_success(
             &output,
             if initialize {

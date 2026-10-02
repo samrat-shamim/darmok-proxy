@@ -79,13 +79,14 @@ PostgreSQL major: fresh/repeated initialization and read-only verification with
 unchanged application state; ordinary partial/version/function mismatches with
 no repair; and independent installations in two explicitly selected databases.
 They check actual child exit codes/output, catalog OIDs and row/catalog `xmin`,
+successful URI and keyword/value inputs selecting an explicit nondefault database,
 helper NULL/UTF8/arbitrary-byte behavior, normal connection closure and database
 removal, and an ordinary nonexistent-database connection error. Missing database
 infrastructure fails the required test invocation.
 This is physical selection evidence, not logical routing authorization.
 
 `DARMOK_CLI_PROCESS_EVIDENCE_DIR`, when set for tests, records every child's
-actual argv, selected physical database, timestamps, status and original
+actual argv, settings format, selected physical database, timestamps, status and original
 stdout/stderr in unique files.
 It is a test evidence destination, not a product setting. Hosted PostgreSQL CI
 requires these groups explicitly; local evidence and the account CI blocker are

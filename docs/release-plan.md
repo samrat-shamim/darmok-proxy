@@ -1414,6 +1414,14 @@ repair, raw SQL escape, credential policy or serving-path admission. The
 [command contract](cli.md) records the deliberate addition of independent
 schema verification before logical route configuration.
 
+The independent initial source review found no functional defect and noted
+that positive process coverage used URI inputs only. The followup fixture adds
+successful keyword/value initialization and verification of the same explicitly
+selected nondefault database, preserving catalog/application snapshots and
+ordinary connection closure. This is coverage strengthening, not a production
+bug fix or new credential policy. Its exact committed results are separate from
+the original candidate and its frozen evidence.
+
 Three offline process groups and three required database process groups are
 implemented. Future pinned PostgreSQL17/18 CI explicitly invokes the latter and
 always preserves their child receipts. Exact committed candidate checks and

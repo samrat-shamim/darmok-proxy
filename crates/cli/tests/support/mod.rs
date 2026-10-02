@@ -41,6 +41,13 @@ pub fn invoke(label: &str, arguments: &[&str], settings: Option<&str>) -> Output
             "arguments": arguments,
             "settings_environment": SETTINGS_ENV,
             "settings_provided": settings.is_some(),
+            "settings_format": settings.map(|value| {
+                if value.starts_with("postgres://") || value.starts_with("postgresql://") {
+                    "uri"
+                } else {
+                    "keyword_value"
+                }
+            }),
             "selected_database": selected_database,
             "started_unix_ns": started.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_string(),
             "finished_unix_ns": finished.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_string(),
