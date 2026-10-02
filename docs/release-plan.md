@@ -1681,6 +1681,15 @@ blocks retirement of that same target backend. That revision is also blocked.
 The new shared-drop intent mechanism removes the lock across native lifecycle
 waits; its regressions cover both target/unrelated exits and concurrent intents
 through a native busy error. The earlier manual exit-barrier polling is removed.
+At `d4fe45e`,21 catalog groups and66 ordinary native owner fixtures pass on each
+major. The PostgreSQL17 package run nevertheless exits101 in the old concurrent
+namespace observation: a prepared query rebinds to the replacement relation while
+its cached description still names the original. Isolated module/bare PostgreSQL17
+diagnostics both retain the old relation, and native source permits global plan
+invalidation from namespace events. The observational fixture now serializes its
+controlled DDL sequences and adds explicit native plan invalidation that proves
+rebinding with an unchanged lookup path; it never treats cached origin as binding
+proof. These test/documentation changes do not alter the server module.
 Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
 prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
 The module does not change server configuration or add routing/auth/grant policy.

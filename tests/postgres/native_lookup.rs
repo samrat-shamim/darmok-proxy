@@ -4,6 +4,10 @@ use darmok_execute::NativeStatementUtc;
 use darmok_types::Value;
 use tokio_postgres::{Client, NoTls};
 
+// Namespace invalidations can reset every cached query plan in the database.
+// Isolate each controlled observation from the other fixtures' namespace DDL.
+static TEST_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 async fn client() -> (
     Client,
     tokio::task::JoinHandle<Result<(), tokio_postgres::Error>>,
@@ -31,9 +35,11 @@ enum LookupChange {
     None,
     TemporarySchema,
     ExplicitPath,
+    DiscardPlans,
 }
 
 async fn renamed_schema(path_contains_source: bool, change: LookupChange) {
+    let _serial = TEST_SERIAL.lock().await;
     let (owner, owner_driver) = client().await;
     let (ddl, ddl_driver) = client().await;
     let pid: i32 = owner
@@ -107,6 +113,9 @@ async fn renamed_schema(path_contains_source: bool, change: LookupChange) {
                 .await
                 .unwrap();
         }
+        LookupChange::DiscardPlans => {
+            owner.batch_execute("DISCARD PLANS").await.unwrap();
+        }
     }
     let path_after = effective_path(&owner).await;
     let row = owner.query_one(&statement, &[]).await.unwrap();
@@ -151,7 +160,13 @@ async fn renamed_schema(path_contains_source: bool, change: LookupChange) {
         "path {path_before:?} -> {path_after:?}; cached origin {cached_row_oid}"
     );
     assert_eq!(path_before, path_during);
-    assert_eq!(path_before != path_after, rebinds);
+    assert_eq!(
+        path_before != path_after,
+        matches!(
+            change,
+            LookupChange::TemporarySchema | LookupChange::ExplicitPath
+        )
+    );
     if !path_contains_source {
         assert_eq!(path_before.0, ["pg_catalog"]);
         assert_eq!(path_after.0.last().unwrap(), "pg_catalog");
@@ -176,4 +191,9 @@ async fn explicit_native_lookup_path_retains_bound_relation_across_schema_rename
 #[tokio::test]
 async fn implicit_temporary_namespace_can_rebind_even_with_fixed_path_text() {
     renamed_schema(false, LookupChange::TemporarySchema).await;
+}
+
+#[tokio::test]
+async fn native_plan_invalidation_rebinds_with_unchanged_path_and_cached_origin() {
+    renamed_schema(false, LookupChange::DiscardPlans).await;
 }
