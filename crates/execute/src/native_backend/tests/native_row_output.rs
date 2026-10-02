@@ -111,7 +111,7 @@ async fn later_returning_output_failure_recovers_writes_and_preserves_outer_work
                 assert_eq!(
                     completion.control(),
                     if outer {
-                        NativeControl::Release
+                        NativeControl::RecoverSavepoint
                     } else {
                         NativeControl::Rollback
                     }
