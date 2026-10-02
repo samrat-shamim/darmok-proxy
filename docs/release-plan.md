@@ -1657,8 +1657,10 @@ Ordinary metadata publication is fenced at native pre-commit; irreversible share
 drops use their native object boundary. A session GID gate and transaction marker
 coordinate SQL two-phase preparation/completion without fencing proven pure DML.
 Native invalidation state distinguishes surviving metadata from rolled-back child
-DDL. Exit-time publishers process pending native storage barriers at their narrow
-pre-commit boundary and stop new reader admission while draining current leases.
+DDL. Shared drops exclude new readers through transaction-owned intent and drain
+existing leases before irreversible effects. They release that short lock across
+native backend-drain/storage waits, so ordinary exit publishers can finish using
+the native lock queue. Native pre-commit separately fences final publication.
 
 The earlier candidate `3e21463` passed catalog fixtures but its ordinary native
 owner regression encountered a database-removal/temp-cleanup barrier deadlock.
@@ -1672,7 +1674,14 @@ fail. Native utility execution leaves a successful PREPARE completion unchanged;
 the hook incorrectly initialized its capture to UNKNOWN and rejected it before
 the portal supplied the parse tag. That source is blocked. The correction seeds
 the known PREPARE tag while retaining native ROLLBACK overrides and the lifetime
-gate. Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
+gate. The corrected `996ba71` passes20 catalog groups on each major, but its
+PostgreSQL17 owner run exits101:65 pass and one target-database/temp-backend cleanup
+fails with native E55006. Holding the early DROP fence across native backend drain
+blocks retirement of that same target backend. That revision is also blocked.
+The new shared-drop intent mechanism removes the lock across native lifecycle
+waits; its regressions cover both target/unrelated exits and concurrent intents
+through a native busy error. The earlier manual exit-barrier polling is removed.
+Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
 prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
 The module does not change server configuration or add routing/auth/grant policy.
 

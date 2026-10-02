@@ -16,10 +16,8 @@
 #include "port/atomics.h"
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
-#include "storage/latch.h"
 #include "storage/lock.h"
 #include "storage/lwlock.h"
-#include "storage/procsignal.h"
 #include "storage/shmem.h"
 #include "storage/sinval.h"
 #include "tcop/utility.h"
@@ -53,8 +51,8 @@ typedef struct DarmokShared
 	unsigned char cluster_id[DARMOK_CLUSTER_ID_BYTES];
 	pg_atomic_uint64 generation;
 	pg_atomic_uint64 next_backend_id;
-	pg_atomic_uint32 pending_exit_writers;
-	ConditionVariable exit_writers_finished;
+	pg_atomic_uint32 pending_shared_drops;
+	ConditionVariable shared_drops_finished;
 } DarmokShared;
 
 typedef struct DarmokLease
@@ -79,8 +77,9 @@ static ResourceOwner writer_owner = NULL;
 static int writer_depth = 0;
 static bool preparing_transaction = false;
 static bool pre_commit_started = false;
-static bool exit_writer_pending = false;
-static bool exit_cleanup_registered = false;
+static bool shared_drop_pending = false;
+static bool shared_drop_cleanup_registered = false;
+static SubTransactionId shared_drop_subid = InvalidSubTransactionId;
 static bool prepare_gate_held = false;
 static LOCKTAG prepare_gate_tag;
 static SubTransactionId prepare_gate_subid = InvalidSubTransactionId;
@@ -223,16 +222,17 @@ release_prepare_gate(void)
 }
 
 static void
-clear_exit_writer_intent(int code, Datum arg)
+clear_shared_drop_intent(int code, Datum arg)
 {
 	(void) code;
 	(void) arg;
-	if (exit_writer_pending)
+	if (shared_drop_pending)
 	{
-		exit_writer_pending = false;
-		Assert(pg_atomic_read_u32(&shared->pending_exit_writers) > 0);
-		pg_atomic_fetch_sub_u32(&shared->pending_exit_writers, 1);
-		ConditionVariableBroadcast(&shared->exit_writers_finished);
+		shared_drop_pending = false;
+		shared_drop_subid = InvalidSubTransactionId;
+		Assert(pg_atomic_read_u32(&shared->pending_shared_drops) > 0);
+		pg_atomic_fetch_sub_u32(&shared->pending_shared_drops, 1);
+		ConditionVariableBroadcast(&shared->shared_drops_finished);
 	}
 }
 
@@ -243,49 +243,8 @@ take_writer_transaction_lock(void)
 	{
 		LOCKTAG tag = catalog_tag();
 
-		if (!proc_exit_inprogress)
-			(void) transaction_lock_acquire(&tag, ExclusiveLock,
-										CurTransactionResourceOwner, false);
-		else
-		{
-			/* Native temp cleanup commits from before_shmem_exit, after its
-			 * deletion/storage calls have returned. proc_exit inhibits normal
-			 * interrupt processing; a blocking native lock wait would prevent
-			 * DROP DATABASE's smgr barrier from completing. Only absorb that
-			 * native barrier at this narrow boundary, never inside smgr calls. */
-			if (!pre_commit_started || InterruptHoldoffCount != 1 ||
-				CritSectionCount != 0)
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("unsafe catalog publication boundary during backend exit")));
-			if (!exit_cleanup_registered)
-			{
-				before_shmem_exit(clear_exit_writer_intent, 0);
-				exit_cleanup_registered = true;
-			}
-			pg_atomic_fetch_add_u32(&shared->pending_exit_writers, 1);
-			exit_writer_pending = true;
-			PG_TRY();
-			{
-				for (;;)
-				{
-					ResetLatch(MyLatch);
-					ProcessProcSignalBarrier();
-					if (transaction_lock_acquire(&tag, ExclusiveLock,
-											 CurTransactionResourceOwner, true) !=
-						LOCKACQUIRE_NOT_AVAIL)
-						break;
-					(void) WaitLatch(MyLatch,
-								 WL_LATCH_SET | WL_TIMEOUT | WL_EXIT_ON_PM_DEATH,
-								 100L, PG_WAIT_EXTENSION);
-				}
-			}
-			PG_FINALLY();
-			{
-				clear_exit_writer_intent(0, 0);
-			}
-			PG_END_TRY();
-		}
+		(void) transaction_lock_acquire(&tag, ExclusiveLock,
+									CurTransactionResourceOwner, false);
 		writer_transaction_lock = true;
 		writer_subid = GetCurrentSubTransactionId();
 		writer_owner = CurTransactionResourceOwner;
@@ -349,6 +308,40 @@ publish_catalog_change(void)
 	{
 		take_writer_transaction_lock();
 		(void) advance_shared(&shared->generation);
+	}
+}
+
+static void
+begin_shared_drop_publication(void)
+{
+	LOCKTAG tag = catalog_tag();
+
+	require_ready();
+	if (lease.active || preparing_transaction || pre_commit_started ||
+		proc_exit_inprogress || writer_transaction_lock)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("unsafe shared-drop catalog publication boundary")));
+	if (!shared_drop_pending)
+	{
+		if (!shared_drop_cleanup_registered)
+		{
+			before_shmem_exit(clear_shared_drop_intent, 0);
+			shared_drop_cleanup_registered = true;
+		}
+		shared_drop_subid = GetCurrentSubTransactionId();
+		pg_atomic_fetch_add_u32(&shared->pending_shared_drops, 1);
+		shared_drop_pending = true;
+		/* Exclude new readers before draining existing leases. Do not retain
+		 * this lock while native DROP waits for backend retirement or storage
+		 * barriers: exiting temp publishers must still acquire it. The intent
+		 * owns reader exclusion until transaction end; pre-commit takes the
+		 * ordinary publication lock independently. One intent per transaction
+		 * preserves its earliest subtransaction owner across nested drops. */
+		(void) transaction_lock_acquire(&tag, ExclusiveLock,
+									CurTransactionResourceOwner, false);
+		(void) advance_shared(&shared->generation);
+		transaction_unlock(&tag, ExclusiveLock, CurTransactionResourceOwner);
 	}
 }
 
@@ -437,8 +430,8 @@ start_shared_memory(void)
 			elog(FATAL, "could not create darmok_server cluster incarnation");
 		pg_atomic_init_u64(&shared->generation, 1);
 		pg_atomic_init_u64(&shared->next_backend_id, 0);
-		pg_atomic_init_u32(&shared->pending_exit_writers, 0);
-		ConditionVariableInit(&shared->exit_writers_finished);
+		pg_atomic_init_u32(&shared->pending_shared_drops, 0);
+		ConditionVariableInit(&shared->shared_drops_finished);
 	}
 	LWLockRelease(AddinShmemInitLock);
 }
@@ -454,7 +447,7 @@ transaction_event(XactEvent event, void *arg)
 			 * publication, not the waits between phases: holding a session fence
 			 * there would deadlock readers with WaitForOlderSnapshots(). */
 			pre_commit_started = true;
-			if (has_catalog_publication())
+			if (shared_drop_pending || has_catalog_publication())
 			{
 				if (last_metadata_subid == InvalidSubTransactionId)
 					note_metadata_attempt();
@@ -462,6 +455,10 @@ transaction_event(XactEvent event, void *arg)
 			}
 			break;
 		case XACT_EVENT_PRE_PREPARE:
+			if (shared_drop_pending)
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("shared-drop catalog publication cannot be prepared")));
 			if (lease.active)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -487,6 +484,7 @@ transaction_event(XactEvent event, void *arg)
 			 * (or its reservation aborted). Native 2PC busy checks still protect
 			 * the remaining detach cleanup after XACT_EVENT_PREPARE. */
 			release_prepare_gate();
+			clear_shared_drop_intent(0, 0);
 			/* Committed facts can stay cached. Aborted/prepared private facts
 			 * cannot; metadata-free transaction boundaries need no cache miss. */
 			if ((event == XACT_EVENT_ABORT || event == XACT_EVENT_PREPARE ||
@@ -514,6 +512,8 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	(void) arg;
 	if (event == SUBXACT_EVENT_COMMIT_SUB)
 	{
+		if (shared_drop_pending && shared_drop_subid == subid)
+			shared_drop_subid = parent;
 		if (prepare_gate_held && prepare_gate_subid == subid)
 			prepare_gate_subid = parent;
 		if (last_metadata_subid == subid)
@@ -531,6 +531,8 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	}
 	else if (event == SUBXACT_EVENT_ABORT_SUB)
 	{
+		if (shared_drop_pending && shared_drop_subid == subid)
+			clear_shared_drop_intent(0, 0);
 		if (prepare_gate_held && prepare_gate_subid == subid)
 			release_prepare_gate();
 		if (last_metadata_subid == subid)
@@ -692,12 +694,12 @@ object_access(ObjectAccessType access, Oid class_id, Oid object_id,
 			note_metadata_attempt();
 		if (preparing_transaction)
 			take_prepared_marker(true);
-		else if (pre_commit_started ||
-				 (access == OAT_DROP &&
-				  (class_id == DatabaseRelationId || class_id == TableSpaceRelationId)))
-			/* DROP DATABASE's invalid marker is in-place before commit. These
-			 * drop hooks run after native lookup/locks and before irreversible
-			 * work; never take this fence at ProcessUtility entry. */
+		else if (access == OAT_DROP &&
+				 (class_id == DatabaseRelationId || class_id == TableSpaceRelationId))
+			/* The invalid database marker and directory removal precede commit.
+			 * Exclude readers here without fencing native cleanup publishers. */
+			begin_shared_drop_publication();
+		else if (pre_commit_started)
 			publish_catalog_change();
 	}
 	if (previous_object_access)
@@ -757,7 +759,8 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("this backend already owns a catalog lease")));
-	if (writer_depth > 0 || preparing_transaction || pre_commit_started)
+	if (writer_depth > 0 || preparing_transaction || pre_commit_started ||
+		shared_drop_pending)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("a catalog lease cannot start during a metadata utility or transaction finalization")));
@@ -773,15 +776,15 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 	{
 		LOCKTAG tag = catalog_tag();
 
-		/* An exiting publisher uses conditional acquisition so it can absorb
-		 * native barriers. Stop admitting new readers while that publisher
-		 * drains existing leases, including the race after Share acquisition. */
+		/* Shared drops exclude new readers through their native lifecycle,
+		 * without holding this fence across backend retirement/storage waits.
+		 * Recheck after Share acquisition to close the admission race. */
 		for (;;)
 		{
 			PG_TRY();
 			{
-				while (pg_atomic_read_u32(&shared->pending_exit_writers) != 0)
-					ConditionVariableSleep(&shared->exit_writers_finished,
+				while (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+					ConditionVariableSleep(&shared->shared_drops_finished,
 									   PG_WAIT_EXTENSION);
 			}
 			PG_FINALLY();
@@ -791,7 +794,7 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 			PG_END_TRY();
 			(void) transaction_lock_acquire(&tag, ShareLock,
 										CurTransactionResourceOwner, false);
-			if (pg_atomic_read_u32(&shared->pending_exit_writers) == 0)
+			if (pg_atomic_read_u32(&shared->pending_shared_drops) == 0)
 				break;
 			transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
 		}

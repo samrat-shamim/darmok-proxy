@@ -43,13 +43,15 @@ async fn client() -> (
     (client, driver)
 }
 
-async fn other_database_client() -> (
+async fn database_client(
+    database: &str,
+) -> (
     Client,
     tokio::task::JoinHandle<Result<(), tokio_postgres::Error>>,
 ) {
     let url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
     let mut config: tokio_postgres::Config = url.parse().unwrap();
-    config.dbname("postgres");
+    config.dbname(database);
     let (client, driver) = config.connect(NoTls).await.unwrap();
     (client, tokio::spawn(driver))
 }
@@ -130,6 +132,19 @@ async fn no_fence(observer: &Client, pid: i32) {
             .unwrap()
             .is_empty()
     );
+}
+
+async fn wait_reader_admission(observer: &Client, backend: i32) {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let waiting: bool = observer.query_one(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1 AND wait_event = 'Extension')", &[&backend]
+            ).await.unwrap().get(0);
+            if waiting { return; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.expect("shared-drop reader admission wait was not observed");
+    no_fence(observer, backend).await;
 }
 
 async fn expect_lease_error(client: &Client, sql: &str, id: Option<i64>, backend: Option<i64>) {
@@ -1254,86 +1269,185 @@ async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
 }
 
 #[tokio::test]
-async fn database_removal_and_normal_temp_backend_exit_both_complete() {
+async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
     let (writer, writer_driver) = client().await;
-    let (temporary, temporary_driver) = client().await;
     let (observer, observer_driver) = client().await;
-    writer
-        .batch_execute("CREATE DATABASE darmok_lease_drop_barrier")
-        .await
-        .unwrap();
-    temporary
-        .batch_execute(
-            "CREATE TEMP TABLE lease_exit_temp(id integer); INSERT INTO lease_exit_temp VALUES (1)",
-        )
-        .await
-        .unwrap();
-    let temp_pid = pid(&temporary).await;
     let writer_pid = pid(&writer).await;
-    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-    let before = begin(&reader).await;
-    let mut dropping = Box::pin(writer.batch_execute("DROP DATABASE darmok_lease_drop_barrier"));
-    tokio::select! {
-        result = &mut dropping => panic!("database removal escaped the catalog lease: {result:?}"),
-        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
-    }
-    close(temporary, temporary_driver).await;
-    tokio::time::timeout(Duration::from_secs(20), async {
-        loop {
-            let waiting: bool = observer.query_one(
-                "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1 AND wait_event = 'Extension')", &[&temp_pid]
-            ).await.unwrap().get(0);
-            if waiting { return; }
-            tokio::time::sleep(Duration::from_millis(10)).await;
+    for target_database in [false, true] {
+        let database = format!("darmok_lease_drop_exit_{}", u8::from(target_database));
+        writer
+            .batch_execute(&format!("CREATE DATABASE {database}"))
+            .await
+            .unwrap();
+        let (temporary, temporary_driver) = if target_database {
+            database_client(&database).await
+        } else {
+            client().await
+        };
+        let (late_reader, late_driver) = client().await;
+        temporary.batch_execute(
+            "CREATE TEMP TABLE lease_exit_temp(id integer); INSERT INTO lease_exit_temp VALUES (1)"
+        ).await.unwrap();
+        let temp_pid = pid(&temporary).await;
+        let late_pid = pid(&late_reader).await;
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        late_reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&reader).await;
+        let drop_sql = format!("DROP DATABASE {database}");
+        let mut dropping = Box::pin(writer.batch_execute(&drop_sql));
+        tokio::select! {
+            result = &mut dropping => panic!("database removal escaped the catalog lease: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
         }
-    }).await.expect("normal temporary backend exit did not reach its publication wait");
-    check(&reader, &before).await;
-    end(&reader, &before).await;
-    reader.batch_execute("COMMIT").await.unwrap();
-    tokio::time::timeout(Duration::from_secs(20), &mut dropping)
-        .await
-        .unwrap()
-        .unwrap();
-    drop(dropping);
-    tokio::time::timeout(Duration::from_secs(20), async {
-        loop {
-            let present: bool = observer
-                .query_one(
-                    "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1)",
-                    &[&temp_pid],
-                )
-                .await
-                .unwrap()
-                .get(0);
-            if !present {
-                return;
+        close(temporary, temporary_driver).await;
+        wait_fence(&observer, temp_pid, "ExclusiveLock", false).await;
+        let mut late_acquisition = Box::pin(begin(&late_reader));
+        tokio::select! {
+            result = &mut late_acquisition => panic!("new reader bypassed shared-drop admission: {result:?}"),
+            () = wait_reader_admission(&observer, late_pid) => {}
+        }
+        check(&reader, &before).await;
+        end(&reader, &before).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), &mut dropping)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(dropping);
+        let after = tokio::time::timeout(Duration::from_secs(20), &mut late_acquisition)
+            .await
+            .unwrap();
+        drop(late_acquisition);
+        assert!(after.generation > before.generation);
+        check(&late_reader, &after).await;
+        let remains: bool = late_reader
+            .query_one(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_database WHERE datname = $1)",
+                &[&database],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert!(!remains);
+        end(&late_reader, &after).await;
+        late_reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let present: bool = observer
+                    .query_one(
+                        "SELECT EXISTS (SELECT FROM pg_catalog.pg_stat_activity WHERE pid = $1)",
+                        &[&temp_pid],
+                    )
+                    .await
+                    .unwrap()
+                    .get(0);
+                if !present {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
             }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("temporary backend did not complete ordinary cleanup");
-    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-    let after = begin(&reader).await;
-    assert!(after.generation > before.generation);
-    let remains: bool = reader.query_one(
-        "SELECT EXISTS (SELECT FROM pg_catalog.pg_database WHERE datname = 'darmok_lease_drop_barrier')", &[]
-    ).await.unwrap().get(0);
-    assert!(!remains);
-    end(&reader, &after).await;
-    reader.batch_execute("COMMIT").await.unwrap();
+        })
+        .await
+        .expect("temporary backend did not complete ordinary cleanup");
+        close(late_reader, late_driver).await;
+    }
     close(reader, reader_driver).await;
     close(writer, writer_driver).await;
     close(observer, observer_driver).await;
 }
 
 #[tokio::test]
+async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_error() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (first_writer, first_driver) = client().await;
+    let (second_writer, second_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let (late_reader, late_driver) = client().await;
+    // Database utilities each require their own native top-level request.
+    first_writer
+        .batch_execute("CREATE DATABASE darmok_lease_drop_first")
+        .await
+        .unwrap();
+    first_writer
+        .batch_execute("CREATE DATABASE darmok_lease_drop_busy")
+        .await
+        .unwrap();
+    let (temporary, temporary_driver) = database_client("darmok_lease_drop_first").await;
+    temporary
+        .batch_execute("CREATE TEMP TABLE lease_drop_temp(id integer)")
+        .await
+        .unwrap();
+    let (busy, busy_driver) = database_client("darmok_lease_drop_busy").await;
+    let first_pid = pid(&first_writer).await;
+    let second_pid = pid(&second_writer).await;
+    let late_pid = pid(&late_reader).await;
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    late_reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let before = begin(&reader).await;
+    let mut first = Box::pin(first_writer.batch_execute("DROP DATABASE darmok_lease_drop_first"));
+    tokio::select! {
+        result = &mut first => panic!("first drop escaped the old lease: {result:?}"),
+        () = wait_fence(&observer, first_pid, "ExclusiveLock", false) => {}
+    }
+    let mut second = Box::pin(second_writer.batch_execute("DROP DATABASE darmok_lease_drop_busy"));
+    tokio::select! {
+        result = &mut second => panic!("second drop escaped the old lease: {result:?}"),
+        () = wait_fence(&observer, second_pid, "ExclusiveLock", false) => {}
+    }
+    close(temporary, temporary_driver).await;
+    let mut acquisition = Box::pin(begin(&late_reader));
+    tokio::select! {
+        result = &mut acquisition => panic!("reader bypassed shared-drop admission: {result:?}"),
+        () = wait_reader_admission(&observer, late_pid) => {}
+    }
+    end(&reader, &before).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut first)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(first);
+    no_fence(&observer, second_pid).await;
+    no_fence(&observer, late_pid).await;
+    // The first native transaction's commit must not clear the second intent.
+    let error = tokio::select! {
+        result = &mut acquisition => panic!("reader escaped a surviving drop intent: {result:?}"),
+        result = tokio::time::timeout(Duration::from_secs(20), &mut second) => result.unwrap().unwrap_err(),
+    };
+    assert_eq!(error.code(), Some(&SqlState::OBJECT_IN_USE));
+    drop(second);
+    let after = tokio::time::timeout(Duration::from_secs(20), &mut acquisition)
+        .await
+        .unwrap();
+    drop(acquisition);
+    assert!(after.generation > before.generation);
+    check(&late_reader, &after).await;
+    let exists: bool = late_reader.query_one(
+        "SELECT EXISTS (SELECT FROM pg_catalog.pg_database WHERE datname = 'darmok_lease_drop_busy')", &[]
+    ).await.unwrap().get(0);
+    assert!(exists);
+    end(&late_reader, &after).await;
+    late_reader.batch_execute("COMMIT").await.unwrap();
+    close(busy, busy_driver).await;
+    second_writer
+        .batch_execute("DROP DATABASE darmok_lease_drop_busy")
+        .await
+        .unwrap();
+    close(reader, reader_driver).await;
+    close(first_writer, first_driver).await;
+    close(second_writer, second_driver).await;
+    close(observer, observer_driver).await;
+    close(late_reader, late_driver).await;
+}
+
+#[tokio::test]
 async fn ddl_in_an_uninstalled_database_uses_the_cluster_fence() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
-    let (writer, writer_driver) = other_database_client().await;
+    let (writer, writer_driver) = database_client("postgres").await;
     let other_oid: u32 = writer
         .query_one(
             "SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database()",

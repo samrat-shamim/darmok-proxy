@@ -121,12 +121,15 @@ The final valid-index transition is fenced at the final transaction's pre-commit
 No session fence spans the old-snapshot waits between phases.
 
 `DROP DATABASE` changes its invalid marker in place before commit. Its native
-drop hook therefore acquires the fence after database lookup/locking and before
-that change. A tablespace drop is likewise fenced at its native drop hook before
-irreversible directory removal. Taking either fence at utility entry would
-reverse the native dependency ordering. Database moves retain native database
-locks across their file-copy and internal commit; their transactional catalog
-publication receives the ordinary commit fence.
+drop hook registers transaction-owned reader exclusion after database lookup/
+locking. A short exclusive fence drains existing leases and advances generation
+before that change, then releases the lock. New leases remain excluded until
+native commit/abort. A tablespace drop uses the same mechanism before irreversible
+directory removal. This keeps the fence available to metadata publishers while
+native DROP waits for backend retirement or storage barriers. Native lifecycle
+checks and their errors retain their original order. Database moves retain native
+database locks across their file-copy and internal commit; their transactional
+catalog publication receives the ordinary commit fence.
 
 ## Prepared transactions
 
@@ -167,29 +170,31 @@ B. A query waiting on B while holding the global lease would block completion
 of that transaction. Prelocking B alone does not solve this cycle. Ending the
 global lease before row execution is mandatory even with complete dependencies.
 
-## Backend exit and native barriers
+## Shared drops and backend exit
 
-Native temporary-table cleanup runs before the exiting backend retires its
-process-signal slot. Exit suppresses ordinary interrupt handling. A backend
-waiting for the global fence there could prevent a database-removal storage
-barrier from completing while removal owns that same fence.
+Native temporary-table cleanup publishes before the exiting backend retires its
+process-signal slot. Holding the global fence across a database drop's backend
+drain would prevent that cleanup from finishing; holding it across a storage
+barrier would likewise prevent retirement. Reader exclusion therefore belongs
+to shared-drop intent, rather than a writer lock spanning those native waits.
 
-At the temporary cleanup's pre-commit boundary, after its deletion/storage calls
-have returned, the module uses conditional fence acquisition and absorbs pending
-native process-signal barriers. It requires the original exit interrupt holdoff
-of one and no critical section, and never resets interrupt counters or processes
-cancel/termination requests. This follows the native
-[process-signal barrier](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/ipc/procsignal.c)
-and [storage reentrancy](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/smgr/smgr.c)
-constraints. Other exit-time publication boundaries fail explicitly.
+Intent is registered before draining old leases. New lease requests wait on a
+condition variable without holding Share, and recheck the shared count after
+acquiring Share to close the admission race. An intent keeps its earliest owning
+subtransaction, promotes on subcommit and clears on owning subabort or top-level
+commit/abort. Native exit cleanup also clears it. Multiple droppers each own one
+intent; completion of one cannot reopen admission while another remains. A
+backend owning intent cannot acquire its own read lease or transfer it to PREPARE.
 
-An exiting publisher advertises shared intent while waiting. New lease requests
-wait without holding the global read fence, and recheck intent after acquiring
-it to close the admission race. Existing leases can finish. This prevents new
-readers from starving a conditional writer that is not in the native lock queue.
-A condition variable wakes readers; native exit/error cleanup clears the intent.
-The exceptional exit path has a 100ms timed latch fallback for lock availability;
-ordinary acquisition continues to use the native lock queue.
+Native pre-commit reacquires and retains the ordinary publication lock through
+invalidation/lock cleanup, even when a shared drop has already advanced generation
+before irreversible effects. At commit, clearing intent wakes readers, but that
+lock still prevents acquisition before native invalidations are delivered.
+Aborts may conservatively advance generation. Both ordinary and exit-time
+publishers use PostgreSQL's native lock queue; the module has no exit-time polling,
+barrier processing or interrupt-counter adjustment. The supported native database/
+tablespace paths perform storage-barrier waits outside those publication locks;
+custom late callbacks remain outside the declared contract.
 
 ## Caller requirements and limits
 
@@ -222,7 +227,10 @@ argument before replacing this mechanism.
 The module runs no SQL during acquisition or release. It uses fixed backend
 state, one backend-identity atomic allocation per participating connection,
 ordinary native lock ownership and per-acquisition result allocation.
-Two atomic intent reads are added to uncontended acquisition. Publication
+Two atomic intent reads are added to uncontended acquisition. Shared drops add
+one transaction-owned admission count, a short native drain lock and the ordinary
+pre-commit publication lock; ordinary exit publishers need no special wait loop.
+Publication
 inspection copies pending native invalidations only when present; prepared
 commands add a session gate and fixed native catalog lookup/marker probes,
 without adding SQL to ordinary lease acquisition or release. Local
@@ -236,7 +244,8 @@ readers, ordinary DML, external relation/schema/function/type/domain/collation
 DDL, drop/recreate, metadata rollback, savepoint ownership, concurrent index
 publication, cross-database hooks, enabled/default 2PC profiles, prepared DDL/DML,
 rolled-back child DDL, mixed prepared row/catalog changes and normal temp-backend
-exit during database removal. Missing module
+exit in the target or an unrelated database during removal, plus concurrent drop
+intents and ordinary native busy-error cleanup. Missing module
 dependencies fail. The Docker build installs the shared library, LLVM bitcode,
 extension SQL/control files and Apache license; SDK tools stay in the build
 stage. Other platform packages, hosted CI execution and the full artifact/
