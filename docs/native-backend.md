@@ -2,7 +2,8 @@
 
 Status: **implemented control lifecycle component; not a statement executor**.
 `NativeBackend` connects through the existing PostgreSQL connector, retains the
-client and driver privately, and submits only its own fixed transaction controls.
+client and driver privately, and submits only its own fixed initialization and
+transaction controls.
 It cannot adopt an arbitrary `Client`, implement `GenericClient`, or expose a raw
 SQL method. A caller cannot prepare or execute statements through this API.
 The [execution contract](native-execution.md) still requires semantic admission,
@@ -11,11 +12,16 @@ live catalog validity, and rollback through row decoding and frontend encoding.
 ## Construction and ownership
 
 A new owner retains both halves returned by the connector and starts one driver
-task. Before returning, it submits `ROLLBACK` and checks the complete command
-tag and idle ReadyForQuery state. This initialization is deliberately restricted
+task. Before returning, it submits `ROLLBACK; SET search_path = pg_catalog` and
+checks both complete command tags and idle ReadyForQuery state. The
+[native lookup context](native-lookup.md) keeps application schema routing
+explicit; PostgreSQL's temporary namespace remains implicit. This initialization
+is deliberately restricted
 to a fresh connection: it cannot roll back another caller's existing work. It
 adds one protocol round trip per connection and provides an observed idle state
-without changing the connector's startup processing.
+without changing the connector's startup processing. A missing SET tag or other
+initialization failure is an error; the uncertain owner is disposed and is not
+returned to its caller.
 
 The owner is neither clonable nor shareable as an independent SQL handle.
 Transaction methods require a mutable borrow. Its Debug output contains the

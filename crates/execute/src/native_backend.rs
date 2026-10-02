@@ -97,7 +97,9 @@ pub struct NativeBackend {
 
 impl NativeBackend {
     /// Forward an existing connector to tokio-postgres, retain both connection
-    /// halves privately, then confirm ROLLBACK / idle before exposing the owner.
+    /// halves privately, then confirm ROLLBACK and a fixed pg_catalog lookup
+    /// context with idle readiness before exposing the owner. Native temporary
+    /// namespaces remain implicit; this is not a catalog-validity lease.
     /// This adds one control round trip per connection, not per statement.
     /// No arbitrary existing Client can be adopted.
     pub async fn connect<T>(config: &Config, connector: T) -> Result<Self, NativeBackendError>
@@ -115,7 +117,12 @@ impl NativeBackend {
             state: NativeBackendState::Uncertain,
             last_savepoint: 0,
         };
-        let _ = backend.control(NativeControl::Rollback, "ROLLBACK").await?;
+        let _ = backend
+            .control(
+                NativeControl::Initialize,
+                "ROLLBACK; SET search_path = pg_catalog",
+            )
+            .await?;
         Ok(backend)
     }
 
@@ -484,6 +491,7 @@ impl StdError for NativeBackendDisposeError {
 #[cfg(test)]
 mod tests {
     mod frontend_loop;
+    mod native_lookup;
     mod native_row_output;
     mod query_results;
     mod query_transactions;

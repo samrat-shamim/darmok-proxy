@@ -1,4 +1,4 @@
-# Native transaction-control completion
+# Native internal-control completion
 
 `darmok-execute::check_native_control` checks a request's observed native control
 outcome. It consumes the connector's [command events](backend-completion.md);
@@ -11,6 +11,7 @@ The caller chooses one fixed expectation for its known internal control:
 
 | `NativeControl` | Exact command tags, in order | Final ReadyForQuery state |
 | --- | --- | --- |
+| `Initialize` | `ROLLBACK`, `SET` | Idle |
 | `Begin` | `BEGIN` | Transaction |
 | `Commit` | `COMMIT` | Idle |
 | `Rollback` | `ROLLBACK` | Idle |
@@ -25,6 +26,12 @@ private fields and is constructed only after those checks. A command tag alone
 cannot construct it. These expectations cover the owner's ordinary internal
 controls, without `AND CHAIN`, transaction-prepared operations or arbitrary
 batches.
+
+`Initialize` describes the owner's fixed fresh-connection request
+`ROLLBACK; SET search_path = pg_catalog`. A tag cannot identify which setting a
+caller changed. The [owner](native-backend.md) submits that exact SQL privately;
+an arbitrary SET with matching tags is not a certified lookup context. Neither
+this expectation nor the checker can adopt another caller's connection.
 
 The connector records whether the stream has yielded any event or terminal
 error. Passing a partially or completely consumed stream fails with
