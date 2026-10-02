@@ -156,8 +156,10 @@ vector. One local unnamed description owns
 the column names/types and is shared by its rows, with no server statement-close
 request on Drop. The typed, prepared and described-portal lanes share
 row/error/completion logic.
-The text simple-query lane shares one column-name/metadata allocation across
-each statement's rows and uses the existing `SimpleQueryRow` field ranges.
+The text simple-query lane shares one Arc-backed column description per
+statement, with owned column-name strings and the existing per-row field-range
+allocation. Building a description collects a Vec, then constructs its Arc
+slice; it does not imply one total allocation.
 Retaining raw column facts adds fixed metadata per column, also to upstream
 simple-query descriptions; it adds no per-row lookup or value conversion.
 These are structural costs, not a measured performance claim.
@@ -209,3 +211,6 @@ and prepared requests; SHOW preceding the first repeatable-read data snapshot;
 explicit binary cursor rejection; and local encoding failure without a partial
 queued request. Their native observations do not certify a server catalog
 control or its nonblocking guard design.
+Pending-only polling, partial-consumption handoff and metadata propagation
+through the existing upstream helper were reviewed in source; they are not
+claimed as additional dedicated fixture observations.

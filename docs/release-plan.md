@@ -1914,3 +1914,51 @@ costs and ten required ordinary fixtures. Current-source PostgreSQL 17/18
 verification and independent review are required before merging. Catalog guard,
 snapshot/admission, table execution, serving, driver/cache/performance/artifact,
 hosted CI and release gates remain open; the goal and exclusions are unchanged.
+
+### Observed text simple-query local verification
+
+The tested clean code revision is
+`ca84ea2c70d66e953ed2deb61a8a4920bcccf3b2`, tree
+`a943445f4c29297c89137398ff24268b54d9c98c`.
+
+| Check | Executed result |
+| --- | --- |
+| New text simple-query fixtures, PostgreSQL 17 | 10 passed, 0 failed/ignored |
+| Full PostgreSQL package, PostgreSQL 17/18 | 120 passed each, 0 failed/ignored; 15 summaries each, including 10 new transport and 23 catalog lease groups |
+| Workspace all-feature tests/doctests | 1682 passed, 0 failed, 79 explicitly ignored; 42 summaries |
+| Formatting, repository boundaries, strict workspace/connector Clippy | Four commands, actual 0 |
+| Isolated connector without runtime features | Offline consumer check actual 0; locked metadata confirms no connector features and all 80 registry packages match the product lock |
+| Environment and cleanup | 14 native/source commands each, actual 0; eight module inputs equal tested `2021669`, both pinned images/library hashes match, native 2PC remains 10, no prepared transactions, other clients or snapshot-fixture tables remain |
+
+The original optional `cargo check -p tokio-postgres --no-default-features`
+invocation was rejected before compilation because the vendored dependency is
+outside the workspace. Its actual 101 and the enclosing matrix's propagated
+101 remain preserved. The corrected external consumer selects the exact local
+connector with default features disabled and leaves product source/lockfiles
+unchanged. A first metadata helper failed before spawning Cargo because the
+default Python lacked `tomllib`; Python 3.13 ran the same helper successfully.
+A first author audit expected seven module inputs, overlooking `.dockerignore`;
+the corrected audit verifies all eight. Both actual-1 bookkeeping failures
+remain separate from the executed product checks.
+
+Immutable receipts are under `.darmok-work/logs/simple-completion-ca84ea2-*`.
+The author audit has actual exit 0, stdout SHA256
+`87752199318d2468dc7ce40d7e2d7343d80f316da7fb4c359cbc6519123c5839`;
+its 538-file manifest is
+`a420a855c46a9f5916d60219594cdcc593cc80ede5d3403ad814ef1d5c1db72c`,
+and facts `a26c0399648050f29f156c0a2393a10082ee41159a7d95e95ed8f75f50c0b411`.
+Seventeen pinned source snapshots and 21 Git readers have actual exit 0.
+Four environment readers confirm Rust/Cargo 1.96.0, macOS 26.0.1 and arm64.
+Every Cargo invocation and Cargo-spawning helper uses the scoped Rustup/target
+directories serially. The passive design-review seal's 129 files were rehashed;
+its open proof obligations remain unchanged.
+
+Independent source review found no ordinary functional blocker and requested
+precise allocation wording: descriptions collect a Vec, own name strings and
+construct a shared Arc slice; rows retain their existing ranges allocation.
+This documentation leaf applies that correction and records verification
+without changing code. Final independent acceptance is required before merge.
+Pending-only/partial handoff and upstream helper propagation are source-reviewed,
+not extra runtime fixture claims. No native data-snapshot policy, server catalog
+control, complete guard proof, semantic admission, table executor, serving,
+driver/cache/performance/artifact/hosted CI or release gate is certified here.
