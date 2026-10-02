@@ -118,7 +118,7 @@ BEGIN
     -- alone is not proof that a newly added constraint has been validated.
     IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint
             WHERE conrelid = table_oid AND contype = 'n') <>
-            CASE WHEN pg_catalog.current_setting('server_version_num')::pg_catalog.int4 / 10000 = 18 THEN 3 ELSE 0 END
+            (CASE WHEN pg_catalog.current_setting('server_version_num')::pg_catalog.int4 / 10000 = 18 THEN 3 ELSE 0 END)
         OR EXISTS (SELECT FROM pg_catalog.pg_constraint AS c WHERE c.conrelid = table_oid
             AND (NOT c.convalidated OR NOT c.conislocal OR c.coninhcount <> 0
                 OR NOT COALESCE((pg_catalog.to_jsonb(c)->>'conenforced')::pg_catalog.bool, true)
