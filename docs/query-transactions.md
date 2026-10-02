@@ -101,7 +101,9 @@ Digit-only unsigned integer tokens are admitted; decimal/exponent forms return
 1235 consistently before effects. A compound unsupported numeric assignment
 cannot follow an autocommit commit. Missing provenance remains an internal
 error. Numeric SET adds token-span/range vectors and one sorted-endpoint Unicode
-walk; nonnumeric SET has no numeric range allocations or native requests.
+walk. Nonnumeric SET does not allocate numeric ranges; provenance adds no native
+request. An admitted autocommit-zero-to-one SET can still perform the separately
+documented native commit.
 No cache or automatic replay
 is added. Measured latency, allocations, contention and cache behavior remain
 open integrated-workload gates, as do real drivers, both end-to-end examples,
