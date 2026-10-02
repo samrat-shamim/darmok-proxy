@@ -1865,3 +1865,52 @@ fixture inputs. Independent final review is required before component merge.
 These passes do not certify fresh catalog reads, complete native guards, semantic
 admission, table execution, serving, drivers, cache performance, hosted CI or the
 full release. The goal remains active and the user's exclusions remain in force.
+
+### Catalog lease merge and next control boundary
+
+[PR #45](https://github.com/samrat-shamim/darmok-proxy/pull/45) was normally
+squash-merged as `56b5ac5fe973946e7862469d970ade3a646a9814`, tree
+`05aab2bcdd324ecdcc4899e095f395918ede2add`. That tree equals the final reviewed
+documentation leaf `6334aba60ea5c99bf3d8b941b67de48cc4ac4b84`; all 314
+other tracked entries equal tested revision `2021669`. The independent finite
+component review has report SHA256
+`459dfddf46b98bc036cc92c77e0489d28419ba48cd999531c715faef1b7ca2c2`,
+seal `c8c3e70b8ec72046b39577f3eacf0c37857fcc7afae70a1b51c18826a9f48a08`,
+and separate actual-0 invocation
+`f70ffbd925161b555a2aefea669d8be5b998a698bdaec8c3e9a0a9c6e08c7329`.
+The publication audit has actual exit 0, binds 125 files, and records exact tree
+equality, the public personal repository, its non-experimental description,
+and no eligible open PRs. Its facts SHA256 is
+`aca6d7bd41b0277ac2e1537f595d78096e0e92bc99f046624dc70afe42a502de`.
+The audit does not claim hosted CI or release completion.
+
+[Issue #46](https://github.com/samrat-shamim/darmok-proxy/issues/46) records why
+the existing SELECT-based controls cannot serve fresh catalog discovery without
+prematurely creating the owner's first native data snapshot. PostgreSQL 17/18
+source research supports top-level parameterless SET/SHOW as snapshot-neutral,
+but this is an unimplemented candidate transport. Independent design review
+keeps complete catalog/index/TOAST/output/invalidation guards and a continuous
+supported backend-state invariant open. It also requires exact-backend module
+proof before accepting SET acknowledgments, and fresh acquisition portals with
+historical-stamp/expiry semantics. The passive review report has SHA256
+`75feb525b0346365188a9e17f9762f3659c3b654a0499f6a409efae188c47ee1`,
+129-file seal `3c6994cb61f284b0c406a5643bab5291355aededcdf59c80f1b51c338fd7f2e9`
+and separate actual-0 invocation
+`11da2d583c2564abddbe5b59abd55698879385d2eb0aaa80b1aa4663d3f80242`.
+Bookkeeping failures remain preserved; no runtime or implementation acceptance
+is inferred. Concurrent native two-phase transactions remain required for v0.1.
+
+### Observed text simple-query component
+
+The next connector component supplies exact completion for row-returning
+simple queries. Upstream simple-query streams erase exact tags, empty-query
+distinctions and final transaction state; command-only events reject row
+descriptions. Reusing the existing encoder, request queue and text row carrier
+preserves the native sequence in one request without result-type lookup SQL.
+Raw column facts are shared per statement; unknown OIDs require no invented
+connector type. Unsupported binary descriptions terminate explicitly after
+submission. The [completion contract](backend-completion.md) defines the API,
+costs and ten required ordinary fixtures. Current-source PostgreSQL 17/18
+verification and independent review are required before merging. Catalog guard,
+snapshot/admission, table execution, serving, driver/cache/performance/artifact,
+hosted CI and release gates remain open; the goal and exclusions are unchanged.

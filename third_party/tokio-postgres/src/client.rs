@@ -10,6 +10,7 @@ use crate::copy_out::CopyOutStream;
 #[cfg(feature = "runtime")]
 use crate::keepalive::KeepaliveConfig;
 use crate::query::RowStream;
+use crate::simple_completion::SimpleQueryEventStream;
 use crate::simple_query::SimpleQueryStream;
 #[cfg(feature = "runtime")]
 use crate::tls::MakeTlsConnect;
@@ -716,6 +717,22 @@ impl Client {
     /// must establish its connection ownership and rollback scope beforehand.
     pub fn command_events(&self, query: &str) -> Result<CommandEventStream, Error> {
         crate::completion::command_events(self.inner(), query)
+    }
+
+    /// Enqueues a simple query and exposes native descriptions, text rows and
+    /// exact completion events, including final ReadyForQuery transaction state.
+    ///
+    /// Each row retains its statement's raw native column facts without type
+    /// lookup SQL. Binary descriptions and COPY terminate with an error after
+    /// submission. Backend SQL errors are `SimpleQueryEvent::BackendError`
+    /// events; consume through ReadyForQuery to observe the resulting state.
+    /// An `Err` item terminates without confirming completion.
+    ///
+    /// Calling encodes and queues the request immediately. The caller must
+    /// establish connection ownership and rollback scope beforehand. Dropping
+    /// a stream or observing rows/tags alone supplies no cleanup receipt.
+    pub fn simple_query_events(&self, query: &str) -> Result<SimpleQueryEventStream, Error> {
+        crate::simple_completion::simple_query_events(self.inner(), query)
     }
 
     /// Enqueues a prepared query and exposes rows and exact completion events.

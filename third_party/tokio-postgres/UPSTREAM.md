@@ -35,6 +35,16 @@ removed, with no change to its constants.
 The [backend completion contract](../../docs/backend-completion.md) defines the
 new APIs and their ordinary functional verification.
 
+`src/simple_completion.rs` adds `simple_query_events`: one simple-query request
+preserving each native description, text row, exact tag, SQL error, empty query
+and final transaction state. It is fused and records consumed items. It reuses
+the upstream encoder and `SimpleQueryRow`, with no result-type queries or whole
+result buffering. Non-text formats and unsupported sequences fail explicitly
+after submission. `src/simple_query.rs` retains raw description metadata in
+`SimpleColumn` and shares its encoder internally; existing helpers' count/error
+and completion behavior is unchanged. The client and crate root expose the new
+API. These observations do not establish catalog validity or MySQL semantics.
+
 `src/portal_completion.rs` additionally observes Bind, portal Describe and Sync
 before queuing any Execute. Its built-in descriptions use fresh native labels,
 origins and typmods, with no result-type lookup SQL. `src/client.rs` and

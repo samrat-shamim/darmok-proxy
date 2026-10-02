@@ -71,3 +71,7 @@ path = "typed_completion.rs"
 [[test]]
 name = "server_catalog_lease"
 path = "server_catalog_lease.rs"
+
+[[test]]
+name = "simple_completion"
+path = "simple_completion.rs"
