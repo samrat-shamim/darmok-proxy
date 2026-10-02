@@ -1398,7 +1398,7 @@ and separate actual invocation
 
 The evidence leaf changes only this release record and the component contract;
 its exact parent/tree/evidence proof and independent wording review are separate
-from runtime certification. Required hosted CI, public table/catalog-validity
+from the recorded runtime checks. Required hosted CI, public table/catalog-validity
 execution, executable integration, real drivers, measured performance, merge,
 release and M2/M3/M4/full-goal completion remain pending. Security work,
 compiler PR4, resource stress and forced interruption remain excluded.

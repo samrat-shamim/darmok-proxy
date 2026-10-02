@@ -95,5 +95,6 @@ builds, formatting, repository boundaries, diff and 116 fresh stock cases.
 The independent source/correction/expanded-fixture reviews found no functional
 defect; the positive introducer coverage concern is closed. Exact commands,
 counts, environment and immutable evidence hashes are recorded in
-[the release plan](release-plan.md). These results certify that code revision;
-later documentation leaves retain a separate tree/evidence proof.
+[the release plan](release-plan.md). These local results apply to that
+code/fixture revision; later documentation leaves retain a separate
+tree/evidence proof.
