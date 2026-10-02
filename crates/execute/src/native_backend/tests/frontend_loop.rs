@@ -6,7 +6,7 @@ use crate::{
     FrontendConnection, FrontendEnd, FrontendReport, QueryOutcome, ServerSetValues,
     execute_query_command,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use darmok_protocol::constants::{COM_PING, COM_QUERY, COM_QUIT};
 use darmok_protocol::{CapabilityFlags, Command, PacketHeader, RawPacket, StatusFlags};
 use darmok_session::{AutocommitSetting, MysqlCompatibilityProfile, SessionState, SqlModes};
@@ -508,5 +508,185 @@ async fn frontend_loop_ping_preserves_condition_count_until_next_statement() {
         assert_eq!(result.session.row_count, 0);
         assert_eq!(result.session.last_insert_id, 7);
         assert_eq!(result.session.found_rows, 1);
+    }
+}
+
+fn binary_reference_column(expected: &serde_json::Value) -> (Vec<u8>, u16, u32, u8, u16, u8) {
+    let unhex = crate::select_controller::binary_tests::unhex;
+    for field in ["schema_hex", "table_hex", "org_table_hex", "org_name_hex"] {
+        assert_eq!(expected[field].as_str().unwrap(), "");
+    }
+    (
+        unhex(expected["name_hex"].as_str().unwrap()),
+        expected["charset"].as_u64().unwrap().try_into().unwrap(),
+        expected["width"].as_u64().unwrap().try_into().unwrap(),
+        expected["type"].as_u64().unwrap().try_into().unwrap(),
+        expected["flags"].as_u64().unwrap().try_into().unwrap(),
+        expected["decimals"].as_u64().unwrap().try_into().unwrap(),
+    )
+}
+
+async fn binary_result(
+    input: &mut TcpStream,
+    deprecated: bool,
+    case: &serde_json::Value,
+    flags: u16,
+) {
+    use darmok_protocol::read_lenenc_bytes;
+    let unhex = crate::select_controller::binary_tests::unhex;
+    input
+        .write_all(&encoded(
+            COM_QUERY,
+            case["sql"].as_str().unwrap().as_bytes(),
+        ))
+        .await
+        .unwrap();
+    let expected_columns = case["columns"].as_array().unwrap();
+    assert_eq!(
+        packet(input, 1).await,
+        [u8::try_from(expected_columns.len()).unwrap()]
+    );
+    let mut sequence = 2;
+    for expected in expected_columns {
+        let column = packet(input, sequence).await;
+        assert_eq!(
+            super::query_results::column(&column),
+            binary_reference_column(expected),
+            "{case}"
+        );
+        sequence += 1;
+    }
+    let [lo, hi] = flags.to_le_bytes();
+    if !deprecated {
+        assert_eq!(packet(input, sequence).await, [0xfe, 0, 0, lo, hi]);
+        sequence += 1;
+    }
+    let row = packet(input, sequence).await;
+    sequence += 1;
+    let mut remaining = row.as_slice();
+    let expected = case["rows_hex"].as_array().unwrap();
+    assert_eq!(expected.len(), 1);
+    for value in expected[0].as_array().unwrap() {
+        if let Some(value) = value.as_str() {
+            assert_eq!(
+                read_lenenc_bytes(&mut remaining, "binary literal").unwrap(),
+                unhex(value),
+                "{case}"
+            );
+        } else {
+            assert_eq!(remaining.get_u8(), 0xfb);
+        }
+    }
+    assert!(remaining.is_empty());
+    let end = packet(input, sequence).await;
+    if deprecated {
+        assert_eq!(end, [0xfe, 0, 0, lo, hi, 0, 0]);
+    } else {
+        assert_eq!(end, [0xfe, 0, 0, lo, hi]);
+    }
+}
+
+fn binary_status(mode: &str, active: bool) -> u16 {
+    2 | if active { 1 } else { 0 }
+        | if mode.contains("NO_BACKSLASH_ESCAPES") {
+            512
+        } else {
+            0
+        }
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn frontend_loop_binary_literals_match_stock_fields_bytes_and_both_eof_forms() {
+    let data = crate::select_controller::binary_tests::corpus();
+    assert_eq!(data["cases"].as_array().unwrap().len(), 44);
+    for deprecated in [false, true] {
+        let mut backend = connect_backend().await;
+        let (mut session, globals) = fixture(deprecated);
+        session.last_insert_id = 29;
+        prepare(
+            &mut session,
+            &mut backend,
+            &globals,
+            "SET TRANSACTION READ ONLY",
+        )
+        .await;
+        let pending = session.transaction_settings().unwrap().next;
+        let (mut input, owner) = connection(session, backend, globals, BytesMut::new()).await;
+        for case in data["cases"].as_array().unwrap() {
+            let mode = case["sql_mode"].as_str().unwrap();
+            let flags = binary_status(mode, false);
+            ok(
+                &command(
+                    &mut input,
+                    COM_QUERY,
+                    format!("SET sql_mode='{mode}'").as_bytes(),
+                )
+                .await,
+                flags,
+            );
+            binary_result(&mut input, deprecated, case, flags).await;
+            ok(&command(&mut input, COM_PING, b"").await, flags);
+        }
+        input.write_all(&encoded(COM_QUIT, b"")).await.unwrap();
+        closed(&mut input).await;
+        let result = owner.await.unwrap();
+        report(&result, FrontendEnd::Quit, false);
+        assert_eq!(result.session.last_insert_id, 29);
+        assert_eq!(result.session.transaction_settings().unwrap().next, pending);
+        assert_eq!(result.session.found_rows, 1);
+        assert_eq!(result.session.warning_count(), 0);
+    }
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn frontend_loop_binary_literal_errors_preserve_outer_work_and_next_valid_results() {
+    let data = crate::select_controller::binary_tests::corpus();
+    assert_eq!(data["syntax_errors"].as_array().unwrap().len(), 28);
+    assert_eq!(data["unsupported"].as_array().unwrap().len(), 44);
+    for deprecated in [false, true] {
+        let mut backend = connect_backend().await;
+        let name = table(&backend).await;
+        let (mut session, globals) = fixture(deprecated);
+        prepare(&mut session, &mut backend, &globals, "START TRANSACTION").await;
+        setup(&backend, &format!("INSERT INTO {name} VALUES(1)")).await;
+        let (mut input, owner) = connection(session, backend, globals, BytesMut::new()).await;
+        for (group, expected_code) in [("syntax_errors", 1064u16), ("unsupported", 1235u16)] {
+            for case in data[group].as_array().unwrap() {
+                let mode = case["sql_mode"].as_str().unwrap();
+                let flags = binary_status(mode, true);
+                ok(
+                    &command(
+                        &mut input,
+                        COM_QUERY,
+                        format!("SET sql_mode='{mode}'").as_bytes(),
+                    )
+                    .await,
+                    flags,
+                );
+                let error = command(
+                    &mut input,
+                    COM_QUERY,
+                    case["sql"].as_str().unwrap().as_bytes(),
+                )
+                .await;
+                let [lo, hi] = expected_code.to_le_bytes();
+                assert_eq!(
+                    &error[..9],
+                    &[0xff, lo, hi, b'#', b'4', b'2', b'0', b'0', b'0'],
+                    "{case}"
+                );
+                ok_with_warnings(&command(&mut input, COM_PING, b"").await, flags, 1);
+                binary_result(&mut input, deprecated, &data["cases"][0], flags).await;
+                ok(&command(&mut input, COM_PING, b"").await, flags);
+            }
+        }
+        ok(&command(&mut input, COM_QUERY, b"COMMIT").await, 514);
+        input.write_all(&encoded(COM_QUIT, b"")).await.unwrap();
+        closed(&mut input).await;
+        let result = owner.await.unwrap();
+        report(&result, FrontendEnd::Quit, false);
+        assert_eq!(effects_and_cleanup(&name).await, vec![0, 1]);
     }
 }

@@ -1,6 +1,7 @@
 // Modified for Darmok: Parse typed MySQL variables and SET assignment alternatives.
 // Modified for Darmok: verify SHOW INDEX aliases against their canonical form.
 // Modified for Darmok: verify MySQL transaction clauses and reserved RELEASE syntax.
+// Modified for Darmok: distinguish MySQL bit literals from Generic byte literals.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -4000,7 +4001,15 @@ fn parse_logical_xor() {
 
 #[test]
 fn parse_bitstring_literal() {
-    let select = mysql_and_generic().verified_only_select("SELECT B'111'");
+    let select = mysql().verified_only_select("SELECT B'111'");
+    assert_eq!(
+        select.projection,
+        vec![SelectItem::UnnamedExpr(Expr::Value(
+            (Value::BitStringLiteral("111".to_string())).with_empty_span()
+        ))]
+    );
+    let select = TestedDialects::new(vec![Box::new(GenericDialect {})])
+        .verified_only_select("SELECT B'111'");
     assert_eq!(
         select.projection,
         vec![SelectItem::UnnamedExpr(Expr::Value(

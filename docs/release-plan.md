@@ -1250,3 +1250,155 @@ Required hosted CI, CLI and runtime integration, complete catalog validity,
 admitted table SQL, real drivers, measured performance, merge and release remain
 pending. M2/M3/M4 and the full goal are not complete. Security work and compiler
 PR4 remain excluded; no hosted CI retry, account action, merge or release ran.
+
+### Original-source binary literal execution
+
+The `feat/native-binary-literals` branch adds distinct MySQL bit tokens/AST
+values, quoted digit validation and complete unquoted-token classification.
+The local SELECT lane emits direct hex/bit byte strings, parentheses/plus/aliases
+and selected `_binary` introducers with stock field metadata. It adds no native
+query or catalog plan. Numeric/coercion, other introducers/quoted binary text,
+COLLATE and public table execution remain explicit unsupported gates. The
+[component contract](query-binary-literals.md) records the exact scope and cost.
+
+A stock standard-client capture from clean `271b4cf` independently records
+MySQL 8.4.11 fields and values under four mode combinations. The selected
+initial corpus has 40 positive cases/200 fields and cells, 28 syntax cases and 44
+unimplemented contexts/names. Both initial captures remain outside the
+distribution; the first width query used a reserved alias and retains its actual
+SQL error, while the second uses a valid alias. Their process exits are0, not
+claims that all submitted SQL succeeded. PyMySQL distribution1.1.2/module1.4.6
+and Python3.9.6 remain pinned to the existing ordinary fixture client.
+
+Draft checks currently pass two local corpus tests, five parser regressions and
+two PostgreSQL17 command-phase TCP groups with both EOF formats, diagnostics,
+next-setting preservation and earlier outer writes surviving rejected input
+followed by valid results and commit. The repository-local stock observer also
+passes112 observations:40 positive,28 syntax,44 unimplemented reference
+contexts. It checks pinned image identity/content digest and connected fixture
+UUID, and preserves each stock outcome and six actual subprocess exits0. The
+stock result fields come from the pinned standard client; only supported binary
+rows are exact byte observations. This is not an authenticated proxy driver run.
+
+These are dirty-source development receipts under `logs/binary-draft-*`, not
+committed-candidate certification. Three compile attempts retain actual101:
+ambiguous Into at a tokenizer error, test code using mode constants as flags
+and a private token constructor, and a partial test-edit replacement. The
+corrected development checks retain separate actual0 receipts. Every Cargo
+invocation uses the task RUSTUP_HOME/shared CARGO_TARGET_DIR, serially. A fresh
+committed matrix and independent review remain required.
+
+The first committed candidate `10d6a240d158475c5e4f1ced5dfd2bfd6abc2cef`
+passes ordinary PostgreSQL17/18 owners66 each and BigDecimal frontend10 each.
+Its all-feature workspace run stops with actual101 at the existing
+`sqlparser_mysql::parse_bitstring_literal` assertion: that test incorrectly
+requires MySQL's new bit AST and Generic's unchanged byte AST to be identical.
+The corrected test asserts each dialect independently, retaining Generic's
+original result and identifying the modified upstream file. The failed run and
+four successful backend runs remain immutable; the remaining matrix commands
+did not execute. This candidate is not certified by those partial results.
+
+The subsequent `bb77400cd60511cd46d320591959d4c73da2e9a0` passes both native
+backend variants, workspace all1676/default1669 with76 ignored each, but strict
+Clippy stops with actual101 at `manual_is_multiple_of` in the decoder. The next
+revision uses the Rust1.96 divisibility API and computes first-group width once
+before the byte loop. No warning suppression is added. The partial matrix and
+lint failure remain distinct; feature, boundary and stock checks had not run.
+
+The subsequent `9673f9b9a1c3bdda3beb207d28e35f375984c13b`, tree
+`28ad20e9574d876b3f3fe6a590f92781b5e75d04`, passes all14 matrix commands,
+including the full suites and strict lint. Its fresh stock observer matches112
+cases, and author audit seals659 files/42 receipts with39 nonaggregate serial
+intervals. This remains a historical code candidate after the fixture extension.
+The independent source review found no functional defect but identified that
+empty/unary-plus `_binary` forms were only captured in a rejected mixed query.
+A separate clean-head stock capture now records those four expressions in a
+successful query under all four modes. Four exact observations extend the
+positive corpus to44 cases/216 fields and cells,116 total cases, and run through
+the existing pure and ordinary TCP loops. No runtime implementation changes.
+A new committed matrix and bounded review are required for the expanded fixture.
+
+Future MySQL CI declares a pinned standard-client virtual environment, required
+observer and always-run pinned artifact upload. Hosted CI is not polled or
+retried under the existing account blocker. Security, compiler PR4, resource
+stress and forced interruption work remain excluded. M2/M3/M4, catalog execution
+validity, executable integration, real drivers, performance, merge, release and
+the full goal remain incomplete.
+
+Final expanded code/fixture revision `e6ccbf39b835be3d44620464eb7d1c61652147a2`,
+tree `0d4589614348cef92ca95326e022a3af694ae849`, passes all14 local matrix
+commands. Each PostgreSQL17.11/18.6 backend passes owners66/0 with14 filtered
+and BigDecimal frontend10/0 with70 filtered. The three exact abandoned/dropped
+control exclusions remain in owner argv; ignored groups are not counted as
+passing. Workspace all/default pass1676/1669, each with76 ignored, across39/38
+summaries. Strict Clippy, three parser feature builds, formatting, repository
+boundaries, diff and the fresh stock observer all exit0.
+
+Both mandatory Cargo inputs are recorded on every Cargo/helper receipt:
+`RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup` and
+`CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target`.
+The matrix invokes the following owner and frontend commands once per fixture,
+at ports32769/32768 respectively. Each database URL selects the existing
+`darmok_test` fixture. The remaining commands run once, serially.
+
+```text
+cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored --nocapture --skip native_backend::tests::abandoned_transaction_recovery_never_restores_ready --skip native_backend::tests::unpolled_control_is_inert_and_dropped_pending_control_is_uncertain --skip native_backend::tests::dropped_scope_and_dropped_finish_never_restore_ready
+cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::frontend_loop -- --ignored --nocapture
+cargo test --workspace --exclude darmok-postgres-tests --all-features --locked
+cargo test --workspace --exclude darmok-postgres-tests --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo check -p darmok-sqlparser --no-default-features --locked
+cargo check -p darmok-sqlparser --no-default-features --features std --locked
+cargo check -p darmok-sqlparser --no-default-features --features visitor --locked
+cargo fmt --all --check
+python3 scripts/check_repository.py
+git diff --check 271b4cfadeccce057fb2665135ff7fec0e5b70a3..HEAD
+```
+
+The last check uses the existing pinned-client interpreter with `-B`, followed
+by `tests/reference/observe_mysql_binary_literals.py --container
+darmok-mysql-reference-84 --image
+mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+--port 32770 --corpus crates/execute/fixtures/mysql-binary-literals.json
+--evidence-dir /Users/shamim/Projects/duotronic/.darmok-work/logs/binary-e6ccbf3-stock-evidence`.
+Its116 actual observations match exactly:44 positive cases/216 fields and cells,
+28 syntax errors and44 unimplemented reference contexts. Six saved subprocesses
+exit0. Image ID/content digest and connected server UUID association are checked.
+The four new cases exactly preserve their separate clean9673 stock capture;
+the original112 cases exactly preserve the initial-v2 capture. No generated
+expectation, raw decoded numeric-wire claim or proxy driver claim is introduced.
+
+The twelve environment-v4 readers exit0 and bind this head/tree to Rust/Cargo
+1.96.0, macOS26.0.1 arm64, pinned PostgreSQL17.11/18.6 UTF8/max identifier63
+fixtures, MySQL8.4.11, Python3.9.6 and PyMySQL distribution1.1.2/module1.4.6.
+`logs/binary-e6ccbf3-author-audit-v1.json` exits0, SHA256
+`65abf9469430f56772c1c7339e165433f571ba669f9608e81e66a7f5453c1323`.
+It binds60 terminal command receipts and56 nonaggregate sequential intervals;
+the four nested matrix parents are counted separately. The889-file
+`logs/binary-e6ccbf3-code-evidence-manifest.json` has SHA256
+`560b50d96fc459f6c8d7ae20700a8e3c617cf8dbe53529557e24a8b5847302b1`.
+`logs/binary-e6ccbf3-audit-facts.json` has SHA256
+`74e558ca6267884320108167bf92e64cba8779db6505a332c0cb0b4718a8900c`.
+The graph preserves the prior659-file seal, original241-file initialization
+evidence, PR41 publication/account-blocker anchors and all failed/draft attempts.
+No historical or dirty-source result is relabeled as this committed run.
+
+Independent source review at10d6 records44 Git commands0; the9673 corrective
+source/evidence addendum records17 Git commands0; the e6 expanded-fixture
+addendum records24 Git commands0. All three final passive invocations exit0.
+No functional finding remains; four new successful queries close the original
+positive introducer coverage concern. One exploratory missing-filename reader1
+and one pre-write nested-quote builder1 remain separately preserved bookkeeping
+failures, not runtime results or passed invocations. No reviewer reruns Cargo,
+SQL, Docker or network checks. The current source/evidence report has SHA256
+`1d7c80b09fb137e0d80d13214d3e16ae3ef7d5737b3c6896de3050506c38b96e`,
+its seal `7712a2d544bf51416ba9e7a564083f9452578ab98e90831b07e57752684f891e`
+and separate actual invocation
+`602a3152f0e300b5e9ca872d3adf1331bb6cf075df5c52934b9ce2a06a748e3e`.
+
+The evidence leaf changes only this release record and the component contract;
+its exact parent/tree/evidence proof and independent wording review are separate
+from the recorded runtime checks. Required hosted CI, public table/catalog-validity
+execution, executable integration, real drivers, measured performance, merge,
+release and M2/M3/M4/full-goal completion remain pending. Security work,
+compiler PR4, resource stress and forced interruption remain excluded.

@@ -1,3 +1,4 @@
+// Modified for Darmok: represent MySQL bit-value literals independently of byte strings.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -196,6 +197,8 @@ pub enum Value {
     NationalQuoteDelimitedStringLiteral(QuoteDelimitedString),
     /// X'hex value'
     HexStringLiteral(String),
+    /// MySQL B'bits' or 0bbits; the payload retains binary digits, not decoded bytes.
+    BitStringLiteral(String),
 
     /// Double quoted string literal, e.g. `"abc"`.
     DoubleQuotedString(String),
@@ -233,7 +236,8 @@ impl Value {
             | Value::EscapedStringLiteral(s)
             | Value::UnicodeStringLiteral(s)
             | Value::NationalStringLiteral(s)
-            | Value::HexStringLiteral(s) => Some(s),
+            | Value::HexStringLiteral(s)
+            | Value::BitStringLiteral(s) => Some(s),
             Value::DollarQuotedString(s) => Some(s.value),
             Value::QuoteDelimitedStringLiteral(s) => Some(s.value),
             Value::NationalQuoteDelimitedStringLiteral(s) => Some(s.value),
@@ -277,6 +281,7 @@ impl fmt::Display for Value {
             Value::QuoteDelimitedStringLiteral(v) => v.fmt(f),
             Value::NationalQuoteDelimitedStringLiteral(v) => write!(f, "N{v}"),
             Value::HexStringLiteral(v) => write!(f, "X'{v}'"),
+            Value::BitStringLiteral(v) => write!(f, "B'{v}'"),
             Value::Boolean(v) => write!(f, "{v}"),
             Value::SingleQuotedByteStringLiteral(v) => write!(f, "B'{v}'"),
             Value::DoubleQuotedByteStringLiteral(v) => write!(f, "B\"{v}\""),
