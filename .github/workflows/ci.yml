@@ -173,6 +173,13 @@ jobs:
           name: mysql-query-results-reference
           path: ${{ runner.temp }}/mysql-query-results-reference
           if-no-files-found: error
+      - name: Preserve typed substring reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-substring-reference
+          path: ${{ runner.temp }}/mysql-substring-reference
+          if-no-files-found: error
       - name: Required stock exact-number observations
         run: >-
           python3 tests/reference/observe_mysql_exact_numbers.py

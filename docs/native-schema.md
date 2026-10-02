@@ -100,3 +100,14 @@ warning counts, preserving raw commands and streams. The native fixture is
 required by both existing PostgreSQL native-owner jobs; the stock observer is
 required by the MySQL reference job. Hosted jobs have not been run for this
 component while the account blocker persists.
+
+The local implementation/fixture check is bound to revision
+`3821d036529c3a3d9b5fbbff08631473bbb5708f`, tree
+`c6987fca944bec05bb951d2b462013cf59f1b960`. All twelve regression commands
+passed, including eight initialization groups on both backend majors and the
+default/BigDecimal parser configurations. The initial source review found no functional defect.
+The final source/evidence review identified missing future-CI receipt retention;
+the workflow leaf adds an always-run artifact upload using the existing pinned
+action. Its equivalence proof must preserve all implementation, fixture, corpus
+and observer bytes and all sealed runtime evidence. No hosted-CI pass, executable
+integration or complete M3 gate is inferred from these local results.

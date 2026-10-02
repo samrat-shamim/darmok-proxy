@@ -1093,3 +1093,104 @@ admission, generated frontend metadata, public table execution, reusable plans,
 executable integration, real drivers and measured performance remain pending.
 M2/M4, hosted CI, merge and release remain incomplete; security work and compiler
 PR4 remain excluded, and the full goal remains active.
+
+### Explicit native schema local evidence
+
+`feat/native-schema-initialization` implements the functional
+[per-database initialization component](native-schema.md). An idle exclusive
+owner submits fixed BEGIN/DO/COMMIT and requires exact completion and idle
+readiness. Initialization creates the reserved schema only when absent;
+verification uses a read-only transaction and never installs. Matching repeats
+preserve artifacts. Partial installations, changed definitions, extra objects
+and version/profile mismatches fail without repair. Confirmed SQL failure keeps
+its original observations and separately awaits rollback. The operation cannot
+join, finish or recover a caller's existing transaction.
+
+The manifest validates namespace inventory, relation/type/function structure,
+PostgreSQL 18 NOT NULL constraint validation, and singleton version metadata.
+Four strict signed-int8 substring kernels handle UTF8 text and bytea with two
+or three arguments. This is typed kernel behavior, not frontend coercion,
+unsigned/warning translation or admitted frontend SUBSTRING support. Ownership,
+ACL and privilege properties remain deferred with the excluded security work.
+Participating explicit operations use a database-scoped transaction advisory
+lock. Neither installation verification nor qualified helper names provide a
+catalog execution-validity lease against arbitrary DDL.
+
+Code/fixture revision `3821d036529c3a3d9b5fbbff08631473bbb5708f`, tree
+`c6987fca944bec05bb951d2b462013cf59f1b960`, passes all twelve local matrix
+commands. PostgreSQL 17.11 and 18.6 each pass 10 native-control groups and 63
+ordinary owner groups, with 12 filtered. The owner groups include eight new
+initialization fixtures: unchanged repeats/read-only verification, absence and
+partial/conflicting namespaces, metadata/version drift, functional definition
+and inventory drift, outer-work preservation, rollback after creating every
+artifact, 810 stock substring values, and two ordinary owners initializing and
+verifying one physical database. BigDecimal initialization variants pass eight
+groups per backend, with 67 filtered. These ordinary two-owner observations do
+not certify forced-contention, arbitrary-DDL or stress coverage.
+
+The exact required commands are:
+
+```text
+cargo test -p darmok-postgres-tests --test native_controls --locked -- --nocapture
+cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored --nocapture --skip native_backend::tests::abandoned_transaction_recovery_never_restores_ready --skip native_backend::tests::unpolled_control_is_inert_and_dropped_pending_control_is_uncertain --skip native_backend::tests::dropped_scope_and_dropped_finish_never_restore_ready
+cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::native_schema -- --ignored --nocapture
+```
+
+Each database command runs separately for ports 32769/32768. No new resource or
+forced-interruption experiment ran. Every Cargo invocation and helper that
+spawns Cargo uses `RUSTUP_HOME=.darmok-work/rustup` and
+`CARGO_TARGET_DIR=.darmok-work/native-values/target`, expanded to this workspace's
+absolute paths, with only one Cargo/helper at a time.
+
+Workspace all-features/default pass 1669/1662 tests with 73 ignored across
+38/37 summaries. Commands are `cargo test --workspace --exclude darmok-postgres-tests --all-features --locked`
+and the same argv without `--all-features`. Strict
+`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`,
+`cargo fmt --all --check`, `python3 scripts/check_repository.py` and
+`git diff --check` pass. Rust/Cargo are 1.96.0 on macOS 26.0.1 arm64; both
+backends use UTF8, max_identifier_length 63 and en_US.utf8 database collation.
+
+The independent stock capture has 810 cases from MySQL 8.4.11 using installed
+PyMySQL 1.1.2 on Python 3.9.6; the module reports `__version__ = 1.4.6`, retained
+as the corpus's client field. The repository-local standard-library CLI observer
+also verifies all 810 values and immediate zero-warning counts against pinned
+image digest `6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242`.
+Its actual0 receipt is bound to `328c078`; observer and corpus bytes are proven
+identical at the tested code head. The stock command and finite limits are in
+`native-schema.md`; it is not a raw-wire proxy differential.
+
+Evidence remains outside the distribution under `.darmok-work/logs/schema-*`.
+Receipts record exact argv, source/tree/status, both Cargo environment values,
+port, timing, actual exit and raw stream hashes. The author audit exits0, binds
+24 terminal receipts and verifies 23 nonoverlapping intervals; the nested matrix
+parent is counted separately. `schema-3821d03-code-evidence-manifest.json` seals
+133 files, SHA256
+`4ae91eef422cc2c87c59e6e71987a8077242aecd813d91d775513757cffd139e`.
+`schema-3821d03-audit-facts.json` has SHA256
+`9b570d94073ecfc6e52db22480df3c9b6d30b3e414a61aa4943434cf98ab0005`.
+Prior portal publication/review/evidence and the hosted CI blocker are unchanged.
+
+Three failed attempts remain preserved. `94ff5ec` has actual101 with seven
+failed groups because PL/pgSQL terminates the unparenthesized IF CASE condition
+at its inner THEN. `c925e5b` groups that expression and passes seven groups on
+both backends. The first portable stock observer has actual1 before case
+execution because it compares a tagged image name with Docker's canonical
+RepoDigest spelling; `328c078` compares the pinned content digest and passes.
+The first environment reader has actual1 on unavailable `lc_collate` GUC;
+reader v2 uses `pg_database.datcollate` and exits0 without changing source or
+fixtures. Audit readers v1/v2 were never invoked; v3 is the actual0 reader.
+
+Independent passive source review at `c925e5b` finds no functional defect;
+its 18 Git commands and separate invocation exit0. The later bounded source
+and evidence review identifies F1: the future-CI stock observer directory needs
+an always-run artifact upload. The workflow/documentation leaf adds only that
+upload and evidence text; its proof must preserve all other tree entries and
+sealed runtime files, and independent leaf review must close F1. No native
+runtime receipt is relabeled as a test of this leaf. Reviews run no Cargo,
+SQL, network or security work and retain their actual invocation outcomes.
+
+CLI/configuration/routing integration, full functional SQL admission and catalog
+validity, public table execution, real drivers and measured performance remain
+pending. This is component progress; M2/M3/M4, required hosted CI, merge and
+release remain incomplete. Security work and compiler PR4 remain excluded, and
+the full goal remains active.
