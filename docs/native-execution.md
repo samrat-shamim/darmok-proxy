@@ -7,6 +7,11 @@ and [exclusive control owner and borrowed scopes](native-backend.md) are
 implemented components. Admitted statement execution, rollback through output
 validation and a runnable proxy remain pending.
 
+The [native portal component](native-portals.md) separates Bind/Describe from
+Execute and checks actual bound output facts against the prepared handle. This
+is a representation prerequisite; dependency admission and the scoped public
+executor still remain pending.
+
 ## Why the executor needs its own boundary
 
 Preparing a statement describes types, not every possible value. A native

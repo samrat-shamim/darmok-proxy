@@ -29,7 +29,9 @@ pub use native_control::{
 };
 pub use native_param::{NativeParamError, NativeParamUtc};
 pub use native_result::{NativeResultError, NativeResultUtc, NativeRowFormat};
-pub use native_statement::{NativeBindingsUtc, NativeStatementError, NativeStatementUtc};
+pub use native_statement::{
+    NativeBindingsUtc, NativePortalUtc, NativeStatementError, NativeStatementUtc,
+};
 pub use native_transaction::{NativeIsolation, NativeTransactionAccess, NativeTransactionSpec};
 pub use native_value::{NativeValueError, decode_native_row_utc};
 pub use query_controller::{QueryExecutionError, QuerySqlError};

@@ -742,6 +742,42 @@ impl Client {
         crate::completion::query_events(self.inner(), statement.clone(), params)
     }
 
+    /// Bind, describe a binary portal with built-in result OIDs, and observe readiness.
+    ///
+    /// No Execute is queued. The result requires an explicit native transaction;
+    /// an Idle or failed boundary cannot return a usable portal. Unknown result
+    /// OIDs fail explicitly and the request is drained without type lookup SQL.
+    /// A failure retains submission, prefix, native error and readiness facts.
+    /// Establish ownership and a rollback scope before polling this future.
+    /// This primitive supplies neither semantic admission nor dependency validity.
+    pub async fn bind_described_builtin<P, I>(
+        &self,
+        statement: &Statement,
+        params: I,
+    ) -> Result<crate::DescribedPortal, crate::PortalBindFailure>
+    where
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        crate::portal_completion::bind_described_builtin(self.inner(), statement.clone(), params)
+            .await
+    }
+
+    /// Execute a described portal using its actual bound column description.
+    ///
+    /// A positive limit can suspend rather than complete the portal; zero fetches
+    /// all rows. Completion and ReadyForQuery are separate events. The stream
+    /// retains the portal handle through consumption. Ownership, validated output
+    /// and rollback/finish still belong to the caller; this does not admit SQL.
+    pub fn query_portal_events(
+        &self,
+        portal: &crate::DescribedPortal,
+        max_rows: i32,
+    ) -> Result<QueryEventStream, Error> {
+        crate::completion::query_portal_events(self.inner(), portal, max_rows)
+    }
+
     /// Enqueues a one-shot typed internal query with built-in result types.
     ///
     /// Parse/Bind/Describe/Execute/Sync share one request. Parameters are encoded

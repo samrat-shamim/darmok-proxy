@@ -33,5 +33,14 @@ The generated `src/error/sqlstate.rs` map declaration has one trailing space
 removed, with no change to its constants.
 
 The [backend completion contract](../../docs/backend-completion.md) defines the
-new APIs and their ordinary functional verification. No other upstream source is
-modified.
+new APIs and their ordinary functional verification.
+
+`src/portal_completion.rs` additionally observes Bind, portal Describe and Sync
+before queuing any Execute. Its built-in descriptions use fresh native labels,
+origins and typmods, with no result-type lookup SQL. `src/client.rs` and
+`src/lib.rs` expose the described portal and failure receipts; `src/statement.rs`
+adds private prepared-handle identity comparison. `src/completion.rs` executes
+described portals with their actual metadata, retains their cleanup handle,
+and validates result formats and NoData/row distinctions. Existing prepared
+query helpers retain their cached-description behavior. These additions do not
+provide semantic admission, dependency validity or connection ownership.
