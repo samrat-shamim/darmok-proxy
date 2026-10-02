@@ -57,30 +57,90 @@ jobs:
             image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
           - version: "18"
             image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
-    services:
-      postgres:
-        image: ${{ matrix.image }}
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: darmok-test
-          POSTGRES_DB: darmok_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d darmok_test"
-          --health-interval 3s
-          --health-timeout 3s
-          --health-retries 30
     env:
       DARMOK_TEST_DATABASE_URL: postgres://postgres:darmok-test@localhost:5432/darmok_test
+      DARMOK_TEST_TWO_PHASE_DATABASE_URL: postgres://postgres:darmok-test@localhost:5433/darmok_test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
         run: rustup show active-toolchain
+      - name: Build and initialize the required server module
+        run: |
+          mkdir '${{ runner.temp }}/darmok-server-evidence'
+          docker build --progress=plain \
+            --build-arg 'POSTGRES_IMAGE=${{ matrix.image }}' \
+            --tag 'darmok-server-test:${{ matrix.version }}' \
+            postgres/darmok_server \
+            >'${{ runner.temp }}/darmok-server-evidence/build.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/build.stderr'
+          docker run --detach --name darmok-server-test \
+            --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=darmok-test \
+            --env POSTGRES_DB=darmok_test --publish 127.0.0.1:5432:5432 \
+            --health-cmd 'pg_isready -h 127.0.0.1 -U postgres -d darmok_test' \
+            --health-interval 1s --health-timeout 3s --health-retries 30 \
+            'darmok-server-test:${{ matrix.version }}' \
+            postgres -c shared_preload_libraries=darmok_server \
+            -c max_prepared_transactions=0
+          docker run --detach --name darmok-server-two-phase-test \
+            --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=darmok-test \
+            --env POSTGRES_DB=darmok_test --publish 127.0.0.1:5433:5432 \
+            --health-cmd 'pg_isready -h 127.0.0.1 -U postgres -d darmok_test' \
+            --health-interval 1s --health-timeout 3s --health-retries 30 \
+            'darmok-server-test:${{ matrix.version }}' \
+            postgres -c shared_preload_libraries=darmok_server \
+            -c max_prepared_transactions=10
+          darmok_server_ready=false
+          for darmok_attempt in {1..30}; do
+            darmok_server_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-test)
+            darmok_two_phase_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-two-phase-test)
+            if [ "$darmok_server_health" = healthy ] && [ "$darmok_two_phase_health" = healthy ]; then
+              darmok_server_ready=true
+              break
+            fi
+            if [ "$darmok_server_health" = unhealthy ] || [ "$darmok_two_phase_health" = unhealthy ]; then
+              docker logs darmok-server-test
+              docker logs darmok-server-two-phase-test
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$darmok_server_ready" != true ]; then
+            docker logs darmok-server-test
+            docker logs darmok-server-two-phase-test
+            exit 1
+          fi
+          docker exec darmok-server-test psql --username postgres --dbname darmok_test \
+            --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
+            >'${{ runner.temp }}/darmok-server-evidence/install.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/install.stderr'
+          docker exec darmok-server-two-phase-test psql --username postgres --dbname darmok_test \
+            --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
+            >'${{ runner.temp }}/darmok-server-evidence/install-two-phase.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/install-two-phase.stderr'
       - name: Required PostgreSQL tests
         run: cargo test -p darmok-postgres-tests --locked
+      - name: Preserve server build and diagnostics
+        if: always()
+        run: |
+          docker logs darmok-server-test \
+            >'${{ runner.temp }}/darmok-server-evidence/server.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/server.stderr'
+          docker inspect darmok-server-test \
+            >'${{ runner.temp }}/darmok-server-evidence/container.json'
+          docker logs darmok-server-two-phase-test \
+            >'${{ runner.temp }}/darmok-server-evidence/server-two-phase.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/server-two-phase.stderr'
+          docker inspect darmok-server-two-phase-test \
+            >'${{ runner.temp }}/darmok-server-evidence/container-two-phase.json'
+      - name: Upload server module evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: darmok-server-pg${{ matrix.version }}
+          path: ${{ runner.temp }}/darmok-server-evidence
+          if-no-files-found: error
       - name: Required CLI schema process fixtures
         env:
           DARMOK_CLI_PROCESS_EVIDENCE_DIR: ${{ runner.temp }}/cli-schema-processes

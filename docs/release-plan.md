@@ -1638,3 +1638,30 @@ interruption remain excluded. A component merge does not certify the pending
 hosted-CI, compatibility or release gates.
 The full goal remains active, including admitted table execution, `serve`, real
 drivers, measured performance, complete artifacts and the final release.
+
+### Server catalog publication lease component
+
+The project-owned PostgreSQL17/18 module in `postgres/darmok_server` supplies a
+transaction-owned read fence and generation stamp. Its native mechanisms live
+in a separate, versioned `darmok_server` extension namespace; SQL compatibility
+functions remain in `darmok`. The selected initial lease profile requires a
+primary with `max_prepared_transactions=0`, separate from planned MySQL prepared
+statement support. Native 2PC is already outside the advertised first-release
+distributed-transaction scope. This footprint choice is an implementation
+decision, not an additional user approval or a certification of row execution.
+
+The [lease contract](server-catalog-lease.md) specifies per-commit catalog
+publication fencing, savepoint ownership, private metadata invalidation,
+cluster/connection identity, the broad DDL contention tradeoff and the two-call
+cost boundary. Holding a session fence across concurrent index phases is
+rejected because it can deadlock old-snapshot waits. Passing a catalog-only
+prepared-DDL fixture does not certify leased row execution; enabled native 2PC
+therefore produces an explicit lease-profile error. The module does not change
+server configuration or add routing/authentication/grant policy.
+
+Required current-revision builds, PostgreSQL fixtures, local command matrix and
+independent review are recorded in the subsequent evidence entry. Earlier draft
+observations do not certify this source. Combined explicit module installation/
+verification, fresh leased catalog snapshots, native scope integration, complete
+semantic admission/results, reusable plans, MySQL snapshots/row locks and public
+table execution remain required. M2/M4 and the full release goal stay open.

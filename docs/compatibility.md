@@ -55,6 +55,12 @@ are outside scope. Additional unsupported protocol modes are enumerated by the
 capability registry. Unsupported syntax must fail deliberately; backend syntax
 errors are not a substitute for an advertised compatibility contract.
 
+The catalog lease profile requires a PostgreSQL primary with native two-phase
+transactions disabled (`max_prepared_transactions=0`). This is separate from
+MySQL prepared statements, which remain in the target capability matrix.
+The [catalog lease contract](server-catalog-lease.md) describes the table-lock
+dependency behind that installation requirement.
+
 ## Required evidence
 
 1. Unit tests of parsing, rewrite decisions and type/protocol boundaries.

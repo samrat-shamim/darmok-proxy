@@ -1,0 +1,5 @@
+comment = 'Catalog generation and execution leases for Darmok'
+default_version = '1.0'
+module_pathname = '$libdir/darmok_server'
+relocatable = false
+schema = 'darmok_server'

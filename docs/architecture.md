@@ -157,6 +157,16 @@ round-trip and contention costs. Its server packages become part of the
 self-contained artifact gate. Unrestricted plugin loading remains outside the
 first release. Security-related extension work remains deferred.
 
+The [server catalog lease](server-catalog-lease.md) supplies the initial
+generation/publication primitive. It uses a separate `darmok_server` namespace
+for native mechanisms and keeps SQL compatibility functions in `darmok`.
+Its first-release lease profile requires a primary server with native two-phase
+transactions disabled (`max_prepared_transactions=0`). MySQL prepared statements
+remain a separate planned protocol feature. Combined explicit initialization/
+verification, fresh leased catalog snapshots, owning scope integration, cache
+admission and table execution remain required; the primitive alone does not
+close the catalog validity gate.
+
 ## Observability
 
 Expose bounded-cardinality metrics for request outcomes, queue time, backend
