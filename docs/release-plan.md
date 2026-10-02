@@ -21,6 +21,8 @@ documentation. Deferred gates cannot count as release certification.
   databases, each naming one physical database and one schema.
 - Separate frontend credentials, backend role credentials, and route grants.
 - Explicit per-database initialization in the reserved `darmok` schema.
+- A project-owned PostgreSQL extension is permitted when required for correctness;
+  the selected execution/DDL/lock mechanism still needs a proof and verification.
 - No application-specific integrations or external control-plane dependency.
 
 ## Milestones and mandatory exit gates
@@ -1540,7 +1542,79 @@ objects. It derives representations from reported types/modifiers, with
 explicit numeric, temporal, charset and byte-width conditions. It makes no
 origin, key, projected nullability or catalog-execution assumption. Five
 required PostgreSQL fixture groups and three offline groups cover the mapper
-and its integration with checked portals and both row encoders. Local candidate
-verification and independent review are pending. No M2/M4 gate is complete;
+and its integration with checked portals and both row encoders. No M2/M4 gate is complete;
 public table execution, live dependency validity, configuration/routing,
 `serve`, real drivers, measured performance and release artifacts remain required.
+
+The clean tested revision is `55d137cd4fd936ba6ef0c8eaf78f18bdad7e1953`,
+tree `a607e7ff59b7cd33e4aebe405f8fe4d3d4e7b470`, based on setup-tool
+leaf `f95df5be7af891a82b9fd761d3a62820b09368b1`. It adds seven paths without
+changing the dependency lockfile, native owner/control/encoding code, CLI,
+frontend SQL admission or serving path. The existing PostgreSQL CI package
+command automatically requires the new fixture binary; no hosted run is polled.
+
+All twelve committed-source commands have actual exit0:
+
+| Check | Executed result |
+| --- | --- |
+| Metadata/output/statement fixtures, PostgreSQL17/18 | 20 passed,0 failed/ignored each;3 summaries (5 new metadata,9 output,6 statement) |
+| Workspace all/default features | 1682/1675 passed,0 failed,79 ignored;42/41 summaries |
+| Workspace and vendored connector Clippy | Both strict commands0 |
+| Parser minimal/std/visitor | Three commands0 |
+| Formatting, repository boundaries, diff | Three commands0 |
+
+The five metadata groups cover all nineteen scalar outputs and NULLs through
+actual checked portals and both encoders, decimal endpoints/rejections,
+temporal precisions0..6, binary-session UTF-8 byte bounds, BPCHAR padding,
+utf8mb3 supplementary-character errors with unchanged output, domain base
+descriptions, later DDL, lost expression typmods and a native enum named
+`varchar` rejected by identity. Unsupported numeric RETURNING descriptions
+are rejected before Bind/Execute and independent table reads confirm zero
+writes. These are representation observations; no MySQL table-query, live DDL
+lease, native effect-admission or full compatibility gate is certified.
+
+All Cargo commands and helpers that may spawn Cargo retain both scoped
+`RUSTUP_HOME` and shared `CARGO_TARGET_DIR` paths used above and run serially.
+Immutable receipts are under `.darmok-work/logs/metadata-55d137c-*`, with exact
+head/tree, argv, timestamps, actual exits and raw stream hashes.
+Fifteen fresh environment readers exit0: Rust/Cargo1.96.0, macOS26.0.1 arm64,
+pinned PostgreSQL17.11/18.6, UTF8/max identifier63 and zero remaining named
+metadata fixture objects. Each workspace feature run preserves sixteen
+ordinary CLI child receipts:5 actual0,5 expected1,6 expected usage2.
+These child statuses are distinct from the twelve top-level successful checks.
+
+The initial draft fixture compilation actual101 is retained in
+`metadata-draft-03-pg17`: its empty generic binding iterator was ambiguous,
+so no PostgreSQL test executed. The corrected fixture uses checked empty
+bindings. Six draft receipts remain frozen; the other five have actual0.
+The code audit `metadata-55d137c-author-audit-v1.json` has actual0, SHA256
+`c1fa0da54099fecafd4d206dd34641e6c11206bb07f20571ddf746a0abef1704`.
+Its227-file manifest has SHA256
+`875acbb08f48dd8901c870be5c54395113298de8561869a8dc58f50caa0e3618`,
+and facts `f1f8f268a59807e44ad5d74cf112e87980864724677e0b1c8c61fccf24be9fdc`.
+It binds the new source/evidence and unchanged parent CLI manifest/publication
+anchors; parent runtime evidence retains its original revision and scope.
+
+The documentation leaf records the user's extension installation preference,
+clarifies that complete semantic result definitions remain pending, and records
+this evidence. Code/fixture executions stay pinned to the revision above.
+Independent passive review has no functional finding. Its29 Git readers and
+final v2 invocation have actual0, with report SHA256
+`0950f8c8bd772b7423d2b9a305dbcf41fe82f466ceed75be0a5216429c0eca26`,
+seal `3b909ef7075e904f34da225282aaa656b601a22a589779f528be73242d5b1608`
+and separate invocation `91de7f16f7617d2ef16e051b9c6be0fdbd4c9b876233ebdf8503456d645c05e7`.
+The first review invocation actual1 stopped at its clean-status assertion while
+the author's pending documentation leaf was present. That bookkeeping failure,
+helper and raw streams are retained; the clean-source v2 does not rewrite it.
+No runtime was executed by the reviewer. The low-priority D1 wording observation
+closes in this documentation leaf by naming the remaining complete semantic
+result definitions explicitly.
+
+Hosted CI remains blocked by the previously recorded personal-account condition.
+The owner now requests reviewed PRs to be squash-merged in dependency order;
+this supersedes the earlier merge hold. CI polling/retries, account actions,
+release publication, security work, compiler PR4, resource stress and forced
+interruption remain excluded. A component merge does not certify the pending
+hosted-CI, compatibility or release gates.
+The full goal remains active, including admitted table execution, `serve`, real
+drivers, measured performance, complete artifacts and the final release.

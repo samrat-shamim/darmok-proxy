@@ -118,6 +118,6 @@ explicit recovery and success followed by confirmed finish. They observe the
 Execute request's completion and readiness before owner finish/recovery. They
 prove native data effects only, not MySQL
 lock retention or an admitted public executor. Catalog execution validity,
-generated result metadata, session timezone semantics, stock differential
+complete semantic result definitions, session timezone semantics, stock differential
 formatting, table SQL, driver workloads and executable integration remain
 pending. Security work remains outside the user-requested scope.

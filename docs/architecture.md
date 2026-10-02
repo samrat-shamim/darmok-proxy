@@ -148,6 +148,15 @@ enabling reusable catalog-dependent plans. Measure the extra round trips and
 lock contention. Do not silently select weaker behavior when required
 privileges or infrastructure are missing.
 
+A project-owned PostgreSQL extension is permitted when a verified correctness
+mechanism requires it. The user approved this installation option; it is not a
+claim that an extension already resolves catalog validity or MySQL lock/snapshot
+semantics. Any selected extension must have explicit installation/version checks,
+a correctness argument and ordinary PostgreSQL17/18 evidence, including its
+round-trip and contention costs. Its server packages become part of the
+self-contained artifact gate. Unrestricted plugin loading remains outside the
+first release. Security-related extension work remains deferred.
+
 ## Observability
 
 Expose bounded-cardinality metrics for request outcomes, queue time, backend
