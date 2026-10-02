@@ -19,13 +19,14 @@ fn decode(digits: &str, shift: u8) -> Result<Bytes, SelectSqlError> {
     // Declared protocol width must be representable before allocating output.
     u32::try_from(width).map_err(|_| SelectSqlError::Unsupported)?;
     let mut output = Vec::with_capacity(width);
+    let first_width = if digits.len().is_multiple_of(per_byte) {
+        per_byte
+    } else {
+        digits.len() % per_byte
+    };
     let mut offset = 0;
     while offset < digits.len() {
-        let size = if offset == 0 && digits.len() % per_byte != 0 {
-            digits.len() % per_byte
-        } else {
-            per_byte
-        };
+        let size = if offset == 0 { first_width } else { per_byte };
         let mut byte = 0u8;
         for &digit in &digits.as_bytes()[offset..offset + size] {
             let value = match digit {

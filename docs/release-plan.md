@@ -1298,6 +1298,13 @@ original result and identifying the modified upstream file. The failed run and
 four successful backend runs remain immutable; the remaining matrix commands
 did not execute. This candidate is not certified by those partial results.
 
+The subsequent `bb77400cd60511cd46d320591959d4c73da2e9a0` passes both native
+backend variants, workspace all1676/default1669 with76 ignored each, but strict
+Clippy stops with actual101 at `manual_is_multiple_of` in the decoder. The next
+revision uses the Rust1.96 divisibility API and computes first-group width once
+before the byte loop. No warning suppression is added. The partial matrix and
+lint failure remain distinct; feature, boundary and stock checks had not run.
+
 Future MySQL CI declares a pinned standard-client virtual environment, required
 observer and always-run pinned artifact upload. Hosted CI is not polled or
 retried under the existing account blocker. Security, compiler PR4, resource
