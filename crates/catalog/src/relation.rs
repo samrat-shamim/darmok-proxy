@@ -502,7 +502,7 @@ const NAMED_RELATION_SQL: &str = relation_query!(
     r#"
     SELECT DISTINCT c.oid, c.relnamespace, n.nspname, c.relname, c.relkind,
            c.relpersistence, c.relispartition
-    FROM pg_catalog.unnest($1::text[], $2::text[])
+    FROM ROWS FROM (pg_catalog.unnest($1::text[]), pg_catalog.unnest($2::text[]))
          AS requested(schema_name, relation_name)
     JOIN pg_catalog.pg_namespace AS n
       ON n.nspname = requested.schema_name::pg_catalog.name
