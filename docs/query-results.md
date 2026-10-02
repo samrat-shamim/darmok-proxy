@@ -1,9 +1,10 @@
 # Local SELECT results
 
 The public `execute_query_command` path now admits a single direct SELECT with
-no table or other clauses. Exact numeric literals, booleans, NULL and ordinary quoted strings
-produce one text row. Parentheses, selected unary plus expressions, numeric
-unary minus and explicit aliases retain their MySQL label semantics.
+no table or other clauses. Exact numeric literals, booleans, NULL and ordinary
+quoted strings produce one text row. Parentheses, selected unary plus
+expressions, numeric unary minus and explicit aliases retain their MySQL label
+semantics.
 [Exact decimal and large-integer literals](exact-numeric-literals.md) retain
 their value, scale, signedness and declared-width contracts. Approximate
 floating-point and general expressions are explicit 1235/42000 errors, pending
@@ -44,8 +45,10 @@ contract failures are explicit caller errors, not AST-rendered label fallbacks.
 
 Declared column metadata is independent of encoded row length. Integers use
 LONGLONG, binary collation, signed/unsigned flags and literal declared widths;
-NULL uses its own type and null marker. Strings use the immutable session text
-authority, character count times charset maximum width, and string decimals 31.
+Exact decimals and promoted integer expressions use NEWDECIMAL with independent
+declared width and original fractional scale. NULL uses its own type and null
+marker. Strings use the immutable session text authority, character count
+times charset maximum width, and string decimals 31.
 System-variable strings declare 21845 characters: the MySQL system charset's
 65535-byte declaration divided by its three-byte maximum, then converted to
 result charset bytes. Empty source identifiers and original names describe

@@ -1,7 +1,7 @@
 # Exact numeric literals
 
-The local SELECT result controller is being extended from integers to exact
-MySQL number tokens. Scientific-notation literals remain approximate numbers
+The local SELECT result controller admits exact MySQL number tokens.
+Scientific-notation literals remain approximate numbers
 and are explicitly unsupported until their formatting, metadata and diagnostic
 contract is implemented. The full SQL/type/release objective remains open.
 
@@ -28,7 +28,7 @@ Integer literal width retains its original digit count and its signed or
 unsigned declaration. Values and declared widths are never inferred from one
 another. CLI's computed NUM flag is not a server packet flag.
 
-Nested unary plus/minus expressions over exact numbers are planned in order.
+The planner applies nested unary plus/minus operations over exact numbers in order.
 Negating an unsigned integer may produce a signed integer or DECIMAL; negating
 any nonzero negative signed operand produces DECIMAL, including `-(-1)`.
 This is MySQL's declared-type rule even when the result fits a signed integer;
@@ -63,5 +63,7 @@ References are MySQL's [numeric literals](https://dev.mysql.com/doc/refman/8.4/e
 [DECIMAL characteristics](https://dev.mysql.com/doc/refman/8.4/en/precision-math-decimal-characteristics.html)
 and pinned MySQL 8.4.11 source at
 `99960bf74fa919347e4f4e3ca47672f333d6e91f`. Source excerpts and exploratory
-stock transcripts remain outside the Apache distribution. Implementation,
-required current-revision tests and independent review are not yet certified.
+stock transcripts remain outside the Apache distribution. Current-revision
+checks and remaining gates are recorded in
+[the release plan](release-plan.md#exact-numeric-literal-progress). Independent
+review and local component checks do not establish full SQL or release support.
