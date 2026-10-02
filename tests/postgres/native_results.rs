@@ -348,7 +348,7 @@ async fn integer_ranges_include_int24_and_year_without_display_width_truncation(
         .await
         .unwrap();
     for (kind, unsigned, valid, binary_value, invalid) in [
-        (field_type::TINY, false, -128_i64, vec![0x80], 128),
+        (field_type::TINY, false, -128_i64, vec![0x80], 128_i64),
         (field_type::TINY, true, 255, vec![0xff], -1),
         (field_type::SHORT, false, -32768, vec![0, 0x80], 32768),
         (field_type::SHORT, true, 65535, vec![0xff, 0xff], 65536),
