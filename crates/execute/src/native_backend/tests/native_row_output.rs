@@ -119,7 +119,7 @@ async fn later_returning_output_failure_recovers_writes_and_preserves_outer_work
                 assert_eq!(
                     completion.ready_state(),
                     if outer {
-                        TransactionState::InTransaction
+                        TransactionState::Transaction
                     } else {
                         TransactionState::Idle
                     }
@@ -220,7 +220,7 @@ async fn returning_rows_are_encoded_before_confirmed_scope_finish() {
             assert_eq!(
                 completion.ready_state(),
                 if outer {
-                    TransactionState::InTransaction
+                    TransactionState::Transaction
                 } else {
                     TransactionState::Idle
                 }
