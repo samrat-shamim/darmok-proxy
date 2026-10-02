@@ -33,7 +33,7 @@ pub(crate) fn unhex(source: &str) -> Vec<u8> {
 #[test]
 fn binary_literals_match_all_captured_stock_metadata_and_bytes() {
     let data = corpus();
-    assert_eq!(data["cases"].as_array().unwrap().len(), 40);
+    assert_eq!(data["cases"].as_array().unwrap().len(), 44);
     for case in data["cases"].as_array().unwrap() {
         let (state, globals) = fixture(case["sql_mode"].as_str().unwrap());
         let parsed = parse_mysql_source(

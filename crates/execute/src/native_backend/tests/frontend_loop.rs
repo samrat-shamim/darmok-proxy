@@ -599,7 +599,7 @@ fn binary_status(mode: &str, active: bool) -> u16 {
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn frontend_loop_binary_literals_match_stock_fields_bytes_and_both_eof_forms() {
     let data = crate::select_controller::binary_tests::corpus();
-    assert_eq!(data["cases"].as_array().unwrap().len(), 40);
+    assert_eq!(data["cases"].as_array().unwrap().len(), 44);
     for deprecated in [false, true] {
         let mut backend = connect_backend().await;
         let (mut session, globals) = fixture(deprecated);

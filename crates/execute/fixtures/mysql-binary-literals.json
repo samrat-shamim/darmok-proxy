@@ -3121,6 +3121,266 @@
       ],
       "warning_count": 0,
       "kind": "result"
+    },
+    {
+      "name": "introduced-empty-and-plus",
+      "sql_mode": "",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01'",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-empty-and-plus",
+      "sql_mode": "NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01'",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-empty-and-plus",
+      "sql_mode": "ANSI_QUOTES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01'",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
+    },
+    {
+      "name": "introduced-empty-and-plus",
+      "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01'",
+      "columns": [
+        {
+          "name_hex": "5f62696e61727920582727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "5f62696e61727920622727",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 0,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "285f42694e6152792030783029",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        },
+        {
+          "name_hex": "2b5f62696e617279206227303127",
+          "org_name_hex": "",
+          "schema_hex": "",
+          "table_hex": "",
+          "org_table_hex": "",
+          "type": 253,
+          "charset": 63,
+          "width": 1,
+          "flags": 129,
+          "decimals": 31
+        }
+      ],
+      "rows_hex": [
+        [
+          "",
+          "",
+          "00",
+          "01"
+        ]
+      ],
+      "warning_count": 0,
+      "kind": "result"
     }
   ],
   "syntax_errors": [
@@ -3353,7 +3613,7 @@
     {
       "name": "introduced-names",
       "sql_mode": "",
-      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary 'é', (_binary ' hi '), _binary ''",
       "columns": [
         {
           "name_hex": "5f62696e61727920582727",
@@ -3643,7 +3903,7 @@
     {
       "name": "introduced-names",
       "sql_mode": "NO_BACKSLASH_ESCAPES",
-      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary 'é', (_binary ' hi '), _binary ''",
       "columns": [
         {
           "name_hex": "5f62696e61727920582727",
@@ -3933,7 +4193,7 @@
     {
       "name": "introduced-names",
       "sql_mode": "ANSI_QUOTES",
-      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary 'é', (_binary ' hi '), _binary ''",
       "columns": [
         {
           "name_hex": "5f62696e61727920582727",
@@ -4223,7 +4483,7 @@
     {
       "name": "introduced-names",
       "sql_mode": "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
-      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary '\u00e9', (_binary ' hi '), _binary ''",
+      "sql": "SELECT _binary X'', _binary b'', (_BiNaRy 0x0), +_binary b'01', _binary 'é', (_binary ' hi '), _binary ''",
       "columns": [
         {
           "name_hex": "5f62696e61727920582727",

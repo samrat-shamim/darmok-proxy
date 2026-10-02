@@ -1263,7 +1263,7 @@ COLLATE and public table execution remain explicit unsupported gates. The
 
 A stock standard-client capture from clean `271b4cf` independently records
 MySQL 8.4.11 fields and values under four mode combinations. The selected
-corpus has 40 positive cases/200 fields and cells, 28 syntax cases and 44
+initial corpus has 40 positive cases/200 fields and cells, 28 syntax cases and 44
 unimplemented contexts/names. Both initial captures remain outside the
 distribution; the first width query used a reserved alias and retains its actual
 SQL error, while the second uses a valid alias. Their process exits are0, not
@@ -1304,6 +1304,19 @@ Clippy stops with actual101 at `manual_is_multiple_of` in the decoder. The next
 revision uses the Rust1.96 divisibility API and computes first-group width once
 before the byte loop. No warning suppression is added. The partial matrix and
 lint failure remain distinct; feature, boundary and stock checks had not run.
+
+The subsequent `9673f9b9a1c3bdda3beb207d28e35f375984c13b`, tree
+`28ad20e9574d876b3f3fe6a590f92781b5e75d04`, passes all14 matrix commands,
+including the full suites and strict lint. Its fresh stock observer matches112
+cases, and author audit seals659 files/42 receipts with39 nonaggregate serial
+intervals. This remains a historical code candidate after the fixture extension.
+The independent source review found no functional defect but identified that
+empty/unary-plus `_binary` forms were only captured in a rejected mixed query.
+A separate clean-head stock capture now records those four expressions in a
+successful query under all four modes. Four exact observations extend the
+positive corpus to44 cases/216 fields and cells,116 total cases, and run through
+the existing pure and ordinary TCP loops. No runtime implementation changes.
+A new committed matrix and bounded review are required for the expanded fixture.
 
 Future MySQL CI declares a pinned standard-client virtual environment, required
 observer and always-run pinned artifact upload. Hosted CI is not polled or

@@ -40,12 +40,17 @@ spelling rather than rendering the AST. Existing name normalization and
 unsupported warning/truncation conditions still apply.
 
 `mysql-binary-literals.json` records stock MySQL 8.4.11 observations under four
-combinations of ANSI_QUOTES/NO_BACKSLASH_ESCAPES. It contains 40 positive cases,
+combinations of ANSI_QUOTES/NO_BACKSLASH_ESCAPES. It contains 44 positive cases,
 28 quoted-syntax cases and 44 unimplemented contexts/names. Positive cases
-cover 200 field declarations and cells, empty/NULL/zero distinctions, arbitrary
+cover 216 field declarations and cells, empty/NULL/zero distinctions, arbitrary
 bytes, leading groups, 64/65-bit values, aliases, parentheses, plus and comments.
 The syntax/unsupported groups retain stock outcomes separately from the
 proxy's narrower error contract.
+
+Introduced empty hex/bit values, a parenthesized introduced zero value and an
+introduced unary-plus bit value have their own successful query in every mode.
+These cells are checked in the positive pure and both-EOF TCP loops rather than
+being witnessed only inside a rejected mixed query.
 
 The repository observer uses pinned PyMySQL 1.1.2 for stock fields and binary
 values, checks Docker image identity/content digest and verifies the connected
