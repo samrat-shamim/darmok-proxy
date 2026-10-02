@@ -5,9 +5,10 @@ use darmok_protocol::{ColumnDefinition, encode_binary_row, write_lenenc_bytes};
 use darmok_session::charset::lookup_charset;
 use darmok_types::Value;
 use darmok_types::mysql_const::{charset, column_flag, field_type};
-use tokio_postgres::{Row, types::Type};
+use tokio_postgres::{Column, Row, types::Type};
 
-use crate::{NativeStatementError, NativeStatementUtc};
+use crate::native_statement::decode_native_columns_utc;
+use crate::{NativePortalUtc, NativeStatementError, NativeStatementUtc};
 
 /// Row payload format, independent of packet framing and result completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +22,8 @@ pub enum NativeRowFormat {
 pub enum NativeResultError {
     #[error("a native result set must have at least one column")]
     EmptyDescription,
+    #[error("a native result set cannot use a NoData portal description")]
+    NoRowDescription,
     #[error("frontend result column count mismatch: expected {expected}, received {actual}")]
     ColumnCount { expected: usize, actual: usize },
     #[error("unsupported frontend representation for native column {column}: {reason}")]
@@ -37,7 +40,7 @@ pub enum NativeResultError {
 /// This represents output only: it cannot admit SQL, execute, or finish a scope.
 #[derive(Clone, Copy)]
 pub struct NativeResultUtc<'statement, 'columns> {
-    description: NativeStatementUtc<'statement>,
+    description: &'statement [Column],
     columns: &'columns [ColumnDefinition],
 }
 
@@ -45,7 +48,7 @@ impl fmt::Debug for NativeResultUtc<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("NativeResultUtc")
-            .field("description", &self.description)
+            .field("native_columns", &self.description.len())
             .field("columns", &self.columns.len())
             .finish()
     }
@@ -59,7 +62,25 @@ impl<'statement, 'columns> NativeResultUtc<'statement, 'columns> {
         description: NativeStatementUtc<'statement>,
         columns: &'columns [ColumnDefinition],
     ) -> Result<Self, NativeResultError> {
-        let native = description.statement().columns();
+        Self::from_columns(description.statement().columns(), columns)
+    }
+
+    /// Bind frontend metadata to an actual checked portal description before
+    /// Execute. NoData is rejected separately from an empty row description.
+    pub fn from_portal(
+        description: NativePortalUtc<'_, 'statement>,
+        columns: &'columns [ColumnDefinition],
+    ) -> Result<Self, NativeResultError> {
+        let native = description
+            .columns()
+            .ok_or(NativeResultError::NoRowDescription)?;
+        Self::from_columns(native, columns)
+    }
+
+    fn from_columns(
+        native: &'statement [Column],
+        columns: &'columns [ColumnDefinition],
+    ) -> Result<Self, NativeResultError> {
         if native.is_empty() {
             return Err(NativeResultError::EmptyDescription);
         }
@@ -78,7 +99,7 @@ impl<'statement, 'columns> NativeResultUtc<'statement, 'columns> {
             })?;
         }
         Ok(Self {
-            description,
+            description: native,
             columns,
         })
     }
@@ -97,7 +118,7 @@ impl<'statement, 'columns> NativeResultUtc<'statement, 'columns> {
         format: NativeRowFormat,
         dst: &mut BytesMut,
     ) -> Result<(), NativeResultError> {
-        let values = self.description.decode_row(row)?;
+        let values = decode_native_columns_utc(self.description, row)?;
         for (index, (value, column)) in values.iter().zip(self.columns).enumerate() {
             check_value(value, column).map_err(|reason| NativeResultError::Encoding {
                 column: index,

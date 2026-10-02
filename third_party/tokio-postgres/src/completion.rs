@@ -24,7 +24,7 @@ pub enum TransactionState {
 }
 
 impl TransactionState {
-    fn from_status(status: u8) -> Result<Self, Error> {
+    pub(crate) fn from_status(status: u8) -> Result<Self, Error> {
         match status {
             b'I' => Ok(Self::Idle),
             b'T' => Ok(Self::Transaction),
@@ -50,7 +50,8 @@ pub enum CommandEvent {
 /// An observed event from one prepared statement execution.
 #[derive(Debug)]
 pub enum QueryEvent {
-    /// A row using the prepared statement's native description.
+    /// A row using this request's description. Prepared streams retain cached
+    /// statement metadata; described-portal streams use native bound metadata.
     Row(Row),
     /// The exact backend command tag.
     CommandComplete(String),
@@ -169,26 +170,30 @@ enum QueryPhase {
     Done,
 }
 
-/// Stream of prepared rows and outcomes through ReadyForQuery.
+/// Stream of prepared or described-portal rows and outcomes through readiness.
 ///
 /// A command tag, empty query or suspended portal is separate from readiness.
 /// Errors before BindComplete remain observable alongside their final backend
 /// transaction state. An `Err` item terminates without confirming completion.
 pub struct QueryEventStream {
     inner: QueryEvents,
+    // Keep a described portal's original statement and cleanup handle alive.
+    _portal: Option<crate::Portal>,
 }
 
 /// A result OID outside the built-in result description contract.
 ///
-/// This is the source of a terminal stream error, after SQL was submitted.
-/// It does not establish backend completion or rollback.
+/// A typed query stream returns it as a terminal error without confirmed
+/// completion. A portal binding failure can retain it as a representation
+/// error alongside separately observed readiness. This error alone establishes
+/// neither backend completion nor rollback.
 #[derive(Debug)]
 pub struct UnsupportedBuiltinResultType {
     oid: u32,
 }
 
 impl UnsupportedBuiltinResultType {
-    /// The exact native result type OID which required a separate type lookup.
+    /// The observed native OID outside the built-in result contract.
     pub fn oid(&self) -> u32 {
         self.oid
     }
@@ -241,6 +246,7 @@ struct QueryEvents {
     phase: QueryPhase,
     parameter_count: usize,
     has_yielded: bool,
+    returns_rows: bool,
 }
 
 pub(crate) fn query_events<P, I>(
@@ -261,7 +267,38 @@ where
             phase: QueryPhase::Binding,
             parameter_count: 0,
             has_yielded: false,
+            returns_rows: true,
         },
+        _portal: None,
+    })
+}
+
+pub(crate) fn query_portal_events(
+    client: &InnerClient,
+    portal: &crate::DescribedPortal,
+    max_rows: i32,
+) -> Result<QueryEventStream, Error> {
+    if max_rows < 0 {
+        return Err(Error::encode(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "described portal row limit cannot be negative",
+        )));
+    }
+    let buf = client.with_buf(|buf| {
+        frontend::execute(portal.portal.name(), max_rows, buf).map_err(Error::encode)?;
+        frontend::sync(buf);
+        Ok(buf.split().freeze())
+    })?;
+    Ok(QueryEventStream {
+        inner: QueryEvents {
+            statement: Some(portal.description.clone()),
+            responses: client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?,
+            phase: QueryPhase::Rows,
+            parameter_count: 0,
+            has_yielded: false,
+            returns_rows: portal.returns_rows,
+        },
+        _portal: Some(portal.portal.clone()),
     })
 }
 
@@ -292,6 +329,7 @@ where
             phase: QueryPhase::Parsing,
             parameter_count,
             has_yielded: false,
+            returns_rows: false,
         },
     })
 }
@@ -331,9 +369,10 @@ impl QueryEvents {
                     }
                 }
                 (QueryPhase::Description, Message::RowDescription(body)) => {
-                    match builtin_columns(body) {
+                    match builtin_columns(body, 0) {
                         Ok(columns) => {
                             this.statement = Some(Statement::unnamed(vec![], columns));
+                            this.returns_rows = true;
                             this.phase = QueryPhase::Rows;
                             continue;
                         }
@@ -349,7 +388,7 @@ impl QueryEvents {
                     this.phase = QueryPhase::Rows;
                     continue;
                 }
-                (QueryPhase::Rows, Message::DataRow(body)) => {
+                (QueryPhase::Rows, Message::DataRow(body)) if this.returns_rows => {
                     let statement = this
                         .statement
                         .as_ref()
@@ -405,12 +444,19 @@ impl QueryEvents {
     }
 }
 
-fn builtin_columns(
+pub(crate) fn builtin_columns(
     body: postgres_protocol::message::backend::RowDescriptionBody,
+    expected_format: i16,
 ) -> Result<Vec<Column>, Error> {
     let mut columns = Vec::new();
     let mut fields = body.fields();
     while let Some(field) = fields.next().map_err(Error::parse)? {
+        if field.format() != expected_format {
+            return Err(Error::parse(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "result column format differs from the expected description format",
+            )));
+        }
         let type_ = Type::from_oid(field.type_oid()).ok_or_else(|| {
             Error::from_sql(
                 Box::new(UnsupportedBuiltinResultType {

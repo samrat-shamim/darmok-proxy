@@ -13,6 +13,11 @@ rows. A description with zero columns and parameters is valid for this check;
 it does not mean transaction commands, COPY, DDL or empty SQL are admitted.
 SQL admission must separately identify the command and allowed effects.
 
+The [portal representation guard](native-portals.md) additionally compares an
+actual bound binary description before Execute, including exact prepared-handle
+identity and native origins. Cached statement-to-row comparison remains a
+separate check; neither supplies complete catalog validity.
+
 The wrapper borrows the driver's statement, preserving exact output labels,
 types, typmods and optional relation/attribute origins. It adds no database
 query, SQL rewrite, catalog lookup, allocation or statement clone. `bind`

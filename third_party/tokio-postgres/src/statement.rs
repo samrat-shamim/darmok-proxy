@@ -1,3 +1,5 @@
+// Modified for Darmok: expose exact prepared-handle identity internally.
+// See ../UPSTREAM.md for the source pin and local changes.
 use crate::client::InnerClient;
 use crate::codec::FrontendMessage;
 use crate::connection::RequestMessages;
@@ -36,6 +38,10 @@ impl Drop for StatementInner {
 pub struct Statement(Arc<StatementInner>);
 
 impl Statement {
+    pub(crate) fn is_same(&self, other: &Statement) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
     pub(crate) fn new(
         inner: &Arc<InnerClient>,
         name: String,
