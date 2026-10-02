@@ -9,6 +9,7 @@ mod native_statement;
 mod native_transaction;
 mod native_value;
 mod numeric;
+mod set_controller;
 
 pub use native_backend::{
     NativeBackend, NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError,
@@ -22,3 +23,6 @@ pub use native_param::{NativeParamError, NativeParamUtc};
 pub use native_statement::{NativeBindingsUtc, NativeStatementError, NativeStatementUtc};
 pub use native_transaction::{NativeIsolation, NativeTransactionAccess, NativeTransactionSpec};
 pub use native_value::{NativeValueError, decode_native_row_utc};
+pub use set_controller::{
+    ServerSetValues, SetExecutionError, SetOutcome, SetSqlError, execute_mysql_set,
+};

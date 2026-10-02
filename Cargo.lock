@@ -224,6 +224,9 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "chrono",
+ "darmok-protocol",
+ "darmok-session",
+ "darmok-sqlparser",
  "darmok-types",
  "futures-util",
  "thiserror",

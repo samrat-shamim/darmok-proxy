@@ -223,6 +223,10 @@ impl TransactionSettings {
         Ok(self.confirmed)
     }
 
+    pub(crate) fn last_confirmed(&self) -> TransactionSettingsSnapshot {
+        self.confirmed
+    }
+
     pub(crate) fn unconfirmed(&self) -> Option<UnconfirmedTransactionCommand> {
         self.staged
             .as_ref()
@@ -463,6 +467,14 @@ impl TransactionCommandStage<'_> {
     /// Statement/error recovery outcomes need their own verified controller;
     /// an error packet is not a successful completion of this setting command.
     pub fn finish_success_with_validated_output(
+        self,
+    ) -> Result<TransactionSettingsSnapshot, TransactionSettingsError> {
+        self.finish_known_effects()
+    }
+
+    /// Only a session command guard may settle intermediate model effects;
+    /// that guard keeps public reads unavailable until the statement output.
+    pub(crate) fn finish_known_effects(
         self,
     ) -> Result<TransactionSettingsSnapshot, TransactionSettingsError> {
         let stage = self

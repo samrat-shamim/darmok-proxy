@@ -1,9 +1,10 @@
 use bitflags::bitflags;
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::constants::OK_HEADER;
 use crate::wire::write_lenenc_bytes;
 use crate::wire::write_lenenc_int;
+use crate::{CapabilityFlags, constants::OK_HEADER};
+use darmok_types::error::{ProtocolError, ProxyError};
 
 bitflags! {
     /// MySQL server status flags.
@@ -15,6 +16,8 @@ bitflags! {
         const SERVER_STATUS_NO_GOOD_INDEX_USED   = 0x0010;
         const SERVER_STATUS_CURSOR_EXISTS        = 0x0040;
         const SERVER_STATUS_LAST_ROW_SENT        = 0x0080;
+        const SERVER_STATUS_NO_BACKSLASH_ESCAPES  = 0x0200;
+        const SERVER_STATUS_IN_TRANS_READONLY    = 0x2000;
         const SERVER_SESSION_STATE_CHANGED       = 0x4000;
     }
 }
@@ -40,9 +43,15 @@ const OK_AS_EOF_HEADER: u8 = 0xFE;
 
 impl OkPacket {
     /// Encode this OK packet into the destination buffer.
-    pub fn encode(&self, dst: &mut BytesMut) {
+    pub fn encode(
+        &self,
+        dst: &mut BytesMut,
+        capabilities: CapabilityFlags,
+    ) -> Result<(), ProxyError> {
+        self.validate_tracking(capabilities)?;
         dst.put_u8(OK_HEADER);
-        self.encode_body(dst);
+        self.encode_body(dst, capabilities);
+        Ok(())
     }
 
     /// Encode this OK packet as an EOF replacement (`0xFE` header).
@@ -51,22 +60,49 @@ impl OkPacket {
     /// packet with header byte `0xFE` in the final row-terminator position.
     /// The post-column-definition EOF is omitted entirely. The body layout is
     /// identical to a regular OK packet.
-    pub fn encode_ok_as_eof(&self, dst: &mut BytesMut) {
+    pub fn encode_ok_as_eof(
+        &self,
+        dst: &mut BytesMut,
+        capabilities: CapabilityFlags,
+    ) -> Result<(), ProxyError> {
+        self.validate_tracking(capabilities)?;
         dst.put_u8(OK_AS_EOF_HEADER);
-        self.encode_body(dst);
+        self.encode_body(dst, capabilities);
+        Ok(())
     }
 
     /// Encode the OK packet body (everything after the header byte).
-    fn encode_body(&self, dst: &mut BytesMut) {
+    fn encode_body(&self, dst: &mut BytesMut, capabilities: CapabilityFlags) {
         write_lenenc_int(dst, self.affected_rows);
         write_lenenc_int(dst, self.last_insert_id);
-        dst.put_u16_le(self.status_flags.bits());
-        dst.put_u16_le(self.warnings);
-        write_lenenc_bytes(dst, self.info.as_ref());
-
-        if let Some(session_state_changes) = &self.session_state_changes {
-            write_lenenc_bytes(dst, session_state_changes.as_ref());
+        if capabilities.contains(CapabilityFlags::CLIENT_PROTOCOL_41) {
+            dst.put_u16_le(self.status_flags.bits());
+            dst.put_u16_le(self.warnings);
+        } else if capabilities.contains(CapabilityFlags::CLIENT_TRANSACTIONS) {
+            dst.put_u16_le(self.status_flags.bits());
         }
+        if capabilities.contains(CapabilityFlags::CLIENT_SESSION_TRACK) {
+            write_lenenc_bytes(dst, self.info.as_ref());
+            if let Some(session_state_changes) = &self.session_state_changes {
+                write_lenenc_bytes(dst, session_state_changes.as_ref());
+            }
+        } else {
+            dst.extend_from_slice(self.info.as_ref());
+        }
+    }
+
+    fn validate_tracking(&self, capabilities: CapabilityFlags) -> Result<(), ProxyError> {
+        let changed = self
+            .status_flags
+            .contains(StatusFlags::SERVER_SESSION_STATE_CHANGED);
+        if changed != self.session_state_changes.is_some()
+            || (changed && !capabilities.contains(CapabilityFlags::CLIENT_SESSION_TRACK))
+        {
+            return Err(ProxyError::protocol(ProtocolError::InvalidPacket(
+                "OK session-state data requires its status flag and session tracking".into(),
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -87,7 +123,12 @@ mod tests {
         };
 
         let mut dst = BytesMut::new();
-        packet.encode(&mut dst);
+        packet
+            .encode(
+                &mut dst,
+                CapabilityFlags::CLIENT_PROTOCOL_41 | CapabilityFlags::CLIENT_SESSION_TRACK,
+            )
+            .unwrap();
 
         assert_eq!(
             dst.as_ref(),
@@ -97,5 +138,28 @@ mod tests {
                 b't'
             ]
         );
+    }
+
+    #[test]
+    fn ordinary_protocol_41_ok_uses_eof_info_not_length_encoded_info() {
+        let mut packet = OkPacket {
+            affected_rows: 0,
+            last_insert_id: 0,
+            status_flags: StatusFlags::SERVER_STATUS_AUTOCOMMIT,
+            warnings: 0,
+            info: Bytes::new(),
+            session_state_changes: None,
+        };
+        let mut dst = BytesMut::new();
+        packet
+            .encode(&mut dst, CapabilityFlags::CLIENT_PROTOCOL_41)
+            .unwrap();
+        assert_eq!(&dst[..], &[0, 0, 0, 2, 0, 0, 0]);
+        dst.clear();
+        packet.info = Bytes::from_static(b"done");
+        packet
+            .encode(&mut dst, CapabilityFlags::CLIENT_PROTOCOL_41)
+            .unwrap();
+        assert_eq!(&dst[..], &[0, 0, 0, 2, 0, 0, 0, b'd', b'o', b'n', b'e']);
     }
 }

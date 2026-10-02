@@ -162,7 +162,8 @@ fn a_parsed_next_setting_inside_active_preserves_confirmed_choices() {
 
 #[test]
 fn additional_transaction_scopes_and_source_forms_are_explicit_inputs() {
-    for scope in [ContextModifier::Local, ContextModifier::Global] {
+    {
+        let scope = ContextModifier::Global;
         let sql = format!("SET {scope}TRANSACTION READ ONLY");
         let Set::SetTransaction(input) = set(&sql) else {
             panic!("expected transaction setting")
@@ -173,6 +174,10 @@ fn additional_transaction_scopes_and_source_forms_are_explicit_inputs() {
         );
         assert_eq!(input.to_string(), sql);
     }
+    assert_eq!(
+        transaction("SET LOCAL TRANSACTION READ ONLY"),
+        transaction("SET SESSION TRANSACTION READ ONLY")
+    );
     let Set::SetTransaction(input) = set("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
     else {
         panic!("expected characteristics form")

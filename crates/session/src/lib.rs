@@ -2,6 +2,7 @@ pub mod charset;
 pub mod compatibility;
 pub mod input;
 pub mod prepared_stmts;
+pub mod set_command;
 pub mod sql_mode;
 pub mod state;
 pub mod transaction;
@@ -23,6 +24,7 @@ pub use input::{
 pub use prepared_stmts::{
     PreparedStatement, PreparedStatementError, PreparedStatementLimits, PreparedStatementRegistry,
 };
+pub use set_command::{SessionSetStage, SetSettingsSnapshot, UnconfirmedSetCommand};
 pub use sql_mode::{SqlMode, SqlModeNamesError, SqlModes};
 pub use state::{SessionState, SessionWarning, TranslationFingerprint, WarningLevel};
 pub use transaction::{

@@ -1,7 +1,7 @@
 # Frontend transaction settings
 
-Status: **typed setting/staging component implemented; frontend controller and
-transaction equivalence pending**. `darmok-session` owns typed transaction
+Status: **typed setting/staging component and selected SET execution implemented;
+transaction-start/row controllers and transaction equivalence pending**. `darmok-session` owns typed transaction
 choices and ordered command stages. Its separate
 [SQL input component](session-sql-input.md) classifies direct transaction settings
 and retains variable syntax facts.
@@ -95,10 +95,11 @@ SESSION variable assignments, bare assignments, unqualified-@@ assignments and
 transaction statements. A further case exercises both listed @@SESSION
 assignment forms, named pending-access replacement between transactions and
 changed defaults with unchanged active choices.
-The parser retains LOCAL syntax, and the direct command classifier returns an
-explicit unimplemented-scope error for it. LOCAL controller integration,
-DEFAULT expressions, aliases, prepared forms and compound SET semantics remain
-separate verification work. The input view retains compound keyword context and
+The parser retains LOCAL syntax, and the direct command classifier now treats
+it as SESSION. The [SET controller](set-controller.md) handles selected DEFAULT
+and compound assignments with one outcome boundary and native autocommit commit
+receipts. Aliases, prepared forms and general expressions remain unimplemented.
+The input view retains compound keyword context and
 per-name qualifiers independently; it does not apply their values. Global or
 persistent forms must not be silently converted into session updates; their
 behavior is outside this controller contract. No global setting implementation

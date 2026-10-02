@@ -351,6 +351,45 @@ complete release gate runs once on the final candidate.
   This does not implement a SET controller, native effects, output or any M2/M4
   or release gate. Security-related work remains deferred.
 
+- The [selected SET execution component](set-controller.md) now joins parsed
+  inputs, one authoritative session state, exclusive native ownership and
+  encoded/sent output. It handles four variables, SESSION/LOCAL/next scope,
+  pre-update ordinary reads/checks and ordered DEFAULT semantic checks. A native
+  autocommit commit is confirmed before frontend end/setting publication.
+  Independent review of `20742af7bea77712d9c872ecc2bc99bd186e4e33` found C1:
+  an unsupported DEFAULT could follow earlier effects or a native commit.
+  `d5626740bd583af7f284d236485241ac1cfc8391` admits DEFAULT support first and
+  retains the supported late 1568 check at update time. Independent passive
+  followup review closes C1 at that exact revision with no new concrete finding;
+  the original finding remains preserved against its original head. The
+  reviewer did not run Cargo or SQL; its source audit is separate from the
+  author's current dynamic receipts.
+  At that corrected revision, ten new ordinary controller groups pass on
+  PostgreSQL 17.11 and 18.6, each with exit 0, including real native commit/data
+  and rollback effects and unchanged data after rejected unsupported DEFAULT.
+  Starts are trusted fixture setup; no native isolation mapping or full
+  nineteen-script proxy execution is certified. Exact required commands are:
+  `cargo test -p darmok-execute --lib --locked native_backend::tests::set_controller -- --ignored`,
+  `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`,
+  `cargo test --workspace --exclude darmok-postgres-tests --all-features --locked`,
+  `cargo test --workspace --exclude darmok-postgres-tests --locked`,
+  `cargo fmt --all --check`, `python3 scripts/check_repository.py`, and
+  `git diff --check 9f787745ca2678a89d6fea0b749caa0dccd397d6..HEAD`.
+  All exit 0. Workspace counts are 1,650/1,643 passing with 32 ignored;
+  the new ignored database groups are explicitly required in both native-owner
+  CI jobs. Current native runs select the ten new groups, rather than silently
+  treating ignored groups as passing. Local Rust uses the pinned toolchain and
+  the required `RUSTUP_HOME`/shared `CARGO_TARGET_DIR`; actual revision, tree,
+  commands, environment, fixture port, exits and hashed streams are in
+  `logs/set-controller-support-*.json` outside the distribution. Draft compile/
+  lint failures and a terminated overlapping default-suite attempt remain
+  separate receipts; the accepted default suite runs serially and exits 0.
+  Actual MySQL frontend dispatch, starts, catalog leases, row admission,
+  prepared execution, general coercion/warnings, session tracking, real drivers
+  and measured end-to-end performance remain pending. Account Actions is still
+  disabled, so this work cannot merge or complete M2/M4 or a release gate.
+  Security-related work and the compiler draft remain excluded.
+
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.
 

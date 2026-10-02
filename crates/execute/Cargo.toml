@@ -8,6 +8,9 @@ publish = false
 
 [dependencies]
 darmok-types = { workspace = true }
+darmok-session = { workspace = true }
+darmok-protocol = { workspace = true }
+sqlparser = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }

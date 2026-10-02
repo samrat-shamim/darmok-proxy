@@ -3,6 +3,11 @@
 Status: finite MySQL reference fixture; no SQL SET controller or PostgreSQL
 compatibility claim is implemented by this fixture.
 
+The separate [selected SET controller](set-controller.md) now uses these
+requirements with native commit and response-output boundaries. Its native
+fixtures check selected postconditions; the nineteen full scripts here remain
+stock-MySQL observations, not proxy or transaction-equivalence evidence.
+
 The [borrowed SQL input](session-sql-input.md) retains keyword scopes,
 per-name qualifiers and source expressions. Applying each item as soon as it
 is parsed would mix expression evaluation with mutation. Assuming the whole

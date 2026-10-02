@@ -76,8 +76,9 @@ pub struct SessionState {
     /// their setting effects are implemented. Numeric/name identity is shared.
     text_collation: &'static CharsetInfo,
     time_zone: &'static str,
-    sql_modes: SqlModes,
-    transactions: TransactionSettings,
+    pub(crate) sql_modes: SqlModes,
+    pub(crate) transactions: TransactionSettings,
+    pub(crate) pending_set: Option<crate::set_command::PendingSetCommand>,
     pub client_capabilities: u32,
     pub last_insert_id: u64,
     pub affected_rows: u64,
@@ -97,6 +98,7 @@ impl Default for SessionState {
             time_zone: profile.default_time_zone,
             sql_modes: profile.default_sql_modes,
             transactions: TransactionSettings::new(profile.default_transaction_characteristics),
+            pending_set: None,
             client_capabilities: 0,
             last_insert_id: 0,
             affected_rows: 0,
@@ -118,6 +120,7 @@ impl SessionState {
 
     /// Extract session fields relevant for translation cache fingerprinting.
     pub fn translation_fingerprint(&self) -> Result<TranslationFingerprint, SessionVariableError> {
+        self.ensure_settled()?;
         let transactions = self.transactions.snapshot()?;
         Ok(TranslationFingerprint {
             database: self.database.clone(),
@@ -133,7 +136,7 @@ impl SessionState {
     }
 
     pub fn sql_modes(&self) -> Result<SqlModes, TransactionSettingsError> {
-        self.transactions.snapshot()?;
+        self.ensure_settled()?;
         Ok(self.sql_modes)
     }
 
@@ -143,7 +146,7 @@ impl SessionState {
     /// must establish those obligations; it must not use a value update as a
     /// SQL compatibility or execution receipt.
     pub fn set_sql_modes(&mut self, modes: SqlModes) -> Result<(), TransactionSettingsError> {
-        self.transactions.snapshot()?;
+        self.ensure_settled()?;
         self.sql_modes = modes;
         Ok(())
     }
@@ -151,6 +154,7 @@ impl SessionState {
     pub fn transaction_settings(
         &self,
     ) -> Result<TransactionSettingsSnapshot, TransactionSettingsError> {
+        self.ensure_settled()?;
         self.transactions.snapshot()
     }
 
@@ -158,11 +162,20 @@ impl SessionState {
         &mut self,
         command: FrontendTransactionCommand,
     ) -> Result<TransactionCommandStage<'_>, TransactionSettingsError> {
+        self.ensure_settled()?;
         self.transactions.stage(command)
     }
 
     pub fn unconfirmed_transaction_command(&self) -> Option<UnconfirmedTransactionCommand> {
         self.transactions.unconfirmed()
+    }
+
+    pub(crate) fn ensure_settled(&self) -> Result<(), TransactionSettingsError> {
+        if self.pending_set.is_some() {
+            return Err(TransactionSettingsError::UnsettledOutcome);
+        }
+        self.transactions.snapshot()?;
+        Ok(())
     }
 
     pub fn clear_warning_stack(&mut self) {
@@ -199,6 +212,7 @@ impl SessionState {
 
 impl SessionVariableReader for SessionState {
     fn read_variable(&self, variable: SessionVariable) -> Result<Value, SessionVariableError> {
+        self.ensure_settled()?;
         let state = self.transactions.snapshot()?;
         let profile = MysqlCompatibilityProfile::default_mysql8();
         use SessionVariable as Var;
