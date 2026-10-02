@@ -1638,3 +1638,230 @@ interruption remain excluded. A component merge does not certify the pending
 hosted-CI, compatibility or release gates.
 The full goal remains active, including admitted table execution, `serve`, real
 drivers, measured performance, complete artifacts and the final release.
+
+### Server catalog publication lease component
+
+The project-owned PostgreSQL17/18 module in `postgres/darmok_server` supplies a
+transaction-owned read fence and generation stamp. Its native mechanisms live
+in a separate, versioned `darmok_server` extension namespace; SQL compatibility
+functions remain in `darmok`. Concurrent native PostgreSQL two-phase transactions are required for v0.1 per
+the user's selected footprint. MySQL prepared statements and MySQL XA remain
+separate features; no server-setting restriction substitutes for this native
+concurrency requirement. Security-related work remains deferred.
+
+The [lease contract](server-catalog-lease.md) now limits the global lease to
+admitted catalog phases. Complete native dependencies are acquired outside the
+lease and retained after it ends, before row execution. This is mandatory for
+prepared transactions that combine DDL in one relation with row locks in another.
+Ordinary metadata publication is fenced at native pre-commit; irreversible shared
+drops use their native object boundary. Every native SQL prepared completion is
+fenced, including pure DML; native core owns exact GID handling. Native invalidation
+state distinguishes surviving metadata from rolled-back child DDL for ordinary
+transaction commits. Shared drops exclude new readers through transaction-owned intent and drain
+existing leases before irreversible effects. They release that short lock across
+native backend-drain/storage waits, so ordinary exit publishers can finish using
+the native lock queue. Native pre-commit separately fences final publication.
+
+The earlier candidate `3e21463` passed catalog fixtures but its ordinary native
+owner regression encountered a database-removal/temp-cleanup barrier deadlock.
+That failure remains preserved and blocks acceptance of that revision. The next candidate `00899b5` passed 18 PostgreSQL18 groups, but independent
+review found an unfenced absent-GID race: PREPARE was only queued when its
+utility hook released the gate. Creation must retain that gate through native
+prepare/abort callbacks. That source is also blocked and its evidence is
+preserved. The lifetime correction at `73047ce` builds on both majors, but its
+PostgreSQL18 run has actual exit101:14 groups pass and six valid-preparation groups
+fail. Native utility execution leaves a successful PREPARE completion unchanged;
+the hook incorrectly initialized its capture to UNKNOWN and rejected it before
+the portal supplied the parse tag. That source is blocked. The correction seeds
+the known PREPARE tag while retaining native ROLLBACK overrides and the lifetime
+gate. The corrected `996ba71` passes20 catalog groups on each major, but its
+PostgreSQL17 owner run exits101:65 pass and one target-database/temp-backend cleanup
+fails with native E55006. Holding the early DROP fence across native backend drain
+blocks retirement of that same target backend. That revision is also blocked.
+The new shared-drop intent mechanism removes the lock across native lifecycle
+waits; its regressions cover both target/unrelated exits and concurrent intents
+through a native busy error. The earlier manual exit-barrier polling is removed.
+At `d4fe45e`,21 catalog groups and66 ordinary native owner fixtures pass on each
+major. The PostgreSQL17 package run nevertheless exits101 in the old concurrent
+namespace observation: a prepared query rebinds to the replacement relation while
+its cached description still names the original. Isolated module/bare PostgreSQL17
+diagnostics both retain the old relation, and native source permits global plan
+invalidation from namespace events. The observational fixture now serializes its
+controlled DDL sequences and adds explicit native plan invalidation that proves
+rebinding with an unchanged lookup path; it never treats cached origin as binding
+proof. These test/documentation changes do not alter the server module.
+The next candidate `36dff9e` stops its PostgreSQL17 catalog run with actual
+exit101:20 groups pass and the concurrent-drop fixture fails. That assertion
+incorrectly orders the two independent clients' responses. Native abort clears
+its intent and wakes the reader; the reader result may reach its task before the
+DROP error does. The corrected fixture observes continued reader admission wait
+after the first drop commits, then checks the second drop's native E55006 and
+reader success independently. It retains the exact generation/catalog checks
+and changes no module behavior. The failed command and stopped matrix remain
+preserved; they do not certify the corrected source.
+Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
+prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
+The module does not change server configuration or add routing/auth/grant policy.
+
+Required current-revision builds, PostgreSQL fixtures, local command matrix and
+independent review are recorded in the subsequent evidence entry. Earlier draft
+observations do not certify this source. Combined explicit module installation/
+verification, fresh leased catalog snapshots, native scope integration, complete
+semantic admission/results, reusable plans, MySQL snapshots/row locks and public
+table execution remain required. M2/M4 and the full release goal stay open.
+
+### Server catalog lease verification
+
+The clean tested revision is `32bbc56f3094e23c71a070dce29f4c56d6eafb77`,
+tree `ceefd195868418fb29f2fd8c9b6fefaa8072d10f`, based on main
+`14ac0abb5a57228d3b600049086fb1b16667bde1`. All 25 serial command checks
+have actual exit 0, as does their enclosing matrix:
+
+| Check | Executed result |
+| --- | --- |
+| Full PostgreSQL package, PostgreSQL 17/18 | 108 passed each, 0 failed/ignored; 14 summaries each, including 21 catalog lease and 5 namespace groups |
+| Ordinary native owner fixtures, PostgreSQL 17/18 | 66 passed each, 0 failed/ignored, 17 filtered |
+| CLI schema process fixtures, PostgreSQL 17/18 | 3 groups each; 23 child processes each: 11 actual 0, 12 expected 1 |
+| BigDecimal query/TCP transaction fixtures, PostgreSQL 17/18 | Four commands, 10 passed each, 0 failed/ignored |
+| Workspace all/default features | 1682/1675 passed, 0 failed, 79 ignored; 42/41 summaries |
+| Formatting, repository boundaries, strict workspace/connector Clippy | Four commands, actual 0 |
+| Parser minimal/std/visitor; module license; installed artifacts | Six commands, actual 0 |
+| Environment and fixture cleanup | Five environment readers actual 0; both servers have 0 prepared transactions, other clients, named lease relations and drop-test databases |
+
+The four disposable profiles run pinned PostgreSQL 17.11/18.6 on Linux arm64
+with `max_prepared_transactions=10` or the native default 0. The enabled
+profiles exercise concurrent prepared DDL, pure DML, mixed row/catalog changes,
+GID reuse, queued preparation/deferred triggers and native completion errors.
+The default profiles independently acquire and release leases. Normal temporary
+backend cleanup covers both the target and an unrelated database. Three forced
+interruption/abandoned-control owner fixtures remain explicitly excluded;
+neither local servers nor client controls are interrupted as failure experiments.
+
+The module images were built at `d4fe45ef6e28c50a9c9bd1481bf7afc4d70468d4`,
+tree `ab27123e3f766229f5e4a0b502d890d5ccca6918`, with actual exit 0 on
+both majors. All eight module build inputs, including C, recipe, SQL/control,
+license and README, match the tested revision exactly. This is explicit build
+reuse, not a claim of a new build at `32bbc56`. The current identity receipt
+binds those inputs to the running images, healthy profiles and installed
+extension version 1.0. Seven installed library/bitcode/SQL/control/document
+hashes are preserved per major; the module's Apache license matches the root.
+The Alpine SDK package closure and other target platforms remain artifact gates.
+
+Rust/Cargo 1.96.0 on macOS 26.0.1 arm64 ran every Cargo command and Cargo-spawning
+helper serially with both scoped `RUSTUP_HOME` and `CARGO_TARGET_DIR`. Immutable
+receipts are under `.darmok-work/logs/catalog-lease-32bbc56-*`; each binds clean
+head/tree, argv, timestamps, actual exit and raw stream hashes. The two workspace
+runs each preserve 16 ordinary CLI children: 5 actual 0, 5 expected 1 and 6
+expected usage 2. Those child outcomes are distinct from top-level check exits.
+The enclosing matrix stdout SHA256 is
+`492aa723a52e5cb22aee30bc70b4c0ef50f55d4dcd0b0461430541cd9e61ef9d`.
+
+The author audit has actual exit 0, stdout SHA256
+`b7f5f3598eed4f234f47733f762c5b8de256a276365970d70afd3563b939fbdd`.
+Its 1186-file manifest has SHA256
+`7331fdd1b785e042b73d12ddcc625ed4508d238aba679cdd72f69e195f491bfa`,
+and facts `2b58f20c0592d3df307c7ee31b2a4a965130dd71f3e05b8fed6e758f00a389be`.
+It binds the current evidence, compiled module inputs, primary sources and
+historical review seals without rewriting earlier failures. Earlier component
+passes, isolated diagnostics and stopped matrices retain their original source
+and scope. Independent final review is required before merging this component.
+The lease primitive does not certify fresh catalog reads, complete native guards,
+semantic admission, table execution, serving, real drivers, cache performance,
+hosted CI or the full release. The goal remains active.
+
+### Prepared-completion correction
+
+Independent source review at `bed10ba8e18e71d01d17997e6228db3338a16ced`
+found two further blockers in the prepared-target classifier. A native prepared
+transaction can retain an exclusive lock on `pg_prepared_xacts`; querying that
+view before native completion can wait on the very target whose finish would
+release it. The unqualified text equality in that query also depends on the
+finisher's operator lookup path, so case-distinct native GIDs can lose exact
+classification. These are source findings, not executed hanging experiments.
+The review addendum seal is
+`4f064bce03684bb92389ff9b9df53e69846b1e371f013ab5d84d1b08129aaf8b`.
+It supersedes the earlier finite acceptance; the successful `32bbc56` matrix
+remains historical evidence and cannot certify the replacement.
+
+The replacement fences every SQL prepared commit or rollback before native
+completion. It removes classifier SQL, marker locks, GID hash/session gates and
+completion-tag capture. Native core alone resolves exact GIDs and preserves its
+target checks and errors. PREPARE keeps metadata private and cannot transfer the
+global fence. Errors clean up through native transaction resource ownership.
+
+This deliberately trades selective prepared-DML cache reuse for correctness:
+all prepared completions serialize with catalog readers and advance generation,
+including pure DML and native errors after fence acquisition. The fence includes
+native completion work and waits; it has no uniform short-duration guarantee.
+Ordinary pure-DML commits and ordinary lease protocol round trips are unchanged.
+New ordinary regressions cover retained prepared-view locks, schema-local text
+equality with case-distinct GIDs, queued PREPARE validity, concurrent completions,
+native error cleanup and row waits outside catalog leases.
+
+New module builds and current-source verification on PostgreSQL 17/18 with
+enabled/default two-phase settings, the ordinary owner/CLI matrix and independent
+frozen-source review are required before merging. The subsequent entry records
+the replacement's executed checks. Fresh catalog reads, complete native guards,
+frontend data snapshots, table execution, serving, cache performance and release gates remain
+open. Security work and interruption/stress experiments remain excluded.
+
+### Prepared-completion verification
+
+The clean tested and freshly built revision is
+`202166984df7fb00bd0358c04177ef4c15ee3e13`, tree
+`f35ed2e9f98066beeb08611d6d237ddc0a21619d`. Both module builds, all
+13 setup steps and their enclosing command have actual exit 0. The four profiles
+run pinned PostgreSQL 17.11/18.6 with native two-phase settings 10 or 0; no earlier
+module binary is reused to certify the changed C source. Previously healthy,
+inactive profiles were stopped normally only after native checks found no
+prepared transactions or other client backends. Historical quarantines remain
+untouched.
+
+All 25 serial checks and their enclosing matrix have actual exit 0:
+
+| Check | Executed result |
+| --- | --- |
+| Full PostgreSQL package, PostgreSQL 17/18 | 110 passed each, 0 failed/ignored; 14 summaries each, including 23 catalog lease and 5 namespace groups |
+| Ordinary native owner fixtures, PostgreSQL 17/18 | 66 passed each, 0 failed/ignored, 17 filtered |
+| CLI schema process fixtures, PostgreSQL 17/18 | 3 groups each; 23 child processes each: 11 actual 0, 12 expected 1 |
+| BigDecimal query/TCP transaction fixtures, PostgreSQL 17/18 | Four commands, 10 passed each, 0 failed/ignored |
+| Workspace all/default features | 1682/1675 passed, 0 failed, 79 ignored; 42/41 summaries |
+| Formatting, boundaries, strict workspace/connector Clippy | Four commands, actual 0 |
+| Parser minimal/std/visitor; license; installed artifacts | Six commands, actual 0 |
+| Environment and fixture cleanup | Five environment readers actual 0; both primary servers have 0 prepared transactions, other clients, named lease relations and drop-test databases |
+
+Both majors verify native COMMIT and ROLLBACK of a prepared transaction retaining
+the prepared-transaction view's exclusive lock. The finisher first waits on the
+publication fence, then completes and releases the retained view lock. A second
+fixture proves schema-local text equality differs from native equality, then
+finishes case-distinct GIDs with separate commit/rollback catalog outcomes.
+Prepared pure DML and rolled-back child DDL now explicitly wait for catalog
+readers and advance generation. Queued PREPARE remains private; a finish before
+native validity reports the native missing-GID error. Duplicate/reused GIDs,
+top-level and savepoint native errors, active-lease preparation rejection and
+mixed row/catalog transactions retain their ordinary lifecycle checks.
+
+Immutable receipts are under `.darmok-work/logs/catalog-lease-2021669-*`.
+The enclosing matrix stdout SHA256 is
+`b923b456270c0dde915ab5cc7a303f839ab43052a92256cc85a4799e44365d90`;
+the setup enclosure is
+`3485fb9e9ae802a38a0de08dff3beaa10de359e0b9a7e8c86ea44a49796a6424`.
+Every Cargo invocation and Cargo-spawning helper uses the scoped Rustup and
+target directories, serially. Rust/Cargo 1.96.0 on macOS 26.0.1 arm64 ran the
+Rust checks; pinned Linux arm64 builds supply seven installed artifact hashes
+per major. The SDK package closure and other platforms remain artifact gates.
+
+The author audit has actual exit 0, stdout SHA256
+`d8f3bbaac7d72e418f1a35c7fea9185821f79d46c63e95dd1673af9a231c7d89`.
+Its 2194-file manifest has SHA256
+`973e4e6c1bbd0961a977f01cca7abb5bd12cd42b3d6935f6638d6edac9a9f38a`,
+and facts `daf0f13ec81389fff89e4c34a0b3496171b3d6cdf8cd7f15e861473c49ff6697`.
+It preserves the prior successful matrix, failures and superseded review seals
+under their original revisions. Seventeen exact Git source snapshots also have
+actual exit 0 and match the manifest; their receipt SHA256 is
+`b14254af3e995a5b4c516675c38b0435d2adf13fcf189f0ad2af69537c38c299`.
+This documentation leaf adds the executed evidence without changing module or
+fixture inputs. Independent final review is required before component merge.
+These passes do not certify fresh catalog reads, complete native guards, semantic
+admission, table execution, serving, drivers, cache performance, hosted CI or the
+full release. The goal remains active and the user's exclusions remain in force.

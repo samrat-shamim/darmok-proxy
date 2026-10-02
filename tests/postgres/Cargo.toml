@@ -67,3 +67,7 @@ path = "native_controls.rs"
 [[test]]
 name = "typed_completion"
 path = "typed_completion.rs"
+
+[[test]]
+name = "server_catalog_lease"
+path = "server_catalog_lease.rs"

@@ -58,10 +58,15 @@ statement description to returned rows. Matching that description therefore
 does not prove which relation supplied the row.
 
 Required PostgreSQL 17/18 fixtures prepare a qualified query, rename its native
-schema, and create a same-shaped replacement under the original name. Without
-a lookup change the observed statement retains the original relation. An
+schema, and create a same-shaped replacement under the original name. These
+controlled sequences run serially because namespace invalidations can reset all
+cached query plans, including those in another fixture. In the isolated sequence
+without a lookup change the observed statement retains the original relation. An
 explicit path change or first temporary namespace creation causes it to read
 the replacement while the cached column origin still names the original OID.
+An explicit native `DISCARD PLANS` also causes that rebind with an unchanged
+effective `pg_catalog` path. Retention is an observation, not a promised binding;
+native invalidation may trigger reanalysis independently of a lookup change.
 The returned `tableoid` establishes the actual source independently of that
 cached origin. These are ordinary sequential DDL fixtures, not a concurrent DDL
 or complete dependency-validity test.
