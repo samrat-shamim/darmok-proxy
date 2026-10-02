@@ -76,7 +76,11 @@ def main():
     try:
         container = json.loads(run("container", ["docker", "inspect", "--format", '{"id":{{json .Id}},"image":{{json .Image}}}', args.container]))
         image = json.loads(run("image", ["docker", "image", "inspect", "--format", '{"id":{{json .Id}},"digests":{{json .RepoDigests}}}', args.image]))
-        if container["image"] != image["id"] or args.image not in image["digests"]:
+        digest = args.image.partition("@")[2]
+        # Docker's RepoDigests use the repository without the :8.4 tag. The
+        # requested content digest must match, independently of that spelling.
+        if not digest or container["image"] != image["id"] or not any(
+                item.endswith("@" + digest) for item in image["digests"]):
             raise RuntimeError("container differs from the pinned reference image")
         version = run("version", client, "SELECT VERSION();\n").strip()
         if version != corpus["reference"]["version"] or not version.startswith("8.4."):
