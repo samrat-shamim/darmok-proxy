@@ -807,3 +807,75 @@ performance, bounded shutdown and M2/M4 remain incomplete. Security work and
 compiler PR4 source remain excluded. Required hosted CI remains unavailable
 under the separately recorded account condition; local component verification
 justifies neither merge nor release. The full goal remains active.
+
+## Native relation name discovery
+
+The catalog component now accepts literal native schema/relation pairs through
+`read_native_named_relations`. One typed statement resolves all names and reads
+columns and domain ancestors in the same native snapshot. The immutable result
+preserves request order and repeats while deduplicating relation/type maps.
+Missing pairs fail the complete read with the first missing input index; empty
+requests issue no SQL. Exact names retain case, dots, quotes, spaces and Unicode
+spelling. Temporary objects use their actual catalog namespace, without
+search-path or logical-alias resolution. The contract and costs are recorded in
+[native catalog facts](native-catalog.md).
+
+Verified code is `76a9da18c4d2466d04871b4abfc8db968a6c5943`, tree
+`28aa911323ed50aed45874b7f675e7851c8f2676`, on `feat/native-named-catalog`,
+stacked on the reviewed command-loop branch. Each clean-source receipt records
+the exact argv, working directory, revision/tree, environment, fixture port,
+actual exit and stream hashes. Every Cargo/Cargo-spawning command used
+`RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup` and
+`CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target`;
+all twelve child check intervals are nonoverlapping. Rust/Cargo are 1.96.0;
+the disposable PostgreSQL fixtures are 17.11 on port32769 and 18.6 on port32768,
+with UTF8 encoding and the standard 63-byte identifier limit.
+
+| Final code check | Actual result |
+| --- | --- |
+| `cargo test -p darmok-postgres-tests --test native_catalog --test native_named_catalog --locked`, each backend | 15 passed, 0 failed, 0 ignored: 7 existing and 8 named fixtures |
+| Workspace tests excluding the PostgreSQL package, `--all-features --locked` | 1669 passed, 0 failed, 60 ignored, 38 suite summaries |
+| Same workspace tests with default features, `--locked` | 1662 passed, 0 failed, 60 ignored, 37 suite summaries |
+| Workspace/all-targets/all-features Clippy, `--locked -- -D warnings` | exit0 |
+| Formatting, repository boundary checker and base-to-head diff check | each exit0 |
+| Rust/Cargo and both PostgreSQL version/encoding/identifier-limit reads | each exit0 |
+
+The new required Cargo test target is included by the existing PostgreSQL CI
+package command. Local evidence adds exact names, duplicates/order, missing
+positions, ASCII/multibyte truncation rejection, temporary and empty relations,
+no-I/O empty input during a native aborted transaction, native error propagation,
+external/local/rolled-back DDL and shared Repeatable Read name/fact snapshots.
+Existing quoted-definition, domain and relation-kind groups also compare named
+and OID facts directly. An explicit schema-before-`pg_catalog` fixture verifies
+that a native domain named `text` keeps its native identity while the query's
+parameter and output casts retain builtin types.
+
+Two real implementation failures remain preserved. At `b65685a`, qualified
+multi-array `unnest` produces PostgreSQL42883: the original native17 invocation
+exits101 with 4 passed/3 failed, before the named target runs. The corrected
+`ROWS FROM` pairing at `26701d9` passes twelve local checks, but fresh review
+then identifies incidental unqualified `text` casts. Its regression-only
+`c669c02` invocation exits101 with PostgreSQL42804 and one failed test. Final
+`76a9da1` qualifies all nine text casts and passes the matrix above. Independent
+passive review identifies these F1/F2 corrections and the precise D1 wording
+for text casts; it inspects source and saved receipts rather than running
+Cargo, SQL, network or stress checks itself.
+
+Raw receipts are outside the distribution under `.darmok-work/logs/`:
+`named-catalog-type-identity-fixed17`, `named-catalog-76a9da1-*`, and the two
+negative prefixes `named-catalog-candidate-native17` and
+`named-catalog-type-identity-negative17`. The author audit exits0 and binds all
+source identities, exact commands/environments/ports, native/workspace counts,
+nonoverlapping child intervals and unchanged prior evidence. Its facts are
+`named-catalog-audit-facts-v2.json`. The 50-file code evidence manifest is
+`named-catalog-code-evidence-v2.json`, SHA256
+`86cecb43b3698e49f8deb766d0366e5e44bda1b1dcddc76f03b0dc682a3f5e40`.
+A documentation leaf retains all other Git entries from that verified code.
+
+This is native discovery progress. It does not pin objects against later DDL
+or admit table execution. Catalog execution validity, reusable plans, public
+table SQL, native/created-schema workloads, executable integration, real drivers,
+measured performance and M2/M4 remain incomplete. Required hosted CI, merge and
+release remain pending under the recorded account condition; no CI retry or
+merge/release gate is claimed. Security work and compiler PR4 remain excluded,
+and the full goal remains active.

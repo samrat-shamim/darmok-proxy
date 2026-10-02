@@ -1,6 +1,7 @@
 use darmok_catalog::{
-    CatalogError, ColumnGeneration, ColumnIdentity, NativeCatalog, NativeColumn, RelationKind,
-    RelationPersistence, TypeKind, read_native_relations,
+    CatalogError, ColumnGeneration, ColumnIdentity, NativeCatalog, NativeColumn,
+    NativeRelationName, RelationKind, RelationPersistence, TypeKind, read_native_named_relations,
+    read_native_relations,
 };
 use darmok_execute::decode_native_row_utc;
 use darmok_types::Value;
@@ -32,6 +33,26 @@ fn column<'a>(catalog: &'a NativeCatalog, oid: u32, name: &str) -> &'a NativeCol
         .unwrap()
 }
 
+async fn assert_named_matches<C: GenericClient + Sync>(
+    client: &C,
+    oids: &[u32],
+    expected: &NativeCatalog,
+) {
+    let names: Vec<_> = oids
+        .iter()
+        .map(|oid| {
+            let relation = &expected.relations[oid];
+            NativeRelationName {
+                schema_name: &relation.schema_name,
+                relation_name: &relation.name,
+            }
+        })
+        .collect();
+    let named = read_native_named_relations(client, &names).await.unwrap();
+    assert_eq!(named.relation_oids(), oids);
+    assert_eq!(named.catalog(), expected);
+}
+
 #[tokio::test]
 async fn quoted_native_definitions_keep_attributes_without_inventing_mysql_metadata() {
     let (mut client, connection) = database_client().await;
@@ -58,6 +79,7 @@ async fn quoted_native_definitions_keep_attributes_without_inventing_mysql_metad
     .unwrap();
     let oid = relation_oid(&tx, "\"Catalog Case\".\"Product.Set\"").await;
     let catalog = read_native_relations(&tx, &[oid, oid]).await.unwrap();
+    assert_named_matches(&tx, &[oid, oid], &catalog).await;
     assert_eq!(catalog.relations.len(), 1);
     let relation = &catalog.relations[&oid];
     assert_eq!(relation.oid, oid);
@@ -185,6 +207,7 @@ async fn declared_domains_and_other_native_types_keep_their_own_identity() {
     .unwrap();
     let oid = relation_oid(&tx, "pg_temp.catalog_domains").await;
     let catalog = read_native_relations(&tx, &[oid]).await.unwrap();
+    assert_named_matches(&tx, &[oid], &catalog).await;
     let amount = column(&catalog, oid, "amount");
     let direct = column(&catalog, oid, "direct");
     assert_ne!(amount.declared_type_oid, direct.declared_type_oid);
@@ -343,6 +366,7 @@ async fn relation_kinds_and_temporary_shadowing_are_native_oid_facts() {
     assert_ne!(toast_oid, 0);
     oids.push(toast_oid);
     let catalog = read_native_relations(&tx, &oids).await.unwrap();
+    assert_named_matches(&tx, &oids, &catalog).await;
     assert_eq!(catalog.relations.len(), cases.len() + 1);
     for ((_, kind, persistence), oid) in cases.iter().zip(&oids) {
         let relation = &catalog.relations[oid];
