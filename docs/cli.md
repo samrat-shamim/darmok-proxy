@@ -79,15 +79,36 @@ PostgreSQL major: fresh/repeated initialization and read-only verification with
 unchanged application state; ordinary partial/version/function mismatches with
 no repair; and independent installations in two explicitly selected databases.
 They check actual child exit codes/output, catalog OIDs and row/catalog `xmin`,
-successful URI and keyword/value inputs selecting an explicit nondefault database,
+successful URI and keyword/value inputs selecting an explicit nondefault
+database,
 helper NULL/UTF8/arbitrary-byte behavior, normal connection closure and database
 removal, and an ordinary nonexistent-database connection error. Missing database
 infrastructure fails the required test invocation.
 This is physical selection evidence, not logical routing authorization.
 
 `DARMOK_CLI_PROCESS_EVIDENCE_DIR`, when set for tests, records every child's
-actual argv, settings format, selected physical database, timestamps, status and original
-stdout/stderr in unique files.
-It is a test evidence destination, not a product setting. Hosted PostgreSQL CI
+actual argv, settings format, selected physical database, timestamps, status and
+original stdout/stderr in unique files. It is a test evidence destination, not
+a product setting. Hosted PostgreSQL CI
 requires these groups explicitly; local evidence and the account CI blocker are
 recorded in [the release plan](release-plan.md).
+
+## Recorded local candidate
+
+The successful process/runtime checks apply to code revision
+`6c0f3e899687e5cf4bf27c17d1178d0e643f3250`, tree
+`d30e82956723e92049d9a64b8a17275d8399a13f`. Each PostgreSQL major runs three
+required groups and 23 actual command children: 11 exits0 and 12 expected exits1.
+Both keyword initialization and verification succeed against the explicit
+nondefault database, with unchanged installation/application snapshots. The
+offline groups run 16 children per workspace feature set: five exits0, five
+expected exits1 and six expected usage exits2.
+
+All15 matrix commands exit0. Independent review closes the original positive
+keyword coverage observation; no functional finding remains. The copied
+optimized macOS arm64 development binary is checked for help/version from an
+empty working directory only. Its schema behavior, other artifact platforms,
+serving, real drivers and release readiness are not established by that smoke
+check. The complete local hashes, exact command/environment records, preserved
+bookkeeping failure and pending hosted CI are in the release plan. This evidence
+documentation does not relabel runtime executions as a later docs-only leaf.
