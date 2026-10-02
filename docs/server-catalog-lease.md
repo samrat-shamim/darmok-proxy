@@ -2,7 +2,8 @@
 
 `postgres/darmok_server` implements PostgreSQL 17/18 catalog publication and a
 one-shot reader with internal, transaction-owned read fences. The reader and
-private Rust scope integration await current-revision native verification.
+private Rust scope integration have current-revision local PostgreSQL 17.11/18.6
+verification under the continuous private-owner profile.
 Statement admission, complete dependency guards, result definitions, plan
 caching and a MySQL table executor remain required before exposing table SQL.
 Component evidence is recorded in the release plan.
@@ -206,8 +207,10 @@ Prepared completion adds one publication lock and generation advance, without
 classifier SQL, GID allocations or protocol round trips. All prepared completions
 contend with readers and conservatively invalidate catalog cache identities,
 including pure DML; ordinary pure-DML commits retain their previous behavior.
-The one-shot reader needs one SET/SHOW round trip, two successful raw Share
-acquisitions and four full fact-heap scans per nonempty request. Its
+The one-shot reader needs one SET/SHOW round trip per nonempty request. An
+uncontended successful attempt has two raw Share acquisitions and four full
+fact-heap scans. Shared-drop admission retries add acquisitions; a changed
+generation restarts the attempt and adds acquisitions and preparation. Its
 [phase budgets and sequential fixture](catalog-discovery.md) do not establish
 proxy throughput, cache hit rates or parallel contention.
 

@@ -1,7 +1,7 @@
 # Exclusive native backend ownership and control scopes
 
-Status: **implemented control lifecycle; catalog discovery awaiting native
-verification; not a statement executor**.
+Status: **implemented control lifecycle and catalog discovery; local discovery
+verification on PostgreSQL 17.11/18.6; not a statement executor**.
 `NativeBackend` connects through the existing PostgreSQL connector, retains the
 client and driver privately, and submits its own fixed initialization,
 transaction controls and catalog discovery requests.
@@ -171,6 +171,14 @@ isolation/access combinations through explicit BEGIN and transaction scopes,
 unchanged session defaults, inherited savepoint characteristics through recovery
 and release, and wrong-boundary errors. They check native settings, not MySQL
 snapshot or lock equivalence.
+Three discovery fixtures additionally cover first data views at both scope
+boundaries, explicit missing-relation recovery and disposal-only missing-module
+or unsupported-profile errors. They require a preloaded, installed primary
+database, its uninstalled `postgres` database and
+`DARMOK_TEST_UNPRELOADED_DATABASE_URL` naming an installed database without
+module preloading. These three fixtures have current-revision local receipts
+on both versions; earlier lifecycle fixtures retain their own revision-specific
+evidence in the release plan.
 Fixture SQL uses private test access and is not an admitted statement path.
 No forced transport interruption, security review, adversarial inputs or
 resource stress is included. MySQL behavior and release gates remain pending.

@@ -2005,10 +2005,98 @@ remain preserved. This is design/source acceptance, not runtime proof.
 The implementation adds the native reader, strict fact decoder and exclusive
 scope integration, retires the unreleased SQL lease API and replaces publication
 fixtures with a separate native test probe absent from the product image.
-Current-revision product/probe builds, ordinary PostgreSQL 17/18 fixtures,
-workspace checks and independent implementation review are still pending.
-The earlier SELECT-lease results do not certify this changed native module.
+The current-revision local verification below supersedes the pending build and
+fixture status. The earlier SELECT-lease results do not certify this changed
+native module.
 MySQL data-view/lock policy, native dependency guards/recheck/admission, table
 execution, serving, driver/cache/performance/artifact/hosted CI and release
 gates remain open. Security work, compiler PR #4, stress/forced interruption,
+remote CI/account actions and release publication remain excluded.
+
+### One-shot discovery local verification
+
+The tested clean implementation revision is
+`3bc480ad0b73bf403cfd02c7d650fffe23680615`, tree
+`bbaab322a552126a36d51a711b2d3485251977ee`.
+
+| Check | Executed result |
+| --- | --- |
+| Required private-owner discovery fixtures, PostgreSQL 17/18 | 3 passed each, 0 failed/ignored; both scope kinds, first data views, native missing-relation recovery and disposal-only installation/profile failures |
+| Full PostgreSQL package, PostgreSQL 17/18 | 123 passed each, 0 failed/ignored; 16 summaries each, including 11 discovery and 15 publication groups |
+| Workspace all-feature tests/doctests | 1690 passed, 0 failed, 82 explicitly ignored; 42 summaries |
+| Formatting, repository boundaries, strict workspace/connector Clippy | Four commands, actual 0; boundaries cover 9 packages |
+| Fresh product/probe builds | Four actual-0 builds at `958be08710bc70d7714a6bdaf6eb5b0b86981e1a`; all 14 module/probe inputs equal tested `3bc480a` |
+| Setup and final environment | 75 setup and 40 final environment commands, all actual 0; six healthy profiles, exact image/library/bitcode identities, probe absent from product images, no prepared transactions, other fixture clients or named fixture tables remain |
+
+Each version used three fresh profiles: a preloaded/installed primary with
+`max_prepared_transactions=10`, a preloaded/installed native-default profile
+with `0`, and an installed but unpreloaded product profile with `10`. The `0`
+profile is an additional ordinary case, never a requirement. Prepared catalog
+heap waits occur outside Share; both native COMMIT PREPARED and ROLLBACK PREPARED
+complete while the reader waits. Prepared user DDL has committed setup before
+preparation and becomes visible after completion. No stop, restart or forced
+cleanup was used; the six healthy disposable profiles remain retained.
+
+Build bases are pinned `postgres:17-alpine` digest
+`b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24`
+and `postgres:18-alpine` digest
+`77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873`.
+The executed servers are PostgreSQL 17.11/18.6 on Linux arm64/musl; the local
+Rust/Cargo toolchain is 1.96.0 on macOS 26.0.1 arm64. Every Cargo invocation or
+Cargo-spawning helper ran serially with scoped Rustup and target directories.
+Other platforms and hosted CI are not certified by these receipts.
+
+The bounded sequential observation used 32 warm-up and 128 measured requests,
+one SET/SHOW round trip each. PostgreSQL 17 had 81 namespaces, 416 classes,
+3133 attributes and 619 types, with p50 463250 ns and p95 606458 ns. PostgreSQL
+18 had 21/416/3168/623 respectively, with p50 383625 ns and p95 440709 ns.
+This measures the complete discovery request over local TCP, not proxy
+throughput, cache hit rates or parallel contention. Two Share acquisitions
+describe an uncontended successful attempt; admission/generation retries add
+acquisitions. Full scans scale with catalog size, and phase allocation budgets
+do not bound total process memory.
+
+Two failed fixture-development attempts remain preserved: `958be08` native
+compile exited 101 because the empty portal parameter iterator lacked a type;
+`a01ef8d` discovery exited 101 with 10 passed/1 failed because a combined
+CREATE/BEGIN/ALTER/PREPARE request left the table private to its prepared
+transaction. Explicit typing and a separately committed CREATE correct those
+fixtures. The failed prepared transaction was resolved through ordinary
+ROLLBACK PREPARED, actual 0. Earlier unused-result warnings were removed by
+checking completion/disposal receipts or explicitly discarding cost observations.
+
+Independent review of `a01ef8d` found F1: generic native discovery errors could
+permit scope recovery although installation/profile failures require disposal.
+`3bc480a` permits recovery only for a requested missing relation or exhausted
+pre-effect generation attempts, with exact failed readiness and no stream or
+shape error. New owner fixtures cover missing per-database installation and
+the unpreloaded module's placeholder echo. The original review finding remains
+preserved in `.darmok-work/logs/review-catalog-discovery-a01ef8d-v1`; its 99-file
+seal is `d4645bb6cb747a54e8d6e1311c9186ac5692fc9216c99fd6cc796759eb20a523`.
+The independent current-source pass finds no further functional blocker and
+requested the acquisition-count clarification included in this documentation
+leaf. Final bounded source/evidence acceptance is required before merge.
+
+Immutable command receipts are under
+`.darmok-work/logs/catalog-discovery-{4217002,958be08,a01ef8d,c97f94b,3bc480a}-*`.
+The actual-0 author audit is `catalog-discovery-3bc480a-11-author-audit`, stdout
+SHA256 `9fa0999b4617325add7be7cda3a2e6bdd5c39e0763b94d3c0c56277e94f01597`.
+Its facts have SHA256
+`2c0e38e62460e5d9050d62a90a8954496ecdc47407bacafd1209cf1c97985b84`;
+the 1421-file manifest is
+`cab4c7dd525a4e81be4494f36da32e178e086903df8c1f23586cb44462f65186`.
+It verifies 11 current and 16 historical command receipts, all 162 source
+readers, the 115 nested setup/environment commands and all 14 build inputs.
+The old 129-file passive-control, 260-file conditional architecture, 169-file
+simple-query and 99-file initial implementation seals were rehashed unchanged.
+Pinned primary-source manifests bind 94 discovery and 30 earlier control
+source captures. Independent current review evidence is under
+`.darmok-work/logs/review-catalog-discovery-3bc480a-v1`.
+
+This closes local one-shot observation verification under its private-owner
+profile. Complete native dependency guards, fresh recheck, supported preparation
+and admission still belong to [issue #46](https://github.com/samrat-shamim/darmok-proxy/issues/46).
+MySQL data/current-read and lock policy, table execution, serving, real drivers,
+cache/performance/artifact checks, hosted CI and release gates remain open.
+The goal remains active; security work, compiler PR #4, stress/forced interruption,
 remote CI/account actions and release publication remain excluded.

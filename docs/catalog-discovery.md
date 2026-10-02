@@ -1,6 +1,8 @@
 # Snapshot-neutral catalog discovery
 
-Status: **implementation awaiting current-revision native verification**.
+Status: **implemented and locally verified on PostgreSQL 17.11/18.6 under the
+continuous private-owner profile below**. Revision and executed checks are
+recorded in [release-plan.md](release-plan.md).
 This component reads immutable native relation facts through the private
 `NativeScope`. It does not admit, prepare or execute table queries. A returned
 stamp is a historical observation, not an execution lease.
@@ -111,8 +113,11 @@ semantic admission and result validation remain required for statement execution
 
 ## Costs, bounds and fixtures
 
-A nonempty owner request has one SET/SHOW round trip. Each successful native
-attempt has two short Share acquisitions and four full heap scans. It copies
+A nonempty owner request has one SET/SHOW round trip. An uncontended successful
+native attempt has two short Share acquisitions and four full heap scans.
+Shared-drop admission retries can add acquisitions within either phase;
+generation changes restart the attempt and add acquisitions and preparation.
+These counts are not a bound on a request that encounters contention. It copies
 all namespaces/types and only requested relations/columns, then selects domain
 ancestors in memory. Cost scales with catalog size, not just request count;
 there is no per-object index optimization or throughput/cache claim.
@@ -134,6 +139,6 @@ proof, inert Describe, historical portals and a bounded sequential cost report.
 Private-owner fixtures additionally check both scope boundaries, recoverable
 missing-relation errors and rejection of both missing per-database installation
 and an installed but unpreloaded module's placeholder echo. Fresh PostgreSQL
-17/18 product/probe images and executed
-receipts are required before component acceptance. No stress, forced
+17/18 product/probe images, three profiles per version and current-revision
+fixtures have local executed receipts in the release plan. No stress, forced
 interruption, security work or hosted CI claim belongs to these fixtures.
