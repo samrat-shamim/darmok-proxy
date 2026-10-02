@@ -122,6 +122,13 @@ jobs:
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
           --corpus tests/reference/mysql_query_results.json
           --evidence-dir '${{ runner.temp }}/mysql-query-results-reference'
+      - name: Required stock typed substring reference observations
+        run: >-
+          python3 tests/reference/observe_mysql_substrings.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus crates/execute/fixtures/native-substring-mysql84.json
+          --evidence-dir '${{ runner.temp }}/mysql-substring-reference'
       - name: Required stock query transaction observations
         run: >-
           python3 tests/reference/observe_mysql_transactions.py

@@ -86,3 +86,16 @@ transactional rollback, preservation of outer work, and the independently
 captured 810-case stock MySQL 8.4 corpus. This is component evidence; M3 and the
 full release remain open. Exact revision, commands and outcomes are recorded in
 `release-plan.md` after verification.
+
+The corpus also has a repository-local standard-library observer. With the
+existing stock fixture's `MYSQL_PWD` environment, run:
+
+```text
+python3 tests/reference/observe_mysql_substrings.py --container <reference-container> --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 --corpus crates/execute/fixtures/native-substring-mysql84.json --evidence-dir <new-external-directory>
+```
+
+It verifies the pinned image, server version, all values and immediate statement
+warning counts, preserving raw commands and streams. The native fixture is
+required by both existing PostgreSQL native-owner jobs; the stock observer is
+required by the MySQL reference job. Hosted jobs have not been run for this
+component while the account blocker persists.
