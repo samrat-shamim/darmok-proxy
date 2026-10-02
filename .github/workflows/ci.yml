@@ -81,6 +81,17 @@ jobs:
         run: rustup show active-toolchain
       - name: Required PostgreSQL tests
         run: cargo test -p darmok-postgres-tests --locked
+      - name: Required CLI schema process fixtures
+        env:
+          DARMOK_CLI_PROCESS_EVIDENCE_DIR: ${{ runner.temp }}/cli-schema-processes
+        run: cargo test -p darmok-cli --test schema_process --locked -- --ignored
+      - name: Preserve CLI schema process receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cli-schema-processes-pg${{ matrix.version }}
+          path: ${{ runner.temp }}/cli-schema-processes
+          if-no-files-found: error
       - name: Required native owner database unit fixtures
         run: cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
       - name: Required BigDecimal original-source SET and transaction fixtures

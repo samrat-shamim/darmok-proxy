@@ -30,7 +30,7 @@ documentation. Deferred gates cannot count as release certification.
 | M0 | Pin and inventory the starting implementation; establish baseline; write contracts | Reproducible source inventory and test results, documented inherited failures, architecture and scope contracts | Complete; baseline has one recorded failure |
 | M1 | Independent workspace, vendored parser, package names, licensing and CI | Fresh checkout builds and tests without another repository or private dependency; upstream notices preserved | Complete |
 | M2 | Extract the generic translation and execution engine | All application assumptions and allocation/capture/control-plane dependencies removed; both minimal end-to-end examples pass | In progress; component extraction only |
-| M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | Pending |
+| M3 | Configuration, initialization, authentication, routing, diagnostics | Idempotent init, explicit mismatch errors, tested TLS/login/authorization/reset behavior, least-privilege runtime | In progress; explicit initialization executable component only |
 | M4 | SQL, types, metadata, transaction/session/prepared/cache correctness | Every advertised construct has executable evidence; external DDL and native schema tests pass | Pending |
 | M5 | Drivers, adversarial inputs, concurrency and performance | Required driver and differential matrices, fuzz smoke, resource limits, isolation and cancellation tests, reproducible benchmarks pass | Pending |
 | M6 | Documentation, artifacts, independent review and publication | Exact candidate passes all gates; fresh artifact examples pass; review resolved; PR merged; signed/checksummed release artifacts published | Pending |
@@ -1402,3 +1402,31 @@ from the recorded runtime checks. Required hosted CI, public table/catalog-valid
 execution, executable integration, real drivers, measured performance, merge,
 release and M2/M3/M4/full-goal completion remain pending. Security work,
 compiler PR4, resource stress and forced interruption remain excluded.
+
+### Standalone setup executable component
+
+The `darmok-cli` package now builds the real `darmok` executable with `init`,
+`schema verify`, help and version. The explicit environment input must select a
+physical database; no default database is inferred. The command invokes the
+existing native owner and reviewed version-1 manifest, awaits disposal and
+preserves ordinary failure/rollback outcomes. It adds no schema SQL, automatic
+repair, raw SQL escape, credential policy or serving-path admission. The
+[command contract](cli.md) records the deliberate addition of independent
+schema verification before logical route configuration.
+
+Three offline process groups and three required database process groups are
+implemented. Future pinned PostgreSQL17/18 CI explicitly invokes the latter and
+always preserves their child receipts. Exact committed candidate checks and
+independent review are recorded separately after verification; draft process
+checks are development evidence only. The new README documents building and
+running the setup commands while making clear that proxy serving and release
+readiness are still pending.
+
+This advances M3 initialization and the standalone executable path. It does not
+complete M2/M3/M4 or the full goal. Configuration/routing, complete functional
+SQL/catalog admission, `serve`, real-driver matrices, measured performance,
+release artifacts and the final release remain required. Hosted CI remains
+blocked by the existing personal-account condition: no CI polling/retry,
+account actions, merge or release are performed. Authentication, TLS, grants,
+security review, compiler PR4, resource stress and forced interruption remain
+excluded.
