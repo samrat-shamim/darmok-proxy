@@ -4,6 +4,10 @@
 typed proxy values. It is an execution component, not a runnable proxy or an
 end-to-end SQL compatibility claim. PostgreSQL 17 and 18 are its test matrix.
 
+[Native output](native-results.md) binds a checked prepared description to
+explicit frontend metadata and validates/encodes these values into row payloads.
+Metadata generation, semantic admission and owned execution remain separate.
+
 ## Explicit scalar representations
 
 | PostgreSQL type | Proxy value | Conditions |

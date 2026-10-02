@@ -42,6 +42,33 @@ impl ColumnDefinition {
     }
 }
 
+/// The encoding fields used by a binary row, borrowed from its established
+/// description. Names and origins are not copied or consulted by this writer.
+pub trait BinaryColumnMetadata {
+    fn field_type(&self) -> u8;
+    fn flags(&self) -> u16;
+}
+
+impl BinaryColumnMetadata for ColumnDefinition {
+    fn field_type(&self) -> u8 {
+        self.column_type
+    }
+
+    fn flags(&self) -> u16 {
+        self.flags
+    }
+}
+
+impl BinaryColumnMetadata for ColumnMeta {
+    fn field_type(&self) -> u8 {
+        self.mysql_type
+    }
+
+    fn flags(&self) -> u16 {
+        self.flags
+    }
+}
+
 /// Encode the result set header (column count) as a length-encoded integer.
 ///
 /// This is the first packet in both text and binary result set responses.
@@ -86,9 +113,9 @@ pub fn encode_null_bitmap(nulls: &[bool], offset: usize, dst: &mut BytesMut) {
 /// Integer width and signedness come from the column, never the value's Rust
 /// representation. An error restores the destination's original length.
 /// No per-cell buffers or NULL-bitmap allocations are required.
-pub fn encode_binary_row(
+pub fn encode_binary_row<C: BinaryColumnMetadata>(
     values: &[Value],
-    columns: &[ColumnMeta],
+    columns: &[C],
     dst: &mut BytesMut,
 ) -> Result<()> {
     if values.len() != columns.len() {
@@ -99,9 +126,9 @@ pub fn encode_binary_row(
     let bitmap_start = dst.len();
     dst.resize(bitmap_start + (values.len() + 2).div_ceil(8), 0);
     for (index, (value, column)) in values.iter().zip(columns).enumerate() {
-        if !supported_binary_type(column.mysql_type) {
+        if !supported_binary_type(column.field_type()) {
             dst.truncate(start);
-            return Err(binary_type_error(column.mysql_type));
+            return Err(binary_type_error(column.field_type()));
         }
         if matches!(value, Value::Null) {
             let bit = index + 2;
@@ -141,9 +168,13 @@ fn supported_binary_type(kind: u8) -> bool {
     )
 }
 
-fn encode_binary_value(value: &Value, column: &ColumnMeta, dst: &mut BytesMut) -> Result<()> {
-    let unsigned = column.flags & column_flag::UNSIGNED != 0;
-    let kind = column.mysql_type;
+fn encode_binary_value<C: BinaryColumnMetadata>(
+    value: &Value,
+    column: &C,
+    dst: &mut BytesMut,
+) -> Result<()> {
+    let unsigned = column.flags() & column_flag::UNSIGNED != 0;
+    let kind = column.field_type();
     match kind {
         field_type::TINY
         | field_type::SHORT

@@ -2,6 +2,7 @@
 
 Status: **statement execution design; not an implemented row executor**. The
 native value and parameter codecs, [prepared representation checks](native-statements.md),
+[bound output representations](native-results.md),
 and [exclusive control owner and borrowed scopes](native-backend.md) are
 implemented components. Admitted statement execution, rollback through output
 validation and a runnable proxy remain pending.
@@ -155,6 +156,12 @@ The row path validates native values and encodes them against the already
 established frontend description inside the scope. Encoder failure aborts the
 statement just like decoder failure. Returning unchecked rows to a caller that
 can finish the transaction without completing encoding is not this contract.
+
+The native output component now performs row description, decoding and
+representation checks against borrowed frontend definitions before writing
+text or binary row payloads. Its API cannot execute SQL or finish a scope. The
+public executor must still own and enforce the lifecycle described here;
+private native-owner fixtures alone do not supply semantic admission.
 Any plan with several backend steps or internal RETURNING data owns all of them
 under the same rollback boundary.
 
