@@ -447,6 +447,18 @@ async fn decimal_scale_precision_sign_and_fraction_only_values_are_exact() {
             Some(b"0.12".as_slice()),
         ),
         (
+            "'-0.12'::numeric",
+            column(field_type::NEWDECIMAL, 4, 2, false),
+            // MySQL's signed precision2/scale2 description has length4;
+            // the leading integer zero makes this valid payload five bytes.
+            Some(b"-0.12".as_slice()),
+        ),
+        (
+            "(repeat('9',35)||'.'||repeat('9',30))::numeric",
+            column(field_type::NEWDECIMAL, 67, 30, false),
+            Some(b"99999999999999999999999999999999999.999999999999999999999999999999".as_slice()),
+        ),
+        (
             "'0.00'::numeric",
             column(field_type::NEWDECIMAL, 3, 2, true),
             Some(b"0.00".as_slice()),
