@@ -879,3 +879,17 @@ measured performance and M2/M4 remain incomplete. Required hosted CI, merge and
 release remain pending under the recorded account condition; no CI retry or
 merge/release gate is claimed. Security work and compiler PR4 remain excluded,
 and the full goal remains active.
+
+### Native output representation candidate
+
+`feat/native-row-output` adds the [native output contract](native-results.md):
+borrow a checked native statement and exact frontend column definitions,
+check encoding metadata before Bind/Execute, and validate/encode all supported
+native scalar values as text or binary row payloads. Any failure preserves the
+destination. The binary writer accepts borrowed wire definitions directly;
+no metadata-name vector is copied per row. Ordinary required native fixtures
+cover output representations and private owned DML RETURNING recovery/finish.
+Local verification and independent review for this candidate are pending.
+This is not semantic admission, generated metadata, catalog execution validity,
+or a public row executor. M2/M4, hosted CI, merge and release remain incomplete;
+security work and compiler PR4 remain excluded.

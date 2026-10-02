@@ -20,6 +20,10 @@ checks the dense backend value count and returns borrowed parameter wrappers
 through an exact-size iterator. Values are encoded once by the driver using
 `NativeParamUtc`; this check does not implement MySQL input coercion.
 
+[Native output](native-results.md) separately binds this checked description to
+immutable frontend column definitions and validates/encodes text or binary row
+payloads. It does not generate those definitions or supply SQL admission.
+
 `decode_row` compares the row's driver description to the checked statement,
 including count, names, types, typmods and origins, before ordinary native
 decoding. Incompatible descriptions are rejected; separate statements with

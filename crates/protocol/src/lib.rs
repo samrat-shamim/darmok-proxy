@@ -20,6 +20,7 @@ pub use handshake::{CommandPhaseContext, HandshakeResponse41, HandshakeV10};
 pub use ok::{OkPacket, StatusFlags};
 pub use packet::{PacketHeader, RawPacket};
 pub use resultset::{
-    ColumnDefinition, encode_binary_row, encode_result_set_header, encode_text_row,
+    BinaryColumnMetadata, ColumnDefinition, encode_binary_row, encode_result_set_header,
+    encode_text_row,
 };
 pub use wire::{read_lenenc_bytes, read_lenenc_int, write_lenenc_bytes, write_lenenc_int};
