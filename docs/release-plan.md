@@ -1194,3 +1194,59 @@ validity, public table execution, real drivers and measured performance remain
 pending. This is component progress; M2/M3/M4, required hosted CI, merge and
 release remain incomplete. Security work and compiler PR4 remain excluded, and
 the full goal remains active.
+
+### Native schema temporary type correction and final local evidence
+
+Self-review after the first workflow/documentation leaf found a remaining
+functional lookup problem: implicit temporary namespaces can shadow unqualified
+manifest declaration types even with `search_path = pg_catalog`. The ordinary
+PostgreSQL 17 probe `schema-temp-types-probe-v1` has actual3 at `2914a62`: a
+temporary `text` domain resolves the manifest's text arrays as integers and
+raises an invalid-input error during local-variable initialization. The probe
+connection exits and rolls back all temporary setup; it changes no permanent
+installation or application objects. This is type resolution, not a credential,
+grant, adversarial, resource or forced-interruption test.
+
+Final code/fixture revision `edd7361ffcd4b393986fc5e4e5e83c5edb77f622`, tree
+`6b00ffd146641108a6276b105616af881c6961bd`, qualifies all declaration types and
+array casts, updates the private creation switch, and adds the ninth ordinary
+namespace fixture. Installed function body strings, table/metadata definitions
+and all installation SQL after the DO BEGIN are unchanged. No schema version
+change, replacement, migration or compatibility behavior is introduced.
+
+All twelve revised matrix commands pass. Each PostgreSQL 17.11/18.6 backend
+passes native controls 10, ordinary owners 64 with 12 filtered, and BigDecimal
+schema variants 9 with 67 filtered. The three exact abandoned/dropped-control
+exclusions remain in ordinary owner argv. Every native corpus run still checks
+all 810 stock values. Workspace all/default pass 1669/1662 with 74 ignored
+across 38/37 summaries; strict Clippy, formatting, repository boundaries and
+diff pass. Commands and mandatory Cargo environment are the same as the prior
+record, with fresh revision-bound receipts. Environment reader v3 records this
+head with the same Rust/Cargo, OS, architecture, pinned fixtures and encoding;
+it exits0 and preserves both earlier environment readers.
+
+`schema-edd7361-author-audit` exits0. Its audit binds 27 terminal receipts and
+verifies 26 nonaggregate sequential intervals; nested matrix parent is counted
+separately. The 241-file `schema-edd7361-code-evidence-manifest.json` has SHA256
+`0faa5066d6db9ded151ba019717d65213fa5a890c386eaf0ce7bc75833db3ea3`.
+`schema-edd7361-audit-facts.json` has SHA256
+`9272a7af6029b3162b154cfbc4dad959978801f7ab48972c2a40b333392394f4`.
+This graph preserves the earlier 133-file seal, all failed attempts, original
+reviews, and the historical workflow leaf proof. Stock observer and corpus
+bytes remain equal to the independently verified `328c078` artifacts.
+
+The original `c925e5b` review and bounded `3821d03` review remain immutable;
+the latter preserves F1 open at that older source head. The seven-line uploader
+fix at `2914a62` matches the observer directory, always runs, uses the existing
+pinned upload action and fails if receipts are absent. Revised source/evidence
+review checks this closure alongside the type fix and unchanged installed
+artifacts. Documentation refinement D1 states precisely that function bodies
+qualify built-in functions/operators/helper names, while manifest declarations
+and casts qualify built-in types. The final leaf changes only evidence/spec
+prose; its proof preserves all other entries and sealed files. No runtime
+result is relabeled as an execution of a documentation leaf.
+
+Required hosted CI, CLI and runtime integration, complete catalog validity,
+admitted table SQL, real drivers, measured performance, merge and release remain
+pending. M2/M3/M4 and the full goal are not complete. Security work and compiler
+PR4 remain excluded; no hosted CI retry, account action, merge or release ran.

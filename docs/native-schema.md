@@ -65,8 +65,8 @@ implement frontend coercion, unsigned arguments, warning translation, other
 encodings or grapheme counting. Their reference behavior is MySQL 8.4
 [SUBSTRING](https://dev.mysql.com/doc/refman/8.4/en/string-functions.html#function_substring).
 
-Bodies and manifest declarations use qualified built-in types, functions,
-operators and helper names. An implicit temporary namespace can shadow even
+Function bodies qualify built-in types, functions, operators and helper names.
+Manifest declarations and casts qualify built-in types. An implicit temporary namespace can shadow even
 an unqualified built-in type despite an explicit `pg_catalog` search path;
 qualifying manifest declarations and casts avoids that ordinary resolution
 failure. Function bodies are versioned
@@ -105,13 +105,20 @@ required by both existing PostgreSQL native-owner jobs; the stock observer is
 required by the MySQL reference job. Hosted jobs have not been run for this
 component while the account blocker persists.
 
-The local implementation/fixture check is bound to revision
-`3821d036529c3a3d9b5fbbff08631473bbb5708f`, tree
-`c6987fca944bec05bb951d2b462013cf59f1b960`. All twelve regression commands
-passed, including eight initialization groups on both backend majors and the
-default/BigDecimal parser configurations. The initial source review found no functional defect.
-The final source/evidence review identified missing future-CI receipt retention;
-the workflow leaf adds an always-run artifact upload using the existing pinned
-action. Its equivalence proof must preserve all implementation, fixture, corpus
-and observer bytes and all sealed runtime evidence. No hosted-CI pass, executable
-integration or complete M3 gate is inferred from these local results.
+The final implementation/fixture check is bound to revision
+`edd7361ffcd4b393986fc5e4e5e83c5edb77f622`, tree
+`6b00ffd146641108a6276b105616af881c6961bd`. All twelve revised regression
+commands passed, including nine initialization groups on both backend majors
+and the default/BigDecimal parser configurations. The ninth group installs
+ordinary temporary types named like built-ins, confirms their implicit lookup,
+then verifies installation, unchanged repeats and both helper families.
+
+Earlier source/evidence reviews identified missing future-CI receipt retention;
+the workflow correction adds an always-run upload using the existing pinned
+action. A subsequent self-review reproduced unqualified manifest type resolution
+failure; declarations and casts now use explicit `pg_catalog` types. Installed
+helper bodies and schema artifacts retain version 1. Historical receipts and
+reviews remain separately bound to their original revisions. The final evidence
+leaf changes documentation only and preserves all implementation, fixture,
+corpus and observer bytes and sealed runtime evidence. No hosted-CI pass,
+executable integration or complete M3 gate is inferred from these local results.
