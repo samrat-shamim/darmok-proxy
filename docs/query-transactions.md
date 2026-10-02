@@ -1,11 +1,11 @@
 # Original-source transaction controls
 
-The public `execute_query_command` library path connects selected transaction
-controls to the exclusively owned native backend. It parses original MySQL
+The private query controller under [FrontendConnection](frontend-connection.md)
+connects selected transaction controls to the exclusively owned native backend. It parses original MySQL
 source using current session modes, admits the whole plan before effects, and
 holds the session command guard through response encoding, writing and flushing.
-This is a library component; the runnable frontend loop and public table SQL
-executor remain pending.
+This is a command-phase library component; the executable, handshake boundary
+and public table SQL executor remain pending.
 
 ## Admitted contract
 
@@ -29,11 +29,12 @@ must be quoted as a SET value; unquoted RELEASE is a 1064 syntax error.
 Explicit clauses override their corresponding policy choice independently.
 Implicit commits do not apply completion policy.
 
-Release completion returns explicit 1235 before effects, including a bare
-completion under RELEASE policy. Explicit `NO RELEASE` can suppress it.
-The controller borrows an output writer and native owner; it does not own the
-frontend socket lifecycle. That owning loop must implement and verify RELEASE
-before it can be admitted. Client savepoints, prepared controls, batches,
+Release completion is admitted only beneath the owning connection. Its final
+OK is flushed before the frontend closes; explicit `NO RELEASE` suppresses
+closure. Default policy and explicit chaining resolve independently, including
+a new chained transaction that disconnect cleanup then rolls back. The query
+controller is private so a borrowed external writer cannot acknowledge RELEASE
+without owning closure. Client savepoints, prepared controls, batches,
 failed-start recovery and general row statements remain outside this component.
 
 ## Ordered boundaries
@@ -82,7 +83,7 @@ gate.
 `mysql_completion_type_columns.json` declares two CLI field descriptions.
 Existing reference corpora and observers retain their bytes.
 
-Ten required native fixture groups invoke the public decoded query path on
+Ten required native fixture groups invoke the internal decoded query path on
 both PostgreSQL versions, inspect encoded responses/native settings and check
 private fixture data effects. All ten groups also run with the optional
 BigDecimal parser feature, so numeric SET admission is checked in both builds.

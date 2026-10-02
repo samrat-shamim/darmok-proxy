@@ -483,6 +483,7 @@ impl StdError for NativeBackendDisposeError {
 
 #[cfg(test)]
 mod tests {
+    mod frontend_loop;
     mod query_results;
     mod query_transactions;
     mod set_controller;

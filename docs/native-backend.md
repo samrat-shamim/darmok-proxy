@@ -161,3 +161,8 @@ snapshot or lock equivalence.
 Fixture SQL uses private test access and is not an admitted statement path.
 No forced transport interruption, security review, adversarial inputs or
 resource stress is included. MySQL behavior and release gates remain pending.
+
+The [command-phase connection owner](frontend-connection.md) now consumes this
+native owner together with its TCP transport and session. It confirms ordinary
+disconnect rollback separately from local disposal and implements selected
+source controls; it adds no raw SQL escape or row execution.

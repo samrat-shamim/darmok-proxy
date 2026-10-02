@@ -1,6 +1,7 @@
 # Local SELECT results
 
-The public `execute_query_command` path now admits a single direct SELECT with
+The private query controller beneath [FrontendConnection](frontend-connection.md)
+admits a single direct SELECT with
 no table or other clauses. Exact numeric literals, booleans, NULL and ordinary
 quoted strings produce one text row. Parentheses, selected unary plus
 expressions, numeric unary minus and explicit aliases retain their MySQL label
@@ -106,7 +107,8 @@ with no new finding. It audited saved author receipts without rerunning Cargo
 or SQL. Exact commands, environment, counts, original failures and evidence
 boundaries are recorded in [the release plan](release-plan.md).
 
-Table execution, catalog coherence, transaction starts, prepared commands,
-a runnable proxy, real MySQL driver exchanges and release publication remain
-incomplete. Account CI is unavailable under the recorded Actions condition.
+Selected transaction starts and the owning command-phase loop are implemented
+in separate components. Table execution, catalog coherence, prepared commands,
+a runnable proxy, authenticated real MySQL driver exchanges and release
+publication remain incomplete. Account CI is unavailable under the recorded Actions condition.
 Security-related work and the separate compiler draft remain excluded.

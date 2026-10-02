@@ -1,6 +1,7 @@
 # Selected COM_QUERY execution
 
-`darmok-execute::execute_query_command` takes a decoded `Command::Query` and
+The private `execute_query_command` controller beneath the public
+[FrontendConnection](frontend-connection.md) takes a decoded `Command::Query` and
 parses its original SQL with the settled session's current `sql_mode`. It
 dispatches one SET statement to the [selected evaluator](set-controller.md) or
 one local SELECT to the [result controller](query-results.md), or selected
@@ -25,21 +26,25 @@ commit a transaction. Batch execution is unimplemented regardless of client
 capabilities; empty/comment-only input is also explicitly unimplemented.
 A parser failure returns 1064/42000 with project wording. General MySQL error
 precedence and exact error message text are separate gates. A non-query Command
-is a caller error and emits no SQL response; the caller must dispatch it to its
-own controller. This is not a complete frontend command loop.
+is an internal caller error and emits no SQL response; the owning connection
+dispatches other commands according to their protocol response contracts. The
+prior borrowed public entry point is removed.
 
 `SessionCommandStage` replaces the SET-only name: it holds setting effects and
 SQL diagnostics until the complete OK, ERR or SELECT packet sequence is written and flushed.
 Known SQL errors settle the command without losing confirmed effects. Native
-or output uncertainty retains the pending guard and requires disposal. This
-component does not implement cancellation recovery or a transport server.
+or output uncertainty retains the pending guard and requires disposal.
+The connection owner holds the TCP transport through command output and
+termination. Cancellation recovery, listener and handshake integration remain
+separate gates.
 The response sequence is supplied by the caller's wire phase. Protocol 4.1
 without session tracking or optional result metadata remains the required output
 contract. Both ordinary EOF and CLIENT_DEPRECATE_EOF result terminators are
 implemented for the local SELECT path.
 
 All ten existing SET native groups now decode ordinary COM_QUERY payloads and
-use this public source path. Four additional required native groups cover `:=`
+exercise the internal original-source controller directly. Four additional
+required native groups cover `:=`
 and mixed-operator setting effects, both characteristic orders, current-mode
 parsing across commands, and rejection of a valid unsupported statement/batch
 with native rollback data proving the batch did not commit. Frontend starts and
@@ -87,5 +92,5 @@ formatting supplies either admission path.
 The [source transaction controller](query-transactions.md) additionally admits
 selected original START/BEGIN/COMMIT/ROLLBACK inputs. Its whole ordered native
 plan is admitted before effects, and nested transaction receipts remain under
-this same command output guard. RELEASE, consistent snapshots, row execution
-and the owning frontend loop remain pending.
+this same command output guard. RELEASE and the TCP command loop now belong to the connection owner.
+Consistent snapshots, row execution and executable integration remain pending.

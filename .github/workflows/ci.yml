@@ -85,6 +85,8 @@ jobs:
         run: cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored
       - name: Required BigDecimal original-source SET and transaction fixtures
         run: cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::query_transactions -- --ignored
+      - name: Required BigDecimal TCP command ownership fixtures
+        run: cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::frontend_loop -- --ignored
 
   mysql-reference:
     name: MySQL 8.4 reference
@@ -134,6 +136,20 @@ jobs:
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
           --corpus tests/reference/mysql_completion_type_columns.json
           --evidence-dir '${{ runner.temp }}/mysql-completion-type-reference'
+      - name: Required stock release lifecycle observations
+        run: >-
+          python3 -B tests/reference/observe_mysql_frontend_release.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_frontend_release.json
+          --evidence-dir '${{ runner.temp }}/mysql-frontend-release-reference'
+      - name: Preserve stock release lifecycle receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-frontend-release-reference
+          path: ${{ runner.temp }}/mysql-frontend-release-reference
+          if-no-files-found: error
       - name: Preserve query transaction reference receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

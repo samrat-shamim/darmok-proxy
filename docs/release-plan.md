@@ -705,3 +705,30 @@ lock equivalence or measured performance. Required hosted CI remains unavailable
 under the separately recorded personal-account Actions condition; local results
 justify neither merge nor release. Security and other excluded work remain
 outside this component. The full goal remains active.
+
+
+## Owning TCP command-phase progress
+
+The [connection contract](frontend-connection.md) makes public SQL execution
+consume a real frontend socket, canonical session and exclusive native owner.
+The former borrowed public query function is private, with no transition shim.
+Selected commands run serially; RELEASE confirms native boundaries and flushes
+OK before closure, while normal QUIT/EOF records checked rollback separately
+from local driver disposal. The report never returns a reusable backend.
+
+Sixteen new stock lifecycle cases and seven required native TCP fixture groups
+declare the finite scope, including independently resolved chain/release policy,
+NO RELEASE continuation, discarded prefetched commands, both EOF forms, current
+modes and real post-disconnect table effects/removal. Expected stock CLI exits1
+remain actual exits1. The unchanged transaction observer is reused only for
+identity/setup/effect/cleanup requests; the new entry point and helper retain
+separate source identities. Existing corpora and observers retain their bytes.
+
+This is the post-handshake command-phase library, not a runnable artifact or an
+authentication bypass. Executable/listener/handshake integration, table SQL,
+catalog validity, real authenticated drivers, equivalence, performance and full
+release gates remain incomplete. Security work and compiler PR4 source remain
+excluded. Fresh source-bound results and independent review must be recorded
+before this component can be claimed verified. Required hosted CI remains
+blocked under the separately recorded account condition; no retry, merge or
+release follows from local component work.

@@ -69,6 +69,19 @@ impl Decoder for MySqlPacketCodec {
             }
         }
     }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(packet) = self.decode(src)? {
+            return Ok(Some(packet));
+        }
+        if src.is_empty() && self.assembler.is_idle() {
+            Ok(None)
+        } else {
+            Err(ProxyError::protocol(ProtocolError::InvalidPacket(
+                "connection ended during a logical packet".into(),
+            )))
+        }
+    }
 }
 
 impl Encoder<RawPacket> for MySqlPacketCodec {

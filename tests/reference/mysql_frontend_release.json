@@ -1,0 +1,218 @@
+{
+  "reference": {
+    "mysql_series": "8.4",
+    "storage_engine": "InnoDB",
+    "autocommit": 1,
+    "transaction_isolation": "REPEATABLE-READ"
+  },
+  "setup_sql": "CREATE TABLE items(n INT PRIMARY KEY) ENGINE=InnoDB;\nINSERT INTO items VALUES(0);",
+  "reset_sql": "TRUNCATE TABLE items;\nINSERT INTO items VALUES(0);",
+  "cases": [
+    {
+      "name": "commit-explicit-release-idle",
+      "setup": [],
+      "active": false,
+      "completion": "COMMIT RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "commit-default-release-idle",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": false,
+      "completion": "COMMIT",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "commit-explicit-release-active",
+      "setup": [],
+      "active": true,
+      "completion": "COMMIT RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "commit-default-release-active",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "COMMIT",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "commit-chain-release",
+      "setup": [
+        "SET completion_type='CHAIN'"
+      ],
+      "active": true,
+      "completion": "COMMIT RELEASE",
+      "closes": true,
+      "chain": true,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "commit-release-and-chain",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "COMMIT AND CHAIN",
+      "closes": true,
+      "chain": true,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "commit-release-no-release",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "COMMIT NO RELEASE",
+      "closes": false,
+      "chain": false,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "commit-chain-and-no-chain-release",
+      "setup": [
+        "SET completion_type='CHAIN'"
+      ],
+      "active": true,
+      "completion": "COMMIT AND NO CHAIN RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "rollback-explicit-release-idle",
+      "setup": [],
+      "active": false,
+      "completion": "ROLLBACK RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-default-release-idle",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": false,
+      "completion": "ROLLBACK",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-explicit-release-active",
+      "setup": [],
+      "active": true,
+      "completion": "ROLLBACK RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-default-release-active",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "ROLLBACK",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-chain-release",
+      "setup": [
+        "SET completion_type='CHAIN'"
+      ],
+      "active": true,
+      "completion": "ROLLBACK RELEASE",
+      "closes": true,
+      "chain": true,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-release-and-chain",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "ROLLBACK AND CHAIN",
+      "closes": true,
+      "chain": true,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-release-no-release",
+      "setup": [
+        "SET completion_type='RELEASE'"
+      ],
+      "active": true,
+      "completion": "ROLLBACK NO RELEASE",
+      "closes": false,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    },
+    {
+      "name": "rollback-chain-and-no-chain-release",
+      "setup": [
+        "SET completion_type='CHAIN'"
+      ],
+      "active": true,
+      "completion": "ROLLBACK AND NO CHAIN RELEASE",
+      "closes": true,
+      "chain": false,
+      "ids": [
+        0
+      ]
+    }
+  ]
+}

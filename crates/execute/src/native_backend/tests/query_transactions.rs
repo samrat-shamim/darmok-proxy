@@ -680,16 +680,6 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         )
         .await;
     }
-    for sql in ["COMMIT RELEASE", "ROLLBACK WORK AND NO CHAIN RELEASE"] {
-        sql_error(
-            &mut state,
-            &mut backend,
-            &globals,
-            sql,
-            QuerySqlError::Transaction(TransactionSqlError::Release),
-        )
-        .await;
-    }
     // Rejected controls did not commit value8. Chain rollback removes only that work,
     // retains committed value7 and still starts with the supported active pair.
     assert_eq!(values(&backend).await, [7, 8]);
@@ -731,22 +721,6 @@ async fn query_transactions_admit_all_controls_before_implicit_commit() {
         &globals,
         "SET completion_type=2",
         3,
-    )
-    .await;
-    sql_error(
-        &mut state,
-        &mut backend,
-        &globals,
-        "COMMIT",
-        QuerySqlError::Transaction(TransactionSqlError::Release),
-    )
-    .await;
-    sql_error(
-        &mut state,
-        &mut backend,
-        &globals,
-        "ROLLBACK AND CHAIN",
-        QuerySqlError::Transaction(TransactionSqlError::Release),
     )
     .await;
     ok(
