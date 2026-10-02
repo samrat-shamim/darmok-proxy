@@ -20,6 +20,12 @@ explicitly install in each selected physical database:
 CREATE EXTENSION darmok_server;
 ```
 
+Every native SQL prepared commit or rollback takes the catalog publication
+fence, including pure DML. PostgreSQL retains exact GID handling and native
+errors. PREPARE keeps metadata private and does not retain that global fence.
+Prepared completion can delay catalog readers while native completion runs and
+advances the catalog generation even when no metadata changes.
+
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
 separate `darmok` namespace contains SQL compatibility functions. Current
 `darmok init` and `schema verify` still cover only the compatibility namespace;

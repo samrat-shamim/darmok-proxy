@@ -746,23 +746,6 @@ async fn wait_native_lock(observer: &Client, backend: i32, query_prefix: &str) {
     }).await.expect("native dependency wait was not observed");
 }
 
-async fn prepared_marker_modes(observer: &Client, gid: &str) -> Vec<String> {
-    observer
-        .query(
-            "SELECT l.mode FROM pg_catalog.pg_locks l JOIN pg_catalog.pg_prepared_xacts p
-         ON l.objid::text = p.transaction::text
-         WHERE l.locktype = 'object' AND l.classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
-         AND l.objsubid = 17486 AND l.pid IS NULL AND l.granted AND p.gid = $1
-         ORDER BY l.mode",
-            &[&gid],
-        )
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|row| row.get(0))
-        .collect()
-}
-
 #[tokio::test]
 async fn default_native_two_phase_setting_also_allows_catalog_leases() {
     let _serial = TEST_SERIAL.lock().await;
@@ -788,7 +771,7 @@ async fn default_native_two_phase_setting_also_allows_catalog_leases() {
 }
 
 #[tokio::test]
-async fn prepared_dml_and_rolled_back_child_ddl_do_not_fence_catalog_readers() {
+async fn prepared_dml_and_rolled_back_child_ddl_fence_completion() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
     let (writer, writer_driver) = client().await;
@@ -808,6 +791,7 @@ async fn prepared_dml_and_rolled_back_child_ddl_do_not_fence_catalog_readers() {
     );
     writer.batch_execute("CREATE TABLE lease_prepared_dml(id integer PRIMARY KEY, value integer); INSERT INTO lease_prepared_dml VALUES (1, 1)").await.unwrap();
     let rows_pid = pid(&rows).await;
+    let writer_pid = pid(&writer).await;
     for (index, outcome) in ["COMMIT", "ROLLBACK", "COMMIT", "ROLLBACK"]
         .iter()
         .enumerate()
@@ -820,10 +804,6 @@ async fn prepared_dml_and_rolled_back_child_ddl_do_not_fence_catalog_readers() {
         writer.batch_execute(&format!(
             "BEGIN; {child} UPDATE lease_prepared_dml SET value = value + 10; PREPARE TRANSACTION 'darmok_prepared_dml'"
         )).await.unwrap();
-        assert_eq!(
-            prepared_marker_modes(&observer, "darmok_prepared_dml").await,
-            ["AccessShareLock"]
-        );
         reader.batch_execute("BEGIN READ ONLY").await.unwrap();
         let stamp = begin(&reader).await;
         rows.batch_execute("BEGIN; LOCK TABLE lease_prepared_dml IN ROW EXCLUSIVE MODE")
@@ -835,33 +815,38 @@ async fn prepared_dml_and_rolled_back_child_ddl_do_not_fence_catalog_readers() {
             result = &mut updating => panic!("row update did not wait for the prepared native transaction: {result:?}"),
             () = wait_native_lock(&observer, rows_pid, "UPDATE lease_prepared_dml") => {}
         }
-        // This row waiter owns no catalog lease. The separate catalog reader
-        // still owns one, and metadata-free prepared completion does not wait.
-        tokio::time::timeout(
-            Duration::from_secs(20),
-            writer.batch_execute(&format!("{outcome} PREPARED 'darmok_prepared_dml'")),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        // Row execution owns no global lease. Even metadata-free prepared
+        // completion must first drain the separate catalog reader.
+        let finish_sql = format!("{outcome} PREPARED 'darmok_prepared_dml'");
+        let mut finishing = Box::pin(writer.batch_execute(&finish_sql));
+        tokio::select! {
+            result = &mut finishing => panic!("prepared DML bypassed its publication fence: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+        }
         check(&reader, &stamp).await;
+        end(&reader, &stamp).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(finishing);
         tokio::time::timeout(Duration::from_secs(20), &mut updating)
             .await
             .unwrap()
             .unwrap();
         drop(updating);
         rows.batch_execute("COMMIT").await.unwrap();
-        end(&reader, &stamp).await;
-        reader.batch_execute("COMMIT; BEGIN").await.unwrap();
+        reader.batch_execute("BEGIN").await.unwrap();
         let after = begin(&reader).await;
-        assert_eq!(after.generation, stamp.generation);
+        assert_eq!(after.generation, stamp.generation + 1);
+        let rolled_back: bool = reader.query_one(
+            "SELECT EXISTS (SELECT FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_prepared_dml'::pg_catalog.regclass AND attname = 'rolled_back' AND NOT attisdropped)", &[]
+        ).await.unwrap().get(0);
+        assert!(!rolled_back);
         end(&reader, &after).await;
         reader.batch_execute("COMMIT").await.unwrap();
-        assert!(
-            prepared_marker_modes(&observer, "darmok_prepared_dml")
-                .await
-                .is_empty()
-        );
+        no_fence(&observer, writer_pid).await;
     }
     let value: i32 = rows
         .query_one("SELECT value FROM lease_prepared_dml", &[])
@@ -896,10 +881,6 @@ async fn prepared_ddl_fences_completion_and_native_guards_wait_outside_the_lease
         writer.batch_execute(&format!(
             "BEGIN; ALTER TABLE lease_prepared_ddl ADD COLUMN change_{index} integer; PREPARE TRANSACTION 'darmok_prepared_ddl'"
         )).await.unwrap();
-        assert_eq!(
-            prepared_marker_modes(&observer, "darmok_prepared_ddl").await,
-            ["AccessShareLock", "RowExclusiveLock"]
-        );
         reader.batch_execute("BEGIN READ ONLY").await.unwrap();
         let before = begin(&reader).await;
         let old_columns: i64 = reader.query_one(
@@ -1005,7 +986,7 @@ async fn mixed_prepared_metadata_and_unrelated_row_locks_can_finish() {
 }
 
 #[tokio::test]
-async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classification() {
+async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
     let (writer, writer_driver) = client().await;
@@ -1019,47 +1000,30 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classificatio
     )
     .await
     .unwrap();
-    assert_eq!(
-        prepared_marker_modes(&observer, "darmok_gid_reused").await,
-        ["AccessShareLock", "RowExclusiveLock"]
-    );
-    assert_eq!(
-        prepared_marker_modes(&observer, "darmok_gid_dml").await,
-        ["AccessShareLock"]
-    );
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let before = begin(&reader).await;
     let writer_pid = pid(&writer).await;
+    let dml_pid = pid(&dml).await;
     let replacement_pid = pid(&replacement).await;
     let mut finishing = Box::pin(writer.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"));
     tokio::select! {
         result = &mut finishing => panic!("prepared metadata escaped its lease: {result:?}"),
         () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
     }
-    replacement.batch_execute("BEGIN").await.unwrap();
-    let mut replacing =
-        Box::pin(replacement.batch_execute("PREPARE TRANSACTION 'darmok_gid_reused'"));
+    // Core retains exact GID uniqueness. A second PREPARE fails while the
+    // original is still valid; no module gate changes native error behavior.
+    let error = replacement
+        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
+    replacement.batch_execute("ROLLBACK").await.unwrap();
+    no_fence(&observer, replacement_pid).await;
+    let mut finishing_dml = Box::pin(dml.batch_execute("COMMIT PREPARED 'darmok_gid_dml'"));
     tokio::select! {
-        result = &mut replacing => panic!("GID reused before native completion released its gate: {result:?}"),
-        () = async {
-            tokio::time::timeout(Duration::from_secs(20), async {
-                loop {
-                    let waiting: bool = observer.query_one(
-                        "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1 AND NOT granted)", &[&replacement_pid]
-                    ).await.unwrap().get(0);
-                    if waiting { return; }
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            }).await.expect("GID serialization wait was not observed");
-        } => {}
+        result = &mut finishing_dml => panic!("prepared DML escaped its lease: {result:?}"),
+        () = wait_fence(&observer, dml_pid, "ExclusiveLock", false) => {}
     }
-    tokio::time::timeout(
-        Duration::from_secs(20),
-        dml.batch_execute("COMMIT PREPARED 'darmok_gid_dml'"),
-    )
-    .await
-    .unwrap()
-    .unwrap();
     check(&reader, &before).await;
     end(&reader, &before).await;
     reader.batch_execute("COMMIT").await.unwrap();
@@ -1068,28 +1032,44 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classificatio
         .unwrap()
         .unwrap();
     drop(finishing);
-    tokio::time::timeout(Duration::from_secs(20), &mut replacing)
+    tokio::time::timeout(Duration::from_secs(20), &mut finishing_dml)
         .await
         .unwrap()
         .unwrap();
-    drop(replacing);
-    assert_eq!(
-        prepared_marker_modes(&observer, "darmok_gid_reused").await,
-        ["AccessShareLock"]
-    );
+    drop(finishing_dml);
+    // Reuse is admitted only after the native original has finished.
+    replacement
+        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
+        .await
+        .unwrap();
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let after = begin(&reader).await;
-    assert!(after.generation > before.generation);
-    tokio::time::timeout(
-        Duration::from_secs(20),
-        replacement.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    assert_eq!(after.generation, before.generation + 2);
+    let value: i32 = reader
+        .query_one("SELECT value FROM lease_gid_rows", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(value, 10);
+    let changed: bool = reader.query_one(
+        "SELECT EXISTS (SELECT FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_gid_catalog'::pg_catalog.regclass AND attname = 'changed' AND NOT attisdropped)", &[]
+    ).await.unwrap().get(0);
+    assert!(changed);
+    let mut finishing_reuse =
+        Box::pin(replacement.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"));
+    tokio::select! {
+        result = &mut finishing_reuse => panic!("reused GID completion escaped its lease: {result:?}"),
+        () = wait_fence(&observer, replacement_pid, "ExclusiveLock", false) => {}
+    }
     check(&reader, &after).await;
     end(&reader, &after).await;
     reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut finishing_reuse)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(finishing_reuse);
+    no_fence(&observer, replacement_pid).await;
     writer
         .batch_execute("DROP TABLE lease_gid_catalog, lease_gid_rows")
         .await
@@ -1102,7 +1082,7 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classificatio
 }
 
 #[tokio::test]
-async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_transfer() {
+async fn queued_prepare_stays_private_and_completion_uses_native_gid_validity() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;
     let (writer, writer_driver) = client().await;
@@ -1129,8 +1109,7 @@ async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_tra
         .unwrap();
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let before = begin(&reader).await;
-    // PREPARE from an open child must promote the gate to the root as native
-    // CommitTransactionCommand drains subtransactions, then deferred triggers.
+    // Core drains the open child and deferred triggers after utility entry.
     writer
         .batch_execute("BEGIN; SAVEPOINT child; INSERT INTO lease_prepare_events VALUES (1)")
         .await
@@ -1150,21 +1129,24 @@ async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_tra
         !visible,
         "native preparation must still be before GID validity"
     );
+    no_fence(&observer, writer_pid).await;
     let mut finishing = Box::pin(finisher.batch_execute("COMMIT PREPARED 'darmok_queued_prepare'"));
     tokio::select! {
-        result = &mut finishing => panic!("finisher passed the absent-GID preparation gate: {result:?}"),
-        () = async {
-            tokio::time::timeout(Duration::from_secs(20), async {
-                loop {
-                    let waiting: bool = observer.query_one(
-                        "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1 AND NOT granted)", &[&finisher_pid]
-                    ).await.unwrap().get(0);
-                    if waiting { return; }
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            }).await.expect("finisher did not wait for actual native preparation");
-        } => {}
+        result = &mut finishing => panic!("completion bypassed the publication fence: {result:?}"),
+        () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
     }
+    check(&reader, &before).await;
+    end(&reader, &before).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    // The trigger is still blocked. Native core reports that this GID is not
+    // yet valid; the module does not turn a queued PREPARE into a valid target.
+    let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
+    drop(finishing);
+    no_fence(&observer, finisher_pid).await;
     observer
         .query_one("SELECT pg_catalog.pg_advisory_unlock(708923)", &[])
         .await
@@ -1174,16 +1156,17 @@ async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_tra
         .unwrap()
         .unwrap();
     drop(preparing);
+    no_fence(&observer, writer_pid).await;
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let private = begin(&reader).await;
+    assert_eq!(private.generation, before.generation + 1);
+    let mut finishing = Box::pin(finisher.batch_execute("COMMIT PREPARED 'darmok_queued_prepare'"));
     tokio::select! {
-        result = &mut finishing => panic!("deferred metadata preparation completed without a fence: {result:?}"),
+        result = &mut finishing => panic!("deferred metadata completed without a fence: {result:?}"),
         () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
     }
-    assert_eq!(
-        prepared_marker_modes(&observer, "darmok_queued_prepare").await,
-        ["AccessShareLock", "RowExclusiveLock"]
-    );
-    check(&reader, &before).await;
-    end(&reader, &before).await;
+    check(&reader, &private).await;
+    end(&reader, &private).await;
     reader.batch_execute("COMMIT").await.unwrap();
     tokio::time::timeout(Duration::from_secs(20), &mut finishing)
         .await
@@ -1192,7 +1175,7 @@ async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_tra
     drop(finishing);
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let after = begin(&reader).await;
-    assert!(after.generation > before.generation);
+    assert_eq!(after.generation, private.generation + 1);
     let columns: i64 = reader.query_one(
         "SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_prepare_target'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[]
     ).await.unwrap().get(0);
@@ -1207,10 +1190,11 @@ async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_tra
 }
 
 #[tokio::test]
-async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
+async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
     let _serial = TEST_SERIAL.lock().await;
     let (writer, writer_driver) = client().await;
     let (other, other_driver) = client().await;
+    let (observer, observer_driver) = client().await;
     let writer_pid = pid(&writer).await;
     writer
         .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
@@ -1223,13 +1207,11 @@ async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
         .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
         .await
         .unwrap();
-    let gates: i64 = other.query_one(
-        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1", &[&writer_pid]
+    no_fence(&observer, writer_pid).await;
+    let prepared: i64 = other.query_one(
+        "SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid = 'darmok_prepare_cleanup'", &[]
     ).await.unwrap().get(0);
-    assert_eq!(
-        gates, 0,
-        "no-op/already-aborted PREPARE leaked a session gate"
-    );
+    assert_eq!(prepared, 0);
     other
         .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'")
         .await
@@ -1240,32 +1222,263 @@ async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
         .unwrap_err();
     assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
     writer.batch_execute("ROLLBACK").await.unwrap();
-    let gates: i64 = other.query_one(
-        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1", &[&writer_pid]
+    no_fence(&observer, writer_pid).await;
+    let transferred: i64 = observer.query_one(
+        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND COALESCE(database, 0) = 0 AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objid = 0 AND objsubid = 17485 AND pid IS NULL", &[]
     ).await.unwrap().get(0);
     assert_eq!(
-        gates, 0,
-        "failed native preparation leaked its session gate"
+        transferred, 0,
+        "PREPARE transferred a global publication fence"
     );
     other
         .batch_execute("ROLLBACK PREPARED 'darmok_prepare_cleanup'")
         .await
         .unwrap();
+    for outcome in ["COMMIT", "ROLLBACK"] {
+        other.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&other).await;
+        let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
+        let mut finishing = Box::pin(writer.batch_execute(&sql));
+        tokio::select! {
+            result = &mut finishing => panic!("attempted native finish bypassed its fence: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+        }
+        check(&other, &before).await;
+        end(&other, &before).await;
+        other.batch_execute("COMMIT").await.unwrap();
+        let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
+        drop(finishing);
+        no_fence(&observer, writer_pid).await;
+        other.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let after = begin(&other).await;
+        assert_eq!(after.generation, before.generation + 1);
+        end(&other, &after).await;
+        other.batch_execute("COMMIT").await.unwrap();
+    }
+    for outcome in ["COMMIT", "ROLLBACK"] {
+        other.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&other).await;
+        writer
+            .batch_execute("BEGIN; SAVEPOINT child")
+            .await
+            .unwrap();
+        let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
+        let mut finishing = Box::pin(writer.batch_execute(&sql));
+        tokio::select! {
+            result = &mut finishing => panic!("child native finish bypassed its fence: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+        }
+        end(&other, &before).await;
+        other.batch_execute("COMMIT").await.unwrap();
+        let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.code(), Some(&SqlState::ACTIVE_SQL_TRANSACTION));
+        drop(finishing);
+        no_fence(&observer, writer_pid).await;
+        writer
+            .batch_execute("ROLLBACK TO child; RELEASE child")
+            .await
+            .unwrap();
+        let recovered = begin(&writer).await;
+        assert_eq!(recovered.generation, before.generation + 1);
+        end(&writer, &recovered).await;
+        writer.batch_execute("COMMIT").await.unwrap();
+        no_fence(&observer, writer_pid).await;
+    }
+    writer.batch_execute("BEGIN").await.unwrap();
+    let own = begin(&writer).await;
     let error = writer
-        .batch_execute("COMMIT PREPARED 'darmok_prepare_cleanup'")
+        .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
         .await
         .unwrap_err();
-    assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
+    assert_eq!(
+        error.code(),
+        Some(&SqlState::OBJECT_NOT_IN_PREREQUISITE_STATE)
+    );
+    writer.batch_execute("ROLLBACK").await.unwrap();
+    no_fence(&observer, writer_pid).await;
+    writer.batch_execute("BEGIN").await.unwrap();
+    let next = begin(&writer).await;
+    assert!(next.lease_id > own.lease_id);
+    end(&writer, &next).await;
     writer
-        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
         .await
         .unwrap();
     writer
         .batch_execute("COMMIT PREPARED 'darmok_prepare_cleanup'")
         .await
         .unwrap();
+    no_fence(&observer, writer_pid).await;
     close(writer, writer_driver).await;
     close(other, other_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
+    let _serial = TEST_SERIAL.lock().await;
+    // Open all backends and resolve observer dependencies before a prepared
+    // LOCK on this view recursively retains its underlying catalog locks.
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (finisher, finisher_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let finisher_pid = pid(&finisher).await;
+    let view_oid: u32 = observer
+        .query_one(
+            "SELECT 'pg_catalog.pg_prepared_xacts'::pg_catalog.regclass::oid",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let view_lock = observer.prepare(
+        "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE relation = $1 AND mode = 'AccessExclusiveLock' AND granted AND pid IS NULL)"
+    ).await.unwrap();
+    observer.query(FENCE_LOCKS, &[&finisher_pid]).await.unwrap();
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let warm = begin(&reader).await;
+    check(&reader, &warm).await;
+    end(&reader, &warm).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    for outcome in ["COMMIT", "ROLLBACK"] {
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&reader).await;
+        tokio::time::timeout(Duration::from_secs(20), writer.batch_execute(
+            "BEGIN; LOCK TABLE pg_catalog.pg_prepared_xacts IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_prepared_view_lock'"
+        )).await.unwrap().unwrap();
+        let retained: bool = observer
+            .query_one(&view_lock, &[&view_oid])
+            .await
+            .unwrap()
+            .get(0);
+        assert!(retained, "native view lock was not transferred to PREPARE");
+        let sql = format!("{outcome} PREPARED 'darmok_prepared_view_lock'");
+        let mut finishing = Box::pin(finisher.batch_execute(&sql));
+        tokio::select! {
+            result = &mut finishing => panic!("prepared view-lock finish bypassed the reader fence: {result:?}"),
+            () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
+        }
+        check(&reader, &before).await;
+        end(&reader, &before).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(finishing);
+        let retained: bool = observer
+            .query_one(&view_lock, &[&view_oid])
+            .await
+            .unwrap()
+            .get(0);
+        assert!(
+            !retained,
+            "native completion retained its catalog view lock"
+        );
+        let remaining: i64 = observer.query_one(
+            "SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid = 'darmok_prepared_view_lock'", &[]
+        ).await.unwrap().get(0);
+        assert_eq!(remaining, 0);
+        no_fence(&observer, finisher_pid).await;
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let after = begin(&reader).await;
+        assert_eq!(after.generation, before.generation + 1);
+        end(&reader, &after).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+    }
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(finisher, finisher_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn prepared_gid_identity_is_independent_of_the_native_text_operator_path() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (lower, lower_driver) = client().await;
+    let (upper, upper_driver) = client().await;
+    let (finisher, finisher_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    lower.batch_execute(
+        "CREATE TABLE lease_case_lower(id integer);
+         CREATE TABLE lease_case_upper(id integer);
+         CREATE SCHEMA lease_gid_operators;
+         CREATE FUNCTION lease_gid_operators.equal_folded(text, text) RETURNS boolean
+         LANGUAGE SQL IMMUTABLE AS $$
+             SELECT pg_catalog.lower($1) OPERATOR(pg_catalog.=) pg_catalog.lower($2)
+         $$;
+         CREATE OPERATOR lease_gid_operators.= (LEFTARG = text, RIGHTARG = text, FUNCTION = lease_gid_operators.equal_folded)"
+    ).await.unwrap();
+    finisher
+        .batch_execute("SET search_path = lease_gid_operators, pg_catalog")
+        .await
+        .unwrap();
+    let comparison = finisher
+        .query_one(
+            "SELECT 'darmok_case_gid'::text = 'DARMOK_CASE_GID'::text,
+                'darmok_case_gid'::text OPERATOR(pg_catalog.=) 'DARMOK_CASE_GID'::text",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert!(comparison.get::<_, bool>(0));
+    assert!(!comparison.get::<_, bool>(1));
+    lower.batch_execute("BEGIN; ALTER TABLE lease_case_lower ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_case_gid'").await.unwrap();
+    upper.batch_execute("BEGIN; ALTER TABLE lease_case_upper ADD COLUMN changed integer; PREPARE TRANSACTION 'DARMOK_CASE_GID'").await.unwrap();
+    let finisher_pid = pid(&finisher).await;
+    for (outcome, gid, remaining) in [
+        ("COMMIT", "darmok_case_gid", 1_i64),
+        ("ROLLBACK", "DARMOK_CASE_GID", 0_i64),
+    ] {
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let before = begin(&reader).await;
+        let sql = format!("{outcome} PREPARED '{gid}'");
+        let mut finishing = Box::pin(finisher.batch_execute(&sql));
+        tokio::select! {
+            result = &mut finishing => panic!("operator-path prepared finish bypassed the fence: {result:?}"),
+            () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
+        }
+        check(&reader, &before).await;
+        end(&reader, &before).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(finishing);
+        no_fence(&observer, finisher_pid).await;
+        let count: i64 = observer.query_one(
+            "SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid IN ('darmok_case_gid', 'DARMOK_CASE_GID')", &[]
+        ).await.unwrap().get(0);
+        assert_eq!(count, remaining);
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        let after = begin(&reader).await;
+        assert_eq!(after.generation, before.generation + 1);
+        end(&reader, &after).await;
+        reader.batch_execute("COMMIT").await.unwrap();
+    }
+    for (table, expected) in [("lease_case_lower", true), ("lease_case_upper", false)] {
+        let changed: bool = observer.query_one(
+            "SELECT EXISTS (SELECT FROM pg_catalog.pg_attribute WHERE attrelid = $1::text::pg_catalog.regclass AND attname = 'changed' AND NOT attisdropped)", &[&table]
+        ).await.unwrap().get(0);
+        assert_eq!(changed, expected);
+    }
+    finisher.batch_execute("RESET search_path").await.unwrap();
+    lower.batch_execute("DROP TABLE lease_case_lower, lease_case_upper; DROP SCHEMA lease_gid_operators CASCADE").await.unwrap();
+    close(reader, reader_driver).await;
+    close(lower, lower_driver).await;
+    close(upper, upper_driver).await;
+    close(finisher, finisher_driver).await;
+    close(observer, observer_driver).await;
 }
 
 #[tokio::test]

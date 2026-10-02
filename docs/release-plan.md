@@ -1654,10 +1654,10 @@ admitted catalog phases. Complete native dependencies are acquired outside the
 lease and retained after it ends, before row execution. This is mandatory for
 prepared transactions that combine DDL in one relation with row locks in another.
 Ordinary metadata publication is fenced at native pre-commit; irreversible shared
-drops use their native object boundary. A session GID gate and transaction marker
-coordinate SQL two-phase preparation/completion without fencing proven pure DML.
-Native invalidation state distinguishes surviving metadata from rolled-back child
-DDL. Shared drops exclude new readers through transaction-owned intent and drain
+drops use their native object boundary. Every native SQL prepared completion is
+fenced, including pure DML; native core owns exact GID handling. Native invalidation
+state distinguishes surviving metadata from rolled-back child DDL for ordinary
+transaction commits. Shared drops exclude new readers through transaction-owned intent and drain
 existing leases before irreversible effects. They release that short lock across
 native backend-drain/storage waits, so ordinary exit publishers can finish using
 the native lock queue. Native pre-commit separately fences final publication.
@@ -1768,3 +1768,39 @@ and scope. Independent final review is required before merging this component.
 The lease primitive does not certify fresh catalog reads, complete native guards,
 semantic admission, table execution, serving, real drivers, cache performance,
 hosted CI or the full release. The goal remains active.
+
+### Prepared-completion correction
+
+Independent source review at `bed10ba8e18e71d01d17997e6228db3338a16ced`
+found two further blockers in the prepared-target classifier. A native prepared
+transaction can retain an exclusive lock on `pg_prepared_xacts`; querying that
+view before native completion can wait on the very target whose finish would
+release it. The unqualified text equality in that query also depends on the
+finisher's operator lookup path, so case-distinct native GIDs can lose exact
+classification. These are source findings, not executed hanging experiments.
+The review addendum seal is
+`4f064bce03684bb92389ff9b9df53e69846b1e371f013ab5d84d1b08129aaf8b`.
+It supersedes the earlier finite acceptance; the successful `32bbc56` matrix
+remains historical evidence and cannot certify the replacement.
+
+The replacement fences every SQL prepared commit or rollback before native
+completion. It removes classifier SQL, marker locks, GID hash/session gates and
+completion-tag capture. Native core alone resolves exact GIDs and preserves its
+target checks and errors. PREPARE keeps metadata private and cannot transfer the
+global fence. Errors clean up through native transaction resource ownership.
+
+This deliberately trades selective prepared-DML cache reuse for correctness:
+all prepared completions serialize with catalog readers and advance generation,
+including pure DML and native errors after fence acquisition. The fence includes
+native completion work and waits; it has no uniform short-duration guarantee.
+Ordinary pure-DML commits and ordinary lease protocol round trips are unchanged.
+New ordinary regressions cover retained prepared-view locks, schema-local text
+equality with case-distinct GIDs, queued PREPARE validity, concurrent completions,
+native error cleanup and row waits outside catalog leases.
+
+New module builds and current-source verification on PostgreSQL 17/18 with
+enabled/default two-phase settings, the ordinary owner/CLI matrix and independent
+frozen-source review are required before merging. They have not yet certified
+this replacement. Fresh catalog reads, complete native guards, frontend data
+snapshots, table execution, serving, cache performance and release gates remain
+open. Security work and interruption/stress experiments remain excluded.

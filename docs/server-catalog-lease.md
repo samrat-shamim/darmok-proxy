@@ -133,31 +133,31 @@ catalog publication receives the ordinary commit fence.
 
 ## Prepared transactions
 
-PREPARE does not publish metadata and never transfers the global fence. The
-module intentionally transfers a separate default-method object marker keyed by
-physical database, exact native XID and sub-ID `0x444e`. `AccessShareLock` proves
-participation; an additional `RowExclusiveLock` marks pending catalog publication.
-PostgreSQL's native [lock two-phase records](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/storage/lmgr/lock.c)
-persist, transfer and recover these tag/mode pairs. This recovery argument is
-based on native source; the ordinary fixtures do not run restart experiments.
+PREPARE keeps metadata private. It rejects an active catalog lease or shared-drop
+intent and releases any transaction publication fence before native two-phase
+lock transfer. Private metadata invalidates the backend's local identity when
+preparation completes. The module adds no marker locks, GID hash gates or native
+completion-tag capture; PostgreSQL retains its normal preparation lifecycle and
+completion tags.
 
-PREPARE, COMMIT PREPARED and ROLLBACK PREPARED acquire a default-method **session**
-gate keyed by a GID hash and sub-ID `0x444f`. Completion holds it through the native finish operation. PREPARE queues its
-work at utility entry, so creation retains the gate until the native prepare
-callback after validity and marker-lock transfer, or until abort. Native busy
-checks protect the remaining detach cleanup. Utility errors and owning
-subtransaction abort also release it. It is never transferred to a prepared
-transaction.
-The hook captures the native completion tag even when its caller does not request
-one. It seeds the known PREPARE tag because PostgreSQL only overrides it for a
-no-op or already-aborted block, returning ROLLBACK; those outcomes release the
-gate immediately rather than waiting for a callback that may not occur.
-Hash collisions only add serialization. The gate prevents completion and GID
-reuse from changing the target between the exact native `pg_prepared_xacts`
-lookup, conditional XID-marker probes and native completion. A metadata-marked
-completion takes the publication fence; a proven metadata-free one does not.
-An unmarked prepared transaction has no metadata-free proof and receives the
-publication fence. Native database, ownership and busy checks still run.
+Every SQL COMMIT PREPARED or ROLLBACK PREPARED that reaches the utility hook takes
+the transaction-owned publication fence and advances generation before native
+completion. This includes pure DML, rolled-back child DDL and attempts that later
+fail native target checks. PostgreSQL alone resolves the exact GID and performs
+its database, ownership, uniqueness and busy checks. A queued PREPARE is not a
+valid target until native core makes it valid. The module does not inspect
+`pg_prepared_xacts`, resolve text operators, copy private prepared-transaction
+structures or classify retained locks. In particular, a target can retain an
+exclusive lock on the prepared-transaction view without blocking its own finish
+on a classifier query.
+
+The fence remains owned by the finishing transaction through native completion
+and transaction cleanup. Native errors release it through ordinary resource
+ownership; they may conservatively invalidate generation. Prepared completions
+serialize with catalog readers even when they publish no metadata. Their fence
+duration includes native WAL/file work and any native completion waits, so it has
+no fixed short-duration guarantee. The fixtures use normal completion and do not
+run restart or interruption experiments.
 
 The creation/completion ordering covers native SQL utility entry. Direct calls
 to `FinishPreparedTransaction` by custom modules bypass that hook and are outside
@@ -230,10 +230,12 @@ ordinary native lock ownership and per-acquisition result allocation.
 Two atomic intent reads are added to uncontended acquisition. Shared drops add
 one transaction-owned admission count, a short native drain lock and the ordinary
 pre-commit publication lock; ordinary exit publishers need no special wait loop.
-Publication
-inspection copies pending native invalidations only when present; prepared
-commands add a session gate and fixed native catalog lookup/marker probes,
-without adding SQL to ordinary lease acquisition or release. Local
+Publication inspection copies pending native invalidations only when present.
+Prepared completion adds one publication lock and generation advance, without
+classifier SQL, GID allocations or protocol round trips. All prepared completions
+contend with readers and conservatively invalidate catalog cache identities,
+including pure DML; ordinary pure-DML commits retain their previous behavior.
+Local
 lease numbers avoid a shared atomic allocation on every request. Separate fixed
 begin/end queries cost two protocol round trips; an explicit check adds one.
 The bounded sequential fixture measures those two calls, not proxy throughput,
@@ -243,7 +245,8 @@ Required native fixtures exercise actual fence grants/waits, simultaneous
 readers, ordinary DML, external relation/schema/function/type/domain/collation
 DDL, drop/recreate, metadata rollback, savepoint ownership, concurrent index
 publication, cross-database hooks, enabled/default 2PC profiles, prepared DDL/DML,
-rolled-back child DDL, mixed prepared row/catalog changes and normal temp-backend
+rolled-back child DDL, mixed prepared row/catalog changes, exact case-distinct
+GIDs under a schema-local text operator, prepared view locks and normal temp-backend
 exit in the target or an unrelated database during removal, plus concurrent drop
 intents and ordinary native busy-error cleanup. Missing module
 dependencies fail. The Docker build installs the shared library, LLVM bitcode,

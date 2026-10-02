@@ -1,15 +1,12 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 #include "postgres.h"
 
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_database_d.h"
 #include "catalog/pg_extension_d.h"
 #include "catalog/pg_tablespace_d.h"
-#include "common/hashfn.h"
-#include "executor/spi.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/parsenodes.h"
@@ -42,8 +39,6 @@ PG_FUNCTION_INFO_V1(darmok_end_catalog_lease);
 /* OID zero cannot name an extension. The default lock method is deliberately
  * distinct from user advisory locks. Database zero makes this cluster-wide. */
 #define DARMOK_LOCK_SUBID 0x444d
-#define DARMOK_PREPARED_MARKER_SUBID 0x444e
-#define DARMOK_GID_GATE_SUBID 0x444f
 #define DARMOK_CLUSTER_ID_BYTES 16
 
 typedef struct DarmokShared
@@ -80,9 +75,6 @@ static bool pre_commit_started = false;
 static bool shared_drop_pending = false;
 static bool shared_drop_cleanup_registered = false;
 static SubTransactionId shared_drop_subid = InvalidSubTransactionId;
-static bool prepare_gate_held = false;
-static LOCKTAG prepare_gate_tag;
-static SubTransactionId prepare_gate_subid = InvalidSubTransactionId;
 static SubTransactionId last_metadata_subid = InvalidSubTransactionId;
 
 static shmem_request_hook_type previous_shmem_request = NULL;
@@ -97,29 +89,6 @@ catalog_tag(void)
 
 	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
 					   DARMOK_LOCK_SUBID);
-	return tag;
-}
-
-static LOCKTAG
-prepared_marker_tag(TransactionId xid)
-{
-	LOCKTAG tag;
-
-	SET_LOCKTAG_OBJECT(tag, MyDatabaseId, ExtensionRelationId, xid,
-					   DARMOK_PREPARED_MARKER_SUBID);
-	return tag;
-}
-
-static LOCKTAG
-gid_gate_tag(const char *gid)
-{
-	LOCKTAG tag;
-	uint32 hash = hash_bytes((const unsigned char *) gid, strlen(gid));
-
-	/* Hash collisions only serialize unrelated commands. The classification
-	 * below uses the exact native GID and XID, never this hash. */
-	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, hash,
-					   DARMOK_GID_GATE_SUBID);
 	return tag;
 }
 
@@ -164,26 +133,24 @@ advance_local(void)
 		local_generation++;
 }
 
-static LockAcquireResult
+static void
 transaction_lock_acquire(const LOCKTAG *tag, LOCKMODE mode,
-						 ResourceOwner owner, bool dont_wait)
+						 ResourceOwner owner)
 {
 	ResourceOwner saved = CurrentResourceOwner;
-	LockAcquireResult result = LOCKACQUIRE_NOT_AVAIL;
 
 	/* SQL-function portals have their own resource owners. Put a lease on the
 	 * current transaction owner so a later command can release the same lock. */
 	CurrentResourceOwner = owner;
 	PG_TRY();
 	{
-		result = LockAcquire(tag, mode, false, dont_wait);
+		(void) LockAcquire(tag, mode, false, false);
 	}
 	PG_FINALLY();
 	{
 		CurrentResourceOwner = saved;
 	}
 	PG_END_TRY();
-	return result;
 }
 
 static void
@@ -210,18 +177,6 @@ transaction_unlock(const LOCKTAG *tag, LOCKMODE mode, ResourceOwner owner)
 }
 
 static void
-release_prepare_gate(void)
-{
-	if (prepare_gate_held)
-	{
-		prepare_gate_held = false;
-		prepare_gate_subid = InvalidSubTransactionId;
-		if (!LockRelease(&prepare_gate_tag, ExclusiveLock, true))
-			elog(FATAL, "lost the native preparation serialization gate");
-	}
-}
-
-static void
 clear_shared_drop_intent(int code, Datum arg)
 {
 	(void) code;
@@ -243,25 +198,12 @@ take_writer_transaction_lock(void)
 	{
 		LOCKTAG tag = catalog_tag();
 
-		(void) transaction_lock_acquire(&tag, ExclusiveLock,
-									CurTransactionResourceOwner, false);
+		transaction_lock_acquire(&tag, ExclusiveLock,
+								 CurTransactionResourceOwner);
 		writer_transaction_lock = true;
 		writer_subid = GetCurrentSubTransactionId();
 		writer_owner = CurTransactionResourceOwner;
 	}
-}
-
-static void
-take_prepared_marker(bool metadata)
-{
-	LOCKTAG tag = prepared_marker_tag(GetTopTransactionId());
-
-	if (!LockHeldByMe(&tag, AccessShareLock, false))
-		(void) transaction_lock_acquire(&tag, AccessShareLock,
-									CurTransactionResourceOwner, false);
-	if (metadata && !LockHeldByMe(&tag, RowExclusiveLock, false))
-		(void) transaction_lock_acquire(&tag, RowExclusiveLock,
-									CurTransactionResourceOwner, false);
 }
 
 static void
@@ -285,8 +227,8 @@ has_catalog_publication(void)
 	int count = xactGetCommittedInvalidationMessages(&messages, &init_file);
 
 	/* This native top-level snapshot does not consume the messages. Native
-	 * subabort has already removed its messages; no false prepared metadata
-	 * marker survives solely because a child DDL attempt was rolled back. */
+	 * subabort has already removed its messages, so a rolled-back child DDL
+	 * does not require an ordinary transaction publication fence. */
 	if (messages != NULL)
 		pfree(messages);
 	return count > 0 || init_file;
@@ -338,72 +280,11 @@ begin_shared_drop_publication(void)
 		 * owns reader exclusion until transaction end; pre-commit takes the
 		 * ordinary publication lock independently. One intent per transaction
 		 * preserves its earliest subtransaction owner across nested drops. */
-		(void) transaction_lock_acquire(&tag, ExclusiveLock,
-									CurTransactionResourceOwner, false);
+		transaction_lock_acquire(&tag, ExclusiveLock,
+								 CurTransactionResourceOwner);
 		(void) advance_shared(&shared->generation);
 		transaction_unlock(&tag, ExclusiveLock, CurTransactionResourceOwner);
 	}
-}
-
-/* The caller holds the session GID gate across lookup, classification and the
- * complete native operation. No opaque GXACT fields or TwoPhaseStateLock are
- * used here. The native command retains its own permission/database checks. */
-static bool
-prepared_has_metadata(const char *gid)
-{
-	Oid argument_type = TEXTOID;
-	Datum argument = CStringGetTextDatum(gid);
-	bool found = false;
-	TransactionId xid = InvalidTransactionId;
-	int result;
-
-	if (SPI_connect() != SPI_OK_CONNECT)
-		elog(ERROR, "could not inspect the native prepared transaction");
-	/* Transaction utility statements need not supply an active snapshot. */
-	PushActiveSnapshot(GetTransactionSnapshot());
-	result = SPI_execute_with_args(
-		"SELECT transaction FROM pg_catalog.pg_prepared_xacts WHERE gid = $1",
-		1, &argument_type, &argument, NULL, true, 2);
-	if (result != SPI_OK_SELECT || SPI_processed > 1)
-		elog(ERROR, "unexpected native prepared transaction lookup result");
-	if (SPI_processed == 1)
-	{
-		bool isnull;
-		Datum value = SPI_getbinval(SPI_tuptable->vals[0],
-									 SPI_tuptable->tupdesc, 1, &isnull);
-
-		if (isnull)
-			elog(ERROR, "native prepared transaction has no transaction identity");
-		xid = DatumGetTransactionId(value);
-		if (!TransactionIdIsNormal(xid))
-			elog(ERROR, "invalid native prepared transaction identity");
-		found = true;
-	}
-	if (SPI_finish() != SPI_OK_FINISH)
-		elog(ERROR, "could not finish native prepared transaction lookup");
-	PopActiveSnapshot();
-	pfree(DatumGetPointer(argument));
-	if (found)
-	{
-		LOCKTAG tag = prepared_marker_tag(xid);
-
-		/* RowExclusive is the metadata bit; AccessShare proves that this
-		 * preparation participated in our classification protocol. */
-		if (transaction_lock_acquire(&tag, ShareLock,
-									CurTransactionResourceOwner, true) ==
-			LOCKACQUIRE_NOT_AVAIL)
-			return true;
-		transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
-		if (transaction_lock_acquire(&tag, AccessExclusiveLock,
-									CurTransactionResourceOwner, true) ==
-			LOCKACQUIRE_NOT_AVAIL)
-			return false;
-		transaction_unlock(&tag, AccessExclusiveLock, CurTransactionResourceOwner);
-		/* An unmarked native transaction has no proof of being metadata-free.
-		 * Fence its completion. Catalog-only readers cannot wait on its rows. */
-		return true;
-	}
-	return false;
 }
 
 static void
@@ -464,7 +345,8 @@ transaction_event(XactEvent event, void *arg)
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("end the catalog lease before preparing a transaction")));
 			preparing_transaction = true;
-			take_prepared_marker(has_catalog_publication());
+			/* Private metadata is not published by PREPARE. Never transfer our
+			 * global publication fence into native two-phase lock records. */
 			if (writer_transaction_lock)
 			{
 				LOCKTAG tag = catalog_tag();
@@ -472,6 +354,7 @@ transaction_event(XactEvent event, void *arg)
 				transaction_unlock(&tag, ExclusiveLock, writer_owner);
 				writer_transaction_lock = false;
 				writer_owner = NULL;
+				writer_subid = InvalidSubTransactionId;
 			}
 			break;
 		case XACT_EVENT_COMMIT:
@@ -479,11 +362,6 @@ transaction_event(XactEvent event, void *arg)
 		case XACT_EVENT_PREPARE:
 		case XACT_EVENT_PARALLEL_COMMIT:
 		case XACT_EVENT_PARALLEL_ABORT:
-			/* PREPARE is queued by ProcessUtility and executed later by
-			 * CommitTransactionCommand. Only now are its marker locks transferred
-			 * (or its reservation aborted). Native 2PC busy checks still protect
-			 * the remaining detach cleanup after XACT_EVENT_PREPARE. */
-			release_prepare_gate();
 			clear_shared_drop_intent(0, 0);
 			/* Committed facts can stay cached. Aborted/prepared private facts
 			 * cannot; metadata-free transaction boundaries need no cache miss. */
@@ -514,8 +392,6 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	{
 		if (shared_drop_pending && shared_drop_subid == subid)
 			shared_drop_subid = parent;
-		if (prepare_gate_held && prepare_gate_subid == subid)
-			prepare_gate_subid = parent;
 		if (last_metadata_subid == subid)
 			last_metadata_subid = parent;
 		if (lease.active && lease.subid == subid)
@@ -533,8 +409,6 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	{
 		if (shared_drop_pending && shared_drop_subid == subid)
 			clear_shared_drop_intent(0, 0);
-		if (prepare_gate_held && prepare_gate_subid == subid)
-			release_prepare_gate();
 		if (last_metadata_subid == subid)
 		{
 			last_metadata_subid = parent;
@@ -595,20 +469,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	bool finishing = IsA(pstmt->utilityStmt, TransactionStmt) &&
 		(((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_COMMIT_PREPARED ||
 		 ((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_ROLLBACK_PREPARED);
-	LOCKTAG gid_tag;
-	bool gid_gate = preparing || finishing;
-	volatile bool prepare_queued = false;
-	QueryCompletion prepare_completion;
-	QueryCompletion *native_completion = completion;
 
-	if (preparing)
-	{
-		/* Native utility execution only overrides unsuccessful PREPARE with
-		 * ROLLBACK; its caller normally supplies the successful parse tag later.
-		 * Seed our capture because gate ownership is decided before that step. */
-		SetQueryCompletion(&prepare_completion, CMDTAG_PREPARE_TRANSACTION, 0);
-		native_completion = &prepare_completion;
-	}
 	if (preparing && lease.active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -619,47 +480,22 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		note_metadata_attempt();
 		writer_depth++;
 	}
-	if (gid_gate)
-	{
-		if (preparing && prepare_gate_held)
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("native transaction preparation is already pending")));
-		gid_tag = gid_gate_tag(((TransactionStmt *) pstmt->utilityStmt)->gid);
-		(void) LockAcquire(&gid_tag, ExclusiveLock, true, false);
-		if (preparing)
-		{
-			prepare_gate_tag = gid_tag;
-			prepare_gate_subid = GetCurrentSubTransactionId();
-			prepare_gate_held = true;
-		}
-	}
 	PG_TRY();
 	{
-		if (finishing && prepared_has_metadata(
-				((TransactionStmt *) pstmt->utilityStmt)->gid))
+		if (finishing)
 		{
+			/* Classifying a prepared target through SQL can wait on catalog
+			 * locks retained by that same target. Fence every completion instead;
+			 * native core alone resolves the exact GID and checks its state. */
 			note_metadata_attempt();
 			publish_catalog_change();
 		}
 		if (previous_utility)
 			previous_utility(pstmt, query, read_only_tree, context, params,
-							 query_env, dest, native_completion);
+							 query_env, dest, completion);
 		else
 			standard_ProcessUtility(pstmt, query, read_only_tree, context, params,
-								query_env, dest, native_completion);
-		if (preparing)
-		{
-			/* Outside a block, or in an already-aborted block, native PREPARE
-			 * completes as ROLLBACK and may emit no new abort callback. */
-			if (prepare_completion.commandTag != CMDTAG_PREPARE_TRANSACTION &&
-				prepare_completion.commandTag != CMDTAG_ROLLBACK)
-				elog(ERROR, "unexpected native transaction preparation completion");
-			prepare_queued =
-				prepare_completion.commandTag == CMDTAG_PREPARE_TRANSACTION;
-			if (completion != NULL)
-				*completion = prepare_completion;
-		}
+								query_env, dest, completion);
 		if (writer)
 		{
 			/* An internally committing utility can return in a new transaction.
@@ -672,10 +508,6 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	}
 	PG_FINALLY();
 	{
-		if (preparing && !prepare_queued)
-			release_prepare_gate();
-		if (finishing && !LockRelease(&gid_tag, ExclusiveLock, true))
-			elog(FATAL, "lost the prepared transaction serialization gate");
 		if (writer)
 			writer_depth--;
 	}
@@ -692,14 +524,12 @@ object_access(ObjectAccessType access, Oid class_id, Oid object_id,
 	{
 		if (writer_depth == 0)
 			note_metadata_attempt();
-		if (preparing_transaction)
-			take_prepared_marker(true);
-		else if (access == OAT_DROP &&
+		if (access == OAT_DROP &&
 				 (class_id == DatabaseRelationId || class_id == TableSpaceRelationId))
 			/* The invalid database marker and directory removal precede commit.
 			 * Exclude readers here without fencing native cleanup publishers. */
 			begin_shared_drop_publication();
-		else if (pre_commit_started)
+		else if (pre_commit_started && !preparing_transaction)
 			publish_catalog_change();
 	}
 	if (previous_object_access)
@@ -792,8 +622,8 @@ darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
 				ConditionVariableCancelSleep();
 			}
 			PG_END_TRY();
-			(void) transaction_lock_acquire(&tag, ShareLock,
-										CurTransactionResourceOwner, false);
+			transaction_lock_acquire(&tag, ShareLock,
+									 CurTransactionResourceOwner);
 			if (pg_atomic_read_u32(&shared->pending_shared_drops) == 0)
 				break;
 			transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
