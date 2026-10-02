@@ -1666,7 +1666,13 @@ That failure remains preserved and blocks acceptance of that revision. The next 
 review found an unfenced absent-GID race: PREPARE was only queued when its
 utility hook released the gate. Creation must retain that gate through native
 prepare/abort callbacks. That source is also blocked and its evidence is
-preserved. Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
+preserved. The lifetime correction at `73047ce` builds on both majors, but its
+PostgreSQL18 run has actual exit101:14 groups pass and six valid-preparation groups
+fail. Native utility execution leaves a successful PREPARE completion unchanged;
+the hook incorrectly initialized its capture to UNKNOWN and rejected it before
+the portal supplied the parse tag. That source is blocked. The correction seeds
+the known PREPARE tag while retaining native ROLLBACK overrides and the lifetime
+gate. Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
 prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
 The module does not change server configuration or add routing/auth/grant policy.
 

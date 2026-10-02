@@ -601,7 +601,10 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 
 	if (preparing)
 	{
-		InitializeQueryCompletion(&prepare_completion);
+		/* Native utility execution only overrides unsuccessful PREPARE with
+		 * ROLLBACK; its caller normally supplies the successful parse tag later.
+		 * Seed our capture because gate ownership is decided before that step. */
+		SetQueryCompletion(&prepare_completion, CMDTAG_PREPARE_TRANSACTION, 0);
 		native_completion = &prepare_completion;
 	}
 	if (preparing && lease.active)

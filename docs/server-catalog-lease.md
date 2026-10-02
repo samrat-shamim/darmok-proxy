@@ -145,6 +145,10 @@ callback after validity and marker-lock transfer, or until abort. Native busy
 checks protect the remaining detach cleanup. Utility errors and owning
 subtransaction abort also release it. It is never transferred to a prepared
 transaction.
+The hook captures the native completion tag even when its caller does not request
+one. It seeds the known PREPARE tag because PostgreSQL only overrides it for a
+no-op or already-aborted block, returning ROLLBACK; those outcomes release the
+gate immediately rather than waiting for a callback that may not occur.
 Hash collisions only add serialization. The gate prevents completion and GID
 reuse from changing the target between the exact native `pg_prepared_xacts`
 lookup, conditional XID-marker probes and native completion. A metadata-marked
