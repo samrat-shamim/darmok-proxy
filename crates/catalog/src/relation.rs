@@ -465,11 +465,11 @@ macro_rules! relation_query {
     JOIN pg_catalog.pg_type AS t ON t.oid = ct.type_oid
     WHERE t.typtype = 'd'
 )
-SELECT r.oid, r.relnamespace, r.nspname::text, r.relname::text,
+SELECT r.oid, r.relnamespace, r.nspname::pg_catalog.text, r.relname::pg_catalog.text,
        r.relkind, r.relpersistence, r.relispartition,
-       a.attnum, a.attname::text, a.atttypid, a.atttypmod, a.attndims,
+       a.attnum, a.attname::pg_catalog.text, a.atttypid, a.atttypmod, a.attndims,
        a.attnotnull, a.atthasdef, a.attidentity, a.attgenerated, a.attcollation,
-       t.oid, t.typnamespace, tn.nspname::text, t.typname::text,
+       t.oid, t.typnamespace, tn.nspname::pg_catalog.text, t.typname::pg_catalog.text,
        t.typtype, t.typcategory, t.typelem, t.typbasetype, t.typtypmod,
        t.typnotnull, t.typndims
 FROM relations AS r
@@ -502,14 +502,14 @@ const NAMED_RELATION_SQL: &str = relation_query!(
     r#"
     SELECT DISTINCT c.oid, c.relnamespace, n.nspname, c.relname, c.relkind,
            c.relpersistence, c.relispartition
-    FROM ROWS FROM (pg_catalog.unnest($1::text[]), pg_catalog.unnest($2::text[]))
+    FROM ROWS FROM (pg_catalog.unnest($1::pg_catalog.text[]), pg_catalog.unnest($2::pg_catalog.text[]))
          AS requested(schema_name, relation_name)
     JOIN pg_catalog.pg_namespace AS n
       ON n.nspname = requested.schema_name::pg_catalog.name
-     AND n.nspname::text COLLATE pg_catalog."C" = requested.schema_name
+     AND n.nspname::pg_catalog.text COLLATE pg_catalog."C" = requested.schema_name
     JOIN pg_catalog.pg_class AS c
       ON c.relnamespace = n.oid
      AND c.relname = requested.relation_name::pg_catalog.name
-     AND c.relname::text COLLATE pg_catalog."C" = requested.relation_name
+     AND c.relname::pg_catalog.text COLLATE pg_catalog."C" = requested.relation_name
 "#
 );

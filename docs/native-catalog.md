@@ -32,6 +32,11 @@ comparisons with the deterministic `pg_catalog."C"` collation verify them.
 The exact check is necessary because converting input to PostgreSQL `name` can
 truncate an overlong string. An overlong input must report a missing pair rather
 than select an object with a truncated spelling. No SQL is generated from names.
+All input and output casts use `pg_catalog.text`: a native schema may define a
+different type named `text`, even before explicitly listed `pg_catalog` in
+`search_path`, without changing the catalog query's parameter/field types.
+That native type still keeps its own declared OID and domain facts in the
+returned definitions. This applies to the shared OID reader as well.
 These choices follow PostgreSQL's [namespace catalog](https://www.postgresql.org/docs/17/catalog-pg-namespace.html)
 and [deterministic collation behavior](https://www.postgresql.org/docs/17/collation.html#COLLATION-NONDETERMINISTIC).
 
@@ -127,6 +132,9 @@ distinct Unicode spellings, request ordering/duplicates, missing pairs at each
 position, overlong ASCII/multibyte names, actual temporary namespaces, empty
 relations, no-I/O empty input in an aborted transaction, native error
 propagation, rename/recreation, rollback and shared resolution/fact snapshots.
+An additional fixture places a native `text` domain ahead of `pg_catalog` and
+verifies builtin query representation and native declared-type identity through
+both lookup APIs.
 The existing quoted-definition, domain and relation-kind fixtures compare named
 and OID results directly. MySQL wire metadata and
 catalog-dependent plan execution remain separate gates. Security-related work

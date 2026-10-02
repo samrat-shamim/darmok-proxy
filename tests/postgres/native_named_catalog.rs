@@ -1,6 +1,6 @@
 use darmok_catalog::{
-    CatalogError, NamedNativeCatalog, NativeRelationName, RelationPersistence,
-    TypeKind, read_native_named_relations, read_native_relations,
+    CatalogError, NamedNativeCatalog, NativeRelationName, RelationPersistence, TypeKind,
+    read_native_named_relations, read_native_relations,
 };
 use tokio_postgres::{Client, GenericClient, NoTls, error::SqlState, types::Type};
 
