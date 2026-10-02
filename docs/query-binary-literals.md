@@ -86,3 +86,14 @@ conversion, cache, lock or PostgreSQL round trip is added. Existing response
 buffering and label allocations remain. Measured allocation counts, latency,
 resource bounds and complete M2/M4/driver/release gates remain pending.
 Security work and compiler PR4 remain excluded.
+
+Verified code/fixture revision `e6ccbf39b835be3d44620464eb7d1c61652147a2`,
+tree `0d4589614348cef92ca95326e022a3af694ae849`, passes the 14-command local
+matrix: PostgreSQL 17.11/18.6 ordinary owners and BigDecimal frontend loops,
+workspace all/default features, strict Clippy, minimal/std/visitor parser
+builds, formatting, repository boundaries, diff and 116 fresh stock cases.
+The independent source/correction/expanded-fixture reviews found no functional
+defect; the positive introducer coverage concern is closed. Exact commands,
+counts, environment and immutable evidence hashes are recorded in
+[the release plan](release-plan.md). These results certify that code revision;
+later documentation leaves retain a separate tree/evidence proof.

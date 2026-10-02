@@ -1324,3 +1324,81 @@ retried under the existing account blocker. Security, compiler PR4, resource
 stress and forced interruption work remain excluded. M2/M3/M4, catalog execution
 validity, executable integration, real drivers, performance, merge, release and
 the full goal remain incomplete.
+
+Final expanded code/fixture revision `e6ccbf39b835be3d44620464eb7d1c61652147a2`,
+tree `0d4589614348cef92ca95326e022a3af694ae849`, passes all14 local matrix
+commands. Each PostgreSQL17.11/18.6 backend passes owners66/0 with14 filtered
+and BigDecimal frontend10/0 with70 filtered. The three exact abandoned/dropped
+control exclusions remain in owner argv; ignored groups are not counted as
+passing. Workspace all/default pass1676/1669, each with76 ignored, across39/38
+summaries. Strict Clippy, three parser feature builds, formatting, repository
+boundaries, diff and the fresh stock observer all exit0.
+
+Both mandatory Cargo inputs are recorded on every Cargo/helper receipt:
+`RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup` and
+`CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target`.
+The matrix invokes the following owner and frontend commands once per fixture,
+at ports32769/32768 respectively. Each database URL selects the existing
+`darmok_test` fixture. The remaining commands run once, serially.
+
+```text
+cargo test -p darmok-execute --lib --locked native_backend::tests -- --ignored --nocapture --skip native_backend::tests::abandoned_transaction_recovery_never_restores_ready --skip native_backend::tests::unpolled_control_is_inert_and_dropped_pending_control_is_uncertain --skip native_backend::tests::dropped_scope_and_dropped_finish_never_restore_ready
+cargo test -p darmok-execute --lib --features sqlparser/bigdecimal --locked native_backend::tests::frontend_loop -- --ignored --nocapture
+cargo test --workspace --exclude darmok-postgres-tests --all-features --locked
+cargo test --workspace --exclude darmok-postgres-tests --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo check -p darmok-sqlparser --no-default-features --locked
+cargo check -p darmok-sqlparser --no-default-features --features std --locked
+cargo check -p darmok-sqlparser --no-default-features --features visitor --locked
+cargo fmt --all --check
+python3 scripts/check_repository.py
+git diff --check 271b4cfadeccce057fb2665135ff7fec0e5b70a3..HEAD
+```
+
+The last check uses the existing pinned-client interpreter with `-B`, followed
+by `tests/reference/observe_mysql_binary_literals.py --container
+darmok-mysql-reference-84 --image
+mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+--port 32770 --corpus crates/execute/fixtures/mysql-binary-literals.json
+--evidence-dir /Users/shamim/Projects/duotronic/.darmok-work/logs/binary-e6ccbf3-stock-evidence`.
+Its116 actual observations match exactly:44 positive cases/216 fields and cells,
+28 syntax errors and44 unimplemented reference contexts. Six saved subprocesses
+exit0. Image ID/content digest and connected server UUID association are checked.
+The four new cases exactly preserve their separate clean9673 stock capture;
+the original112 cases exactly preserve the initial-v2 capture. No generated
+expectation, raw decoded numeric-wire claim or proxy driver claim is introduced.
+
+The twelve environment-v4 readers exit0 and bind this head/tree to Rust/Cargo
+1.96.0, macOS26.0.1 arm64, pinned PostgreSQL17.11/18.6 UTF8/max identifier63
+fixtures, MySQL8.4.11, Python3.9.6 and PyMySQL distribution1.1.2/module1.4.6.
+`logs/binary-e6ccbf3-author-audit-v1.json` exits0, SHA256
+`65abf9469430f56772c1c7339e165433f571ba669f9608e81e66a7f5453c1323`.
+It binds60 terminal command receipts and56 nonaggregate sequential intervals;
+the four nested matrix parents are counted separately. The889-file
+`logs/binary-e6ccbf3-code-evidence-manifest.json` has SHA256
+`560b50d96fc459f6c8d7ae20700a8e3c617cf8dbe53529557e24a8b5847302b1`.
+`logs/binary-e6ccbf3-audit-facts.json` has SHA256
+`74e558ca6267884320108167bf92e64cba8779db6505a332c0cb0b4718a8900c`.
+The graph preserves the prior659-file seal, original241-file initialization
+evidence, PR41 publication/account-blocker anchors and all failed/draft attempts.
+No historical or dirty-source result is relabeled as this committed run.
+
+Independent source review at10d6 records44 Git commands0; the9673 corrective
+source/evidence addendum records17 Git commands0; the e6 expanded-fixture
+addendum records24 Git commands0. All three final passive invocations exit0.
+No functional finding remains; four new successful queries close the original
+positive introducer coverage concern. One exploratory missing-filename reader1
+and one pre-write nested-quote builder1 remain separately preserved bookkeeping
+failures, not runtime results or passed invocations. No reviewer reruns Cargo,
+SQL, Docker or network checks. The current source/evidence report has SHA256
+`1d7c80b09fb137e0d80d13214d3e16ae3ef7d5737b3c6896de3050506c38b96e`,
+its seal `7712a2d544bf51416ba9e7a564083f9452578ab98e90831b07e57752684f891e`
+and separate actual invocation
+`602a3152f0e300b5e9ca872d3adf1331bb6cf075df5c52934b9ce2a06a748e3e`.
+
+The evidence leaf changes only this release record and the component contract;
+its exact parent/tree/evidence proof and independent wording review are separate
+from runtime certification. Required hosted CI, public table/catalog-validity
+execution, executable integration, real drivers, measured performance, merge,
+release and M2/M3/M4/full-goal completion remain pending. Security work,
+compiler PR4, resource stress and forced interruption remain excluded.
