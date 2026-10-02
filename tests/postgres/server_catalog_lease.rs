@@ -557,6 +557,105 @@ async fn concurrent_index_fences_publication_without_blocking_old_snapshots() {
 }
 
 #[tokio::test]
+async fn concurrent_index_final_valid_transition_has_distinct_generation() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (blocker, blocker_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (reader, reader_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer
+        .batch_execute("CREATE TABLE lease_index_final(id integer PRIMARY KEY, value integer); INSERT INTO lease_index_final VALUES (1, 1)")
+        .await
+        .unwrap();
+    blocker
+        .batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .unwrap();
+    assert_eq!(
+        blocker
+            .query_one("SELECT value FROM lease_index_final WHERE id = 1", &[])
+            .await
+            .unwrap()
+            .get::<_, i32>(0),
+        1
+    );
+    let writer_pid = pid(&writer).await;
+    let mut building = Box::pin(writer.batch_execute(
+        "CREATE INDEX CONCURRENTLY lease_index_final_value ON lease_index_final(value)",
+    ));
+    tokio::select! {
+        result = &mut building => panic!("index did not wait for the old ordinary snapshot: {result:?}"),
+        () = async {
+            tokio::time::timeout(Duration::from_secs(20), async {
+                loop {
+                    let rows = observer.query("SELECT phase FROM pg_catalog.pg_stat_progress_create_index WHERE pid = $1", &[&writer_pid]).await.unwrap();
+                    if rows.iter().any(|row| row.get::<_, String>(0) == "waiting for old snapshots") {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }).await.expect("concurrent index did not reach its final old-snapshot wait");
+        } => {}
+    }
+    no_fence(&observer, writer_pid).await;
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let intermediate = begin(&reader).await;
+    let flags_sql = "SELECT indisready, indisvalid FROM pg_catalog.pg_index
+        WHERE indexrelid = 'lease_index_final_value'::pg_catalog.regclass";
+    let flags = reader.query_one(flags_sql, &[]).await.unwrap();
+    assert!(flags.get::<_, bool>(0));
+    assert!(!flags.get::<_, bool>(1));
+    // A cache can contain the committed ready-but-invalid index at this stamp.
+    // The final publication must wait for the lease and assign a new stamp.
+    blocker.batch_execute("COMMIT").await.unwrap();
+    tokio::select! {
+        result = &mut building => panic!("index published validity through a held lease: {result:?}"),
+        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+    }
+    check(&reader, &intermediate).await;
+    assert!(
+        !reader
+            .query_one(flags_sql, &[])
+            .await
+            .unwrap()
+            .get::<_, bool>(1)
+    );
+    end(&reader, &intermediate).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut building)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(building);
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let published = begin(&reader).await;
+    check(&reader, &published).await;
+    let final_flags = reader.query_one(flags_sql, &[]).await.unwrap();
+    let ready: bool = final_flags.get(0);
+    let valid: bool = final_flags.get(1);
+    end(&reader, &published).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    no_fence(&observer, writer_pid).await;
+    writer
+        .batch_execute("DROP TABLE lease_index_final")
+        .await
+        .unwrap();
+    close(blocker, blocker_driver).await;
+    close(writer, writer_driver).await;
+    close(reader, reader_driver).await;
+    close(observer, observer_driver).await;
+    eprintln!(
+        "concurrent index validity stamps: invalid={}, valid={}, indisready={ready}, indisvalid={valid}",
+        intermediate.generation, published.generation
+    );
+    assert!(ready && valid);
+    assert!(
+        published.generation > intermediate.generation,
+        "distinct committed catalog facts reused a generation"
+    );
+}
+
+#[tokio::test]
 async fn enabled_native_two_phase_profile_rejects_leases_without_stranding_ddl() {
     let _serial = TEST_SERIAL.lock().await;
     let url = std::env::var("DARMOK_TEST_TWO_PHASE_DATABASE_URL")
