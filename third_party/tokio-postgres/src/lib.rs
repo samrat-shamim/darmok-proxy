@@ -143,6 +143,7 @@ pub use crate::portal::Portal;
 pub use crate::portal_completion::{DescribedPortal, PortalBindFailure, PortalBindMismatch};
 pub use crate::query::RowStream;
 pub use crate::row::{Row, SimpleQueryRow};
+pub use crate::simple_completion::{SimpleQueryEvent, SimpleQueryEventStream};
 pub use crate::simple_query::{SimpleColumn, SimpleQueryStream};
 #[cfg(feature = "runtime")]
 pub use crate::socket::Socket;
@@ -186,6 +187,7 @@ mod portal_completion;
 mod prepare;
 mod query;
 pub mod row;
+mod simple_completion;
 mod simple_query;
 #[cfg(feature = "runtime")]
 mod socket;

@@ -1,7 +1,7 @@
 # Observed backend completion
 
-The vendored `tokio-postgres` 0.7.18 library exposes exact command, prepared
-query and built-in typed-query events. This is a connector component, not an executor, semantic plan,
+The vendored `tokio-postgres` 0.7.18 library exposes exact command, text
+simple-query, prepared query and built-in typed-query events. This is a connector component, not an executor, semantic plan,
 connection owner, catalog validity lease or MySQL support claim. The
 [execution contract](native-execution.md) still requires those boundaries.
 
@@ -31,6 +31,39 @@ undone. Unexpected row descriptions/data terminate this stream with an error.
 That observation occurs after SQL submission, so this primitive cannot reject
 unverified SQL before its effects. The future owner supplies validated internal
 controls; frontend SQL must not enter through this method directly.
+
+`Client::simple_query_events(sql)` queues one simple-query request and exposes
+each native `RowDescription`, text row, exact `CommandComplete`, `EmptyQuery`,
+`BackendError` and final `ReadyForQuery`. Each row shares the description of its
+own statement, including a zero-column description. Completing a statement or
+receiving a backend error discards the stream's current description; the next
+statement cannot reuse it. Multi-statement requests retain their ordered events
+and one final request state. A parse error can precede any description; an
+execution error can follow rows; a deferred commit error can follow a command
+tag. None of those observations alone acknowledges frontend success.
+
+`SimpleColumn` preserves the native label, table/column origin (zero means no
+origin), raw type OID, type size, typmod and format. It does not turn OIDs into
+connector `Type` objects, query type metadata, or consult a type cache. Values
+are PostgreSQL text representations, with NULL distinct from an empty string;
+this does not decode MySQL values or certify a PostgreSQL type's semantics.
+Unknown native type OIDs are valid descriptions in this text transport.
+
+The event stream requires format 0 for every column. PostgreSQL simple queries
+normally use text, but a `FETCH` from a `BINARY` cursor can return binary
+columns. Such a description terminates with an explicit format error, before
+any row is interpreted as text. COPY and other unsupported response sequences
+also terminate explicitly. These are observations after submission, not
+pre-execution rejection or cleanup receipts. The owner must supply verified
+internal SQL, exclusivity, and an unconfirmed-operation disposition; this API
+adds no public SQL entry point to NativeBackend.
+
+This lane permits a row-returning utility such as SHOW without adding an
+extended-protocol Parse/Bind cycle. It does not establish that a utility is
+snapshot-neutral or that a reported lease is live. Server-module presence,
+fresh execution, exact backend identity and complete native guards remain
+separate catalog-control requirements tracked in
+[issue #46](https://github.com/samrat-shamim/darmok-proxy/issues/46).
 
 `Client::query_events(statement, parameters)` accepts an already prepared
 `Statement` and an exact-size parameter iterator. It encodes parameters and
@@ -99,7 +132,7 @@ The future owner must supply exclusivity and validate expected control outcomes.
 
 All these streams are fused after their ReadyForQuery event or terminal `Err`.
 `CommandEventStream::has_yielded()` and
-`BuiltinQueryEventStream::has_yielded()` record whether an event or terminal error
+the simple and built-in typed-query streams' `has_yielded()` record whether an event or terminal error
 has already been returned. A checker requiring the entire request can reject
 handoff of a partially consumed stream. Pending-only polling does not set the
 flag; it is not an execution, readiness or ownership observation.
@@ -123,6 +156,12 @@ vector. One local unnamed description owns
 the column names/types and is shared by its rows, with no server statement-close
 request on Drop. The typed, prepared and described-portal lanes share
 row/error/completion logic.
+The text simple-query lane shares one Arc-backed column description per
+statement, with owned column-name strings and the existing per-row field-range
+allocation. Building a description collects a Vec, then constructs its Arc
+slice; it does not imply one total allocation.
+Retaining raw column facts adds fixed metadata per column, also to upstream
+simple-query descriptions; it adds no per-row lookup or value conversion.
 These are structural costs, not a measured performance claim.
 
 Eight required fixtures on PostgreSQL 17/18 exercise:
@@ -162,3 +201,16 @@ These fixtures do not implement or certify the executor, recovery after a
 stopped consumer, uncertain transport outcomes, pooling, MySQL transaction
 policy or wire behavior. Security-related work and adversarial/resource stress
 verification remain outside the current user-requested scope.
+
+Ten required text simple-query fixtures additionally cover native SHOW tags
+and descriptions; multiple statements with separate labels/origins/typmods;
+NULL, empty and Unicode text; empty SQL, zero rows/columns/counts; custom type
+OIDs; parse and row-producing execution errors; failed-transaction/savepoint
+recovery; deferred implicit commit failures before the last tag; queued simple
+and prepared requests; SHOW preceding the first repeatable-read data snapshot;
+explicit binary cursor rejection; and local encoding failure without a partial
+queued request. Their native observations do not certify a server catalog
+control or its nonblocking guard design.
+Pending-only polling, partial-consumption handoff and metadata propagation
+through the existing upstream helper were reviewed in source; they are not
+claimed as additional dedicated fixture observations.
