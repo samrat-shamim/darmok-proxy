@@ -4,8 +4,8 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import re
 import subprocess
+from mysql_cli_columns import columns_from_cli
 
 
 def main():
@@ -21,6 +21,7 @@ def main():
     result = {"source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
               "source_status": subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True),
               "observer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+              "column_decoder_sha256": hashlib.sha256((Path(__file__).parent / "mysql_cli_columns.py").read_bytes()).hexdigest(),
               "corpus_sha256": hashlib.sha256(args.corpus.read_bytes()).hexdigest(),
               "commands": records, "complete": False}
 
@@ -50,13 +51,7 @@ def main():
         result.update(container=container, image=image, version=version, cases=[])
         for index, case in enumerate(corpus["cases"]):
             output = run("case-" + str(index), client + ["--column-type-info", "--verbose", "--verbose", "--verbose", "--execute", "SET NAMES utf8mb4 COLLATE utf8mb4_general_ci; " + case["sql"]])
-            fields = re.findall(r"(?ms)^Field\s+(\d+):\s+`(.*?)`\nCatalog:\s+`(.*?)`\nDatabase:\s+`(.*?)`\nTable:\s+`(.*?)`\nOrg_table:\s+`(.*?)`\nType:\s+(\w+)\nCollation:\s+[^\n]*\((\d+)\)\nLength:\s+(\d+)\nMax_length:\s+\d+\nDecimals:\s+(\d+)\nFlags: *([^\n]*)", output)
-            columns = []
-            for ordinal, name, catalog, database, table, original_table, kind, charset, width, decimals, flags in fields:
-                if int(ordinal) != len(columns) + 1 or (catalog, database, table, original_table) != ("def", "", "", ""):
-                    raise RuntimeError(case["name"] + " has unexpected source identity")
-                columns.append({"name": name, "type": kind, "charset": int(charset), "width": int(width),
-                                "decimals": int(decimals), "cli_flags": flags.split()})
+            columns = columns_from_cli(output, case["name"])
             if columns != case["columns"]:
                 raise RuntimeError(case["name"] + " columns differ: " + json.dumps(columns, ensure_ascii=False))
             result["cases"].append({"name": case["name"], "columns": columns, "completed": True})

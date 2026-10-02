@@ -517,3 +517,91 @@ does not complete M2/M4 or a release gate.
 No CI restart, account change, main push, merge or release is authorized by
 this implementation milestone. The recorded account Actions condition remains
 a merge/release blocker; authorized functional work can still progress.
+
+## Exact numeric literal progress
+
+The local SELECT controller now admits exact decimal tokens, large
+integer promotion and ordered unary signs. [The contract](exact-numeric-literals.md)
+keeps source labels, row text and declared metadata separate, including scale
+above 30 for literals, trailing zeros and negative signed-operand promotion.
+Scientific notation and general numeric expressions remain explicit unsupported
+outcomes.
+The private evaluator uses borrowed digits until final row allocation and adds
+no native request or runtime dependency. This is progress toward the full
+SQL/type objective, not a replacement of its remaining gates.
+
+Four pinned stock cases declare thirty-four columns, exact string rows and
+zero warnings; the new observer and existing column observer share only their
+CLI field decoder. The old five-case column corpus remains unchanged and must
+be observed freshly when the shared decoder changes. Two further mandatory
+native-owner SELECT groups consume the new corpus across both EOF forms and
+check pending/active settings plus unsupported approximate-number rejection.
+At clean `1cf9377178cb88bf327f0409b71affbd28b985ab`, tree
+`7761e54626a1759e0c6ec177e58045840d33ea78`, eighteen local component/reference
+checks and the serial verification wrapper exit 0. Exact Rust/check commands
+are:
+
+- `cargo test -p darmok-execute --lib --all-features --locked select_controller::tests`
+- `cargo test -p darmok-execute --lib --locked native_backend::tests::query_results -- --ignored`
+- `cargo test -p darmok-execute --lib --locked native_backend::tests::set_controller -- --ignored`
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
+- `cargo test --workspace --exclude darmok-postgres-tests --all-features --locked`
+- `cargo test --workspace --exclude darmok-postgres-tests --locked`
+- `cargo check -p darmok-sqlparser --no-default-features --locked`
+- `cargo check -p darmok-sqlparser --no-default-features --features std --locked`
+- `cargo check -p darmok-sqlparser --no-default-features --features visitor --locked`
+- `cargo fmt --all --check`
+- `python3 -B scripts/check_repository.py`
+- `git diff --check 48c9dcd91e2828f30b43abbb3b9b544f8dd8f150..HEAD`
+
+The selected native commands run separately on PostgreSQL 17.11 and 18.6,
+ports 32769/32768, with six SELECT and fourteen SET groups per backend, zero
+failures and zero ignored in those selected runs. The focused unit command
+passes nine groups with all features. Workspace suites pass 1,663/1,656 tests,
+each with 42 ignored; ignored database groups are not counted as passing.
+Every Cargo invocation uses
+`RUSTUP_HOME=/Users/shamim/Projects/duotronic/.darmok-work/rustup` and
+`CARGO_TARGET_DIR=/Users/shamim/Projects/duotronic/.darmok-work/native-values/target`.
+These are local Linux arm64 database fixtures and the task's pinned Rust
+toolchain, rather than a claim about a hosted runner or released artifact.
+
+The other four checks are two PostgreSQL version requests and both stock CLI
+observers. Each observer runs with
+`--container darmok-mysql-reference-84 --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242`.
+The existing column command is
+`python3 -B tests/reference/observe_mysql_query_results.py --corpus tests/reference/mysql_query_results.json --evidence-dir <new external directory>`;
+the numeric command is
+`python3 -B tests/reference/observe_mysql_exact_numbers.py --corpus tests/reference/mysql_exact_numbers.json --evidence-dir <new external directory>`.
+Saved exact argv includes all of these arguments. On MySQL 8.4.11, the old
+corpus passes five cases/eight child exits 0; the numeric corpus passes four
+cases/thirty-four columns/eleven child exits 0 and zero warnings. Values stay
+strings in the corpus and comparisons; no floating-point JSON conversion is
+used. These are stock CLI declarations/rows plus separate proxy-packet
+fixtures, rather than a live stock/proxy driver differential.
+
+Original `032715a25a0d341da02d76a95ddb0b8b8075513c` has a fixture compile
+failure, E0277/exit 101 before tests run. The one-line checked conversion at
+`5ed799b0b349c5027ba7b0ae92038c2ee87b081c` closes that compile failure.
+Independent review also identifies F1: double negation of ordinary negative
+signed operands incorrectly retains LONGLONG. Author stock observations
+confirm NEWDECIMAL for `-(-1)` and related forms, while `-(-0)` keeps LONGLONG.
+The correction at `1cf9377` models this declared-family rule separately from
+mathematical value range and adds the fourth corpus case plus its unit
+regression. Original failures, observations and the independent review remain
+tied to their own revisions; earlier passing tests do not erase F1.
+
+Exact source, tree, argv, environment, fixture port, actual exits and stream
+hashes are saved in `logs/exact-numeric-1cf9377-*.json` and
+`logs/exact-numeric-corrected-unit.json` outside the distribution, alongside
+the exclusive stock transcript directories. The independent corrective
+review closes F1 at `1cf9377` with no new functional finding. Its offline Git,
+source and saved-receipt audit is separate from the author's dynamic runs;
+the reviewer runs no Cargo or SQL. Reports, actual invocation receipts and
+additive facts remain outside the distribution. The compact
+`logs/exact-numeric-code-evidence.json` binds the corrected code, eighteen
+checks plus outer wrapper, stock transcripts and independent reports.
+A following documentation-only leaf preserves every nondocument byte, with
+fresh boundary/diff checks and a separate Git tree proof. Code/test receipts
+retain their original `1cf9377` source identity. No M2/M4, driver, measured
+performance, fresh CI, merge or release gate is closed by these additions.
+Security-related work and the separate compiler draft remain excluded.

@@ -125,6 +125,20 @@ jobs:
           name: mysql-query-results-reference
           path: ${{ runner.temp }}/mysql-query-results-reference
           if-no-files-found: error
+      - name: Required stock exact-number observations
+        run: >-
+          python3 tests/reference/observe_mysql_exact_numbers.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_exact_numbers.json
+          --evidence-dir '${{ runner.temp }}/mysql-exact-numbers-reference'
+      - name: Preserve exact-number reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-exact-numbers-reference
+          path: ${{ runner.temp }}/mysql-exact-numbers-reference
+          if-no-files-found: error
       - name: Preserve reference receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

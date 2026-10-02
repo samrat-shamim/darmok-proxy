@@ -20,6 +20,7 @@ use sqlparser::{
 };
 
 use crate::ServerSetValues;
+use crate::exact_number::ExactNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectSqlError {
@@ -259,13 +260,17 @@ fn evaluate(
             // MySQL unary plus preserves these selected values and types.
             match unwrap_nested(expr) {
                 Expr::Value(value)
-                    if matches!(
-                        value.value,
-                        Literal::Number(_, false) | Literal::Boolean(_) | Literal::Null
-                    ) =>
+                    if matches!(value.value, Literal::Boolean(_) | Literal::Null) =>
                 {
                     evaluate(state, globals, text, source, expr, spelling)
                 }
+                Expr::Value(value) if matches!(value.value, Literal::Number(_, false)) => {
+                    number_cell(source, expr, spelling)
+                }
+                Expr::UnaryOp {
+                    op: UnaryOperator::Plus | UnaryOperator::Minus,
+                    ..
+                } => evaluate(state, globals, text, source, expr, spelling),
                 Expr::MySqlSystemVariable(_) => {
                     evaluate(state, globals, text, source, expr, spelling)
                 }
@@ -274,21 +279,10 @@ fn evaluate(
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr,
-        } => {
-            let Expr::Value(value) = unwrap_nested(expr) else {
-                return Err(SelectSqlError::Unsupported.into());
-            };
-            if !matches!(value.value, Literal::Number(_, false)) {
-                return Err(SelectSqlError::Unsupported.into());
-            }
-            integer(source.number_source(value)?, true, spelling)
-        }
+            ..
+        } => number_cell(source, expr, spelling),
         Expr::Value(value) => match &value.value {
-            Literal::Number(_, false) => {
-                let original = source.number_source(value)?;
-                integer(original, false, original)
-            }
+            Literal::Number(_, false) => number_cell(source, expr, spelling),
             Literal::Boolean(value) => Ok(numeric_cell(
                 Bytes::from_static(if *value { b"1" } else { b"0" }),
                 spelling,
@@ -331,28 +325,55 @@ fn unwrap_nested(mut expr: &Expr) -> &Expr {
     expr
 }
 
-fn integer(original: &str, negative: bool, label: &str) -> Result<Cell, SelectAdmissionError> {
-    if original.is_empty() || !original.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(SelectSqlError::Unsupported.into());
+fn number_expression<'a>(
+    source: SourceSelect<'a>,
+    expr: &Expr,
+) -> Result<(ExactNumber<'a>, &'a str, bool), SelectAdmissionError> {
+    match expr {
+        Expr::Nested(inner)
+        | Expr::UnaryOp {
+            op: UnaryOperator::Plus,
+            expr: inner,
+        } => number_expression(source, inner),
+        Expr::UnaryOp {
+            op: UnaryOperator::Minus,
+            expr: inner,
+        } => {
+            let (number, token, _) = number_expression(source, inner)?;
+            Ok((
+                number.negate().map_err(|_| SelectSqlError::Unsupported)?,
+                token,
+                true,
+            ))
+        }
+        Expr::Value(value) if matches!(value.value, Literal::Number(_, false)) => {
+            let token = source.number_source(value)?;
+            Ok((
+                ExactNumber::from_token(token).map_err(|_| SelectSqlError::Unsupported)?,
+                token,
+                false,
+            ))
+        }
+        _ => Err(SelectSqlError::Unsupported.into()),
     }
-    let value: u64 = original.parse().map_err(|_| SelectSqlError::Unsupported)?;
-    let unsigned = !negative && value > i64::MAX as u64;
-    let width = u32::try_from(original.len())
-        .ok()
-        .and_then(|width| width.checked_add(u32::from(!unsigned)))
-        .ok_or(SelectSqlError::Unsupported)?;
-    let encoded = if negative {
-        let signed = i64::try_from(-i128::from(value)).map_err(|_| SelectSqlError::Unsupported)?;
-        signed.to_string()
-    } else {
-        value.to_string()
-    };
-    Ok(numeric_cell(
-        Bytes::from(encoded),
-        label,
-        width,
-        flag::NOT_NULL | if unsigned { flag::UNSIGNED } else { 0 },
-    ))
+}
+
+fn number_cell(
+    source: SourceSelect<'_>,
+    expr: &Expr,
+    spelling: &str,
+) -> Result<Cell, SelectAdmissionError> {
+    let (number, token, negation) = number_expression(source, expr)?;
+    let declaration = number.metadata();
+    Ok(Cell {
+        value: Some(number.into_text()),
+        name: Bytes::copy_from_slice(if negation { spelling } else { token }.as_bytes()),
+        mysql_type: declaration.mysql_type,
+        flags: declaration.flags,
+        charset: charset::BINARY,
+        width: declaration.width,
+        decimals: declaration.scale,
+    })
 }
 
 fn numeric_cell(value: Bytes, label: &str, width: u32, flags: u16) -> Cell {
@@ -617,7 +638,7 @@ mod tests {
             "SELECT DISTINCT 1",
             "SELECT 1 ORDER BY 1",
             "SELECT 1 + 2",
-            "SELECT 3.14",
+            "SELECT CAST(1 AS DECIMAL(3, 2))",
             "SELECT 1e2",
             "SELECT @@global.time_zone",
             "SELECT @@warning_count",
@@ -631,6 +652,169 @@ mod tests {
                 ),
                 "{sql}"
             );
+        }
+    }
+
+    #[test]
+    fn exact_decimal_values_keep_source_names_scale_and_declared_widths() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT 12.50, 001.230, .50, 1., 0.000, -0.00, +001.230, (001.230), (-001.230), -(001.230) AS via_neg",
+            state.sql_modes().unwrap().parser_flags(),
+        ).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        for (index, (name, text, width, scale)) in [
+            ("12.50", "12.50", 6, 2),
+            ("001.230", "1.230", 7, 3),
+            (".50", "0.50", 4, 2),
+            ("1.", "1", 2, 0),
+            ("0.000", "0.000", 6, 3),
+            ("-0.00", "0.00", 5, 2),
+            ("001.230", "1.230", 7, 3),
+            ("001.230", "1.230", 7, 3),
+            ("(-001.230)", "-1.230", 7, 3),
+            ("via_neg", "-1.230", 7, 3),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let c = &plan.columns[index];
+            assert_eq!(c.name, name.as_bytes());
+            assert_eq!(c.column_type, ty::NEWDECIMAL);
+            assert_eq!(c.column_length, width);
+            assert_eq!(c.decimals, scale);
+            assert_eq!(c.flags, flag::BINARY | flag::NOT_NULL);
+            assert_eq!(c.character_set, charset::BINARY);
+            assert_eq!(plan.row[index].as_deref(), Some(text.as_bytes()));
+        }
+    }
+
+    #[test]
+    fn exact_integer_promotions_and_nested_negation_follow_declared_types() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT 18446744073709551615 AS unsigned_value, 18446744073709551616 AS decimal_value, -9223372036854775808 AS signed_minimum, -9223372036854775809 AS below_signed, -18446744073709551615 AS negative_unsigned, -(-9223372036854775808), +(-1.00), -(-1.00), -0018446744073709551615, 0018446744073709551616",
+            state.sql_modes().unwrap().parser_flags(),
+        ).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        for (index, (text, kind, width, scale, unsigned)) in [
+            ("18446744073709551615", ty::LONGLONG, 20, 0, true),
+            ("18446744073709551616", ty::NEWDECIMAL, 21, 0, false),
+            ("-9223372036854775808", ty::LONGLONG, 20, 0, false),
+            ("-9223372036854775809", ty::NEWDECIMAL, 20, 0, false),
+            ("-18446744073709551615", ty::NEWDECIMAL, 21, 0, false),
+            ("9223372036854775808", ty::NEWDECIMAL, 20, 0, false),
+            ("-1.00", ty::NEWDECIMAL, 5, 2, false),
+            ("1.00", ty::NEWDECIMAL, 5, 2, false),
+            ("-18446744073709551615", ty::NEWDECIMAL, 23, 0, false),
+            ("18446744073709551616", ty::NEWDECIMAL, 22, 0, false),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let c = &plan.columns[index];
+            assert_eq!(c.column_type, kind);
+            assert_eq!(c.column_length, width);
+            assert_eq!(c.decimals, scale);
+            assert_eq!(
+                c.flags,
+                flag::BINARY | flag::NOT_NULL | if unsigned { flag::UNSIGNED } else { 0 }
+            );
+            assert_eq!(plan.row[index].as_deref(), Some(text.as_bytes()));
+        }
+        assert_eq!(plan.columns[5].name, b"-(-9223372036854775808)".as_slice());
+        assert_eq!(plan.columns[6].name, b"+(-1.00)".as_slice());
+        assert_eq!(plan.columns[7].name, b"-(-1.00)".as_slice());
+    }
+
+    #[test]
+    fn literal_precision_is_separate_from_decimal_column_scale() {
+        let (state, globals) = fixture();
+        let sql = "SELECT 99999999999999999999999999999999999999999999999999999999999999999 AS precision65, .1234567890123456789012345678901 AS scale31";
+        let parsed = parse_mysql_source(sql, state.sql_modes().unwrap().parser_flags()).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        assert_eq!(plan.columns[0].column_type, ty::NEWDECIMAL);
+        assert_eq!(plan.columns[0].column_length, 66);
+        assert_eq!(plan.columns[0].decimals, 0);
+        assert_eq!(
+            plan.row[0].as_deref(),
+            Some(b"99999999999999999999999999999999999999999999999999999999999999999".as_slice())
+        );
+        assert_eq!(plan.columns[1].column_type, ty::NEWDECIMAL);
+        assert_eq!(plan.columns[1].column_length, 33);
+        assert_eq!(plan.columns[1].decimals, 31);
+        assert_eq!(
+            plan.row[1].as_deref(),
+            Some(b"0.1234567890123456789012345678901".as_slice())
+        );
+    }
+
+    #[test]
+    fn nested_plus_preserves_previously_admitted_boolean_null_and_variable_values() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT +(+TRUE), +(+(NULL)), +(+@@autocommit)",
+            state.sql_modes().unwrap().parser_flags(),
+        )
+        .unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        assert_eq!(plan.columns[0].name.as_ref(), b"+(+TRUE)");
+        assert_eq!(plan.columns[0].column_type, ty::LONGLONG);
+        assert_eq!(plan.row[0].as_deref(), Some(b"1".as_slice()));
+        assert_eq!(plan.columns[1].name.as_ref(), b"NULL");
+        assert_eq!(plan.columns[1].column_type, ty::NULL);
+        assert!(plan.row[1].is_none());
+        assert_eq!(plan.columns[2].name.as_ref(), b"+(+@@autocommit)");
+        assert_eq!(plan.row[2].as_deref(), Some(b"1".as_slice()));
+    }
+
+    #[test]
+    fn negating_signed_negative_operands_uses_mysql_declared_decimal_promotion() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT -(-1), -(-0), -(-(001)), -(-9223372036854775807), -(-(-1)), +(-(-1)), -(+(-1)), -(-18446744073709551615)",
+            state.sql_modes().unwrap().parser_flags(),
+        ).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        for (index, (name, value, kind, width)) in [
+            ("-(-1)", "1", ty::NEWDECIMAL, 2),
+            ("-(-0)", "0", ty::LONGLONG, 2),
+            ("-(-(001))", "1", ty::NEWDECIMAL, 4),
+            (
+                "-(-9223372036854775807)",
+                "9223372036854775807",
+                ty::NEWDECIMAL,
+                20,
+            ),
+            ("-(-(-1))", "-1", ty::NEWDECIMAL, 2),
+            ("+(-(-1))", "1", ty::NEWDECIMAL, 2),
+            ("-(+(-1))", "1", ty::NEWDECIMAL, 2),
+            (
+                "-(-18446744073709551615)",
+                "18446744073709551615",
+                ty::NEWDECIMAL,
+                21,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(plan.columns[index].name.as_ref(), name.as_bytes());
+            assert_eq!(plan.columns[index].column_type, kind);
+            assert_eq!(plan.columns[index].column_length, width);
+            assert_eq!(plan.columns[index].decimals, 0);
+            assert_eq!(plan.columns[index].flags, flag::BINARY | flag::NOT_NULL);
+            assert_eq!(plan.row[index].as_deref(), Some(value.as_bytes()));
         }
     }
 }

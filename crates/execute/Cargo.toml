@@ -17,3 +17,6 @@ chrono = { workspace = true }
 tokio-postgres = { workspace = true, features = ["with-chrono-0_4"] }
 futures-util = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"
