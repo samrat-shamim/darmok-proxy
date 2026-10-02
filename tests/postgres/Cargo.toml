@@ -15,6 +15,7 @@ bytes = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 futures-util = { workspace = true }
+serde_json = { workspace = true }
 
 [[test]]
 name = "schema_routing"
@@ -69,8 +70,12 @@ name = "typed_completion"
 path = "typed_completion.rs"
 
 [[test]]
-name = "server_catalog_lease"
-path = "server_catalog_lease.rs"
+name = "server_catalog_publication"
+path = "server_catalog_publication.rs"
+
+[[test]]
+name = "catalog_discovery"
+path = "catalog_discovery.rs"
 
 [[test]]
 name = "simple_completion"

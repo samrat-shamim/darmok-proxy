@@ -60,6 +60,7 @@ jobs:
     env:
       DARMOK_TEST_DATABASE_URL: postgres://postgres:darmok-test@localhost:5432/darmok_test
       DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL: postgres://postgres:darmok-test@localhost:5433/darmok_test
+      DARMOK_TEST_UNPRELOADED_DATABASE_URL: postgres://postgres:darmok-test@localhost:5434/darmok_test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -71,10 +72,16 @@ jobs:
           mkdir '${{ runner.temp }}/darmok-server-evidence'
           docker build --progress=plain \
             --build-arg 'POSTGRES_IMAGE=${{ matrix.image }}' \
-            --tag 'darmok-server-test:${{ matrix.version }}' \
+            --tag 'darmok-server:${{ matrix.version }}' \
             postgres/darmok_server \
             >'${{ runner.temp }}/darmok-server-evidence/build.stdout' \
             2>'${{ runner.temp }}/darmok-server-evidence/build.stderr'
+          docker build --progress=plain \
+            --build-arg 'DARMOK_PRODUCT_IMAGE=darmok-server:${{ matrix.version }}' \
+            --tag 'darmok-server-test:${{ matrix.version }}' \
+            tests/probes/darmok_catalog_probe \
+            >'${{ runner.temp }}/darmok-server-evidence/probe-build.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/probe-build.stderr'
           docker run --detach --name darmok-server-test \
             --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=darmok-test \
             --env POSTGRES_DB=darmok_test --publish 127.0.0.1:5432:5432 \
@@ -91,17 +98,26 @@ jobs:
             'darmok-server-test:${{ matrix.version }}' \
             postgres -c shared_preload_libraries=darmok_server \
             -c max_prepared_transactions=0
+          docker run --detach --name darmok-server-unpreloaded-test \
+            --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=darmok-test \
+            --env POSTGRES_DB=darmok_test --publish 127.0.0.1:5434:5432 \
+            --health-cmd 'pg_isready -h 127.0.0.1 -U postgres -d darmok_test' \
+            --health-interval 1s --health-timeout 3s --health-retries 30 \
+            'darmok-server:${{ matrix.version }}' \
+            postgres -c shared_preload_libraries= -c max_prepared_transactions=10
           darmok_server_ready=false
           for darmok_attempt in {1..30}; do
             darmok_server_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-test)
             darmok_no_two_phase_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-no-two-phase-test)
-            if [ "$darmok_server_health" = healthy ] && [ "$darmok_no_two_phase_health" = healthy ]; then
+            darmok_unpreloaded_health=$(docker inspect --format '{{.State.Health.Status}}' darmok-server-unpreloaded-test)
+            if [ "$darmok_server_health" = healthy ] && [ "$darmok_no_two_phase_health" = healthy ] && [ "$darmok_unpreloaded_health" = healthy ]; then
               darmok_server_ready=true
               break
             fi
-            if [ "$darmok_server_health" = unhealthy ] || [ "$darmok_no_two_phase_health" = unhealthy ]; then
+            if [ "$darmok_server_health" = unhealthy ] || [ "$darmok_no_two_phase_health" = unhealthy ] || [ "$darmok_unpreloaded_health" = unhealthy ]; then
               docker logs darmok-server-test
               docker logs darmok-server-no-two-phase-test
+              docker logs darmok-server-unpreloaded-test
               exit 1
             fi
             sleep 1
@@ -109,6 +125,7 @@ jobs:
           if [ "$darmok_server_ready" != true ]; then
             docker logs darmok-server-test
             docker logs darmok-server-no-two-phase-test
+            docker logs darmok-server-unpreloaded-test
             exit 1
           fi
           docker exec darmok-server-test psql --username postgres --dbname darmok_test \
@@ -119,6 +136,10 @@ jobs:
             --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
             >'${{ runner.temp }}/darmok-server-evidence/install-no-two-phase.stdout' \
             2>'${{ runner.temp }}/darmok-server-evidence/install-no-two-phase.stderr'
+          docker exec darmok-server-unpreloaded-test psql --username postgres --dbname darmok_test \
+            --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION darmok_server' \
+            >'${{ runner.temp }}/darmok-server-evidence/install-unpreloaded.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/install-unpreloaded.stderr'
       - name: Required PostgreSQL tests
         run: cargo test -p darmok-postgres-tests --locked
       - name: Preserve server build and diagnostics
@@ -134,6 +155,11 @@ jobs:
             2>'${{ runner.temp }}/darmok-server-evidence/server-no-two-phase.stderr'
           docker inspect darmok-server-no-two-phase-test \
             >'${{ runner.temp }}/darmok-server-evidence/container-no-two-phase.json'
+          docker logs darmok-server-unpreloaded-test \
+            >'${{ runner.temp }}/darmok-server-evidence/server-unpreloaded.stdout' \
+            2>'${{ runner.temp }}/darmok-server-evidence/server-unpreloaded.stderr'
+          docker inspect darmok-server-unpreloaded-test \
+            >'${{ runner.temp }}/darmok-server-evidence/container-unpreloaded.json'
       - name: Upload server module evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

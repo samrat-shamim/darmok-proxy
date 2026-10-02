@@ -8,7 +8,9 @@ use crate::{
     NativeTransactionSpec, check_native_control,
 };
 
+mod native_catalog;
 mod native_schema;
+pub use native_catalog::{NativeCatalogError, NativeCatalogFailure, NativeCatalogMismatch};
 pub use native_schema::{NATIVE_SCHEMA_VERSION, NativeSchemaCompletion, NativeSchemaFailure};
 
 /// Known lifecycle state under this owner's exclusive SQL submission boundary.
@@ -18,6 +20,7 @@ pub enum NativeBackendState {
     Ready(TransactionState),
     Controlling(NativeControl),
     Scoped(NativeScopeBoundary),
+    Discovering(NativeScopeBoundary),
     /// An unfinished operation or unconfirmed cleanup permits only disposal.
     Uncertain,
 }
@@ -31,6 +34,8 @@ pub enum NativeBackendOperation {
     Rollback,
     StartTransactionScope,
     StartSavepointScope,
+    FinishScope,
+    RecoverScope,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -75,7 +80,8 @@ pub enum NativeRecovery {
 
 /// Owns both halves of a newly established connection. It exposes no Client,
 /// arbitrary SQL, GenericClient implementation, or caller-selected control SQL.
-/// This component owns controls only; admission and the row executor are pending.
+/// It owns fixed controls and catalog observations; admission and the row
+/// executor are pending.
 ///
 /// A scope excludes interleaved parent commands:
 /// ```compile_fail
@@ -390,6 +396,7 @@ impl NativeScope<'_> {
     /// Finish this control scope. Future row execution must retain this scope
     /// internally until its own output validation has completed.
     pub async fn finish(mut self) -> Result<NativeControlCompletion, NativeBackendError> {
+        self.require_active(NativeBackendOperation::FinishScope)?;
         let result = match self.boundary {
             OwnedBoundary::Transaction => {
                 self.backend.control(NativeControl::Commit, "COMMIT").await
@@ -414,6 +421,7 @@ impl NativeScope<'_> {
         mut self,
         recovery: NativeRecovery,
     ) -> Result<NativeControlCompletion, NativeBackendError> {
+        self.require_active(NativeBackendOperation::RecoverScope)?;
         let result = match (self.boundary, recovery) {
             (
                 OwnedBoundary::Transaction,
@@ -435,6 +443,17 @@ impl NativeScope<'_> {
         };
         self.finished = result.is_ok();
         result
+    }
+
+    fn require_active(&self, operation: NativeBackendOperation) -> Result<(), NativeBackendError> {
+        if self.backend.state == NativeBackendState::Scoped(self.boundary.kind()) {
+            Ok(())
+        } else {
+            Err(NativeBackendError::InvalidState {
+                operation,
+                state: self.backend.state,
+            })
+        }
     }
 }
 
@@ -500,6 +519,7 @@ impl StdError for NativeBackendDisposeError {
 #[cfg(test)]
 mod tests {
     mod frontend_loop;
+    mod native_catalog;
     mod native_lookup;
     mod native_row_output;
     mod native_schema;

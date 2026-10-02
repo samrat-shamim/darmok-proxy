@@ -10,6 +10,7 @@ publish = false
 darmok-types = { workspace = true }
 darmok-session = { workspace = true }
 darmok-protocol = { workspace = true }
+darmok-catalog = { workspace = true }
 sqlparser = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
@@ -18,7 +19,4 @@ tokio-postgres = { workspace = true, features = ["with-chrono-0_4"] }
 futures-util = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net"] }
 tokio-util = { workspace = true }
-
-[dev-dependencies]
-darmok-catalog = { workspace = true }
-serde_json = "1"
+serde_json = { workspace = true }

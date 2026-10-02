@@ -1,4 +1,4 @@
-comment = 'Catalog generation and execution leases for Darmok'
+comment = 'Snapshot-neutral catalog discovery and publication fences for Darmok'
 default_version = '1.0'
 module_pathname = '$libdir/darmok_server'
 relocatable = false

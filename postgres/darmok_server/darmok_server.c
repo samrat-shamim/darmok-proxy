@@ -3,6 +3,7 @@
 
 #include "access/xact.h"
 #include "access/xlog.h"
+#include "access/parallel.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_database_d.h"
 #include "catalog/pg_extension_d.h"
@@ -19,11 +20,14 @@
 #include "storage/sinval.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
+#include "utils/guc.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
 #include "utils/resowner.h"
 #include "utils/snapmgr.h"
 #include "utils/wait_event.h"
+
+#include "catalog_read.h"
 
 #if PG_VERSION_NUM < 170000 || PG_VERSION_NUM >= 190000
 #error "darmok_server requires PostgreSQL 17 or 18"
@@ -32,9 +36,6 @@
 PG_MODULE_MAGIC;
 
 PGDLLEXPORT void _PG_init(void);
-PG_FUNCTION_INFO_V1(darmok_begin_catalog_lease);
-PG_FUNCTION_INFO_V1(darmok_check_catalog_lease);
-PG_FUNCTION_INFO_V1(darmok_end_catalog_lease);
 
 /* OID zero cannot name an extension. The default lock method is deliberately
  * distinct from user advisory locks. Database zero makes this cluster-wide. */
@@ -50,22 +51,14 @@ typedef struct DarmokShared
 	ConditionVariable shared_drops_finished;
 } DarmokShared;
 
-typedef struct DarmokLease
-{
-	bool active;
-	uint64 id;
-	uint64 generation;
-	uint64 local_generation;
-	SubTransactionId subid;
-	ResourceOwner owner;
-} DarmokLease;
-
 static DarmokShared *shared = NULL;
 static uint64 backend_id = 0;
-static uint64 next_lease_id = 0;
 static uint64 local_generation = 1;
 static bool broken = false;
-static DarmokLease lease = {0};
+/* These flags belong only to one utility invocation, never a frontend handle. */
+static bool reader_active = false;
+static bool reader_fence_held = false;
+static ResourceOwner reader_owner = NULL;
 static bool writer_transaction_lock = false;
 static SubTransactionId writer_subid = InvalidSubTransactionId;
 static ResourceOwner writer_owner = NULL;
@@ -98,11 +91,11 @@ require_ready(void)
 	if (shared == NULL || broken)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("darmok_server catalog lease state is unavailable")));
+				 errmsg("darmok_server catalog state is unavailable")));
 	if (RecoveryInProgress())
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("darmok_server catalog leases require a primary server")));
+				 errmsg("darmok_server catalog discovery requires a primary server")));
 }
 
 /* A counter is never allowed to wrap and reuse a cache identity. This helper
@@ -139,8 +132,8 @@ transaction_lock_acquire(const LOCKTAG *tag, LOCKMODE mode,
 {
 	ResourceOwner saved = CurrentResourceOwner;
 
-	/* SQL-function portals have their own resource owners. Put a lease on the
-	 * current transaction owner so a later command can release the same lock. */
+	/* Publication uses the transaction owner; an internal read uses its
+	 * current utility owner and releases the fence before returning. */
 	CurrentResourceOwner = owner;
 	PG_TRY();
 	{
@@ -210,10 +203,10 @@ static void
 note_metadata_attempt(void)
 {
 	require_ready();
-	if (lease.active)
+	if (reader_active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("end the catalog lease before changing metadata")));
+				 errmsg("metadata cannot change during catalog discovery")));
 	last_metadata_subid = GetCurrentSubTransactionId();
 	advance_local();
 	require_ready();
@@ -238,10 +231,10 @@ static void
 publish_catalog_change(void)
 {
 	require_ready();
-	if (lease.active)
+	if (reader_active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("end the catalog lease before publishing metadata")));
+				 errmsg("metadata cannot publish during catalog discovery")));
 	if (preparing_transaction)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -259,7 +252,7 @@ begin_shared_drop_publication(void)
 	LOCKTAG tag = catalog_tag();
 
 	require_ready();
-	if (lease.active || preparing_transaction || pre_commit_started ||
+	if (reader_active || preparing_transaction || pre_commit_started ||
 		proc_exit_inprogress || writer_transaction_lock)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -274,7 +267,7 @@ begin_shared_drop_publication(void)
 		shared_drop_subid = GetCurrentSubTransactionId();
 		pg_atomic_fetch_add_u32(&shared->pending_shared_drops, 1);
 		shared_drop_pending = true;
-		/* Exclude new readers before draining existing leases. Do not retain
+		/* Exclude new readers before draining existing internal fences. Do not retain
 		 * this lock while native DROP waits for backend retirement or storage
 		 * barriers: exiting temp publishers must still acquire it. The intent
 		 * owns reader exclusion until transaction end; pre-commit takes the
@@ -340,10 +333,10 @@ transaction_event(XactEvent event, void *arg)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("shared-drop catalog publication cannot be prepared")));
-			if (lease.active)
+			if (reader_active)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("end the catalog lease before preparing a transaction")));
+						 errmsg("a transaction cannot prepare during catalog discovery")));
 			preparing_transaction = true;
 			/* Private metadata is not published by PREPARE. Never transfer our
 			 * global publication fence into native two-phase lock records. */
@@ -369,8 +362,9 @@ transaction_event(XactEvent event, void *arg)
 				 event == XACT_EVENT_PARALLEL_ABORT) &&
 				last_metadata_subid != InvalidSubTransactionId)
 				advance_local();
-			lease.active = false;
-			lease.owner = NULL;
+			reader_active = false;
+			reader_fence_held = false;
+			reader_owner = NULL;
 			writer_transaction_lock = false;
 			writer_owner = NULL;
 			writer_subid = InvalidSubTransactionId;
@@ -394,11 +388,6 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 			shared_drop_subid = parent;
 		if (last_metadata_subid == subid)
 			last_metadata_subid = parent;
-		if (lease.active && lease.subid == subid)
-		{
-			lease.subid = parent;
-			lease.owner = ResourceOwnerGetParent(lease.owner);
-		}
 		if (writer_transaction_lock && writer_subid == subid)
 		{
 			writer_subid = parent;
@@ -413,11 +402,6 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 		{
 			last_metadata_subid = parent;
 			advance_local();
-		}
-		if (lease.active && lease.subid == subid)
-		{
-			lease.active = false;
-			lease.owner = NULL;
 		}
 		if (writer_transaction_lock && writer_subid == subid)
 		{
@@ -470,10 +454,18 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		(((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_COMMIT_PREPARED ||
 		 ((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_ROLLBACK_PREPARED);
 
-	if (preparing && lease.active)
+	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
+		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
+			   DARMOK_CATALOG_REQUEST) == 0)
+	{
+		darmok_catalog_show(context, dest, completion);
+		return;
+	}
+
+	if (preparing && reader_active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("end the catalog lease before preparing a transaction")));
+				 errmsg("a transaction cannot prepare during catalog discovery")));
 
 	if (writer)
 	{
@@ -543,6 +535,8 @@ _PG_init(void)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("darmok_server must be in shared_preload_libraries at server startup")));
+	darmok_catalog_define_guc();
+	MarkGUCPrefixReserved("darmok_server");
 	previous_shmem_request = shmem_request_hook;
 	shmem_request_hook = request_shared_memory;
 	previous_shmem_startup = shmem_startup_hook;
@@ -555,124 +549,84 @@ _PG_init(void)
 	RegisterSubXactCallback(subtransaction_event, NULL);
 }
 
-static uint64
-require_lease(FunctionCallInfo fcinfo)
+void
+darmok_catalog_reader_start(void)
+{
+	require_ready();
+	if (reader_active || writer_depth > 0 || writer_transaction_lock ||
+		preparing_transaction || pre_commit_started || shared_drop_pending ||
+		HistoricSnapshotActive() || IsParallelWorker() || IsInParallelMode() ||
+		ParallelContextActive())
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("unsafe native catalog discovery boundary")));
+	if (backend_id == 0)
+		backend_id = advance_shared(&shared->next_backend_id);
+	reader_owner = CurrentResourceOwner;
+	reader_active = true;
+}
+
+void
+darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 {
 	LOCKTAG tag = catalog_tag();
 
+	Assert(reader_active && !reader_fence_held);
 	require_ready();
-	if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || !lease.active ||
-		PG_GETARG_INT64(0) <= 0 || PG_GETARG_INT64(1) <= 0 ||
-		(uint64) PG_GETARG_INT64(0) != lease.id ||
-		(uint64) PG_GETARG_INT64(1) != backend_id ||
-		!LockHeldByMe(&tag, ShareLock, false))
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("catalog lease is absent or does not match this backend")));
-	return lease.id;
-}
-
-Datum
-darmok_begin_catalog_lease(PG_FUNCTION_ARGS)
-{
-	TupleDesc desc;
-	Datum values[6];
-	bool nulls[6] = {false, false, false, false, false, false};
-	bytea *cluster_id;
-
-	require_ready();
-	if (!IsTransactionBlock())
-		ereport(ERROR,
-				(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-				 errmsg("a catalog lease requires a transaction block")));
-	if (lease.active)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("this backend already owns a catalog lease")));
-	if (writer_depth > 0 || preparing_transaction || pre_commit_started ||
-		shared_drop_pending)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("a catalog lease cannot start during a metadata utility or transaction finalization")));
-	if (next_lease_id >= PG_INT64_MAX)
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("darmok_server lease identity counter exhausted")));
-	if (backend_id == 0)
-		backend_id = advance_shared(&shared->next_backend_id);
-	if (get_call_result_type(fcinfo, NULL, &desc) != TYPEFUNC_COMPOSITE)
-		elog(ERROR, "catalog lease requires its declared composite result");
-	desc = BlessTupleDesc(desc);
+	/* Shared drops close admission through their native lifecycle. No catalog
+	 * work occurs while waiting or while this raw observation fence is held. */
+	for (;;)
 	{
-		LOCKTAG tag = catalog_tag();
-
-		/* Shared drops exclude new readers through their native lifecycle,
-		 * without holding this fence across backend retirement/storage waits.
-		 * Recheck after Share acquisition to close the admission race. */
-		for (;;)
+		PG_TRY();
 		{
-			PG_TRY();
-			{
-				while (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
-					ConditionVariableSleep(&shared->shared_drops_finished,
+			while (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+				ConditionVariableSleep(&shared->shared_drops_finished,
 									   PG_WAIT_EXTENSION);
-			}
-			PG_FINALLY();
-			{
-				ConditionVariableCancelSleep();
-			}
-			PG_END_TRY();
-			transaction_lock_acquire(&tag, ShareLock,
-									 CurTransactionResourceOwner);
-			if (pg_atomic_read_u32(&shared->pending_shared_drops) == 0)
-				break;
-			transaction_unlock(&tag, ShareLock, CurTransactionResourceOwner);
 		}
+		PG_FINALLY();
+		{
+			ConditionVariableCancelSleep();
+		}
+		PG_END_TRY();
+		transaction_lock_acquire(&tag, ShareLock, reader_owner);
+		reader_fence_held = true;
+		if (pg_atomic_read_u32(&shared->pending_shared_drops) == 0)
+			break;
+		darmok_catalog_fence_release();
 	}
-	lease.active = true;
-	lease.id = ++next_lease_id;
-	lease.subid = GetCurrentSubTransactionId();
-	lease.owner = CurTransactionResourceOwner;
-	lease.generation = pg_atomic_read_u64(&shared->generation);
-	lease.local_generation = local_generation;
-	/* A waiter must consume committed invalidations after obtaining the fence.
-	 * This does not replace a frontend data-snapshot policy. */
-	AcceptInvalidationMessages();
-	InvalidateCatalogSnapshot();
-	cluster_id = (bytea *) palloc(VARHDRSZ + DARMOK_CLUSTER_ID_BYTES);
-	SET_VARSIZE(cluster_id, VARHDRSZ + DARMOK_CLUSTER_ID_BYTES);
-	memcpy(VARDATA(cluster_id), shared->cluster_id, DARMOK_CLUSTER_ID_BYTES);
-	values[0] = Int64GetDatum((int64) lease.id);
-	values[1] = PointerGetDatum(cluster_id);
-	values[2] = ObjectIdGetDatum(MyDatabaseId);
-	values[3] = Int64GetDatum((int64) backend_id);
-	values[4] = Int64GetDatum((int64) lease.generation);
-	values[5] = Int64GetDatum((int64) lease.local_generation);
-	PG_RETURN_DATUM(HeapTupleGetDatum(heap_form_tuple(desc, values, nulls)));
+	memcpy(stamp->cluster_id, shared->cluster_id, DARMOK_CLUSTER_ID_BYTES);
+	stamp->database_oid = MyDatabaseId;
+	stamp->backend_id = backend_id;
+	stamp->generation = pg_atomic_read_u64(&shared->generation);
+	stamp->local_generation = local_generation;
 }
 
-Datum
-darmok_check_catalog_lease(PG_FUNCTION_ARGS)
+void
+darmok_catalog_fence_release(void)
 {
-	(void) require_lease(fcinfo);
-	if (lease.generation != pg_atomic_read_u64(&shared->generation) ||
-		lease.local_generation != local_generation)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("catalog lease generation changed")));
-	PG_RETURN_VOID();
-}
-
-Datum
-darmok_end_catalog_lease(PG_FUNCTION_ARGS)
-{
-	(void) require_lease(fcinfo);
+	if (reader_fence_held)
 	{
 		LOCKTAG tag = catalog_tag();
 
-		transaction_unlock(&tag, ShareLock, lease.owner);
+		transaction_unlock(&tag, ShareLock, reader_owner);
+		reader_fence_held = false;
 	}
-	lease.active = false;
-	lease.owner = NULL;
-	PG_RETURN_VOID();
+}
+
+bool
+darmok_catalog_stamp_equal(const DarmokCatalogStamp *left,
+						   const DarmokCatalogStamp *right)
+{
+	return left->generation == right->generation &&
+		left->local_generation == right->local_generation;
+}
+
+void
+darmok_catalog_reader_finish(void)
+{
+	/* Call before any scan/snapshot/relation cleanup, serialization or receiver
+	 * work, also from the invocation's PG_FINALLY on ordinary native ERROR. */
+	darmok_catalog_fence_release();
+	reader_active = false;
+	reader_owner = NULL;
 }

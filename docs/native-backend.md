@@ -1,9 +1,10 @@
 # Exclusive native backend ownership and control scopes
 
-Status: **implemented control lifecycle component; not a statement executor**.
+Status: **implemented control lifecycle and catalog discovery; local discovery
+verification on PostgreSQL 17.11/18.6; not a statement executor**.
 `NativeBackend` connects through the existing PostgreSQL connector, retains the
-client and driver privately, and submits only its own fixed initialization and
-transaction controls.
+client and driver privately, and submits its own fixed initialization,
+transaction controls and catalog discovery requests.
 It cannot adopt an arbitrary `Client`, implement `GenericClient`, or expose a raw
 SQL method. A caller cannot prepare or execute statements through this API.
 The [execution contract](native-execution.md) still requires semantic admission,
@@ -43,6 +44,7 @@ behavior in these internal methods.
 | Ready(I/T/E) | The owner's latest complete request confirmed this native state | A permitted explicit control or new scope |
 | Controlling | Internal SQL has been started; readiness is not confirmed | Finish the control, or dispose after abandonment |
 | Scoped | A borrowed transaction/savepoint scope is open | Finish or recover through that scope |
+| Discovering | The scope's fixed catalog request has started | Confirm complete observation, recover a confirmed native error, or dispose |
 | Uncertain | A started future/scope was dropped or cleanup was unconfirmed | Dispose only |
 
 `Ready` describes a confirmed historical request. It does not predict future
@@ -107,11 +109,14 @@ also does not certify [MySQL lock retention](https://dev.mysql.com/doc/refman/8.
 acquired after a rolled-back savepoint. Data effects and final native state alone
 are insufficient evidence for frontend transaction equivalence.
 
-No rows can currently be obtained through this scope. When the admitted row
-executor is integrated, it must hold the scope privately through decoding,
-encoding and completion; it cannot expose unchecked rows alongside this
-control-only finish method. Scope completion by itself is not statement
-admission or output validation.
+`discover_catalog` returns only checked immutable
+[catalog observations](catalog-discovery.md). It submits no SQL for empty input,
+retains no live fence and cannot execute user table queries. An uncertain read
+prevents both finish and recovery; observed readiness alone does not restore
+the supported owner profile. When the admitted row executor is integrated, it
+must hold the scope privately through decoding, encoding and completion; it
+cannot expose unchecked rows alongside this finish method. Scope completion
+by itself is not statement admission or output validation.
 
 ## Disposal
 
@@ -137,8 +142,9 @@ whole-transaction recovery from either boundary uses fixed static SQL and one
 control request. It avoids a savepoint-recovery request followed by a separate
 outer rollback, without claiming measured latency. Control checking retains its
 fixed matched prefix and first error/mismatch, not an unbounded event history. There
-is no row allocation, result buffering, cache, pipelining or performance claim
-in this component.
+is no cache, pipelining or throughput claim. Catalog discovery adds one SET/SHOW
+request, a retained text response and decoded fact maps as detailed in its
+separate contract.
 
 Private database unit fixtures can exercise table effects without opening a
 public raw SQL escape. They are ignored in database-free workspace jobs and
@@ -165,6 +171,14 @@ isolation/access combinations through explicit BEGIN and transaction scopes,
 unchanged session defaults, inherited savepoint characteristics through recovery
 and release, and wrong-boundary errors. They check native settings, not MySQL
 snapshot or lock equivalence.
+Three discovery fixtures additionally cover first data views at both scope
+boundaries, explicit missing-relation recovery and disposal-only missing-module
+or unsupported-profile errors. They require a preloaded, installed primary
+database, its uninstalled `postgres` database and
+`DARMOK_TEST_UNPRELOADED_DATABASE_URL` naming an installed database without
+module preloading. These three fixtures have current-revision local receipts
+on both versions; earlier lifecycle fixtures retain their own revision-specific
+evidence in the release plan.
 Fixture SQL uses private test access and is not an admitted statement path.
 No forced transport interruption, security review, adversarial inputs or
 resource stress is included. MySQL behavior and release gates remain pending.

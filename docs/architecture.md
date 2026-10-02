@@ -157,17 +157,20 @@ round-trip and contention costs. Its server packages become part of the
 self-contained artifact gate. Unrestricted plugin loading remains outside the
 first release. Security-related extension work remains deferred.
 
-The [server catalog lease](server-catalog-lease.md) supplies the initial
-generation/publication primitive. It uses a separate `darmok_server` namespace
+The [server catalog mechanism](server-catalog-lease.md) supplies catalog
+generation/publication and [one-shot discovery](catalog-discovery.md) through
+the exclusive native owner. It uses a separate `darmok_server` namespace
 for native mechanisms and keeps SQL compatibility functions in `darmok`.
 The primary-server target supports concurrent native two-phase transactions.
-Global leases cover admitted catalog resolution/validation only; complete native
-dependency guards must be acquired outside the lease and retained through row
-execution after the lease ends. MySQL prepared statements remain a separate
-planned protocol feature. Combined explicit initialization/
-verification, fresh leased catalog snapshots, owning scope integration, cache
-admission and table execution remain required; the primitive alone does not
-close the catalog validity gate.
+Discovery uses short internal Share spans and ends them before cleanup/output;
+returned facts and stamps are historical observations, without execution leases.
+Snapshot neutrality depends on its continuous private-owner backend profile.
+Complete native dependency guards must be acquired outside Share, rechecked
+against fresh metadata and retained through row execution. MySQL prepared
+statements remain a separate planned protocol feature. Combined explicit
+initialization/verification, supported preparation, semantic/cache admission
+and table execution remain required; observation alone does not close the
+catalog validity gate.
 
 ## Observability
 

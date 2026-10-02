@@ -1,5 +1,11 @@
 # Native catalog facts
 
+The SQL readers below honor native transaction snapshots. The separate
+[one-shot catalog discovery](catalog-discovery.md) protocol reads current facts
+without selecting the private owner's first data snapshot under its supported
+continuous backend profile. Both return immutable facts, without execution
+leases or table-query admission.
+
 `darmok-catalog::read_native_relations` reads relation definitions by their
 database-local PostgreSQL OIDs. It takes a client or transaction and returns
 exact relation names, active user-column definitions and declared types. All

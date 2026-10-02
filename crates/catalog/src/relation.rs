@@ -32,8 +32,8 @@ pub struct NativeRelationName<'a> {
 /// deduplicate relations and types. This result is not an execution lease.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NamedNativeCatalog {
-    catalog: NativeCatalog,
-    relation_oids: Vec<u32>,
+    pub(crate) catalog: NativeCatalog,
+    pub(crate) relation_oids: Vec<u32>,
 }
 
 impl NamedNativeCatalog {
@@ -316,37 +316,8 @@ fn require_type(catalog: &NativeCatalog, oid: u32) -> Result<(), CatalogError> {
 }
 
 fn relation_from_row(row: &Row) -> Result<NativeRelation, CatalogError> {
-    let code = row.try_get(4)?;
-    let kind = match code as u8 {
-        b'r' => RelationKind::Table,
-        b'i' => RelationKind::Index,
-        b'S' => RelationKind::Sequence,
-        b't' => RelationKind::Toast,
-        b'v' => RelationKind::View,
-        b'm' => RelationKind::MaterializedView,
-        b'c' => RelationKind::Composite,
-        b'f' => RelationKind::ForeignTable,
-        b'p' => RelationKind::PartitionedTable,
-        b'I' => RelationKind::PartitionedIndex,
-        _ => {
-            return Err(CatalogError::UnknownCode {
-                field: "pg_class.relkind",
-                code,
-            });
-        }
-    };
-    let code = row.try_get(5)?;
-    let persistence = match code as u8 {
-        b'p' => RelationPersistence::Permanent,
-        b'u' => RelationPersistence::Unlogged,
-        b't' => RelationPersistence::Temporary,
-        _ => {
-            return Err(CatalogError::UnknownCode {
-                field: "pg_class.relpersistence",
-                code,
-            });
-        }
-    };
+    let kind = relation_kind(row.try_get::<_, i8>(4)? as u8)?;
+    let persistence = relation_persistence(row.try_get::<_, i8>(5)? as u8)?;
     Ok(NativeRelation {
         oid: row.try_get(0)?,
         schema_oid: row.try_get(1)?,
@@ -360,30 +331,8 @@ fn relation_from_row(row: &Row) -> Result<NativeRelation, CatalogError> {
 }
 
 fn column_from_row(row: &Row, attribute_number: i16) -> Result<NativeColumn, CatalogError> {
-    let code = row.try_get(14)?;
-    let identity = match code as u8 {
-        0 => ColumnIdentity::None,
-        b'a' => ColumnIdentity::Always,
-        b'd' => ColumnIdentity::ByDefault,
-        _ => {
-            return Err(CatalogError::UnknownCode {
-                field: "pg_attribute.attidentity",
-                code,
-            });
-        }
-    };
-    let code = row.try_get(15)?;
-    let generation = match code as u8 {
-        0 => ColumnGeneration::None,
-        b's' => ColumnGeneration::Stored,
-        b'v' => ColumnGeneration::Virtual,
-        _ => {
-            return Err(CatalogError::UnknownCode {
-                field: "pg_attribute.attgenerated",
-                code,
-            });
-        }
-    };
+    let identity = column_identity(row.try_get::<_, i8>(14)? as u8)?;
+    let generation = column_generation(row.try_get::<_, i8>(15)? as u8)?;
     Ok(NativeColumn {
         attribute_number,
         name: row.try_get(8)?,
@@ -399,22 +348,7 @@ fn column_from_row(row: &Row, attribute_number: i16) -> Result<NativeColumn, Cat
 }
 
 fn type_from_row(row: &Row, oid: u32) -> Result<NativeType, CatalogError> {
-    let code = row.try_get(21)?;
-    let kind = match code as u8 {
-        b'b' => TypeKind::Base,
-        b'c' => TypeKind::Composite,
-        b'd' => TypeKind::Domain,
-        b'e' => TypeKind::Enum,
-        b'p' => TypeKind::Pseudo,
-        b'r' => TypeKind::Range,
-        b'm' => TypeKind::Multirange,
-        _ => {
-            return Err(CatalogError::UnknownCode {
-                field: "pg_type.typtype",
-                code,
-            });
-        }
-    };
+    let kind = type_kind(row.try_get::<_, i8>(21)? as u8)?;
     let domain = if kind == TypeKind::Domain {
         Some(DomainType {
             base_type_oid: row.try_get(24)?,
@@ -434,6 +368,87 @@ fn type_from_row(row: &Row, oid: u32) -> Result<NativeType, CatalogError> {
         category: row.try_get::<_, i8>(22)? as u8,
         element_type_oid: valid_oid(row.try_get(23)?),
         domain,
+    })
+}
+
+pub(crate) fn relation_kind(code: u8) -> Result<RelationKind, CatalogError> {
+    Ok(match code {
+        b'r' => RelationKind::Table,
+        b'i' => RelationKind::Index,
+        b'S' => RelationKind::Sequence,
+        b't' => RelationKind::Toast,
+        b'v' => RelationKind::View,
+        b'm' => RelationKind::MaterializedView,
+        b'c' => RelationKind::Composite,
+        b'f' => RelationKind::ForeignTable,
+        b'p' => RelationKind::PartitionedTable,
+        b'I' => RelationKind::PartitionedIndex,
+        _ => {
+            return Err(CatalogError::UnknownCode {
+                field: "pg_class.relkind",
+                code: code as i8,
+            });
+        }
+    })
+}
+
+pub(crate) fn relation_persistence(code: u8) -> Result<RelationPersistence, CatalogError> {
+    Ok(match code {
+        b'p' => RelationPersistence::Permanent,
+        b'u' => RelationPersistence::Unlogged,
+        b't' => RelationPersistence::Temporary,
+        _ => {
+            return Err(CatalogError::UnknownCode {
+                field: "pg_class.relpersistence",
+                code: code as i8,
+            });
+        }
+    })
+}
+
+pub(crate) fn column_identity(code: u8) -> Result<ColumnIdentity, CatalogError> {
+    Ok(match code {
+        0 => ColumnIdentity::None,
+        b'a' => ColumnIdentity::Always,
+        b'd' => ColumnIdentity::ByDefault,
+        _ => {
+            return Err(CatalogError::UnknownCode {
+                field: "pg_attribute.attidentity",
+                code: code as i8,
+            });
+        }
+    })
+}
+
+pub(crate) fn column_generation(code: u8) -> Result<ColumnGeneration, CatalogError> {
+    Ok(match code {
+        0 => ColumnGeneration::None,
+        b's' => ColumnGeneration::Stored,
+        b'v' => ColumnGeneration::Virtual,
+        _ => {
+            return Err(CatalogError::UnknownCode {
+                field: "pg_attribute.attgenerated",
+                code: code as i8,
+            });
+        }
+    })
+}
+
+pub(crate) fn type_kind(code: u8) -> Result<TypeKind, CatalogError> {
+    Ok(match code {
+        b'b' => TypeKind::Base,
+        b'c' => TypeKind::Composite,
+        b'd' => TypeKind::Domain,
+        b'e' => TypeKind::Enum,
+        b'p' => TypeKind::Pseudo,
+        b'r' => TypeKind::Range,
+        b'm' => TypeKind::Multirange,
+        _ => {
+            return Err(CatalogError::UnknownCode {
+                field: "pg_type.typtype",
+                code: code as i8,
+            });
+        }
     })
 }
 

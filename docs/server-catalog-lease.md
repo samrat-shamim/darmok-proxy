@@ -1,10 +1,12 @@
 # Server catalog lease
 
-`postgres/darmok_server` implements a PostgreSQL 17/18 catalog generation and
-transaction-owned read fence. It does not implement statement admission, fresh
-catalog reads, the owning Rust execution scope, complete result definitions,
-plan caching, or a MySQL table executor. Those remain required before exposing
-catalog-dependent SQL. Component evidence is recorded in the release plan.
+`postgres/darmok_server` implements PostgreSQL 17/18 catalog publication and a
+one-shot reader with internal, transaction-owned read fences. The reader and
+private Rust scope integration have current-revision local PostgreSQL 17.11/18.6
+verification under the continuous private-owner profile.
+Statement admission, complete dependency guards, result definitions, plan
+caching and a MySQL table executor remain required before exposing table SQL.
+Component evidence is recorded in the release plan.
 
 ## Installation and identity
 
@@ -15,7 +17,7 @@ extension has version `1.0`; its namespace is `darmok_server`, separate from the
 SQL compatibility functions in `darmok`. Current `init`/`schema verify` cover only
 the latter. Combined installation and exact module verification remain pending.
 
-Leases require a primary server. Concurrent native PostgreSQL two-phase
+Discovery requires a primary server. Concurrent native PostgreSQL two-phase
 transactions are part of the v0.1 target; `max_prepared_transactions` may be
 nonzero. This is separate from MySQL prepared statements and MySQL XA support.
 The module does not change the server configuration.
@@ -27,68 +29,36 @@ each participating backend receives an increasing identifier. Persistent cache
 identities cannot assume generations survive a server restart or reuse a backend
 identifier without its incarnation.
 
-## API and ownership
+## Reader API and ownership
 
-The fixed acquisition query is:
+[Catalog discovery](catalog-discovery.md) uses inert SET LOCAL followed by
+top-level SHOW. The module returns immutable facts and a publication stamp; it
+exports no begin/check/end lease functions or frontend handle. Native resource
+ownership is confined to one SHOW invocation. All Share spans end before heap,
+snapshot and descriptor cleanup, serialization and receiver work, including
+ordinary ERROR paths. A suspended SHOW portal keeps historical facts only.
 
-```sql
-SELECT * FROM darmok_server.begin_catalog_lease();
-```
+The private local generation invalidates facts on metadata rollback and native
+transaction prepare; metadata-free transactions preserve that identity. Global
+and local generations are cache inputs, not proof of later statement validity.
+Moving a fact between backends cannot preserve its private ownership.
 
-It requires a PostgreSQL transaction block, allows one active lease per backend,
-and returns six non-NULL fields. An explicit `BEGIN` block can span requests.
-A multi-statement simple query also creates an implicit block; a lease acquired
-there expires at the request's native commit and cannot span requests. A single
-standalone acquisition fails. The owning proxy executor must use an explicit
-transaction for its separate acquisition, execution and release requests.
+The future statement sequence must:
 
-| Field | Native type | Meaning |
-| --- | --- | --- |
-| `lease_id` | `int8` | Increasing handle within this backend |
-| `cluster_id` | `bytea` | Opaque 16-byte server incarnation |
-| `database_oid` | `oid` | Exact physical database |
-| `backend_id` | `int8` | Incarnation-scoped connection identity |
-| `generation` | `int8` | Cluster catalog publication identity |
-| `local_generation` | `int8` | This backend's private catalog identity |
+1. Discover current dependencies through the fixed one-shot reader.
+2. Acquire complete native relation/object dependency guards outside the global
+   fence. These waits may include prepared transactions.
+3. Recheck fresh metadata and dependency closure. An added or changed dependency
+   requires release/restart before effects; no guard may be acquired under Share.
+4. Prepare and validate only proven nonblocking paths inside a controlled native
+   boundary, then release any global fence before row execution.
+5. Retain dependency guards through execution and output validation.
 
-`check_catalog_lease(lease_id, backend_id)` validates active ownership and both
-generations. `end_catalog_lease(lease_id, backend_id)` releases the owned read
-fence. NULL, expired, duplicate or mismatched handles produce errors; there is no
-idempotent success for an absent lease. A backend identity is part of the handle
-because different backends can both have a local lease number `1`. Acquisition
-inside a metadata utility is rejected.
-
-The lock belongs to `CurTransactionResourceOwner`, not the SQL function's portal.
-A later command can release it. PostgreSQL releases unfinished leases at top-level
-commit/rollback and at rollback of their owning savepoint. Savepoint release
-promotes ownership to the parent. A parent lease survives a metadata-free child
-error. The local catalog generation invalidates private facts on metadata rollback
-or transaction prepare, while metadata-free transactions retain reusable catalog
-identity. Handles and catalog cache identities have different lifetimes.
-
-The global lease covers only admitted catalog resolution and validation. It
-must end before any operation that can wait for user-relation, tuple, transaction
-ID or user locks. PostgreSQL planning can execute user/support functions; planning
-is not inherently safe under this lease. The future admission boundary must prove
-its permitted preparation paths cannot perform those waits.
-
-The required statement sequence is:
-
-1. Read dependencies using fixed, fresh, non-row-locking catalog operations under
-   a discovery lease; then end that lease.
-2. Acquire the complete native relation/object dependency guards outside the
-   global lease. These waits may include prepared transactions.
-3. Reacquire a catalog lease and resolve under a fresh snapshot. Validate that
-   dependencies are closed and unchanged. If another dependency is found, end
-   the lease and restart before effects; never acquire another guard under it.
-4. Prepare and validate only admitted nonblocking paths, then end the global
-   lease before row execution.
-5. Retain the complete dependency guards through execution and output validation.
-
-These guards, fresh reads and semantic admission are still required components.
-The global lease alone cannot protect a running plan. Native object replacements
-without sufficient native locking also need a verified guard integration.
-Dropped or failed scopes cannot assert a live lease.
+The reader supplies only the first component and fresh facts for future recheck.
+The prepare/admission boundary is not implemented. PostgreSQL planning can
+execute user/support functions; planning is not inherently safe under Share.
+The global fence cannot protect a running plan. Native object replacements
+without sufficient native locking need a verified guard integration.
 
 ## Catalog publication
 
@@ -115,7 +85,8 @@ storage mappings and sequence values are not immutable schema dependencies;
 this mechanism does not freeze those non-MVCC values.
 
 A writer retains its transaction fence through native catalog invalidation and
-lock cleanup. Waiting readers consume invalidations after acquisition. Internal
+lock cleanup. Readers observe generation, release Share, then consume native
+invalidations outside Share before an unchanged-generation reacquisition. Internal
 commits, including concurrent index phases, each get a new publication generation.
 The final valid-index transition is fenced at the final transaction's pre-commit.
 No session fence spans the old-snapshot waits between phases.
@@ -133,7 +104,7 @@ catalog publication receives the ordinary commit fence.
 
 ## Prepared transactions
 
-PREPARE keeps metadata private. It rejects an active catalog lease or shared-drop
+PREPARE keeps metadata private. It rejects reentry during discovery or shared-drop
 intent and releases any transaction publication fence before native two-phase
 lock transfer. Private metadata invalidates the backend's local identity when
 preparation completes. The module adds no marker locks, GID hash gates or native
@@ -198,11 +169,12 @@ custom late callbacks remain outside the declared contract.
 
 ## Caller requirements and limits
 
-A lease prevents catalog publication during its lifetime; it does not turn an
-old repeatable-read data snapshot into a current catalog snapshot. The fixed
-server catalog-read boundary under a fresh snapshot remains pending. This is
-separate from the MySQL data-snapshot policy and savepoint row-lock retention,
-which this module does not implement.
+An internal Share span prevents publication only while held. The fixed reader
+uses a fresh native catalog snapshot independent of an old repeatable-read data
+view and leaves no live fence after returning. Snapshot neutrality requires its
+continuous private-owner builtin native profile; arbitrary backend histories
+are not certified. MySQL data-snapshot policy and savepoint row-lock retention
+remain separate, unimplemented gates.
 
 The stamp is only one part of a cache key. Physical/backend identity, route,
 schema, SQL mode, charset/collation, time zone, parameter shape, installation
@@ -224,9 +196,9 @@ catalog writer fence. Maintenance utilities may conservatively serialize with
 readers. A narrower fence requires its own complete dependency and publication
 argument before replacing this mechanism.
 
-The module runs no SQL during acquisition or release. It uses fixed backend
-state, one backend-identity atomic allocation per participating connection,
-ordinary native lock ownership and per-acquisition result allocation.
+The module runs no SQL during internal acquisition or release. It uses fixed
+backend state, one backend-identity atomic allocation per participating connection
+and ordinary native lock ownership.
 Two atomic intent reads are added to uncontended acquisition. Shared drops add
 one transaction-owned admission count, a short native drain lock and the ordinary
 pre-commit publication lock; ordinary exit publishers need no special wait loop.
@@ -235,16 +207,19 @@ Prepared completion adds one publication lock and generation advance, without
 classifier SQL, GID allocations or protocol round trips. All prepared completions
 contend with readers and conservatively invalidate catalog cache identities,
 including pure DML; ordinary pure-DML commits retain their previous behavior.
-Local
-lease numbers avoid a shared atomic allocation on every request. Separate fixed
-begin/end queries cost two protocol round trips; an explicit check adds one.
-The bounded sequential fixture measures those two calls, not proxy throughput,
-cache hit rates, catalog-read cost or parallel contention.
+The one-shot reader needs one SET/SHOW round trip per nonempty request. An
+uncontended successful attempt has two raw Share acquisitions and four full
+fact-heap scans. Shared-drop admission retries add acquisitions; a changed
+generation restarts the attempt and adds acquisitions and preparation. Its
+[phase budgets and sequential fixture](catalog-discovery.md) do not establish
+proxy throughput, cache hit rates or parallel contention.
 
-Required native fixtures exercise actual fence grants/waits, simultaneous
-readers, ordinary DML, external relation/schema/function/type/domain/collation
-DDL, drop/recreate, metadata rollback, savepoint ownership, concurrent index
-publication, cross-database hooks, enabled/default 2PC profiles, prepared DDL/DML,
+Required publication fixtures use a separately built test-only native Share
+probe; no probe module or long-held reader API is installed in the product
+image. They exercise actual fence grants/waits, simultaneous synthetic readers,
+ordinary DML, external relation/schema/function/type/domain/collation DDL,
+drop/recreate, metadata rollback, concurrent index publication, cross-database
+hooks, prepared DDL/DML,
 rolled-back child DDL, mixed prepared row/catalog changes, exact case-distinct
 GIDs under a schema-local text operator, prepared view locks and normal temp-backend
 exit in the target or an unrelated database during removal, plus concurrent drop
