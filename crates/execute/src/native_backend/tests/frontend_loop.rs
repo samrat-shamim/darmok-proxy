@@ -454,7 +454,7 @@ async fn frontend_loop_ping_preserves_condition_count_until_next_statement() {
             | StatusFlags::SERVER_STATUS_IN_TRANS.bits()
             | StatusFlags::SERVER_STATUS_IN_TRANS_READONLY.bits();
         ok(
-            &command(&mut input, COM_QUERY, b"BEGIN READ ONLY").await,
+            &command(&mut input, COM_QUERY, b"START TRANSACTION READ ONLY").await,
             flags,
         );
         let bad_mode = b"SET SESSION sql_mode='DARMOK_UNKNOWN_MODE'";
