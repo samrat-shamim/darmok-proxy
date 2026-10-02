@@ -8,6 +8,9 @@ use crate::{
     NativeTransactionSpec, check_native_control,
 };
 
+mod native_schema;
+pub use native_schema::{NATIVE_SCHEMA_VERSION, NativeSchemaCompletion, NativeSchemaFailure};
+
 /// Known lifecycle state under this owner's exclusive SQL submission boundary.
 /// Ready is a confirmed request observation, not a promise of future connectivity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +24,8 @@ pub enum NativeBackendState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeBackendOperation {
+    InitializeSchema,
+    VerifySchema,
     Begin,
     Commit,
     Rollback,
@@ -342,6 +347,10 @@ fn failure_state(failure: &NativeControlFailure) -> NativeBackendState {
             (NativeControl::Savepoint, Some(state @ (Transaction | FailedTransaction))) => {
                 return NativeBackendState::Ready(state);
             }
+            (
+                NativeControl::InitializeSchema | NativeControl::VerifySchema,
+                Some(state @ (Idle | FailedTransaction)),
+            ) => return NativeBackendState::Ready(state),
             _ => {}
         }
     }
@@ -493,6 +502,7 @@ mod tests {
     mod frontend_loop;
     mod native_lookup;
     mod native_row_output;
+    mod native_schema;
     mod query_results;
     mod query_transactions;
     mod set_controller;
