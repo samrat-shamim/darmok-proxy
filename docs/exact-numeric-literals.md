@@ -30,7 +30,9 @@ another. CLI's computed NUM flag is not a server packet flag.
 
 Nested unary plus/minus expressions over exact numbers are planned in order.
 Negating an unsigned integer may produce a signed integer or DECIMAL; negating
-the signed minimum again produces DECIMAL. Ordinary negation retains width,
+any nonzero negative signed operand produces DECIMAL, including `-(-1)`.
+This is MySQL's declared-type rule even when the result fits a signed integer;
+negating signed zero retains LONGLONG. Ordinary negation retains width,
 adding a sign position for unsigned operands. Integer-to-DECIMAL promotion uses
 the operand's declared precision, distinguishing literal and derived values.
 Plain literals and unary plus retain the original numeric-token name; a
@@ -46,7 +48,8 @@ times; each subsequent sign operation uses its stored zero classification.
 There is no new runtime dependency, cache, lock or PostgreSQL round trip.
 Actual end-to-end allocation/latency measurements remain release gates.
 
-The required reference corpus declares three cases and twenty-four columns.
+The required reference corpus declares four cases and thirty-four columns,
+including literal scales 30, 31 and 65.
 Its observer compares pinned MySQL CLI metadata and exact row strings, with
 zero warnings required in each case. Metadata and row commands use distinct
 stock connections and preserve separate transcripts. The public command

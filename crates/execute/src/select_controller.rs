@@ -775,4 +775,46 @@ mod tests {
         assert_eq!(plan.columns[2].name.as_ref(), b"+(+@@autocommit)");
         assert_eq!(plan.row[2].as_deref(), Some(b"1".as_slice()));
     }
+
+    #[test]
+    fn negating_signed_negative_operands_uses_mysql_declared_decimal_promotion() {
+        let (state, globals) = fixture();
+        let parsed = parse_mysql_source(
+            "SELECT -(-1), -(-0), -(-(001)), -(-9223372036854775807), -(-(-1)), +(-(-1)), -(+(-1)), -(-18446744073709551615)",
+            state.sql_modes().unwrap().parser_flags(),
+        ).unwrap();
+        let plan = admit_select(&state, &globals, parsed.single_select().unwrap().unwrap())
+            .ok()
+            .unwrap();
+        for (index, (name, value, kind, width)) in [
+            ("-(-1)", "1", ty::NEWDECIMAL, 2),
+            ("-(-0)", "0", ty::LONGLONG, 2),
+            ("-(-(001))", "1", ty::NEWDECIMAL, 4),
+            (
+                "-(-9223372036854775807)",
+                "9223372036854775807",
+                ty::NEWDECIMAL,
+                20,
+            ),
+            ("-(-(-1))", "-1", ty::NEWDECIMAL, 2),
+            ("+(-(-1))", "1", ty::NEWDECIMAL, 2),
+            ("-(+(-1))", "1", ty::NEWDECIMAL, 2),
+            (
+                "-(-18446744073709551615)",
+                "18446744073709551615",
+                ty::NEWDECIMAL,
+                21,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(plan.columns[index].name.as_ref(), name.as_bytes());
+            assert_eq!(plan.columns[index].column_type, kind);
+            assert_eq!(plan.columns[index].column_length, width);
+            assert_eq!(plan.columns[index].decimals, 0);
+            assert_eq!(plan.columns[index].flags, flag::BINARY | flag::NOT_NULL);
+            assert_eq!(plan.row[index].as_deref(), Some(value.as_bytes()));
+        }
+    }
 }

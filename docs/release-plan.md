@@ -523,13 +523,13 @@ a merge/release blocker; authorized functional work can still progress.
 The local SELECT controller is being extended to exact decimal tokens, large
 integer promotion and ordered unary signs. [The contract](exact-numeric-literals.md)
 keeps source labels, row text and declared metadata separate, including scale
-above 30 for literals, trailing zeros and signed-minimum negation. Scientific
+above 30 for literals, trailing zeros and negative signed-operand promotion. Scientific
 notation and general numeric expressions remain explicit unsupported outcomes.
 The private evaluator uses borrowed digits until final row allocation and adds
 no native request or runtime dependency. This is progress toward the full
 SQL/type objective, not a replacement of its remaining gates.
 
-Three pinned stock cases declare twenty-four columns, exact string rows and
+Four pinned stock cases declare thirty-four columns, exact string rows and
 zero warnings; the new observer and existing column observer share only their
 CLI field decoder. The old five-case column corpus remains unchanged and must
 be observed freshly when the shared decoder changes. Two further mandatory

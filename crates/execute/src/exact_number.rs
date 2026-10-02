@@ -111,9 +111,10 @@ impl<'a> ExactNumber<'a> {
                     NumberKind::Decimal
                 }
             }
-            NumberKind::Signed if self.negative && self.magnitude == Some(1_u64 << 63) => {
-                NumberKind::Decimal
-            }
+            // MySQL promotes every nonzero negative signed constant operand,
+            // even when its mathematical negation would fit a signed integer.
+            // The result's declared family is distinct from its value range.
+            NumberKind::Signed if self.negative => NumberKind::Decimal,
             kind => kind,
         };
         if new_kind == NumberKind::Decimal && previous_kind != NumberKind::Decimal {
