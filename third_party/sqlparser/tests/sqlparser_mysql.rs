@@ -1,5 +1,6 @@
 // Modified for Darmok: Parse typed MySQL variables and SET assignment alternatives.
 // Modified for Darmok: verify SHOW INDEX aliases against their canonical form.
+// Modified for Darmok: verify MySQL transaction clauses and reserved RELEASE syntax.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -27,7 +28,7 @@ use matches::assert_matches;
 use sqlparser::ast::MysqlInsertPriority::{Delayed, HighPriority, LowPriority};
 use sqlparser::ast::*;
 use sqlparser::dialect::{GenericDialect, MySqlDialect};
-use sqlparser::parser::{ParserError, ParserOptions};
+use sqlparser::parser::{Parser, ParserError, ParserOptions};
 use sqlparser::tokenizer::Span;
 use sqlparser::tokenizer::Token;
 use test_utils::*;
