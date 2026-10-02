@@ -1,7 +1,7 @@
 # Darmok server module
 
-This Apache-2.0 PostgreSQL 17/18 extension supplies a catalog generation and
-transaction-owned read lease. It is a prerequisite for catalog-dependent
+This Apache-2.0 PostgreSQL 17/18 extension supplies catalog publication and
+one-shot snapshot-neutral discovery. It is a prerequisite for catalog-dependent
 execution, not a runnable proxy or a MySQL transaction implementation.
 
 Build against the exact server's PGXS development files:
@@ -12,7 +12,7 @@ make PG_CONFIG=/path/to/pg_config install
 ```
 
 Add `darmok_server` to `shared_preload_libraries` before starting PostgreSQL.
-Leases require a primary server. Concurrent native two-phase transactions may
+Discovery requires a primary server. Concurrent native two-phase transactions may
 be enabled; they are separate from MySQL prepared statements. Then
 explicitly install in each selected physical database:
 
@@ -43,21 +43,38 @@ Its default command explicitly preloads the module. Override `POSTGRES_IMAGE`
 with the pinned PostgreSQL 17 image from `.github/workflows/ci.yml` for that major.
 Packages for other target platforms and the release artifact gate remain pending.
 
-Global leases cover only admitted catalog phases and must end before row
-execution or dependency-lock waits. Full dependency guards and the table
-executor remain required. The API, lock scope, required caller checks and
-remaining integration work are
-specified in [`docs/server-catalog-lease.md`](../../docs/server-catalog-lease.md).
-Run its ordinary native fixtures with a disposable module-enabled database and
-`max_prepared_transactions>=2`, plus a second disposable module server with native
-2PC disabled for the default-setting fixture:
+The fixed SET LOCAL/SHOW API returns immutable facts and a publication stamp.
+It retains no lease after returning. Catalog heap waits, cleanup and output
+occur outside internal Share spans so native prepared transactions can finish.
+Full dependency guards, semantic admission, MySQL data-view/lock semantics and
+the table executor remain required. See
+[`docs/catalog-discovery.md`](../../docs/catalog-discovery.md) for the continuous
+private-owner profile, protocol and phase budgets, and
+[`docs/server-catalog-lease.md`](../../docs/server-catalog-lease.md) for publication.
+
+Publication fixtures require a separate test image with a native synthetic
+Share probe. The product Docker build contains no probe library or exported
+SQL lease API:
+
+```sh
+docker build --build-arg DARMOK_PRODUCT_IMAGE=darmok-server:18 \
+  --tag darmok-server-test:18 tests/probes/darmok_catalog_probe
+```
+
+Use a disposable test-image server with `max_prepared_transactions>=2`, a second
+test-image server with native 2PC disabled for its default-setting fixture, and
+an installed but unpreloaded product-image server for the negative owner fixture.
+The disabled profile is a test case, not a serving requirement:
 
 ```sh
 DARMOK_TEST_DATABASE_URL=postgres://postgres:darmok-test@localhost:5432/darmok_test \
 DARMOK_TEST_NO_TWO_PHASE_DATABASE_URL=postgres://postgres:darmok-test@localhost:5433/darmok_test \
-  cargo test -p darmok-postgres-tests --test server_catalog_lease --locked -- --nocapture
+  cargo test -p darmok-postgres-tests --test server_catalog_publication \
+    --test catalog_discovery --locked -- --nocapture
 ```
 
 The fixture uses actual lock observations and normal transaction completions.
 It does not force interruptions or run resource stress workloads. Missing server
-dependencies fail the required tests.
+dependencies fail the required tests. The private-owner catalog fixtures also
+require `DARMOK_TEST_UNPRELOADED_DATABASE_URL` pointing to the third server and
+run explicitly with `native_backend::tests::native_catalog -- --ignored`.

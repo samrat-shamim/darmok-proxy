@@ -310,6 +310,8 @@ dependencies = [
 name = "darmok-catalog"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio-postgres",
 ]
@@ -354,6 +356,7 @@ dependencies = [
  "darmok-protocol",
  "darmok-types",
  "futures-util",
+ "serde_json",
  "tokio",
  "tokio-postgres",
 ]

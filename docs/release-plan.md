@@ -1962,3 +1962,53 @@ Pending-only/partial handoff and upstream helper propagation are source-reviewed
 not extra runtime fixture claims. No native data-snapshot policy, server catalog
 control, complete guard proof, semantic admission, table executor, serving,
 driver/cache/performance/artifact/hosted CI or release gate is certified here.
+
+### Observed text simple-query merge
+
+[PR #47](https://github.com/samrat-shamim/darmok-proxy/pull/47) is merged at
+`f5d8315c1e9c55462335204919a0db05ab0e03bb`, tree
+`52dca3e9507ae5636b610aa2fc4e83c115f51f92` (317 tracked entries).
+The documentation leaf has that same tree; all 315 non-documentation entries
+match tested `ca84ea2`. Independent final acceptance is recorded under
+`.darmok-work/logs/review-simple-completion-ca84ea2-v1`. Its 169-file seal is
+`4733650b7bc07ca1d58343955211ec2401ad673cb34e7dda8a6239929ece9a0d`;
+publication facts and a separately audited 888-file manifest
+have SHA256 `1cffebe01dc74baa5d187702f564d5a9fab19d600233ce2894a6dabeab9e6875`.
+This closes the transport component only, not the open execution/release gates.
+
+### One-shot discovery implementation boundary
+
+The selected architecture replaces exported SELECT lease handles with inert
+SET LOCAL and one-shot native SHOW. Catalog caches, invalidations, installation
+verification and fixed-heap descriptor waits occur outside Share. An
+unchanged-generation reacquisition permits direct fixed-prefix heap scans;
+Share ends before cleanup and output. The returned facts/stamp are immutable
+observations, never live leases. This permits concurrent native 2PC without a
+`max_prepared_transactions=0` requirement. See
+[catalog-discovery.md](catalog-discovery.md) for the continuous private-owner
+profile, cost, phase budgets and remaining admission/guard obligations.
+
+Conditional architecture review of proposal v3 has SHA256
+`c3553cbf347cc105a39672e6cad649355ec0df77181365f0e584a231dc59c520`.
+The independent report is
+`7a7c7d19eabbbb3502970a1cd1e70052c7e0c6111b1babb3739d0f3818e49509`;
+its 260-file seal is
+`3cabd5c4e4966b7260bcfe1f53308c5efe08ba824875e8fbb2b31800faf04dce`.
+The separate final invocation has actual exit 0 and SHA256
+`862728d6c78c1bfd9a7380ef5626597754f9a08213033c214f901376a1dd0b9c`.
+Root's clean-base rehash audit also has actual exit 0, stdout
+`baa34eeebd7c8c1abbf5a28fece6ec8f2d0d77ac1b44755607d204096d4c3cc1`.
+Evidence is under `.darmok-work/logs/review-catalog-discovery-design-v1-f5d8315-v1`
+and `catalog-discovery-f5d8315-01-architecture-audit`; failed bookkeeping attempts
+remain preserved. This is design/source acceptance, not runtime proof.
+
+The implementation adds the native reader, strict fact decoder and exclusive
+scope integration, retires the unreleased SQL lease API and replaces publication
+fixtures with a separate native test probe absent from the product image.
+Current-revision product/probe builds, ordinary PostgreSQL 17/18 fixtures,
+workspace checks and independent implementation review are still pending.
+The earlier SELECT-lease results do not certify this changed native module.
+MySQL data-view/lock policy, native dependency guards/recheck/admission, table
+execution, serving, driver/cache/performance/artifact/hosted CI and release
+gates remain open. Security work, compiler PR #4, stress/forced interruption,
+remote CI/account actions and release publication remain excluded.
