@@ -1,3 +1,4 @@
+// Modified for Darmok: Use typed SET assignment targets in ordinary assertions.
 // Modified for Darmok: test distinct transaction-setting syntax and scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -1585,7 +1586,7 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: None,
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a")]),
+            variable: ObjectName::from(vec![Ident::new("a")]).into(),
             values: vec![Expr::Identifier(Ident {
                 value: "b".into(),
                 quote_style: None,
@@ -1600,7 +1601,7 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: None,
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a")]),
+            variable: ObjectName::from(vec![Ident::new("a")]).into(),
             values: vec![Expr::Value(
                 (Value::SingleQuotedString("b".into())).with_empty_span()
             )],
@@ -1613,7 +1614,7 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: None,
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a")]),
+            variable: ObjectName::from(vec![Ident::new("a")]).into(),
             values: vec![Expr::value(number("0"))],
         })
     );
@@ -1624,7 +1625,7 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: None,
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a")]),
+            variable: ObjectName::from(vec![Ident::new("a")]).into(),
             values: vec![Expr::Identifier(Ident::new("DEFAULT"))],
         })
     );
@@ -1635,7 +1636,7 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: Some(ContextModifier::Local),
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a")]),
+            variable: ObjectName::from(vec![Ident::new("a")]).into(),
             values: vec![Expr::Identifier("b".into())],
         })
     );
@@ -1646,7 +1647,8 @@ fn parse_set() {
         Statement::Set(Set::SingleAssignment {
             scope: None,
             hivevar: false,
-            variable: ObjectName::from(vec![Ident::new("a"), Ident::new("b"), Ident::new("c")]),
+            variable: ObjectName::from(vec![Ident::new("a"), Ident::new("b"), Ident::new("c")])
+                .into(),
             values: vec![Expr::Identifier(Ident {
                 value: "b".into(),
                 quote_style: None,
@@ -1670,7 +1672,8 @@ fn parse_set() {
                 Ident::new("auto"),
                 Ident::new("reducer"),
                 Ident::new("parallelism")
-            ]),
+            ])
+            .into(),
             values: vec![Expr::Value((Value::Boolean(false)).with_empty_span())],
         })
     );

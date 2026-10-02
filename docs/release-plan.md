@@ -304,13 +304,29 @@ complete release gate runs once on the final candidate.
   and quoted columns that resemble variables. It uses the unchanged observer
   with twenty-five SQL clients, two inspections and three metadata processes, and
   a separate required CI step/artifact. Existing corpora remain unchanged.
-  Parser correction is pending in [issue #25](https://github.com/samrat-shamim/darmok-proxy/issues/25).
+  Parser correction is tracked in [issue #25](https://github.com/samrat-shamim/darmok-proxy/issues/25).
   The initial draft completed eight cases, then rejected an immediate
   single-quoted read; its failure, unrun cases and cleanup remain preserved.
   Exact source, command, review and CI records are retained outside the
   distribution. This fixture does not execute the proxy or complete syntax
   admission, native effects, catalog validity or M2/M4 gates. Security-related
   work remains deferred.
+
+- The [system-variable syntax component](mysql-system-variable-syntax.md)
+  separates MySQL sigils from name tokens and uses explicit read/SET target
+  nodes. Session classification borrows those facts without sigil decoding.
+  Focused local checks pass ten existing SQL-input groups and three new groups,
+  including all nineteen declared name forms, columns, spans and visitors.
+  Local workspace tests pass with all features (1,647 passed) and defaults
+  (1,640 passed), each with 22 existing ignored tests. Strict workspace Clippy,
+  formatting, repository boundaries and minimal/std/visitor parser checks pass.
+  Exact candidate, command, environment and evidence records are retained
+  outside the distribution. Independent review found no ordinary functional
+  defect; its 94 focused tests and minimal/std/visitor builds pass. GitHub
+  Actions is disabled for the personal account, so fresh CI and merging
+  remain pending.
+  This does not implement session mode changes, value coercion, native effects, SQL
+  admission, output, catalog coherence, performance or M2/M4.
 
 See [the extraction inventory](extraction-inventory.md) for component decisions
 and inherited semantic risks that require verification.

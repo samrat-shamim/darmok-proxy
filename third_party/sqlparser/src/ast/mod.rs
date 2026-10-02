@@ -1,3 +1,4 @@
+// Modified for Darmok: Represent MySQL variable expressions and SET targets explicitly.
 // Modified for Darmok: preserve transaction-setting syntax and keyword scope.
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
@@ -90,6 +91,7 @@ pub use self::dml::{
     MultiTableInsertValue, MultiTableInsertValues, MultiTableInsertWhenClause, OutputClause,
     Update,
 };
+pub use self::mysql::{MySqlSystemVariable, MySqlSystemVariableScope, SetAssignmentTarget};
 pub use self::operator::{BinaryOperator, UnaryOperator};
 pub use self::query::{
     AfterMatchSkip, ConnectByKind, Cte, CteAsMaterialized, Distinct, EmptyMatchesMode,
@@ -137,6 +139,7 @@ mod ddl;
 mod dml;
 /// Helper modules for building and manipulating AST nodes.
 pub mod helpers;
+mod mysql;
 pub mod table_constraints;
 pub use table_constraints::{
     CheckConstraint, ConstraintUsingIndex, ForeignKeyConstraint, FullTextOrSpatialConstraint,
@@ -833,6 +836,8 @@ impl fmt::Display for CaseWhen {
 pub enum Expr {
     /// Identifier e.g. table name or column name
     Identifier(Ident),
+    /// MySQL `@@` variable syntax, including name quoting and scope.
+    MySqlSystemVariable(MySqlSystemVariable),
     /// Multi-part identifier, e.g. `table_alias.column` or `schema.table.col`
     CompoundIdentifier(Vec<Ident>),
     /// Multi-part expression access.
@@ -1681,6 +1686,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expr::Identifier(s) => write!(f, "{s}"),
+            Expr::MySqlSystemVariable(variable) => variable.fmt(f),
             Expr::Wildcard(_) => f.write_str("*"),
             Expr::QualifiedWildcard(prefix, _) => write!(f, "{prefix}.*"),
             Expr::CompoundIdentifier(s) => write!(f, "{}", display_separated(s, ".")),
@@ -3211,7 +3217,7 @@ pub enum Set {
         /// Whether this is a Hive-style `HIVEVAR:` assignment.
         hivevar: bool,
         /// Variable name to assign.
-        variable: ObjectName,
+        variable: SetAssignmentTarget,
         /// Values assigned to the variable.
         values: Vec<Expr>,
     },
@@ -6444,7 +6450,7 @@ pub struct SetAssignment {
     /// Optional context scope (e.g., SESSION or LOCAL).
     pub scope: Option<ContextModifier>,
     /// Assignment target name.
-    pub name: ObjectName,
+    pub name: SetAssignmentTarget,
     /// Assigned expression value.
     pub value: Expr,
 }

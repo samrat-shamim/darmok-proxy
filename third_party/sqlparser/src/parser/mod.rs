@@ -1,3 +1,4 @@
+// Modified for Darmok: Parse MySQL sigil, scope and contextual variable-name quoting.
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
 // and preserve transaction-setting syntax and keyword scope.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -1772,6 +1773,9 @@ impl<'a> Parser<'a> {
         let next_token = self.get_current_token();
         let span = next_token.span;
         let expr = match &next_token.token {
+            Token::AtAt if dialect_is!(dialect is MySqlDialect) => self
+                .parse_mysql_system_variable(span, true)
+                .map(Expr::MySqlSystemVariable),
             Token::Word(w) => {
                 // The word we consumed may fall into one of two cases: it has a special meaning, or not.
                 // For example, in Snowflake, the word `interval` may have two meanings depending on the context:
@@ -15107,6 +15111,111 @@ impl<'a> Parser<'a> {
         Self::keyword_to_modifier(modifier)
     }
 
+    /// The release lexer requires an identifier or backtick immediately after
+    /// `@@`. After a qualifier dot, reads can also use quoted text. Assignment
+    /// targets require identifier tokens in every position.
+    fn parse_mysql_system_variable(
+        &mut self,
+        sigil_span: Span,
+        read: bool,
+    ) -> Result<MySqlSystemVariable, ParserError> {
+        let first = self
+            .next_token_no_skip()
+            .cloned()
+            .unwrap_or_else(TokenWithSpan::new_eof);
+        let Token::Word(word) = &first.token else {
+            return self.expected("MySQL variable identifier immediately after @@", first);
+        };
+        if !matches!(word.quote_style, None | Some('`')) {
+            return self.expected(
+                "MySQL variable identifier or backtick name immediately after @@",
+                first,
+            );
+        }
+        let scope = match word.keyword {
+            Keyword::SESSION => Some(MySqlSystemVariableScope::Session),
+            Keyword::LOCAL => Some(MySqlSystemVariableScope::Local),
+            Keyword::GLOBAL => Some(MySqlSystemVariableScope::Global),
+            Keyword::NoKeyword
+                if !read
+                    && word.quote_style.is_none()
+                    && word.value.eq_ignore_ascii_case("PERSIST") =>
+            {
+                Some(MySqlSystemVariableScope::Persist)
+            }
+            Keyword::NoKeyword
+                if !read
+                    && word.quote_style.is_none()
+                    && word.value.eq_ignore_ascii_case("PERSIST_ONLY") =>
+            {
+                Some(MySqlSystemVariableScope::PersistOnly)
+            }
+            _ => None,
+        };
+        let mut name = if scope.is_some() {
+            self.expect_token(&Token::Period)?;
+            self.parse_mysql_variable_name(read)?
+        } else {
+            word.to_ident(first.span)
+        };
+        let prefix = if self.consume_token(&Token::Period) {
+            if ["GLOBAL", "LOCAL", "SESSION"]
+                .iter()
+                .any(|reserved| name.value.eq_ignore_ascii_case(reserved))
+            {
+                return self
+                    .expected_ref("unreserved named-variable prefix", self.get_current_token());
+            }
+            let prefix = name;
+            name = self.parse_mysql_variable_name(false)?;
+            Some(prefix)
+        } else {
+            None
+        };
+        if self.peek_token_ref().token == Token::Period {
+            return self.expected_ref("end of MySQL system-variable name", self.peek_token_ref());
+        }
+        Ok(MySqlSystemVariable {
+            scope,
+            prefix,
+            name,
+            sigil_span,
+        })
+    }
+
+    fn parse_mysql_variable_name(&mut self, read: bool) -> Result<Ident, ParserError> {
+        let token = self.next_token();
+        match token.token {
+            Token::Word(word) => Ok(word.into_ident(token.span)),
+            Token::SingleQuotedString(value) if read => {
+                Ok(Ident::with_quote_and_span('\'', token.span, value))
+            }
+            Token::DoubleQuotedString(value) if read => {
+                Ok(Ident::with_quote_and_span('"', token.span, value))
+            }
+            _ => self.expected("MySQL variable name", token),
+        }
+    }
+
+    fn parse_set_assignment_target(&mut self) -> Result<SetAssignmentTarget, ParserError> {
+        let dialect = self.dialect;
+        if dialect_is!(dialect is MySqlDialect) {
+            if self.peek_token_ref().token == Token::AtAt {
+                let sigil_span = self.next_token().span;
+                return self
+                    .parse_mysql_system_variable(sigil_span, false)
+                    .map(SetAssignmentTarget::MySqlSystemVariable);
+            }
+            let mut names = vec![self.parse_mysql_variable_name(false)?];
+            if self.consume_token(&Token::Period) {
+                names.push(self.parse_mysql_variable_name(false)?);
+            }
+            return Ok(ObjectName::from(names).into());
+        }
+        self.parse_object_name(false)
+            .map(SetAssignmentTarget::ObjectName)
+    }
+
     /// Parse a single SET statement assignment `var = expr`.
     fn parse_set_assignment(&mut self) -> Result<SetAssignment, ParserError> {
         let scope = self.parse_context_modifier();
@@ -15119,7 +15228,7 @@ impl<'a> Parser<'a> {
             // If a dialect supports both, and we find a LParen, we early exit from this function.
             self.expected_ref("Unparenthesized assignment", self.peek_token_ref())?
         } else {
-            self.parse_object_name(false)?
+            self.parse_set_assignment_target()?
         };
 
         if !(self.consume_token(&Token::Eq) || self.parse_keyword(Keyword::TO)) {
@@ -15157,7 +15266,7 @@ impl<'a> Parser<'a> {
                 return Ok(Set::SingleAssignment {
                     scope,
                     hivevar,
-                    variable: ObjectName::from(vec!["TIMEZONE".into()]),
+                    variable: ObjectName::from(vec!["TIMEZONE".into()]).into(),
                     values: self.parse_set_values(false)?,
                 }
                 .into());
@@ -15258,10 +15367,14 @@ impl<'a> Parser<'a> {
             }
         }
 
+        enum SetTargets {
+            One(SetAssignmentTarget),
+            Many(Vec<ObjectName>),
+        }
         let variables = if self.dialect.supports_parenthesized_set_variables()
             && self.consume_token(&Token::LParen)
         {
-            let vars = OneOrManyWithParens::Many(
+            let vars = SetTargets::Many(
                 self.parse_comma_separated(|parser: &mut Parser<'a>| parser.parse_identifier())?
                     .into_iter()
                     .map(|ident| ObjectName::from(vec![ident]))
@@ -15270,18 +15383,18 @@ impl<'a> Parser<'a> {
             self.expect_token(&Token::RParen)?;
             vars
         } else {
-            OneOrManyWithParens::One(self.parse_object_name(false)?)
+            SetTargets::One(self.parse_set_assignment_target()?)
         };
 
         if self.consume_token(&Token::Eq) || self.parse_keyword(Keyword::TO) {
             let stmt = match variables {
-                OneOrManyWithParens::One(var) => Set::SingleAssignment {
+                SetTargets::One(var) => Set::SingleAssignment {
                     scope,
                     hivevar,
                     variable: var,
                     values: self.parse_set_values(false)?,
                 },
-                OneOrManyWithParens::Many(vars) => Set::ParenthesizedAssignments {
+                SetTargets::Many(vars) => Set::ParenthesizedAssignments {
                     variables: vars,
                     values: self.parse_set_values(true)?,
                 },

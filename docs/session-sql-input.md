@@ -45,6 +45,12 @@ cloned. Unregistered variables and unsupported SET/name shapes return errors;
 an iterator ends after its first reported error. Earlier items do not authorize
 partially applying a compound statement.
 
+Names now use `SetAssignmentTarget`: ordinary names and explicit MySQL system
+variables are distinct. Reads require `Expr::MySqlSystemVariable`. Sigils and
+qualifiers are not decoded from ordinary identifier strings. The
+[name syntax contract](mysql-system-variable-syntax.md) describes quoting,
+formatting, spans and the native reference boundary.
+
 The [MySQL assignment specification](https://dev.mysql.com/doc/refman/8.4/en/set-variable.html)
 states that the most recent keyword scope carries forward, while an @@ qualifier
 applies to its own name. The component retains both facts independently. For
@@ -70,14 +76,15 @@ and scoped read identity. Model stages in these tests receive trusted manual
 boundaries; no native execution or packet metadata is observed. Parser tests
 check scope and source-form preservation across ordinary dialects, and CI
 checks all/default features plus minimal/std/visitor feature combinations.
-The three existing stock corpora and observer remain unchanged.
+The four existing stock corpora and observer remain unchanged.
 
 Successful classification copies fixed-size tags and borrows AST nodes. The
 assignment iterator makes one pass and uses a fixed 31-name registry lookup;
 it adds no value cloning, native round trips or locks. The transaction classifier
 scans its mode list without allocation. Parser AST construction still allocates
-as before. End-to-end allocation counts, cache behavior and performance remain
-unmeasured. SQL syntax admission remains separate: this input view does not
+and explicit variable nodes change its layout. End-to-end allocation counts,
+cache behavior and performance remain unmeasured. SQL syntax admission remains
+separate: this input view does not
 certify every construct accepted by the shared generic parser.
 
 M2/M4, catalog validity, transaction equivalence, wire/session integration and
