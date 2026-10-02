@@ -891,18 +891,18 @@ no metadata-name vector is copied per row. Ordinary required native fixtures
 cover output representations and private owned DML RETURNING recovery/finish.
 The local implementation matrix runs on `33efae0`
 (`dcae6c7bf48421716d436cc67fb32f30a30e1520`) with sixteen terminal checks,
-all exit0. PostgreSQL17.11 and18.6 each pass nine native output groups and two
+all exit0. PostgreSQL 17.11 and 18.6 each pass nine native output groups and two
 owned-scope groups; native parameters/statements/values additionally pass
-5+6+6 groups each. Workspace all-features/default pass1669/1662 with62 ignored
-across38/37 result summaries. Strict all-targets/all-features Clippy, format,
-repository boundaries and diff checks pass. Rust/Cargo are1.96.0; both backends
-use UTF8 and max_identifier_length63. Required native fixtures fail when their
+5+6+6 groups each. Workspace all-features/default pass 1669/1662 with 62 ignored
+across 38/37 result summaries. Strict all-targets/all-features Clippy, format,
+repository boundaries and diff checks pass. Rust/Cargo are 1.96.0; both backends
+use UTF8 and max_identifier_length 63. Required native fixtures fail when their
 database environment is absent; unrelated ignored stress fixtures were not run.
 
 Revision `07cd3a5` (`ca3551571a11ee7e78b9cf076591bf1f1085c8da`) adds positive
-signed fractional-only -0.12 and precision65/scale30 cases. Only
+signed fractional-only -0.12 and precision 65/scale 30 cases. Only
 `tests/postgres/native_results.rs` and its contract documentation change;
-the other275 Git entries, including production and workspace-test code, retain
+the other 275 Git entries, including production and workspace-test code, retain
 the matrix revision's exact blobs. Six affected checks run on this final
 fixture revision, all exit0: both native output targets (nine groups each),
 strict Clippy, format, boundaries and diff. Prior matrix receipts are retained
@@ -913,7 +913,7 @@ and `cargo test -p darmok-execute --lib --locked native_backend::tests::native_r
 The regression command selects `--test native_values --test native_parameters --test native_statements`.
 Workspace commands use `cargo test --workspace --exclude darmok-postgres-tests --locked`
 with `--all-features` for that variant. Both mandatory Cargo environment values,
-exact argv, source/tree/status, ports32769/32768, times, real exits and raw hashes
+exact argv, source/tree/status, ports 32769/32768, times, real exits and raw hashes
 are recorded per invocation. The single Cargo/helper lane is verified across
 28 nonoverlapping child intervals; aggregate helper intervals are separate.
 
@@ -922,12 +922,12 @@ boundary literal before tests compile; `b2b6a1b` uses the wrong connector enum
 spelling before owner tests compile; `64bab90` passes the success group and
 fails the combined rollback-and-release expectation. `33efae0` corrects that
 expectation to RecoverSavepoint. These change fixture assertions only, not the
-output implementation. All135 production Rust entries retain their initial
+output implementation. All 135 production Rust entries retain their initial
 `c56d405` blobs through the final fixture revision.
 
-An ordinary stock MySQL8.4.11 observation through PyMySQL1.1.2/Python3.9.6
-at port32770 confirms signed DECIMAL(2,2) length4 and DECIMAL(65,30) length67.
-It also confirms that valid -0.12 has five payload bytes despite length4.
+An ordinary stock MySQL 8.4.11 observation through PyMySQL 1.1.2/Python 3.9.6
+at port 32770 confirms signed DECIMAL(2,2) length 4 and DECIMAL(65,30) length 67.
+It also confirms that valid -0.12 has five payload bytes despite length 4.
 This verifies a metadata convention, not general stock row formatting.
 
 Evidence lives outside the distribution under `.darmok-work/logs/`:
@@ -936,7 +936,7 @@ Evidence lives outside the distribution under `.darmok-work/logs/`:
 `row-output-owner-state-fixed17`, and `row-output-decimal-reference`.
 The author audit exits0; `row-output-author-audit-facts.json` records source
 equivalence, command/count/stream checks and unchanged prior evidence.
-`row-output-code-evidence.json` binds106 files, SHA256
+`row-output-code-evidence.json` binds 106 files, SHA256
 `19a07bdbf8a1c84f89d22d1934b777de633ce6aefa8545344e730410d9aca357`.
 Independent passive review finds no production/API defect and checks the source,
 fixture corrections, ordinary stock facts and saved terminal receipts. It runs

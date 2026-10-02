@@ -55,9 +55,9 @@ The value's significant integer digits must fit precision minus scale; zero
 integer digits do not consume precision. Numeric and temporal display widths
 are not treated as maximum payload byte lengths. An unbounded native NUMERIC
 description does not supply fixed frontend precision/scale automatically.
-Ordinary stock MySQL8.4.11 metadata observations confirm signed DECIMAL(2,2)
-length4 and DECIMAL(65,30) length67. The valid value -0.12 has five payload bytes
-despite length4; a leading integer zero must not be mistaken for an overflow.
+Ordinary stock MySQL 8.4.11 metadata observations confirm signed DECIMAL(2,2)
+length 4 and DECIMAL(65,30) length 67. The valid value -0.12 has five payload bytes
+despite length 4; a leading integer zero must not be mistaken for an overflow.
 
 ## Payloads and failure boundary
 
