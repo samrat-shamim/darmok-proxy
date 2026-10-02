@@ -5027,8 +5027,8 @@ fn mysql_transaction_start_uses_mysql_characteristic_grammar() {
 #[test]
 fn mysql_release_is_a_reserved_expression_identifier() {
     for sql in [
-        "SET completion_type='RELEASE'",
-        "SET completion_type=2",
+        "SET completion_type = 'RELEASE'",
+        "SET completion_type = 2",
         "SELECT `RELEASE`",
         "SELECT t.RELEASE FROM t",
     ] {
