@@ -163,43 +163,63 @@ async fn complete_native_catalog_error_can_recover_without_freezing_the_parent_v
 
 #[tokio::test]
 #[ignore = "required PostgreSQL 17/18 native-owner catalog discovery fixture"]
-async fn placeholder_echo_is_disposal_only_and_scope_controls_cannot_repair_it() {
+async fn missing_or_unpreloaded_module_is_disposal_only_and_scope_controls_cannot_repair_it() {
     let url = std::env::var("DARMOK_TEST_UNPRELOADED_DATABASE_URL")
         .expect("required native profile without module preloading");
-    let config: Config = url.parse().unwrap();
-    for recovery in [false, true] {
-        let mut backend = NativeBackend::connect(&config, NoTls).await.unwrap();
-        let mut scope = backend
-            .transaction_scope(READ_COMMITTED_WRITE)
-            .await
-            .unwrap();
-        let error = scope
-            .discover_catalog(&[NativeRelationName {
-                schema_name: "public",
-                relation_name: "unused",
-            }])
-            .await
-            .unwrap_err();
-        assert!(matches!(error, NativeCatalogError::Observation(_)));
-        let error = if recovery {
-            scope
-                .recover(NativeRecovery::Transaction)
+    let unpreloaded: Config = url.parse().unwrap();
+    let primary_url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
+    let mut uninstalled: Config = primary_url.parse().unwrap();
+    uninstalled.dbname("postgres");
+    for (config, placeholder) in [(&uninstalled, false), (&unpreloaded, true)] {
+        for recovery in [false, true] {
+            let mut backend = NativeBackend::connect(config, NoTls).await.unwrap();
+            let mut scope = backend
+                .transaction_scope(READ_COMMITTED_WRITE)
                 .await
-                .unwrap_err()
-        } else {
-            scope.finish().await.unwrap_err()
-        };
-        assert!(matches!(
-            error,
-            NativeBackendError::InvalidState {
-                state: NativeBackendState::Uncertain,
-                ..
+                .unwrap();
+            let error = scope
+                .discover_catalog(&[NativeRelationName {
+                    schema_name: "public",
+                    relation_name: "unused",
+                }])
+                .await
+                .unwrap_err();
+            if placeholder {
+                assert!(matches!(error, NativeCatalogError::Observation(_)));
+            } else {
+                let NativeCatalogError::Completion(failure) = error else {
+                    panic!("expected actual missing-installation error")
+                };
+                assert_eq!(
+                    failure.backend_error().unwrap().code(),
+                    Some(&SqlState::UNDEFINED_OBJECT)
+                );
+                assert_eq!(
+                    failure.ready_state(),
+                    Some(TransactionState::FailedTransaction)
+                );
+                assert!(failure.mismatch().is_none() && failure.stream_error().is_none());
             }
-        ));
-        assert_eq!(backend.state(), NativeBackendState::Uncertain);
-        assert_eq!(
-            backend.dispose().await.unwrap().previous_state(),
-            NativeBackendState::Uncertain
-        );
+            let error = if recovery {
+                scope
+                    .recover(NativeRecovery::Transaction)
+                    .await
+                    .unwrap_err()
+            } else {
+                scope.finish().await.unwrap_err()
+            };
+            assert!(matches!(
+                error,
+                NativeBackendError::InvalidState {
+                    state: NativeBackendState::Uncertain,
+                    ..
+                }
+            ));
+            assert_eq!(backend.state(), NativeBackendState::Uncertain);
+            assert_eq!(
+                backend.dispose().await.unwrap().previous_state(),
+                NativeBackendState::Uncertain
+            );
+        }
     }
 }

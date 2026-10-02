@@ -44,9 +44,13 @@ representation only; it does not establish the source connection or freshness.
 
 The owner requires the complete sequence SET, exact TEXT description, one
 non-NULL row, SHOW and ReadyForQuery(Transaction). It drains ordinary backend
-errors to readiness and never exposes a partial row. Recoverable native errors
-confirmed in a failed transaction permit explicit scope recovery. Submission,
-transport, shape, decoding or profile failures leave the owner uncertain;
+errors to readiness and never exposes a partial row. Only a requested missing
+relation or exhausted pre-effect generation attempts, confirmed in a failed
+transaction without a mismatch/transport error, permit explicit scope recovery.
+Local request limits fail before submission and preserve the scope. Other
+native errors, including missing/incorrect installation, unsafe boundaries,
+budget/identity exhaustion and unsupported profiles, leave the owner uncertain.
+Submission, transport, shape and decoding failures also leave it uncertain;
 finish and recovery then reject reuse. An uncompleted read guard also leaves
 only disposal available. This adds no asynchronous rollback or reset.
 
@@ -128,7 +132,8 @@ literal names, private/savepoint/temporary catalog state, prepared catalog and
 user-relation locks, request restoration/errors/limits, per-database module
 proof, inert Describe, historical portals and a bounded sequential cost report.
 Private-owner fixtures additionally check both scope boundaries, recoverable
-missing-relation errors and rejection of an installed but unpreloaded module's
-placeholder echo. Fresh PostgreSQL 17/18 product/probe images and executed
+missing-relation errors and rejection of both missing per-database installation
+and an installed but unpreloaded module's placeholder echo. Fresh PostgreSQL
+17/18 product/probe images and executed
 receipts are required before component acceptance. No stress, forced
 interruption, security work or hosted CI claim belongs to these fixtures.

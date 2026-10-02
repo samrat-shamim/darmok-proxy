@@ -331,10 +331,14 @@ impl NativeBackend {
             Err(failure) => {
                 let recoverable = failure.mismatch.is_none()
                     && failure.stream_error.is_none()
-                    && failure.backend_error.is_some()
                     && failure.ready_state == Some(TransactionState::FailedTransaction)
-                    && failure.backend_error.as_ref().and_then(Error::code)
-                        != Some(&tokio_postgres::error::SqlState::FEATURE_NOT_SUPPORTED);
+                    && matches!(
+                        failure.backend_error.as_ref().and_then(Error::code),
+                        Some(
+                            &tokio_postgres::error::SqlState::UNDEFINED_TABLE
+                                | &tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
+                        )
+                    );
                 pending.complete(if recoverable {
                     NativeBackendState::Scoped(boundary)
                 } else {
