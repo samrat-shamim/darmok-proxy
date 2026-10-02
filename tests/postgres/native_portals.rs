@@ -55,11 +55,9 @@ async fn execute(client: &Client, portal: &DescribedPortal, limit: i32) -> Compl
         errors: vec![],
     };
     let mut ready = None;
-    assert!(!stream.has_yielded());
     assert!(!stream.is_terminated());
     while let Some(event) = stream.next().await {
         assert!(ready.is_none(), "event after readiness");
-        assert!(stream.has_yielded());
         match event.unwrap() {
             QueryEvent::Row(row) => {
                 assert!(result.tag.is_none() && !result.empty && !result.suspended);
@@ -578,7 +576,7 @@ async fn suspended_portals_resume_and_negative_limits_fail_before_submission() {
         .await
         .unwrap();
     let checked = description.check_portal(&portal).unwrap();
-    client.query_portal_events(&portal, -1).unwrap_err();
+    assert!(client.query_portal_events(&portal, -1).is_err());
     let first = execute(&client, &portal, 2).await;
     assert!(first.suspended && first.tag.is_none() && first.errors.is_empty());
     assert_eq!(

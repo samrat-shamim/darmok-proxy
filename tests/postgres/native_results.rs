@@ -2,7 +2,8 @@ use bytes::{Bytes, BytesMut};
 use darmok_execute::{NativeResultError, NativeResultUtc, NativeRowFormat, NativeStatementUtc};
 use darmok_protocol::ColumnDefinition;
 use darmok_types::mysql_const::{charset, column_flag, field_type};
-use tokio_postgres::{Client, NoTls, Row};
+use futures_util::StreamExt;
+use tokio_postgres::{Client, NoTls, QueryEvent, Row, TransactionState};
 
 async fn client() -> (
     Client,
@@ -101,7 +102,7 @@ fn errors_preserve_buffer(
 async fn all_nineteen_native_scalar_types_have_exact_text_and_binary_payloads() {
     let (client, connection) = client().await;
     client
-        .batch_execute("SET TIME ZONE 'Asia/Dhaka'")
+        .batch_execute("SET TIME ZONE 'Asia/Dhaka'; BEGIN")
         .await
         .unwrap();
     let statement = client
@@ -138,10 +139,21 @@ async fn all_nineteen_native_scalar_types_have_exact_text_and_binary_payloads() 
         column(field_type::DATETIME, 26, 6, false),
         column(field_type::DATETIME, 26, 6, false),
     ];
-    let result =
-        NativeResultUtc::new(NativeStatementUtc::new(&statement).unwrap(), &columns).unwrap();
+    let description = NativeStatementUtc::new(&statement).unwrap();
+    let bindings = description.bind(&[]).unwrap();
+    let portal = client
+        .bind_described_builtin(bindings.statement(), bindings.parameters())
+        .await
+        .unwrap();
+    let checked = description.check_portal(&portal).unwrap();
+    let result = NativeResultUtc::from_portal(checked, &columns).unwrap();
     assert!(std::ptr::eq(result.columns(), columns.as_slice()));
-    let row = client.query_one(&statement, &[]).await.unwrap();
+    let mut events = client.query_portal_events(&portal, 0).unwrap();
+    let row = match events.next().await.unwrap().unwrap() {
+        QueryEvent::Row(row) => row,
+        other => panic!("expected one scalar row, got {other:?}"),
+    };
+    assert!(std::ptr::eq(row.columns(), portal.columns().unwrap()));
     assert_payloads(
         &result,
         &row,
@@ -177,6 +189,18 @@ async fn all_nineteen_native_scalar_types_have_exact_text_and_binary_payloads() 
             6, 49, 56, 0x40, 0xe2, 1, 0,
         ],
     );
+    assert!(
+        matches!(events.next().await.unwrap().unwrap(), QueryEvent::CommandComplete(tag) if tag == "SELECT 1")
+    );
+    assert!(matches!(
+        events.next().await.unwrap().unwrap(),
+        QueryEvent::ReadyForQuery(TransactionState::Transaction)
+    ));
+    assert!(events.next().await.is_none());
+    drop(events);
+    drop(portal);
+    drop(statement);
+    client.batch_execute("ROLLBACK").await.unwrap();
     drop(client);
     connection.await.unwrap().unwrap();
 }
