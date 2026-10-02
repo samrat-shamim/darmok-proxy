@@ -1288,6 +1288,16 @@ corrected development checks retain separate actual0 receipts. Every Cargo
 invocation uses the task RUSTUP_HOME/shared CARGO_TARGET_DIR, serially. A fresh
 committed matrix and independent review remain required.
 
+The first committed candidate `10d6a240d158475c5e4f1ced5dfd2bfd6abc2cef`
+passes ordinary PostgreSQL17/18 owners66 each and BigDecimal frontend10 each.
+Its all-feature workspace run stops with actual101 at the existing
+`sqlparser_mysql::parse_bitstring_literal` assertion: that test incorrectly
+requires MySQL's new bit AST and Generic's unchanged byte AST to be identical.
+The corrected test asserts each dialect independently, retaining Generic's
+original result and identifying the modified upstream file. The failed run and
+four successful backend runs remain immutable; the remaining matrix commands
+did not execute. This candidate is not certified by those partial results.
+
 Future MySQL CI declares a pinned standard-client virtual environment, required
 observer and always-run pinned artifact upload. Hosted CI is not polled or
 retried under the existing account blocker. Security, compiler PR4, resource
