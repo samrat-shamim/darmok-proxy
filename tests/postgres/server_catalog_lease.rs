@@ -1241,7 +1241,14 @@ async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
-    writer.batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'; COMMIT PREPARED 'darmok_prepare_cleanup'").await.unwrap();
+    writer
+        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
+    writer
+        .batch_execute("COMMIT PREPARED 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
     close(writer, writer_driver).await;
     close(other, other_driver).await;
 }
