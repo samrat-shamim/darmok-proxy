@@ -77,8 +77,13 @@ async fn command(input: &mut TcpStream, command: u8, body: &[u8]) -> Vec<u8> {
 }
 
 fn ok(payload: &[u8], flags: u16) {
+    ok_with_warnings(payload, flags, 0);
+}
+
+fn ok_with_warnings(payload: &[u8], flags: u16, warnings: u16) {
     let [lo, hi] = flags.to_le_bytes();
-    assert_eq!(payload, [0, 0, 0, lo, hi, 0, 0]);
+    let [warning_lo, warning_hi] = warnings.to_le_bytes();
+    assert_eq!(payload, [0, 0, 0, lo, hi, warning_lo, warning_hi]);
 }
 
 async fn closed(input: &mut TcpStream) {
@@ -433,5 +438,74 @@ async fn frontend_loop_release_received_over_tcp_sends_ok_then_eof() {
                 vec![0]
             }
         );
+    }
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn frontend_loop_ping_preserves_condition_count_until_next_statement() {
+    for deprecate_eof in [false, true] {
+        let backend = connect_backend().await;
+        let (mut session, globals) = fixture(deprecate_eof);
+        session.last_insert_id = 7;
+        session.found_rows = 11;
+        let (mut input, owner) = connection(session, backend, globals, BytesMut::new()).await;
+        let flags = StatusFlags::SERVER_STATUS_AUTOCOMMIT.bits()
+            | StatusFlags::SERVER_STATUS_IN_TRANS.bits()
+            | StatusFlags::SERVER_STATUS_IN_TRANS_READONLY.bits();
+        ok(
+            &command(&mut input, COM_QUERY, b"BEGIN READ ONLY").await,
+            flags,
+        );
+        let bad_mode = b"SET SESSION sql_mode='DARMOK_UNKNOWN_MODE'";
+        let error = command(&mut input, COM_QUERY, bad_mode).await;
+        assert_eq!(
+            &error[..9],
+            [0xff, 0xcf, 4, b'#', b'4', b'2', b'0', b'0', b'0']
+        );
+        for _ in 0..2 {
+            ok_with_warnings(&command(&mut input, COM_PING, b"").await, flags, 1);
+        }
+        ok(
+            &command(&mut input, COM_QUERY, b"SET sql_mode=DEFAULT").await,
+            flags,
+        );
+        ok(&command(&mut input, COM_PING, b"").await, flags);
+        let error = command(&mut input, COM_QUERY, bad_mode).await;
+        assert_eq!(
+            &error[..9],
+            [0xff, 0xcf, 4, b'#', b'4', b'2', b'0', b'0', b'0']
+        );
+        input
+            .write_all(&encoded(COM_QUERY, b"SELECT 1"))
+            .await
+            .unwrap();
+        assert_eq!(packet(&mut input, 1).await, [1]);
+        let column = packet(&mut input, 2).await;
+        assert_eq!(super::query_results::column(&column).0, b"1");
+        let [lo, hi] = flags.to_le_bytes();
+        let mut sequence = 3;
+        if !deprecate_eof {
+            assert_eq!(packet(&mut input, sequence).await, [0xfe, 0, 0, lo, hi]);
+            sequence += 1;
+        }
+        assert_eq!(packet(&mut input, sequence).await, [1, b'1']);
+        sequence += 1;
+        let end = packet(&mut input, sequence).await;
+        if deprecate_eof {
+            assert_eq!(end, [0xfe, 0, 0, lo, hi, 0, 0]);
+        } else {
+            assert_eq!(end, [0xfe, 0, 0, lo, hi]);
+        }
+        ok(&command(&mut input, COM_PING, b"").await, flags);
+        ok(&command(&mut input, COM_QUERY, b"ROLLBACK").await, 2);
+        input.write_all(&encoded(COM_QUIT, b"")).await.unwrap();
+        closed(&mut input).await;
+        let result = owner.await.unwrap();
+        report(&result, FrontendEnd::Quit, false);
+        assert_eq!(result.session.warning_count(), 0);
+        assert_eq!(result.session.row_count, 0);
+        assert_eq!(result.session.last_insert_id, 7);
+        assert_eq!(result.session.found_rows, 1);
     }
 }
