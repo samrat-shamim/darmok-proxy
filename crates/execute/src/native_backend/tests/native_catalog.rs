@@ -35,7 +35,10 @@ async fn private_owner_discovery_preserves_first_data_views_in_both_scope_kinds(
         for savepoint in [false, true] {
             setup(&writer, &format!("UPDATE public.{table} SET value=1")).await;
             let mut scope = if savepoint {
-                backend.begin(spec).await.unwrap();
+                assert_eq!(
+                    backend.begin(spec).await.unwrap().ready_state(),
+                    TransactionState::Transaction
+                );
                 backend.savepoint_scope().await.unwrap()
             } else {
                 backend.transaction_scope(spec).await.unwrap()
@@ -53,9 +56,20 @@ async fn private_owner_discovery_preserves_first_data_views_in_both_scope_kinds(
                 value, 2,
                 "owned {isolation:?} savepoint={savepoint} fixed its data view early"
             );
-            scope.finish().await.unwrap();
+            let finished = scope.finish().await.unwrap();
+            assert_eq!(
+                finished.control(),
+                if savepoint {
+                    NativeControl::Release
+                } else {
+                    NativeControl::Commit
+                }
+            );
             if savepoint {
-                backend.commit().await.unwrap();
+                assert_eq!(
+                    backend.commit().await.unwrap().ready_state(),
+                    TransactionState::Idle
+                );
             }
             assert_eq!(
                 backend.state(),
@@ -64,8 +78,14 @@ async fn private_owner_discovery_preserves_first_data_views_in_both_scope_kinds(
         }
     }
     setup(&writer, &format!("DROP TABLE public.{table}")).await;
-    backend.dispose().await.unwrap();
-    writer.dispose().await.unwrap();
+    assert_eq!(
+        backend.dispose().await.unwrap().previous_state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
+    assert_eq!(
+        writer.dispose().await.unwrap().previous_state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
 }
 
 #[tokio::test]
@@ -86,13 +106,14 @@ async fn complete_native_catalog_error_can_recover_without_freezing_the_parent_v
         ),
     )
     .await;
-    backend
+    let begun = backend
         .begin(NativeTransactionSpec {
             isolation: NativeIsolation::RepeatableRead,
             access: NativeTransactionAccess::ReadOnly,
         })
         .await
         .unwrap();
+    assert_eq!(begun.ready_state(), TransactionState::Transaction);
     let mut scope = backend.savepoint_scope().await.unwrap();
     let error = scope
         .discover_catalog(&[NativeRelationName {
@@ -113,7 +134,9 @@ async fn complete_native_catalog_error_can_recover_without_freezing_the_parent_v
         Some(TransactionState::FailedTransaction)
     );
     assert!(failure.mismatch().is_none() && failure.stream_error().is_none());
-    scope.recover(NativeRecovery::Statement).await.unwrap();
+    let recovered = scope.recover(NativeRecovery::Statement).await.unwrap();
+    assert_eq!(recovered.control(), NativeControl::RecoverSavepoint);
+    assert_eq!(recovered.ready_state(), TransactionState::Transaction);
     setup(&writer, &format!("UPDATE public.{table} SET value=2")).await;
     assert_eq!(
         client(&backend)
@@ -123,10 +146,19 @@ async fn complete_native_catalog_error_can_recover_without_freezing_the_parent_v
             .get::<_, i32>(0),
         2
     );
-    backend.commit().await.unwrap();
+    assert_eq!(
+        backend.commit().await.unwrap().ready_state(),
+        TransactionState::Idle
+    );
     setup(&writer, &format!("DROP TABLE public.{table}")).await;
-    backend.dispose().await.unwrap();
-    writer.dispose().await.unwrap();
+    assert_eq!(
+        backend.dispose().await.unwrap().previous_state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
+    assert_eq!(
+        writer.dispose().await.unwrap().previous_state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
 }
 
 #[tokio::test]
@@ -165,6 +197,9 @@ async fn placeholder_echo_is_disposal_only_and_scope_controls_cannot_repair_it()
             }
         ));
         assert_eq!(backend.state(), NativeBackendState::Uncertain);
-        backend.dispose().await.unwrap();
+        assert_eq!(
+            backend.dispose().await.unwrap().previous_state(),
+            NativeBackendState::Uncertain
+        );
     }
 }
