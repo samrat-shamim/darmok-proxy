@@ -8,6 +8,7 @@ mod exact_number;
 mod frontend_connection;
 mod native_backend;
 mod native_control;
+mod native_metadata;
 mod native_param;
 mod native_result;
 mod native_statement;
@@ -29,6 +30,7 @@ pub use native_control::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
     check_native_control,
 };
+pub use native_metadata::{NativeMetadataError, NativeTypeMetadataUtc};
 pub use native_param::{NativeParamError, NativeParamUtc};
 pub use native_result::{NativeResultError, NativeResultUtc, NativeRowFormat};
 pub use native_statement::{

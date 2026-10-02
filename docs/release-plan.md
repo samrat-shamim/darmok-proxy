@@ -1531,3 +1531,16 @@ configuration/routing, `serve`, real drivers, measured performance, complete
 artifacts, merge and release remain pending. No CI polling/retry or account
 action is performed; security work, compiler PR4, resource stress and forced
 interruption remain excluded.
+
+### Native scalar metadata component
+
+`feat/native-result-metadata` adds the [native scalar field mapper](native-metadata.md)
+needed to construct result definitions for independently created PostgreSQL
+objects. It derives representations from reported types/modifiers, with
+explicit numeric, temporal, charset and byte-width conditions. It makes no
+origin, key, projected nullability or catalog-execution assumption. Five
+required PostgreSQL fixture groups and three offline groups cover the mapper
+and its integration with checked portals and both row encoders. Local candidate
+verification and independent review are pending. No M2/M4 gate is complete;
+public table execution, live dependency validity, configuration/routing,
+`serve`, real drivers, measured performance and release artifacts remain required.

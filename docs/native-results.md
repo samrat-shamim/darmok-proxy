@@ -21,6 +21,10 @@ them from a native RowDescription. In particular, a catalog column's NOT NULL
 constraint is not a proof that a projected value is non-NULL. A NULL value
 contradicting supplied NOT NULL metadata fails at row encoding.
 
+The [native scalar metadata mapper](native-metadata.md) can derive type,
+charset, width, decimals and representation flags from reported types/modifiers.
+It does not supply those semantic identities or establish a dependency lease.
+
 All nineteen supported [native scalar types](native-values.md) have an explicit
 output representation:
 
