@@ -873,6 +873,9 @@ pub struct Tokenizer<'a> {
     /// If true (the default), the tokenizer will un-escape literal
     /// SQL strings See [`Tokenizer::with_unescape`] for more details.
     unescape: bool,
+    /// Darmok extension: retain executable comments when source admission must
+    /// decide their semantics before parsing their contents.
+    expand_executable_comments: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -897,7 +900,19 @@ impl<'a> Tokenizer<'a> {
             dialect,
             query,
             unescape: true,
+            expand_executable_comments: true,
         }
+    }
+
+    /// Darmok extension: control expansion of MySQL-style `/*! ... */` comments.
+    ///
+    /// When false, the original multiline comment token and source span are
+    /// retained. A caller parsing MySQL must admit or reject executable comments
+    /// explicitly; treating their contents as ordinary ignored comments changes
+    /// SQL semantics. This option does not affect ordinary comments or strings.
+    pub fn with_executable_comment_expansion(mut self, expand: bool) -> Self {
+        self.expand_executable_comments = expand;
+        self
     }
 
     /// Set unescape mode
@@ -978,6 +993,7 @@ impl<'a> Tokenizer<'a> {
             match &token {
                 Token::Whitespace(Whitespace::MultiLineComment(comment))
                     if self.dialect.supports_multiline_comment_hints()
+                        && self.expand_executable_comments
                         && comment.starts_with('!') =>
                 {
                     // Re-tokenize the hints and add them to the buffer

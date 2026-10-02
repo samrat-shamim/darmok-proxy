@@ -1,4 +1,5 @@
-// Modified for Darmok: Parse MySQL variable names, SET operators and characteristics.
+// Modified for Darmok: Parse MySQL variable names, SET operators and characteristics,
+// and optionally retain complete SELECT item source spans.
 // Modified for Darmok: simplify match guards, remove raw mode-string parsing,
 // and preserve transaction-setting syntax and keyword scope.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -363,9 +364,18 @@ pub struct Parser<'a> {
     options: ParserOptions,
     /// Ensures the stack does not overflow by limiting recursion depth.
     recursion_counter: RecursionCounter,
+    /// Opt-in lexical provenance, separate from the mutable AST APIs.
+    pub(crate) projection_source: Option<Vec<(Span, Vec<Span>)>>,
 }
 
 impl<'a> Parser<'a> {
+    pub(crate) fn numeric_source_spans(&self) -> Vec<Span> {
+        self.tokens
+            .iter()
+            .filter_map(|token| matches!(token.token, Token::Number(_, _)).then_some(token.span))
+            .collect()
+    }
+
     /// Create a parser for a [`Dialect`]
     ///
     /// See also [`Parser::parse_sql`]
@@ -389,6 +399,7 @@ impl<'a> Parser<'a> {
             dialect,
             recursion_counter: RecursionCounter::new(DEFAULT_REMAINING_DEPTH),
             options: ParserOptions::new().with_trailing_commas(dialect.supports_trailing_commas()),
+            projection_source: None,
         }
     }
 
@@ -450,6 +461,9 @@ impl<'a> Parser<'a> {
     pub fn with_tokens_with_locations(mut self, tokens: Vec<TokenWithSpan>) -> Self {
         self.tokens = tokens;
         self.index = 0;
+        if let Some(source) = &mut self.projection_source {
+            source.clear();
+        }
         self
     }
 
@@ -5064,11 +5078,15 @@ impl<'a> Parser<'a> {
         F: FnMut(&mut Parser) -> Result<T, ParserError>,
     {
         let index = self.index;
+        let source_len = self.projection_source.as_ref().map(Vec::len);
         match f(self) {
             Ok(t) => Ok(t),
             Err(e) => {
                 // Unwind stack if limit exceeded
                 self.index = index;
+                if let (Some(source), Some(len)) = (&mut self.projection_source, source_len) {
+                    source.truncate(len);
+                }
                 Err(e)
             }
         }
@@ -14660,9 +14678,34 @@ impl<'a> Parser<'a> {
             top = Some(self.parse_top()?);
         }
 
+        let mut projection_spans = vec![];
+        let capture_source = self.projection_source.is_some();
         let projection =
             if self.dialect.supports_empty_projections() && self.peek_keyword(Keyword::FROM) {
                 vec![]
+            } else if capture_source {
+                let trailing_commas = self.options.trailing_commas
+                    | self.dialect.supports_projection_trailing_commas();
+                self.parse_comma_separated_with_trailing_commas(
+                    |p| {
+                        let start = p.peek_token_ref().span.start;
+                        let item = p.parse_select_item()?;
+                        // Index points immediately after consumed input. Do not
+                        // derive this range from Expr::span(): Nested and UnaryOp
+                        // deliberately expose only their inner semantic span.
+                        let end = p.tokens[..p.index]
+                            .iter()
+                            .rev()
+                            .find(|token| !matches!(token.token, Token::Whitespace(_)))
+                            .expect("a parsed projection consumed a token")
+                            .span
+                            .end;
+                        projection_spans.push(Span::new(start, end));
+                        Ok(item)
+                    },
+                    trailing_commas,
+                    Self::is_reserved_for_column_alias,
+                )?
             } else {
                 self.parse_projection()?
             };
@@ -14790,6 +14833,9 @@ impl<'a> Parser<'a> {
             Default::default()
         };
 
+        if let Some(source) = &mut self.projection_source {
+            source.push((select_token.span, projection_spans));
+        }
         Ok(Select {
             select_token: AttachedToken(select_token),
             optimizer_hints,

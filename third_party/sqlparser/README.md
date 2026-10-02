@@ -13,6 +13,12 @@ until registry packaging and dependencies have been verified.
 Both packages are workspace members so their tests run in normal CI. Grammar
 coverage here does not imply Darmok execution support for any dialect.
 
+The opt-in `source::parse_mysql_source` extension binds an immutable MySQL AST
+to original projection and numeric-token source ranges from the same parse.
+It rejects executable comments before parsing: their server-version and source
+contracts are not implemented. A tokenizer option retains those comment tokens
+for explicit admission; ordinary AST parsing keeps its separate upstream path.
+
 The `visitor` feature enables the AST visitor, PostgreSQL emitter and semantic
 metadata APIs. The grammar and MySQL mode APIs can also build without it.
 Both the core parser and visitor extensions support `no_std` with `alloc`.

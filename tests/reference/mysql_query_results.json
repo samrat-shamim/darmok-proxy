@@ -1,0 +1,279 @@
+{
+  "server_version": "8.4.11",
+  "cases": [
+    {
+      "name": "literal-declarations",
+      "sql": "SELECT 001 AS n, -2 AS negative, 18446744073709551615 AS unsigned_value, NULL AS absent, TRUE AS flag;",
+      "columns": [
+        {
+          "name": "n",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 4,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 2,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "unsigned_value",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 20,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "UNSIGNED",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "absent",
+          "type": "NULL",
+          "charset": 63,
+          "width": 0,
+          "decimals": 0,
+          "cli_flags": [
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "flag",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "source-labels",
+      "sql": "SELECT (001), +1, (-1), (True), @@SESSION . AUTOCOMMIT, ( @@session.autocommit );",
+      "columns": [
+        {
+          "name": "001",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 4,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "1",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 2,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "(-1)",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 2,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "(True)",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "NOT_NULL",
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "@@SESSION . AUTOCOMMIT",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "( @@session.autocommit )",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "BINARY",
+            "NUM"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unicode-and-generated-names",
+      "sql": "SELECT 'é', '😀', ' hi ', ' x', '' AS empty_value;",
+      "columns": [
+        {
+          "name": "é",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 4,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        },
+        {
+          "name": "?",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 4,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        },
+        {
+          "name": "hi ",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 16,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        },
+        {
+          "name": " x",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 8,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        },
+        {
+          "name": "empty_value",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 0,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "session-variable-declarations",
+      "sql": "SELECT @@SESSION.autocommit AS auto, @@LOCAL.transaction_read_only AS access, @@transaction_isolation AS isolation, @@sql_mode AS modes, @@global.version AS version, @@character_set_connection AS charset;",
+      "columns": [
+        {
+          "name": "auto",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "access",
+          "type": "LONGLONG",
+          "charset": 63,
+          "width": 1,
+          "decimals": 0,
+          "cli_flags": [
+            "BINARY",
+            "NUM"
+          ]
+        },
+        {
+          "name": "isolation",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        },
+        {
+          "name": "modes",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        },
+        {
+          "name": "version",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        },
+        {
+          "name": "charset",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 87380,
+          "decimals": 31,
+          "cli_flags": []
+        }
+      ]
+    },
+    {
+      "name": "current-mode-literal",
+      "sql": "SET sql_mode='NO_BACKSLASH_ESCAPES'; SELECT 'a\\nb' AS text;",
+      "columns": [
+        {
+          "name": "text",
+          "type": "VAR_STRING",
+          "charset": 45,
+          "width": 16,
+          "decimals": 31,
+          "cli_flags": [
+            "NOT_NULL"
+          ]
+        }
+      ]
+    }
+  ]
+}

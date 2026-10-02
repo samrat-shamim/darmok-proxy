@@ -192,6 +192,8 @@ pub mod test_utils;
 
 /// Session-aware MySQL parsing mode flags (ANSI_QUOTES, NO_BACKSLASH_ESCAPES, etc.).
 pub mod mysql_mode;
+/// Immutable parser-owned source facts for MySQL result labels.
+pub mod source;
 
 /// PG-targeted SQL emitter (backtick→double-quote, ?→$N, etc.).
 #[cfg(feature = "visitor")]

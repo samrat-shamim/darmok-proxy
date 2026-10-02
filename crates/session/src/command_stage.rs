@@ -110,6 +110,14 @@ impl SessionCommandStage<'_> {
         self.state.row_count = 0;
     }
 
+    /// Record a completed ordinary SELECT. MySQL ROW_COUNT() is -1 for a
+    /// result set; FOUND_ROWS() is its row count without SQL_CALC_FOUND_ROWS.
+    pub fn record_select_success(&mut self, rows: u64) {
+        self.state.affected_rows = 0;
+        self.state.row_count = -1;
+        self.state.found_rows = rows;
+    }
+
     /// Call after the controller has encoded and sent either the success
     /// response or the known SQL error response for this entire command.
     pub fn finish_with_sent_output(

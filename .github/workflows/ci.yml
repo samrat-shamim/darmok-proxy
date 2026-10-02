@@ -111,6 +111,20 @@ jobs:
           --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
           --corpus tests/reference/mysql_transactions.json
           --evidence-dir '${{ runner.temp }}/mysql-transaction-reference'
+      - name: Required stock local SELECT column observations
+        run: >-
+          python3 tests/reference/observe_mysql_query_results.py
+          --container '${{ job.services.mysql.id }}'
+          --image mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+          --corpus tests/reference/mysql_query_results.json
+          --evidence-dir '${{ runner.temp }}/mysql-query-results-reference'
+      - name: Preserve SELECT reference receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mysql-query-results-reference
+          path: ${{ runner.temp }}/mysql-query-results-reference
+          if-no-files-found: error
       - name: Preserve reference receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
