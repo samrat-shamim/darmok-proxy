@@ -66,7 +66,8 @@ encodings or grapheme counting. Their reference behavior is MySQL 8.4
 [SUBSTRING](https://dev.mysql.com/doc/refman/8.4/en/string-functions.html#function_substring).
 
 Function bodies qualify built-in types, functions, operators and helper names.
-Manifest declarations and casts qualify built-in types. An implicit temporary namespace can shadow even
+Manifest declarations and casts qualify built-in types. An implicit temporary
+namespace can shadow even
 an unqualified built-in type despite an explicit `pg_catalog` search path;
 qualifying manifest declarations and casts avoids that ordinary resolution
 failure. Function bodies are versioned

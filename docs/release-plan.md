@@ -1204,8 +1204,8 @@ PostgreSQL 17 probe `schema-temp-types-probe-v1` has actual3 at `2914a62`: a
 temporary `text` domain resolves the manifest's text arrays as integers and
 raises an invalid-input error during local-variable initialization. The probe
 connection exits and rolls back all temporary setup; it changes no permanent
-installation or application objects. This is type resolution, not a credential,
-grant, adversarial, resource or forced-interruption test.
+installation or application objects. The probe exercises ordinary type
+resolution within a transaction.
 
 Final code/fixture revision `edd7361ffcd4b393986fc5e4e5e83c5edb77f622`, tree
 `6b00ffd146641108a6276b105616af881c6961bd`, qualifies all declaration types and
