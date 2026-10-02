@@ -1087,6 +1087,166 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_exact_classificatio
 }
 
 #[tokio::test]
+async fn queued_prepare_retains_gid_gate_through_deferred_trigger_and_marker_transfer() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (reader, reader_driver) = client().await;
+    let (writer, writer_driver) = client().await;
+    let (finisher, finisher_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    writer
+        .batch_execute(
+            "CREATE TABLE lease_prepare_target(id integer);
+         CREATE TABLE lease_prepare_events(id integer);
+         CREATE FUNCTION lease_prepare_deferred() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN
+             PERFORM pg_catalog.pg_advisory_xact_lock(708923);
+             EXECUTE 'ALTER TABLE lease_prepare_target ADD COLUMN from_deferred integer';
+             RETURN NULL;
+         END $$;
+         CREATE CONSTRAINT TRIGGER lease_prepare_trigger AFTER INSERT ON lease_prepare_events
+         DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION lease_prepare_deferred()",
+        )
+        .await
+        .unwrap();
+    observer
+        .query_one("SELECT pg_catalog.pg_advisory_lock(708923)", &[])
+        .await
+        .unwrap();
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let before = begin(&reader).await;
+    // PREPARE from an open child must promote the gate to the root as native
+    // CommitTransactionCommand drains subtransactions, then deferred triggers.
+    writer
+        .batch_execute("BEGIN; SAVEPOINT child; INSERT INTO lease_prepare_events VALUES (1)")
+        .await
+        .unwrap();
+    let writer_pid = pid(&writer).await;
+    let finisher_pid = pid(&finisher).await;
+    let mut preparing =
+        Box::pin(writer.batch_execute("PREPARE TRANSACTION 'darmok_queued_prepare'"));
+    tokio::select! {
+        result = &mut preparing => panic!("native prepare did not reach its deferred trigger wait: {result:?}"),
+        () = wait_native_lock(&observer, writer_pid, "PREPARE TRANSACTION") => {}
+    }
+    let visible: bool = observer.query_one(
+        "SELECT EXISTS (SELECT FROM pg_catalog.pg_prepared_xacts WHERE gid = 'darmok_queued_prepare')", &[]
+    ).await.unwrap().get(0);
+    assert!(
+        !visible,
+        "native preparation must still be before GID validity"
+    );
+    let mut finishing = Box::pin(finisher.batch_execute("COMMIT PREPARED 'darmok_queued_prepare'"));
+    tokio::select! {
+        result = &mut finishing => panic!("finisher passed the absent-GID preparation gate: {result:?}"),
+        () = async {
+            tokio::time::timeout(Duration::from_secs(20), async {
+                loop {
+                    let waiting: bool = observer.query_one(
+                        "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1 AND NOT granted)", &[&finisher_pid]
+                    ).await.unwrap().get(0);
+                    if waiting { return; }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }).await.expect("finisher did not wait for actual native preparation");
+        } => {}
+    }
+    observer
+        .query_one("SELECT pg_catalog.pg_advisory_unlock(708923)", &[])
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut preparing)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(preparing);
+    tokio::select! {
+        result = &mut finishing => panic!("deferred metadata preparation completed without a fence: {result:?}"),
+        () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
+    }
+    assert_eq!(
+        prepared_marker_modes(&observer, "darmok_queued_prepare").await,
+        ["AccessShareLock", "RowExclusiveLock"]
+    );
+    check(&reader, &before).await;
+    end(&reader, &before).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(finishing);
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    let after = begin(&reader).await;
+    assert!(after.generation > before.generation);
+    let columns: i64 = reader.query_one(
+        "SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = 'lease_prepare_target'::pg_catalog.regclass AND attnum > 0 AND NOT attisdropped", &[]
+    ).await.unwrap().get(0);
+    assert_eq!(columns, 2);
+    end(&reader, &after).await;
+    reader.batch_execute("COMMIT").await.unwrap();
+    writer.batch_execute("DROP TABLE lease_prepare_target, lease_prepare_events; DROP FUNCTION lease_prepare_deferred()").await.unwrap();
+    close(reader, reader_driver).await;
+    close(writer, writer_driver).await;
+    close(finisher, finisher_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn preparation_noop_abort_and_native_errors_release_gid_gates() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (writer, writer_driver) = client().await;
+    let (other, other_driver) = client().await;
+    let writer_pid = pid(&writer).await;
+    writer
+        .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
+    writer.batch_execute("BEGIN").await.unwrap();
+    let error = writer.query_one("SELECT 1 / 0", &[]).await.unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::DIVISION_BY_ZERO));
+    writer
+        .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
+    let gates: i64 = other.query_one(
+        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1", &[&writer_pid]
+    ).await.unwrap().get(0);
+    assert_eq!(
+        gates, 0,
+        "no-op/already-aborted PREPARE leaked a session gate"
+    );
+    other
+        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
+    let error = writer
+        .batch_execute("BEGIN; SAVEPOINT child; PREPARE TRANSACTION 'darmok_prepare_cleanup'")
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
+    writer.batch_execute("ROLLBACK").await.unwrap();
+    let gates: i64 = other.query_one(
+        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objsubid = 17487 AND pid = $1", &[&writer_pid]
+    ).await.unwrap().get(0);
+    assert_eq!(
+        gates, 0,
+        "failed native preparation leaked its session gate"
+    );
+    other
+        .batch_execute("ROLLBACK PREPARED 'darmok_prepare_cleanup'")
+        .await
+        .unwrap();
+    let error = writer
+        .batch_execute("COMMIT PREPARED 'darmok_prepare_cleanup'")
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
+    writer.batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_prepare_cleanup'; COMMIT PREPARED 'darmok_prepare_cleanup'").await.unwrap();
+    close(writer, writer_driver).await;
+    close(other, other_driver).await;
+}
+
+#[tokio::test]
 async fn database_removal_and_normal_temp_backend_exit_both_complete() {
     let _serial = TEST_SERIAL.lock().await;
     let (reader, reader_driver) = client().await;

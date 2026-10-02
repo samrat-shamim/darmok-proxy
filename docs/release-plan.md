@@ -1662,8 +1662,11 @@ pre-commit boundary and stop new reader admission while draining current leases.
 
 The earlier candidate `3e21463` passed catalog fixtures but its ordinary native
 owner regression encountered a database-removal/temp-cleanup barrier deadlock.
-That failure remains preserved and blocks acceptance of that revision. Revised
-source must pass both PostgreSQL versions, the default/enabled 2PC settings,
+That failure remains preserved and blocks acceptance of that revision. The next candidate `00899b5` passed 18 PostgreSQL18 groups, but independent
+review found an unfenced absent-GID race: PREPARE was only queued when its
+utility hook released the gate. Creation must retain that gate through native
+prepare/abort callbacks. That source is also blocked and its evidence is
+preserved. Revised source must pass both PostgreSQL versions, the default/enabled 2PC settings,
 prepared DDL/DML/mixed cases, the normal-exit regression and independent review.
 The module does not change server configuration or add routing/auth/grant policy.
 

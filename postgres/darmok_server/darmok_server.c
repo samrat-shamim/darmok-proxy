@@ -81,6 +81,9 @@ static bool preparing_transaction = false;
 static bool pre_commit_started = false;
 static bool exit_writer_pending = false;
 static bool exit_cleanup_registered = false;
+static bool prepare_gate_held = false;
+static LOCKTAG prepare_gate_tag;
+static SubTransactionId prepare_gate_subid = InvalidSubTransactionId;
 static SubTransactionId last_metadata_subid = InvalidSubTransactionId;
 
 static shmem_request_hook_type previous_shmem_request = NULL;
@@ -205,6 +208,18 @@ transaction_unlock(const LOCKTAG *tag, LOCKMODE mode, ResourceOwner owner)
 		CurrentResourceOwner = saved;
 	}
 	PG_END_TRY();
+}
+
+static void
+release_prepare_gate(void)
+{
+	if (prepare_gate_held)
+	{
+		prepare_gate_held = false;
+		prepare_gate_subid = InvalidSubTransactionId;
+		if (!LockRelease(&prepare_gate_tag, ExclusiveLock, true))
+			elog(FATAL, "lost the native preparation serialization gate");
+	}
 }
 
 static void
@@ -467,6 +482,11 @@ transaction_event(XactEvent event, void *arg)
 		case XACT_EVENT_PREPARE:
 		case XACT_EVENT_PARALLEL_COMMIT:
 		case XACT_EVENT_PARALLEL_ABORT:
+			/* PREPARE is queued by ProcessUtility and executed later by
+			 * CommitTransactionCommand. Only now are its marker locks transferred
+			 * (or its reservation aborted). Native 2PC busy checks still protect
+			 * the remaining detach cleanup after XACT_EVENT_PREPARE. */
+			release_prepare_gate();
 			/* Committed facts can stay cached. Aborted/prepared private facts
 			 * cannot; metadata-free transaction boundaries need no cache miss. */
 			if ((event == XACT_EVENT_ABORT || event == XACT_EVENT_PREPARE ||
@@ -494,6 +514,8 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	(void) arg;
 	if (event == SUBXACT_EVENT_COMMIT_SUB)
 	{
+		if (prepare_gate_held && prepare_gate_subid == subid)
+			prepare_gate_subid = parent;
 		if (last_metadata_subid == subid)
 			last_metadata_subid = parent;
 		if (lease.active && lease.subid == subid)
@@ -509,6 +531,8 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 	}
 	else if (event == SUBXACT_EVENT_ABORT_SUB)
 	{
+		if (prepare_gate_held && prepare_gate_subid == subid)
+			release_prepare_gate();
 		if (last_metadata_subid == subid)
 		{
 			last_metadata_subid = parent;
@@ -571,6 +595,15 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		 ((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_ROLLBACK_PREPARED);
 	LOCKTAG gid_tag;
 	bool gid_gate = preparing || finishing;
+	volatile bool prepare_queued = false;
+	QueryCompletion prepare_completion;
+	QueryCompletion *native_completion = completion;
+
+	if (preparing)
+	{
+		InitializeQueryCompletion(&prepare_completion);
+		native_completion = &prepare_completion;
+	}
 	if (preparing && lease.active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -583,8 +616,18 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	}
 	if (gid_gate)
 	{
+		if (preparing && prepare_gate_held)
+			ereport(ERROR,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("native transaction preparation is already pending")));
 		gid_tag = gid_gate_tag(((TransactionStmt *) pstmt->utilityStmt)->gid);
 		(void) LockAcquire(&gid_tag, ExclusiveLock, true, false);
+		if (preparing)
+		{
+			prepare_gate_tag = gid_tag;
+			prepare_gate_subid = GetCurrentSubTransactionId();
+			prepare_gate_held = true;
+		}
 	}
 	PG_TRY();
 	{
@@ -596,10 +639,22 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		}
 		if (previous_utility)
 			previous_utility(pstmt, query, read_only_tree, context, params,
-							 query_env, dest, completion);
+							 query_env, dest, native_completion);
 		else
 			standard_ProcessUtility(pstmt, query, read_only_tree, context, params,
-								query_env, dest, completion);
+								query_env, dest, native_completion);
+		if (preparing)
+		{
+			/* Outside a block, or in an already-aborted block, native PREPARE
+			 * completes as ROLLBACK and may emit no new abort callback. */
+			if (prepare_completion.commandTag != CMDTAG_PREPARE_TRANSACTION &&
+				prepare_completion.commandTag != CMDTAG_ROLLBACK)
+				elog(ERROR, "unexpected native transaction preparation completion");
+			prepare_queued =
+				prepare_completion.commandTag == CMDTAG_PREPARE_TRANSACTION;
+			if (completion != NULL)
+				*completion = prepare_completion;
+		}
 		if (writer)
 		{
 			/* An internally committing utility can return in a new transaction.
@@ -612,7 +667,9 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	}
 	PG_FINALLY();
 	{
-		if (gid_gate && !LockRelease(&gid_tag, ExclusiveLock, true))
+		if (preparing && !prepare_queued)
+			release_prepare_gate();
+		if (finishing && !LockRelease(&gid_tag, ExclusiveLock, true))
 			elog(FATAL, "lost the prepared transaction serialization gate");
 		if (writer)
 			writer_depth--;

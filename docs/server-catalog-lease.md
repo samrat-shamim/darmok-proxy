@@ -139,8 +139,12 @@ persist, transfer and recover these tag/mode pairs. This recovery argument is
 based on native source; the ordinary fixtures do not run restart experiments.
 
 PREPARE, COMMIT PREPARED and ROLLBACK PREPARED acquire a default-method **session**
-gate keyed by a GID hash and sub-ID `0x444f`. It is held through the entire native
-command and released on errors; it is never transferred to a prepared transaction.
+gate keyed by a GID hash and sub-ID `0x444f`. Completion holds it through the native finish operation. PREPARE queues its
+work at utility entry, so creation retains the gate until the native prepare
+callback after validity and marker-lock transfer, or until abort. Native busy
+checks protect the remaining detach cleanup. Utility errors and owning
+subtransaction abort also release it. It is never transferred to a prepared
+transaction.
 Hash collisions only add serialization. The gate prevents completion and GID
 reuse from changing the target between the exact native `pg_prepared_xacts`
 lookup, conditional XID-marker probes and native completion. A metadata-marked
