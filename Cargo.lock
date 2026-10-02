@@ -229,6 +229,7 @@ dependencies = [
  "darmok-sqlparser",
  "darmok-types",
  "futures-util",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-postgres",

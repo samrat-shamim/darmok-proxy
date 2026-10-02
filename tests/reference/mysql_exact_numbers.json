@@ -1,0 +1,53 @@
+{
+  "server_version": "8.4.11",
+  "cases": [
+    {
+      "name": "decimal-spelling-scale-and-zero",
+      "sql": "SELECT 12.50, 001.230, .50, 1., 0.000, -0.00, +001.230, (001.230), (-001.230), -(001.230) AS via_neg;",
+      "columns": [
+        {"name": "12.50", "type": "NEWDECIMAL", "charset": 63, "width": 6, "decimals": 2, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "001.230", "type": "NEWDECIMAL", "charset": 63, "width": 7, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": ".50", "type": "NEWDECIMAL", "charset": 63, "width": 4, "decimals": 2, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "1.", "type": "NEWDECIMAL", "charset": 63, "width": 2, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "0.000", "type": "NEWDECIMAL", "charset": 63, "width": 6, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "-0.00", "type": "NEWDECIMAL", "charset": 63, "width": 5, "decimals": 2, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "001.230", "type": "NEWDECIMAL", "charset": 63, "width": 7, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "001.230", "type": "NEWDECIMAL", "charset": 63, "width": 7, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "(-001.230)", "type": "NEWDECIMAL", "charset": 63, "width": 7, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "via_neg", "type": "NEWDECIMAL", "charset": 63, "width": 7, "decimals": 3, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]}
+      ],
+      "row": ["12.50", "1.230", "0.50", "1", "0.000", "0.00", "1.230", "1.230", "-1.230", "-1.230"],
+      "warning_count": 0
+    },
+    {
+      "name": "integer-promotion-and-ordered-negation",
+      "sql": "SELECT 18446744073709551615 AS unsigned_value, 18446744073709551616 AS decimal_value, -9223372036854775808 AS signed_minimum, -9223372036854775809 AS below_signed, -18446744073709551615 AS negative_unsigned, -(-9223372036854775808), +(-1.00), -(-1.00), -0018446744073709551615, 0018446744073709551616;",
+      "columns": [
+        {"name": "unsigned_value", "type": "LONGLONG", "charset": 63, "width": 20, "decimals": 0, "cli_flags": ["NOT_NULL", "UNSIGNED", "BINARY", "NUM"]},
+        {"name": "decimal_value", "type": "NEWDECIMAL", "charset": 63, "width": 21, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "signed_minimum", "type": "LONGLONG", "charset": 63, "width": 20, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "below_signed", "type": "NEWDECIMAL", "charset": 63, "width": 20, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "negative_unsigned", "type": "NEWDECIMAL", "charset": 63, "width": 21, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "-(-9223372036854775808)", "type": "NEWDECIMAL", "charset": 63, "width": 20, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "+(-1.00)", "type": "NEWDECIMAL", "charset": 63, "width": 5, "decimals": 2, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "-(-1.00)", "type": "NEWDECIMAL", "charset": 63, "width": 5, "decimals": 2, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "-0018446744073709551615", "type": "NEWDECIMAL", "charset": 63, "width": 23, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "0018446744073709551616", "type": "NEWDECIMAL", "charset": 63, "width": 22, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]}
+      ],
+      "row": ["18446744073709551615", "18446744073709551616", "-9223372036854775808", "-9223372036854775809", "-18446744073709551615", "9223372036854775808", "-1.00", "1.00", "-18446744073709551615", "18446744073709551616"],
+      "warning_count": 0
+    },
+    {
+      "name": "precision-and-literal-scale",
+      "sql": "SELECT 99999999999999999999999999999999999999999999999999999999999999999 AS precision65, .123456789012345678901234567890 AS scale30, .1234567890123456789012345678901 AS scale31, .0000000000000000000000000000000 AS zero31;",
+      "columns": [
+        {"name": "precision65", "type": "NEWDECIMAL", "charset": 63, "width": 66, "decimals": 0, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "scale30", "type": "NEWDECIMAL", "charset": 63, "width": 32, "decimals": 30, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "scale31", "type": "NEWDECIMAL", "charset": 63, "width": 33, "decimals": 31, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]},
+        {"name": "zero31", "type": "NEWDECIMAL", "charset": 63, "width": 33, "decimals": 31, "cli_flags": ["NOT_NULL", "BINARY", "NUM"]}
+      ],
+      "row": ["99999999999999999999999999999999999999999999999999999999999999999", "0.123456789012345678901234567890", "0.1234567890123456789012345678901", "0.0000000000000000000000000000000"],
+      "warning_count": 0
+    }
+  ]
+}

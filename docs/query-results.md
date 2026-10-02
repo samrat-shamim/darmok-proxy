@@ -1,10 +1,11 @@
 # Local SELECT results
 
 The public `execute_query_command` path now admits a single direct SELECT with
-no table or other clauses. Integer literals through the unsigned 64-bit range,
-signed negative integer literals, booleans, NULL and ordinary quoted strings
+no table or other clauses. Exact numeric literals, booleans, NULL and ordinary quoted strings
 produce one text row. Parentheses, selected unary plus expressions, numeric
-unary minus and explicit aliases retain their MySQL label semantics. Decimal,
+unary minus and explicit aliases retain their MySQL label semantics.
+[Exact decimal and large-integer literals](exact-numeric-literals.md) retain
+their value, scale, signedness and declared-width contracts. Approximate
 floating-point and general expressions are explicit 1235/42000 errors, pending
 their own value, metadata and diagnostic contracts. Queries with WHERE, LIMIT,
 ORDER BY, DISTINCT, hints, tables, CTEs or other clauses are not approximated.

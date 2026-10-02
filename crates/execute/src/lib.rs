@@ -2,6 +2,7 @@
 //! controls, exclusively owned transaction scopes and source-admitted selected
 //! COM_QUERY SET and local SELECT execution. Table execution remains a gate.
 
+mod exact_number;
 mod native_backend;
 mod native_control;
 mod native_param;

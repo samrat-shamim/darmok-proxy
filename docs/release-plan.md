@@ -517,3 +517,24 @@ does not complete M2/M4 or a release gate.
 No CI restart, account change, main push, merge or release is authorized by
 this implementation milestone. The recorded account Actions condition remains
 a merge/release blocker; authorized functional work can still progress.
+
+## Exact numeric literal progress
+
+The local SELECT controller is being extended to exact decimal tokens, large
+integer promotion and ordered unary signs. [The contract](exact-numeric-literals.md)
+keeps source labels, row text and declared metadata separate, including scale
+above 30 for literals, trailing zeros and signed-minimum negation. Scientific
+notation and general numeric expressions remain explicit unsupported outcomes.
+The private evaluator uses borrowed digits until final row allocation and adds
+no native request or runtime dependency. This is progress toward the full
+SQL/type objective, not a replacement of its remaining gates.
+
+Three pinned stock cases declare twenty-four columns, exact string rows and
+zero warnings; the new observer and existing column observer share only their
+CLI field decoder. The old five-case column corpus remains unchanged and must
+be observed freshly when the shared decoder changes. Two further mandatory
+native-owner SELECT groups consume the new corpus across both EOF forms and
+check pending/active settings plus unsupported approximate-number rejection.
+Current-revision validation and independent review remain pending. No M2/M4,
+driver, performance, CI, merge or release gate is closed by these additions.
+Security-related work and the separate compiler draft remain excluded.
