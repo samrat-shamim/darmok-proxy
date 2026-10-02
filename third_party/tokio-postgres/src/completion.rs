@@ -170,7 +170,7 @@ enum QueryPhase {
     Done,
 }
 
-/// Stream of prepared rows and outcomes through ReadyForQuery.
+/// Stream of prepared or described-portal rows and outcomes through readiness.
 ///
 /// A command tag, empty query or suspended portal is separate from readiness.
 /// Errors before BindComplete remain observable alongside their final backend
@@ -183,15 +183,17 @@ pub struct QueryEventStream {
 
 /// A result OID outside the built-in result description contract.
 ///
-/// This is the source of a terminal stream error, after SQL was submitted.
-/// It does not establish backend completion or rollback.
+/// A typed query stream returns it as a terminal error without confirmed
+/// completion. A portal binding failure can retain it as a representation
+/// error alongside separately observed readiness. This error alone establishes
+/// neither backend completion nor rollback.
 #[derive(Debug)]
 pub struct UnsupportedBuiltinResultType {
     oid: u32,
 }
 
 impl UnsupportedBuiltinResultType {
-    /// The exact native result type OID which required a separate type lookup.
+    /// The observed native OID outside the built-in result contract.
     pub fn oid(&self) -> u32 {
         self.oid
     }

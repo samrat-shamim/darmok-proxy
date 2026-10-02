@@ -1012,3 +1012,84 @@ execution, reusable plans, executable integration, real drivers and measured
 performance remain pending. M2/M4, required hosted CI, merge and release remain
 incomplete; security work and compiler PR4 remain excluded, and the full goal
 remains active.
+
+### Native bound portal local evidence
+
+`feat/native-portal-description` implements the [bound portal component](native-portals.md).
+Bind/portal Describe/Sync precedes a separate Execute/Sync request. The native
+receipt retains actual binary columns and distinguishes NoData from a
+zero-column RowDescription. Exact prepared-handle identity and every output
+fact are checked before Execute; described rows share those observed columns.
+The private owner output fixtures now use this path and observe final readiness
+before finish or recovery. This is an output prerequisite, not SQL admission or
+complete catalog execution validity.
+
+Code/fixture revision `bdaacb8431a4985dbf914aba2960cacb677f9934`, tree
+`b33964de4300f71591ec73266e52ebec4995e7cc`, passes all sixteen local matrix
+commands. PostgreSQL 17.11 and 18.6 each pass seven required target suites:
+backend completion 8, controls 10, lookup 4, portals 9, output 9, statement
+representations 6 and typed completion 8, totaling 54 groups per backend.
+The nineteen-type exact-payload fixture now uses checked bound descriptions.
+Each backend also passes 55 ordinary owner groups with 12 filtered, and
+BigDecimal transaction/TCP variants pass 10/8 groups with 57/59 filtered.
+The three abandoned/dropped-control cases remain explicitly excluded from
+ordinary owner invocations; no new interruption or resource-stress work ran.
+
+New portal fixtures cover exact handles and cloned handles, native metadata
+identity on rows, local parameter failure before submission, native planning
+failure with failed readiness, unsupported observed result OIDs with drained
+readiness, implicit-transaction rejection, NoData/zero columns/zero rows/empty
+SQL, suspended fetches and remaining native SELECT counts, and stream ownership
+after caller handles are dropped. Ordinary schema rename/recreation plus a
+temporary namespace changes the actual portal origin: the guard rejects the
+old origin for both nonempty and empty output before Execute, including an
+unexecuted INSERT RETURNING. This does not prove hidden dependency validity.
+
+Workspace all-features/default pass 1669/1662 tests, with 65 ignored across
+38/37 summaries. Strict workspace and vendored-connector Clippy, both formatting
+checks, repository boundaries and diff pass. Rust/Cargo are 1.96.0 on macOS
+26.0.1 arm64; both backends use UTF8 and max_identifier_length 63. Exact argv,
+both mandatory Cargo environment values, source/tree/status, fixture port,
+actual exit, timing and raw stream hashes are retained in every author receipt.
+
+The database command selects `native_portals`, `native_statements`,
+`native_results`, `backend_completion`, `typed_completion`, `native_controls`
+and `native_lookup` using `cargo test -p darmok-postgres-tests --locked`.
+Ordinary owner commands select `native_backend::tests -- --ignored` with the
+three exact exclusions in their argv. BigDecimal selects `::query_transactions`
+and `::frontend_loop` with `--features sqlparser/bigdecimal`. Workspace commands
+exclude `darmok-postgres-tests`; one adds `--all-features`.
+
+Evidence stays outside the distribution under `.darmok-work/logs/portal-bdaacb8-*`.
+The author audit exits0, verifies the sixteen sequential matrix child intervals,
+and binds 32 terminal child/probe/format/environment/description receipts plus
+the aggregate matrix parent. `portal-bdaacb8-code-evidence.json` seals 107 files,
+SHA256 `9edfd6c427f34306578530ba68d74f8f8704dd3992a4f5a0d3cb0bc065027f99`.
+Prior lookup publication/evidence and the hosted CI blocker remain unchanged.
+
+Two earlier candidates remain actual101. `6ff8fa5` fails to compile new fixtures
+that incorrectly assume a stream API; `f2e3a41` passes eight portal groups and
+fails the expected resumed SELECT count. The corrected expectation retains
+PostgreSQL's remaining count rather than inventing a total. These corrections
+change fixtures only; production behavior is unchanged from `b78d293`.
+
+Independent passive review at the code head finds no functional blocker and
+identifies D1: the unsupported-result OID rustdoc must describe both terminal
+typed-stream failure and portal representation failure with separate readiness.
+The documentation leaf corrects only three Rustdoc passages, updates the portal
+contract and appends this evidence; its equivalence proof preserves all other
+entries, implementation bodies, fixture bodies and sealed author files. Review
+runs no Cargo, SQL, network or security work and records its own actual exits.
+Two reviewer recorder bookkeeping failures are retained separately: a script
+construction SyntaxError before child commands and an overly narrow changed-path
+assertion. Neither changes source or supplies runtime verification; the corrected
+passive audit exits0. Core records use `review-native-portal-bdaacb8-*`.
+
+Bind can process parameters and plan native SQL; no queued Execute is not a
+general no-effects guarantee. The extra request adds a round trip and extends
+the transaction's usual lock duration; this is structural analysis, not a
+throughput or allocation measurement. Catalog execution validity, semantic
+admission, generated frontend metadata, public table execution, reusable plans,
+executable integration, real drivers and measured performance remain pending.
+M2/M4, hosted CI, merge and release remain incomplete; security work and compiler
+PR4 remain excluded, and the full goal remains active.

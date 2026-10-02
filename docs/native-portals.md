@@ -1,7 +1,7 @@
 # Native portal descriptions before execution
 
-Status: **component implementation; local verification pending**. Semantic
-admission, full dependency validity and the public row executor remain pending.
+Status: **locally verified component; no admitted native row executor**.
+Semantic admission and full dependency validity remain pending.
 
 The connector's `Client::bind_described_builtin` queues Bind, portal Describe
 and Sync in one request. It queues no Execute. Success requires BindComplete,
@@ -86,3 +86,23 @@ lock is introduced by this component. Native planning retains its usual locks;
 the extra request boundary extends the owning transaction and its lock duration
 until Execute and owner finish/recovery complete.
 This is an allocation/round-trip analysis, not measured performance evidence.
+
+## Ordinary functional evidence
+
+Required PostgreSQL 17/18 fixtures distinguish native NoData, zero-column rows,
+zero-row results and empty queries; observe local parameter rejection, native
+planning failure, rejected result OIDs and final readiness; check exact source
+handles and cloned handles; and verify suspended fetches, remaining native
+SELECT counts and stream retention after caller handles are dropped.
+Schema rename/recreation plus temporary namespace creation changes the portal's
+observed origin before Execute. The guard rejects that change for rows, empty
+output and an unexecuted ordinary INSERT RETURNING. This is a native output
+identity observation, not complete dependency validity.
+
+All nineteen scalar codecs have exact text/binary output evidence through the
+described path. Private owner fixtures retain their scope while checking actual
+portal rows and readiness, then recover later output failures or finish valid
+output. They prove ordinary native data effects, not frontend semantics, lock
+retention, measured performance or public executable integration. Exact code
+revision, commands, exclusions and saved failures are in the
+[release plan](release-plan.md#native-bound-portal-local-evidence).
