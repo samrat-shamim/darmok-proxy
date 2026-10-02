@@ -224,11 +224,12 @@ pub(crate) async fn execute_query_command<W: AsyncWrite + Unpin>(
         }
         let settings = stage.settings()?;
         let flags = session_status_flags(settings);
+        let warnings = stage.statement_condition_count_u16();
         let ok = OkPacket {
             affected_rows: 0,
             last_insert_id: 0,
             status_flags: flags,
-            warnings: 0,
+            warnings,
             info: Bytes::new(),
             session_state_changes: None,
         };
@@ -254,7 +255,7 @@ pub(crate) async fn execute_query_command<W: AsyncWrite + Unpin>(
                 ok.encode_ok_as_eof(&mut payload, capabilities)?;
             } else {
                 EofPacket {
-                    warnings: 0,
+                    warnings,
                     status_flags: flags,
                 }
                 .encode(&mut payload);

@@ -289,6 +289,7 @@ fn server_identity_and_statement_counts_have_no_value_overwrite_path() {
     );
     assert_eq!(state.warning_stack().len(), 3);
     assert_eq!(state.warning_count_u16(), 3);
+    assert_eq!(state.statement_condition_count_u16(), 3);
     assert_eq!(
         state
             .read_variable(SessionVariable::VersionCompileOs)
@@ -307,7 +308,7 @@ fn server_identity_and_statement_counts_have_no_value_overwrite_path() {
             Err(SessionVariableError::ReadOnly(variable))
         );
     }
-    state.clear_warning_stack();
+    state.clear_diagnostics();
     assert_eq!(
         state.read_variable(SessionVariable::WarningCount).unwrap(),
         Value::UInt(0)
@@ -317,6 +318,7 @@ fn server_identity_and_statement_counts_have_no_value_overwrite_path() {
         Value::UInt(0)
     );
     assert_eq!(state.warning_count_u16(), 0);
+    assert_eq!(state.statement_condition_count_u16(), 0);
 }
 
 #[test]

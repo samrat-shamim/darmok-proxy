@@ -249,7 +249,8 @@ impl FrontendConnection {
             .encode(&mut payload);
         } else {
             // PING acknowledges liveness without changing the transaction,
-            // pending choices, modes, last insert id or the SQL condition list.
+            // pending choices, modes, last insert id, SQL condition list or its
+            // statement count. Its OK serializes that count, including errors.
             stage.record_sql_success();
             OkPacket {
                 affected_rows: 0,
@@ -257,7 +258,7 @@ impl FrontendConnection {
                 status_flags: session_status_flags(
                     stage.settings().map_err(QueryExecutionError::from)?,
                 ),
-                warnings: 0,
+                warnings: stage.statement_condition_count_u16(),
                 info: Bytes::new(),
                 session_state_changes: None,
             }

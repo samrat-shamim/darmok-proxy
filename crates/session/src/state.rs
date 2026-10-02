@@ -85,6 +85,9 @@ pub struct SessionState {
     pub row_count: i64,
     pub found_rows: u64,
     warning_stack: Vec<SessionWarning>,
+    /// Statement conditions are a separate authority from retained diagnostics.
+    /// PING preserves this count; admitted ordinary SQL replaces it.
+    statement_condition_count: usize,
 }
 
 impl Default for SessionState {
@@ -108,6 +111,7 @@ impl Default for SessionState {
             row_count: 0,
             found_rows: 0,
             warning_stack: Vec::new(),
+            statement_condition_count: 0,
         }
     }
 }
@@ -187,8 +191,12 @@ impl SessionState {
         Ok(())
     }
 
-    pub fn clear_warning_stack(&mut self) {
+    /// Replace the retained conditions and the current statement count together.
+    /// Diagnostic-preserving SQL forms need a distinct boundary and are not
+    /// admitted by the current selected execution controller.
+    pub fn clear_diagnostics(&mut self) {
         self.warning_stack.clear();
+        self.statement_condition_count = 0;
     }
 
     pub fn push_warning(&mut self, level: WarningLevel, code: u16, message: impl Into<String>) {
@@ -197,6 +205,7 @@ impl SessionState {
             code,
             message: message.into(),
         });
+        self.statement_condition_count += 1;
     }
 
     pub fn warning_stack(&self) -> &[SessionWarning] {
@@ -209,6 +218,12 @@ impl SessionState {
 
     pub fn warning_count_u16(&self) -> u16 {
         self.warning_count().min(u16::MAX as usize) as u16
+    }
+
+    /// Count serialized by a terminal response, including notes and errors.
+    /// It must not be inferred from the retained condition list.
+    pub fn statement_condition_count_u16(&self) -> u16 {
+        self.statement_condition_count.min(u16::MAX as usize) as u16
     }
 
     pub fn error_count(&self) -> usize {
@@ -353,6 +368,7 @@ mod tests {
 
         assert_eq!(state.warning_count(), 2);
         assert_eq!(state.warning_count_u16(), 2);
+        assert_eq!(state.statement_condition_count_u16(), 2);
         assert_eq!(state.error_count(), 1);
         assert_eq!(
             state.get_system_var("warning_count").unwrap(),
@@ -362,8 +378,9 @@ mod tests {
         assert_eq!(state.warning_stack[0].level.as_str(), "Warning");
         assert_eq!(state.warning_stack[1].level.as_str(), "Error");
 
-        state.clear_warning_stack();
+        state.clear_diagnostics();
         assert_eq!(state.warning_count(), 0);
+        assert_eq!(state.statement_condition_count_u16(), 0);
         assert_eq!(state.error_count(), 0);
         assert_eq!(
             state.get_system_var("warning_count").unwrap(),

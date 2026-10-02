@@ -340,9 +340,10 @@ async fn frontend_loop_unimplemented_responding_command_errors_without_closing_o
         &error[..9],
         [0xff, 0xd3, 4, b'#', b'4', b'2', b'0', b'0', b'0']
     );
-    ok(
+    ok_with_warnings(
         &command(&mut input, COM_PING, b"").await,
         StatusFlags::SERVER_STATUS_AUTOCOMMIT.bits(),
+        1,
     );
     input.write_all(&encoded(COM_QUIT, b"")).await.unwrap();
     closed(&mut input).await;
@@ -389,7 +390,7 @@ async fn frontend_loop_unimplemented_no_response_commands_terminate_without_an_i
 
 #[tokio::test]
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
-async fn frontend_loop_normal_coalesced_and_split_frames_reset_each_command_sequence() {
+async fn frontend_loop_coalesced_commands_and_split_client_writes_reset_each_command_sequence() {
     let backend = connect_backend().await;
     let (session, globals) = fixture(false);
     let (mut input, owner) = connection(session, backend, globals, BytesMut::new()).await;

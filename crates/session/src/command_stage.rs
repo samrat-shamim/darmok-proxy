@@ -115,7 +115,11 @@ impl SessionCommandStage<'_> {
     }
 
     pub fn clear_diagnostics(&mut self) {
-        self.state.clear_warning_stack();
+        self.state.clear_diagnostics();
+    }
+
+    pub fn statement_condition_count_u16(&self) -> u16 {
+        self.state.statement_condition_count_u16()
     }
 
     pub fn record_sql_error(&mut self, code: u16, message: &str) {

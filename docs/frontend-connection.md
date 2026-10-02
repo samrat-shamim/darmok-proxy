@@ -32,11 +32,15 @@ unsupported entry contracts rather than guessed framing modes. A complete
 logical packet at EOF is still processed; incomplete framing is a terminal
 error rather than a normal disconnect.
 
-PING sends OK with current session status and zero affected rows/insert id/
-warnings. It records ROW_COUNT as zero, preserving the SQL condition list,
-LAST_INSERT_ID, FOUND_ROWS, transaction modes and next choices. The declared
-behavior follows the pinned ordinary command dispatch; complete stock driver
-diagnostics/wire equivalence remains a separate gate.
+PING sends OK with current session status, zero affected rows/insert id and the
+canonical statement condition count, including preceding SQL errors. It records
+ROW_COUNT as zero, preserving both that count and the retained SQL condition
+list, LAST_INSERT_ID, FOUND_ROWS, transaction modes and next choices. The count
+is modeled separately from list length. Every currently admitted SQL statement
+replaces both diagnostic authorities; diagnostic-preserving SQL forms and
+row-warning producers remain unsupported. Ordinary pinned standard-client
+packets corroborate the PING count; full driver diagnostics/wire equivalence
+remains a separate gate.
 
 Other decoded commands requiring a response receive an explicit 1235/42000
 error before effects. They are not implemented by this component. Prepared
@@ -81,7 +85,9 @@ reuses the existing per-command output buffers and native driver. No reader
 task, shared lock, cache or extra query lookup is added. Local SELECT, PING and
 local SET need no native request; existing active SET commits and transaction
 requests retain their own documented costs. Normal active termination adds one
-ROLLBACK. Measured latency, memory, allocations, concurrent workloads and bounded
+ROLLBACK. The statement diagnostic count adds one scalar and one increment per
+generated condition, with no additional condition allocation. Measured latency,
+memory, allocations, concurrent workloads and bounded
 shutdown remain open gates; no result is inferred from this request count.
 
 `mysql_frontend_release.json` declares sixteen stock CLI lifecycle cases. The
@@ -93,11 +99,13 @@ in receipts. CLI observations do not expose raw server flags or certify proxy
 equivalence; the resolved chain status is corroborated by the pinned server
 dispatch, separately from observable closure/data effects.
 
-Seven required native fixture groups use real ordinary TCP command-phase
+Eight required native fixture groups use real ordinary TCP command-phase
 exchanges on PostgreSQL17/18. They check serial selected commands/current SQL
 modes, both EOF formats, status and error/continuation output, all sixteen
 release choices, discarded prefetched input, persistent commit/rollback effects,
-normal coalesced/split frames, RELEASE received directly over TCP, normal
+coalesced commands and split client writes (receive chunking is unasserted),
+repeated PING diagnostic counts followed by successful SET/SELECT replacement,
+RELEASE received directly over TCP, normal
 QUIT/EOF rollback and verified fixture removal, and explicit termination
 without invented prepared close/long-data responses. Setup DML is private fixture
 SQL; public table execution and authenticated real-driver exchanges remain

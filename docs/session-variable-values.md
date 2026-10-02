@@ -48,6 +48,13 @@ guessed defaults.
 | Statement diagnostic stack | warning_count, error_count | Read-only variable values; explicit diagnostic APIs |
 | Other declared names | No implemented value | Explicit error |
 
+Terminal response warnings use a separately modeled statement condition count,
+including notes and errors, rather than deriving a packet count from retained
+list length. `clear_diagnostics` replaces both authorities; `push_warning`
+records a condition in both. The current selected SQL controller admits only
+statements that replace diagnostics. PING preserves both authorities across its
+OK; diagnostic-preserving SQL reads and retention policies remain unimplemented.
+
 `version_compile_os` uses the compiled target's OS rather than an unconditional
 Linux label. Profile version text identifies Darmok and is not a certified
 MySQL server implementation.
