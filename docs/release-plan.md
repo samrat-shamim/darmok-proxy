@@ -4263,3 +4263,109 @@ documentation/source checks and independent C1 correction review are required
 before a normal PR merge. Native implementation, builds, ordinary paired suites,
 performance and full closure/executor/serving/release gates, issues46/15 and the
 overall goal remain OPEN. Standing work exclusions remain in force.
+
+### Variable catalog payload implementation: paired local verification
+
+The corrected design at `91f6f8035bce39b5e55ce4b87c84aeafe963ea71`
+was independently accepted within its stated builtin profile and merged through
+[PR58](https://github.com/samrat-shamim/darmok-proxy/pull/58) at public main
+`012be29d806c4928b328ec06abd58c831c0b93da`. C1 closed only for that corrected
+design; the original888 rejection remains preserved. Design acceptance did not
+certify the implementation described in this checkpoint.
+
+The private C invocation now copies column default/generation and directly
+referenced type-default carriers through three coherent observations. All six
+fact-catalog storage graphs join application graphs with exact mode union and
+per-root provenance. A closes before native physical waits. B retains its
+registered source snapshot through builtin-profile descriptor admission and
+direct selected-TOAST heap copying, outside raw/S. It normalizes actual native
+short/plain/PGLZ/LZ4 carriers without parsing expressions or loading type codecs.
+B closes before C; C validates exact facts/carriers and presents owned B images
+to one pure consumer. This adds no SQL/frontend storage entry point.
+
+Tested source is `ed847973888af48c5d36c73018614a2280d624a2`, tree
+`b5d3a0845aa4111ceb25a5d7bd8f5699f67c67cc`. Strict GCC and LLVM product/probe
+packages were built at `c43443d27d8fa70d38da9ac7e52c128b31907c43`, tree
+`778d72febd5a4e9cf171ed6d9e2014b2c275a535`. All22 actual native inputs
+(16 product,6 probe), including public headers and packaged README, are
+byte-identical at tested ed847. The later change only simplifies two fixture
+assertions and passes full lint/runtime checks. Packages use pinned official
+PostgreSQL17.11/18.6 Alpine bases on Linux/arm64. Four image IDs, in17
+product/test then18 product/test order, are:
+
+- `sha256:6673c7a74a003a6a018c9bf5ed2a4a8dcc4e055a7e18ae5a459ac5a51f3cf9e8`
+- `sha256:58729feee3045f28da74562fffa6490016fc172d0a9c11151f29746467ee600c`
+- `sha256:0b885335f52f5742463e6336085527ec473d61a3cada25627691c1141e41b424`
+- `sha256:c63f389ba04b5fa32c337ba96d7dfe253158ac1b0a5bc5dcc90c04add8ce020e`
+
+Root30 packages actually exit0 with38 child commands0; product/probe product
+library hashes match and product images contain no probe. Package facts
+`logs/native-variable-payloads-c43443d-packages-v1/facts.json` SHA256 is
+`af69cd288024cfd75a46716a3319c3fee04c2f8e47132ed238d77cf4de1dcc52`.
+Root31/34 start eight fresh required verification profiles and bind their actual
+IDs/images/settings/libraries, with45/147 child commands0. Existing profiles
+are untouched. Primary/ordered profiles require native maximum10; zero is only
+additional coverage. The ordered callback preload is explicitly
+`darmok_catalog_probe,darmok_server`. Profile manifest SHA256 values are
+`fbcff1a0c5d280fe0a5557817aeb593c288d29a0b4ce0d4853c496b91db745a4`
+and `bc58c75325b2786f152de6bafda6dd3cb5d983c775946c2f06823c869f07081e`.
+
+Sequential root records use `logs/native-variable-payloads-<source>-<number>-<label>`:
+
+| Records | Actual command/result |
+|---|---|
+| c434 `32-storage17`, `33-storage18` | `cargo test --locked -p darmok-postgres-tests --test server_heap_storage -- --test-threads=1 --nocapture`:11 passed per major, zero failed/ignored |
+| ed847 `37-package17`, `38-package18` | `cargo test --locked -p darmok-postgres-tests -- --test-threads=1 --nocapture`:19 binaries/148 passed per major, zero failed/ignored; includes all11 storage cases |
+| ed847 `39-owner17`, `40-owner18` | `cargo test --locked -p darmok-execute --lib native_backend::tests::native_catalog -- --ignored --test-threads=1 --nocapture`:3 selected required groups passed per major, zero failed/ignored,95 filtered |
+| ed847 `36-clippy` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:0 |
+| ed847 `41-format` | `cargo fmt --all -- --check`:0 |
+| ed847 `42-boundaries` | `python3 scripts/check_repository.py`:0,9 packages |
+
+All use scoped RUSTUP_HOME/shared native-values target, exact clean source reads
+before/after, and preserved child streams/actual exits. Matrix binding manifests
+and child argv identify the actual ordered endpoint. No current full-workspace
+test count is claimed. Package17/18 receipt SHA256 values are
+`46daf0bdd0a338a3585a2c2791a31b6d7a1641e79f0cc3c668f41b615230d5cc`
+and `7978694bbe78b23e72421e30e1767d92b161e90974cfa7585829ab23d2e9e024`.
+
+Bounded ordinary fixtures use independent native detoasting/carrier oracles,
+including independent absent/text-only type fields, NULL/empty values, actual
+inline/external PGLZ/LZ4/uncompressed carriers, equal images with distinct source
+identities, unrelated TOAST rows, default changes/removal, renamed/dropped slots,
+missing-value retention, stored/PG18 virtual generation, and fresh/established
+RR. Prepared column/type changes and literal replacement verify both normal
+native COMMIT PREPARED/ROLLBACK PREPARED outcomes. Waiting captures own all six
+catalog AS references, retain no A catalog horizon, and preserve entered data
+snapshot state. Continuous pinned bootstrap prerequisites remain explicit;
+arbitrary catalog/provider histories are not admitted by a post-open check.
+
+Failures remain immutable: root25 at10443 actually exits101 with0 passed/11
+failed. The implementation assumed eight-byte `text[]` reloptions alignment;
+native17/18 declarations both require four-byte alignment. A fixture also
+incorrectly required both domain-default fields to use PGLZ: native binary is
+external/PGLZ while its independently stored text is external/uncompressed.
+Root26b/28 native declarations and root27/29 bounded native carrier observations
+exit0; c434 corrects exact checks without a fallback. Root35 atc434 exits101 on
+two fixture style lints; ed847 corrects them and root36 exits0. Earlier10443
+packages/profile results and bff local compiler feedback retain their original
+scopes and do not certify the corrected implementation.
+
+The c434 ordinary storage fixture reports12 cost samples per major: all one
+attempt,35/37 exact references,78..254 selected chunks versus209..337 scanned
+TOAST rows. B context allocation reaches3,006,056/3,038,824 bytes; complete
+SQL-and-SHOW elapsed ranges are8.82..29.44/8.03..32.84ms. These are finite fixture
+observations, not allocation-event, process-memory, throughput or contention
+acceptance. A/B/C scan/copy costs remain separately recorded.
+
+Root43 is read-only:82 actual commands0 rebind all22 inputs/four image IDs and
+eight unchanged healthy profile IDs/settings/libraries/headers/README/probes.
+Prepared counts, coordination/synthetic-reference counts and matching
+storage/attribute/missing/payload fixture objects are zero. Environment facts
+`logs/native-variable-payloads-ed84797-environment-v1/facts.json` SHA256 is
+`37870842d96ec75c7a990bdabc37455221d4cffba9c7a47bac0ff4aeea49b4ce`.
+No new stress, forced-error, interruption, recovery or existing-profile lifecycle
+experiment was introduced. Independent frozen-source implementation acceptance
+is required before normal PR merge. Full transitive descriptors/providers/default
+dependencies/constraints/effects, neutral admission/reanalysis, immutable IR,
+row execution, MySQL locking, performance, serving and release remain OPEN;
+issues46/15 and the overall goal stay OPEN. Standing exclusions remain in force.

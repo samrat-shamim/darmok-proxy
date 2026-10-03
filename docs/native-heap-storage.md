@@ -12,8 +12,8 @@ within that finite profile. See
 remain open. Concurrent native PostgreSQL two-phase transactions
 remain supported; disabling them is not a serving requirement.
 
-The current variable-payload implementation is awaiting paired package/runtime
-verification and independent review. Historical acceptance above does not certify
+The current variable-payload implementation passes paired local package/runtime
+verification; independent implementation acceptance is pending. Historical acceptance above does not certify
 this changed native code. Its full source/carrier and pre-open descriptor contract
 is [native-variable-catalog-payloads.md](native-variable-catalog-payloads.md).
 
