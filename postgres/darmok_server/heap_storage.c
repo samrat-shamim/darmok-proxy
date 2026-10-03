@@ -370,7 +370,7 @@ storage_prepare(StorageObservation *observation)
 			RelationGetDescr(observation->heaps[2])->natts != Natts_pg_index)
 			elog(ERROR, "native storage fixed catalog layout is inconsistent");
 		storage_target_layout(observation->heaps[1], Natts_pg_class,
-			Anum_pg_class_reloptions, TEXTARRAYOID, TYPALIGN_DOUBLE);
+			Anum_pg_class_reloptions, TEXTARRAYOID, TYPALIGN_INT);
 		storage_target_layout(observation->heaps[3], Natts_pg_attribute,
 			Anum_pg_attribute_attmissingval, ANYARRAYOID, TYPALIGN_DOUBLE);
 		storage_target_layout(observation->heaps[4], Natts_pg_type,

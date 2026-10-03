@@ -769,9 +769,15 @@ async fn owned_defaults_cover_actual_native_carriers_and_independent_type_presen
                     assert!(type_values(name).iter().all(|value|value["present"]==false));
                 }
                 assert!(type_values("inherited").iter().all(|value|value["present"]==true));
-                for (name,method) in [("dp",b'p'),("dl",b'l')] {
-                    assert!(type_values(name).iter().all(|value|value["present"]==true && value["carrier_kind"]=="e" && value["compression_kind"]==u64::from(method)));
+                for name in ["dp","dl"] {
+                    assert!(type_values(name).iter().all(|value|value["present"]==true && value["carrier_kind"]=="e"));
                 }
+                // PGLZ cannot reuse this distant text repetition. The binary
+                // node representation still compresses; each field's actual
+                // carrier must determine its decoder independently.
+                assert_eq!(type_values("dp")[0]["compression_kind"],u64::from(b'p'));
+                assert_eq!(type_values("dp")[1]["compression_kind"],0);
+                assert!(type_values("dl").iter().all(|value|value["compression_kind"]==u64::from(b'l')));
                 assert!(type_values("inline_l").iter().all(|value|value["carrier_kind"]=="l"));
             }
             let mut graph = oracle(&observer,root).await;

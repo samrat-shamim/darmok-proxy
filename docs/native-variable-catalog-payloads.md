@@ -153,6 +153,10 @@ trigger or other descriptor-loading branch beyond the native bootstrap profile:
 `relhasrules`, `relhastriggers`, `relrowsecurity` and `relispartition` are false.
 Check `pg_class.reloptions` is physically present and NULL before using its
 NULL bit; do not detoast or parse a non-NULL option carrier.
+The prepared fact descriptor must match the native four-byte alignment of
+`reloptions` (`text[]`); `attmissingval` (`anyarray`) separately requires native
+eight-byte alignment. An array's declared element layout does not justify
+substituting another array type's alignment.
 
 Copy every positive attribute row for the target, not just ordinals 1–3, and
 reject duplicates, extras, dropped slots, missing/default/generated/identity
