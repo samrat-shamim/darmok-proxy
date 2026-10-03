@@ -5,9 +5,11 @@ verification and independent implementation review at
 `2640513033227cfe00ad5be4511b12e85491c09c`. Acceptance is confined to the
 continuous builtin private-owner and source-admitted pure consumer profile.
 It does not certify application SQL, an executor or complete semantic closure.
-The current feature branch extends fixed column/type declarations; its build,
-runtime and independent implementation verification are pending. See
-[native-attribute-type-facts.md](native-attribute-type-facts.md). Issues 46/15 remain open. Concurrent native PostgreSQL two-phase transactions
+The fixed column/type declaration extension also passed local verification and
+independent implementation review at `1934034e28d7fda64953c1693104b248c37c42ea`
+within that finite profile. See
+[native-attribute-type-facts.md](native-attribute-type-facts.md). Issues 46/15
+remain open. Concurrent native PostgreSQL two-phase transactions
 remain supported; disabling them is not a serving requirement.
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.

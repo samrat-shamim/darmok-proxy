@@ -1,10 +1,11 @@
 # Private fixed column and type facts
 
-Status: the finite fixed-fact extension is implemented on the feature branch,
-following conditional design review at clean `23842c4` on PostgreSQL 17.11/18.6
-primary source evidence. Exact-source build/runtime and independent
-implementation verification are pending. This extends the [private heap-storage
-invocation](native-heap-storage.md); it does not admit SQL or an executor.
+Status: the finite fixed-fact component passed local PostgreSQL 17.11/18.6
+verification and independent implementation review at
+`1934034e28d7fda64953c1693104b248c37c42ea`. Acceptance is confined to the
+continuous builtin private-owner and source-admitted pure C copying contract.
+This extends the [private heap-storage invocation](native-heap-storage.md);
+it does not admit SQL or an executor.
 
 One coherent raw observation copies fixed `pg_namespace`, `pg_class` and
 `pg_index` maps, resolves exact counted literal root names to actual OIDs, then
@@ -71,15 +72,27 @@ scanned rows, selected attribute/type counts, defined array bytes and each
 observation context's allocated bytes separately. Context allocation excludes
 other process/cache/consumer contexts and does not count allocation events.
 
-Required paired ordinary verification covers exact literal/duplicate/mode
-bindings, empty/dropped/renamed/maximum-byte names, true layout equality and
-valid per-column overrides; domains/arrays/enums/composites and builtin-like
+Nine required ordinary fixtures pass on both majors. They cover exact literal/
+duplicate/mode bindings, empty/dropped/renamed/63-byte names, true layout equality
+and valid per-column overrides; domains/arrays/enums/composites and builtin-like
 type names remain descriptive. Removed dropped types, repeated live type IDs,
 missing/default/identity/generation flags, cold/warm descriptors, actual TEMP,
-native ownership and prepared commit/rollback must be exercised. Strict fresh
-product/probe images, affected and complete native groups, private-owner checks,
-static checks, final environment, finite costs and independent implementation
-review remain pending. Historical tests certify their historical source only.
+native ownership and both prepared commit/rollback outcomes are exercised.
+An exact inherited child has nonlocal/positive inheritance declarations, without
+parent/descendant expansion, on fresh unset-snapshot and established RR paths.
+The complete native package passes 146 tests across 19 binaries per major,
+including these nine; three selected private-owner checks also pass per major.
+These runs have zero failed/ignored tests. Strict product/probe GCC/LLVM builds,
+formatting, repository boundaries, workspace/connector Clippy, final environment
+and separately scoped ordinary costs are recorded in the release ledger.
+
+The native images were built at `828692023861fdc31a9989658c00f9bb8dab89ad`.
+All 20 product/probe inputs match at tested `1934034`. The final documentation leaf
+changes one packaged DOCS/build-context input, the README status pointer; the
+other 19 native inputs and all executable/test/dependency entries are unchanged.
+Existing tested images retain the historical packaged README. This is not a
+fresh final-leaf artifact or full performance/release certification. Historical
+results certify their historical source and explicitly verified unchanged inputs.
 
 Full variable/transitive descriptor/provider/name/candidate closure, effects,
 immutable executable binding, native Parse/Bind/Describe/reanalysis admission,

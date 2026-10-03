@@ -126,4 +126,4 @@ TupleDesc/TypeCache construction, frontend column flags or codec admission
 follows. Scan counts, selected array bytes and observation context allocation
 are reported separately to the private consumer. See
 [`docs/native-attribute-type-facts.md`](../../docs/native-attribute-type-facts.md)
-for the finite contract and pending verification status.
+for the finite contract, recorded verification status and remaining gates.

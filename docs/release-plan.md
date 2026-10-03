@@ -3294,3 +3294,106 @@ returned0. This is a reader bookkeeping error, not a native/review result;
 source was unchanged and recorded full rehash35 actually returned0.
 Full closure/effects/preparation/execution/MySQL data/lock/serving/release gates,
 issues46/15 and the goal remain open. Standing exclusions are unchanged.
+
+
+### Verified private fixed column and direct-type facts
+
+Clean tested `1934034e28d7fda64953c1693104b248c37c42ea`, tree
+`f33cce9026bba70c196073d7229668b175489488`, adds positive inherited-child coverage
+to the independently inspected implementation. Both fresh unset-snapshot and
+established RR paths select the exact child, assert local=false and positive
+inheritance_count, compare complete storage/root/attribute/direct-type native
+oracles, reject parent/descendant expansion and observe no remaining checked
+physical/coordination references before ordinary COMMIT. C2 closes here only;
+the old `32b4e29` review remains unchanged with its historical finding open.
+
+Recorder prefix `logs/native-attribute-facts-1934034-` records exact clean source,
+scoped RUSTUP_HOME/CARGO_TARGET_DIR, actual argv, exits and raw streams:
+`36-input-bind`0; `37-storage17`/`38-storage18` each pass 9 required fixtures;
+`39-package17`/`40-package18` each pass 146 native tests across 19 binaries,
+including those 9, zero failed/ignored. Explicit `41-owner17`/`42-owner18` each
+pass 3 private-owner checks, zero failed/ignored and 86 filtered out.
+`43-format`0; `44-boundaries`0 (9 packages); workspace/all-target/all-feature
+strict `45-clippy`0; tokio-postgres library strict `46-connector-clippy`0.
+No current full workspace test total is claimed. Original `8286920` strict product/
+probe GCC/LLVM builds remain the native artifact evidence. Input-binding facts
+SHA `f93f130cbe3e42d9e0d259d7d5fe77a7bae2ab65121232b9ab23fcd933a1407e`
+prove all 20 native inputs at `1934034` equal built `8286920` and original setup.
+
+`47-cost17`/`48-cost18`0 preserve 32 warmups and 128 ordinary sequential SET calls
+per major under `logs/native-attribute-facts-1934034-cost{17|18}-v2`.
+PG17 p50/p95/max are 670500/969000/3103000ns; PG18 are 884000/4521000/8794000ns.
+Five storage nodes/thirteen exact native references/two selected slots/two
+actual types yield 208/416 defined array bytes. Each initial/final observation
+context is 1204320 bytes on 17 and 1237088 on 18. Full scan rows are, separately,
+namespace/class/index/attribute/type: 17 has 160/420/167/3147/619 and 18 has
+162/420/166/3182/623. Timings include both five-catalog observations, graph,
+SI/descriptor/native lock-owner and pure-copy/protocol work with 1us psql
+quantization; only the final copied view is inspected. The historical `32b4e29` timing
+run stays immutable. Variance is visible; no cause or performance improvement
+is inferred. Allocation events, peak/process memory, throughput, contention,
+isolated-C/baseline and full performance acceptance remain open.
+
+`49-environment`0 records 85 successful actions and eight healthy exact profiles,
+unchanged native images/containers/libraries/bitcode/headers/probe/packaged README
+and all 20 tested inputs. Checked prepared/module/mock refs and old/new fixture
+tables/schemas/types are zero. Primary/ordered native 2PC remains 10; no profile
+lifecycle action occurred. Environment facts SHA
+`058216105187746d5aa8e83332fe6e13e3fcc13e2eeb581e39b47b41c8b06362`.
+`50-author-audit`0 seals 2270 members; facts SHA
+`20d168abdbdac76ab5cb759a204b71ad196b0dfd618ff1b1fafcebfe416e7a14`,
+seal SHA `6a06c6e362af215d2d6e4e77dabd4a48222f5ab5c85e665bbf66bf540003a93e`.
+The old 1777-path root review is preserved with two exact Git `32b4e29` source witnesses
+for its changed test/ledger paths, rather than current working-path bytes.
+
+Independent correction review from `/root/native_values_review` is
+`logs/review-native-attribute-facts-1934034-correction-v2`. Finite implementation
+accepted; C2/P2 closed at `1934034`. Report SHA
+`0c7dabedbd06b1e892465788ad0a0343dc6eef82d9fa704da7865f05603834cc`,
+facts SHA `4048fcb8d60abb8b066c2f8f19f9137db3ade6c7bac34baf929f49aac2007884`,
+2528-member structured seal SHA
+`cfe8ab52d07fc24030f6d497f5a233dfe88b478def3134a316633ecdf013bc08`.
+Actually executed `20-final-invocation.json`0 SHA
+`190e505ca91165d94ff9fccb1ce80a0f5d31cfbf8d97fd7578cc7f328dc6fcfd`
+and independent `21-post-invocation.json`0 SHA
+`675c26d4a7cac77585a1da95279788cf2ca003eacd17889c7f985075c98f12c0`
+retain exact clean source and post facts SHA
+`08fe2d8b99c78e9f0f02a0e6a22408116545d004ae6f4663a7e5824d234f11f8`.
+73 prefinal passive records preserve 72 zero and audit 15 exit 1 (a mistyped
+historical evidence-folder prefix); distinct corrected audit 16 exits 0. Final/post
+source readers exit 0, live reads released. No reviewer runtime execution occurred.
+
+Root `51-correction-rehash` actually returns 1: its checker assumed the old plain
+seal map, while this new manifest wraps 2528 entries in `members`. That original
+helper/receipt/stderr SHA
+`d1e0579cca09cac7f62119d64bf68a009c618856cbc2762e98b5fdbe538462b8`
+remain unchanged. A distinct schema-aware `52-correction-rehash-v3` actually
+returns 0, verifies 2528 sealed members plus companions: 2550 unique paths and
+preserves the failed 51 record. Root facts SHA
+`a5c8612351e640682c1f28d8810d5364b3f8b34e09985888722c4c7ec72950ab`.
+Prior Clippy exit 101, reviewer exits 128/128/1 and root bookkeeping failures stay historical;
+none is relabeled as success or a product/runtime defect.
+
+D1/P3 requires a status-neutral packaged README pointer after finite acceptance.
+The final leaf updates that DOCS/build-context input plus the three unpackaged
+status/ledger documents. Relative to tested `1934034`, all executable/test/dependency
+entries and 19 other native inputs remain identical; existing tested images keep
+their historical README. Do not claim all 20 final-leaf inputs match old images.
+A separate exact documentation-leaf audit and independent readback must close
+D1 before normal squash merge; the PR records final leaf/tree/publication proof.
+No runtime repetition or fresh final-leaf artifact certification follows from
+this documentation-only correction.
+
+Acceptance remains limited to fixed selected positive slots and direct types
+inside the private whole-invocation metadata point. Variable/transitive/provider/
+candidate/effect/immutable-IR closure, native preparation/Parse/Bind/Describe/
+reanalysis, data-derived storage, row execution, MySQL data/read-lock semantics,
+serving, cache/full performance and artifact/release gates, issues46/15 and the
+goal remain open. Security, compiler PR4/resources, stress/forced interruptions,
+profile stop/restart/signal, hosted CI/account/admin and release publication
+remain outside current scope. No full milestone or goal completion is claimed.
+
+A draft documentation spacing edit surfaced trailing whitespace through
+`git diff --check`; the multi-command display ended0 on its later status read,
+so that display is not a successful diff check. The whitespace is removed
+before commit and the separate diff check must pass. No runtime result changes.
