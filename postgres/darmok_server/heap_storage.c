@@ -1,10 +1,12 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 #include "postgres.h"
 
+#include "access/detoast.h"
 #include "access/heapam.h"
 #include "access/htup_details.h"
 #include "access/table.h"
 #include "access/tableam.h"
+#include "access/toast_compression.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_am_d.h"
@@ -17,6 +19,7 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "storage/proc.h"
+#include "utils/array.h"
 #include "utils/hsearch.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
@@ -114,6 +117,8 @@ typedef struct StorageAttribute
 	/* Exact positive ordinal key, with no native struct padding in the hash. */
 	uint64 key;
 	DarmokHeapAttributeFact fact;
+	struct varlena *missing_carrier;
+	Size missing_carrier_bytes;
 } StorageAttribute;
 
 typedef struct StorageType
@@ -142,8 +147,11 @@ typedef struct StorageObservation
 	DarmokHeapStorageRootFact *root_facts;
 	DarmokHeapAttributeFact *attributes;
 	DarmokHeapTypeFact *types;
+	DarmokHeapMissingFact *missing;
 	int attribute_count;
 	int type_count;
+	int missing_count;
+	Size missing_image_bytes;
 	DarmokHeapObservationCost cost;
 	DarmokHeapStorageFact *facts;
 	DarmokRelationRequest *references;
@@ -204,6 +212,21 @@ storage_budget(StorageObservation *observation)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("native storage copied phase exceeds 64 MiB")));
+}
+
+static void
+storage_missing_budget(StorageObservation *observation, Size bytes,
+					   Size cumulative, bool allocating)
+{
+	/* Subtraction checks precede both cumulative addition and native palloc.
+	 * Context block overhead can still overshoot the periodic phase limit. */
+	if (bytes > MaxAllocSize || bytes > STORAGE_PHASE_BYTES ||
+		cumulative > STORAGE_PHASE_BYTES - bytes ||
+		(allocating && MemoryContextMemAllocated(observation->context, true) >
+		 STORAGE_PHASE_BYTES - bytes))
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("native storage missing images exceed the 64 MiB phase budget")));
 }
 
 static void
@@ -274,6 +297,19 @@ storage_prepare(StorageObservation *observation)
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("native storage requires builtin heap catalogs")));
+		}
+		{
+			TupleDesc descriptor = RelationGetDescr(observation->heaps[3]);
+			Form_pg_attribute target;
+
+			if (descriptor->natts != Natts_pg_attribute)
+				elog(ERROR, "native storage pg_attribute descriptor has an unexpected column count");
+			target = TupleDescAttr(descriptor, Anum_pg_attribute_attmissingval - 1);
+			if (target->attrelid != AttributeRelationId ||
+				target->attnum != Anum_pg_attribute_attmissingval || target->attisdropped ||
+				target->atttypid != ANYARRAYOID || target->attlen != -1 ||
+				target->attbyval || target->attalign != TYPALIGN_INT)
+				elog(ERROR, "native storage pg_attribute missing carrier layout is inconsistent");
 		}
 	}
 	PG_FINALLY();
@@ -368,13 +404,190 @@ storage_copy_type(DarmokHeapTypeFact *fact, const FormData_pg_type *row)
 }
 
 static void
+storage_copy_missing(StorageObservation *observation, StorageAttribute *attribute,
+					 HeapTuple tuple)
+{
+	TupleDesc descriptor = RelationGetDescr(observation->heaps[3]);
+	HeapTupleHeader header = tuple->t_data;
+	int natts;
+	Size minimum;
+	Size offset;
+	Size available;
+	Size bytes;
+	uint32 aligned_header;
+	Datum datum;
+	const char *carrier;
+	bool is_null = false;
+
+	if (attribute->fact.dropped || !OidIsValid(attribute->fact.type_oid))
+		elog(ERROR, "native storage missing value has no live column type");
+	if (tuple->t_len < SizeofHeapTupleHeader)
+		elog(ERROR, "native storage missing tuple has a truncated header");
+	natts = HeapTupleHeaderGetNatts(header);
+	minimum = SizeofHeapTupleHeader;
+	if (HeapTupleHasNulls(tuple))
+		minimum += BITMAPLEN(natts);
+	if (natts < Anum_pg_attribute_attmissingval || natts > descriptor->natts ||
+		header->t_hoff < MAXALIGN(minimum) || header->t_hoff > tuple->t_len ||
+		header->t_hoff != MAXALIGN(header->t_hoff))
+		elog(ERROR, "native storage missing tuple does not physically contain its compiled ordinal");
+	/* Physical presence excludes heap_getattr/getmissingattr. The prepared
+	 * builtin fast/nocache path walks layout only; no detoast/provider/cache
+	 * construction. Native per-major offset caches remain native and private. */
+	datum = fastgetattr(tuple, Anum_pg_attribute_attmissingval, descriptor, &is_null);
+	if (is_null)
+		elog(ERROR, "native storage declared missing value has a NULL carrier");
+	carrier = DatumGetPointer(datum);
+	if ((uintptr_t) carrier < (uintptr_t) header)
+		elog(ERROR, "native storage missing carrier is outside its tuple");
+	offset = (uintptr_t) carrier - (uintptr_t) header;
+	if (offset < header->t_hoff || offset >= tuple->t_len)
+		elog(ERROR, "native storage missing carrier is outside its tuple data");
+	available = tuple->t_len - offset;
+	/* The first-byte external test precedes every tag or pointer-specific
+	 * access. No on-disk/indirect/expanded/unknown external form is admitted. */
+	if (VARATT_IS_EXTERNAL(carrier))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("native storage missing value requires an inline carrier")));
+	if (VARATT_IS_SHORT(carrier))
+	{
+		bytes = VARSIZE_SHORT(carrier);
+		if (bytes < VARHDRSZ_SHORT)
+			elog(ERROR, "native storage missing short carrier has an invalid size");
+	}
+	else
+	{
+		if (available < VARHDRSZ)
+			elog(ERROR, "native storage missing carrier has a truncated length header");
+		memcpy(&aligned_header, carrier, VARHDRSZ);
+		if (!VARATT_IS_4B_U(&aligned_header) && !VARATT_IS_4B_C(&aligned_header))
+			elog(ERROR, "native storage missing carrier has an unknown inline form");
+		bytes = VARSIZE_4B(&aligned_header);
+		if (bytes < (VARATT_IS_4B_C(&aligned_header) ? VARHDRSZ_COMPRESSED : VARHDRSZ))
+			elog(ERROR, "native storage missing carrier has an invalid inline header size");
+	}
+	if (bytes > available)
+		elog(ERROR, "native storage missing carrier extends past its tuple");
+	storage_missing_budget(observation, bytes, observation->cost.missing_carrier_bytes, true);
+	attribute->missing_carrier = MemoryContextAlloc(observation->context, bytes);
+	memcpy(attribute->missing_carrier, carrier, bytes);
+	attribute->missing_carrier_bytes = bytes;
+	observation->cost.missing_carrier_bytes += bytes;
+	if (observation->missing_count == PG_INT32_MAX)
+		elog(ERROR, "native storage missing value count exceeds native limits");
+	observation->missing_count++;
+}
+
+static void
+storage_normalize_missing(StorageObservation *observation)
+{
+	int position = 0;
+
+	/* Only initial invocation-owned carriers, after reader cleanup and before
+	 * any physical wait. Nothing in this function runs under raw or S. */
+	MemoryContextSwitchTo(observation->context);
+	if ((Size) observation->missing_count > MaxAllocSize / sizeof(DarmokHeapMissingFact))
+		elog(ERROR, "native storage missing fact array exceeds native limits");
+	if (observation->missing_count > 0)
+	{
+		Size bytes = sizeof(DarmokHeapMissingFact) * (Size) observation->missing_count;
+
+		storage_missing_budget(observation, bytes, 0, true);
+		observation->missing = palloc0(bytes);
+	}
+	for (int i = 0; i < observation->attribute_count; i++)
+	{
+		const DarmokHeapAttributeFact *fact = &observation->attributes[i];
+		uint64 key = ((uint64) fact->relation_oid << 32) | (uint16) fact->number;
+		StorageAttribute *attribute;
+		struct varlena *carrier;
+		ArrayType *image;
+		DarmokHeapMissingFact *missing;
+		Size expanded;
+		char kind;
+		bool allocating;
+
+		if (!fact->has_missing)
+			continue;
+		attribute = hash_search(observation->attribute_rows, &key, HASH_FIND, NULL);
+		if (attribute == NULL || attribute->missing_carrier == NULL ||
+			position >= observation->missing_count)
+			elog(ERROR, "native storage lost a copied missing carrier");
+		carrier = attribute->missing_carrier;
+		/* Recheck before even a generic native detoast call. All accepted
+		 * branches are inline memory work on an aligned owned copy. */
+		if (VARATT_IS_EXTERNAL(carrier))
+			elog(ERROR, "native storage copied an unadmitted external missing carrier");
+		allocating = !VARATT_IS_4B_U(carrier);
+		if (VARATT_IS_SHORT(carrier))
+		{
+			expanded = attribute->missing_carrier_bytes - VARHDRSZ_SHORT + VARHDRSZ;
+			kind = 's';
+		}
+		else if (VARATT_IS_COMPRESSED(carrier))
+		{
+			Size payload = VARDATA_COMPRESSED_GET_EXTSIZE(carrier);
+			uint32 method = VARDATA_COMPRESSED_GET_COMPRESS_METHOD(carrier);
+
+			if (payload > MaxAllocSize - VARHDRSZ)
+				elog(ERROR, "native storage missing expansion size exceeds native limits");
+			expanded = payload + VARHDRSZ;
+			if (method == TOAST_PGLZ_COMPRESSION_ID)
+				kind = 'p';
+			else if (method == TOAST_LZ4_COMPRESSION_ID)
+				kind = 'l';
+			else
+				elog(ERROR, "native storage missing carrier has an unknown compression method");
+		}
+		else if (VARATT_IS_4B_U(carrier))
+		{
+			expanded = attribute->missing_carrier_bytes;
+			kind = 'u';
+		}
+		else
+			elog(ERROR, "native storage missing carrier has an unknown copied form");
+		storage_missing_budget(observation, expanded, observation->missing_image_bytes, allocating);
+		if (expanded < ARR_OVERHEAD_NONULLS(1))
+			elog(ERROR, "native storage missing image is smaller than its singleton array envelope");
+		image = (ArrayType *) detoast_attr(carrier);
+		if (!VARATT_IS_4B_U(image) || (Size) VARSIZE(image) != expanded ||
+			ARR_NDIM(image) != 1 || ARR_ELEMTYPE(image) != fact->type_oid ||
+			ARR_DIMS(image)[0] != 1 || ARR_LBOUND(image)[0] != 1)
+			elog(ERROR, "native storage missing image has an inconsistent singleton array envelope");
+		if (ARR_HASNULL(image))
+		{
+			if (expanded < ARR_OVERHEAD_WITHNULLS(1, 1) ||
+				image->dataoffset != ARR_OVERHEAD_WITHNULLS(1, 1) ||
+				(ARR_NULLBITMAP(image)[0] & 1) == 0)
+				elog(ERROR, "native storage missing image has a NULL element or invalid bitmap offset");
+		}
+		if ((Size) ARR_DATA_OFFSET(image) > expanded)
+			elog(ERROR, "native storage missing image has an out-of-range data offset");
+		missing = &observation->missing[position++];
+		missing->relation_oid = fact->relation_oid;
+		missing->number = fact->number;
+		missing->type_oid = fact->type_oid;
+		missing->carrier_kind = kind;
+		missing->stored_bytes = attribute->missing_carrier_bytes;
+		missing->image_bytes = expanded;
+		missing->image = (const char *) image;
+		observation->missing_image_bytes += expanded;
+		storage_budget(observation);
+	}
+	if (position != observation->missing_count)
+		elog(ERROR, "native storage copied missing count disagrees with selected columns");
+	storage_budget(observation);
+}
+
+static void
 storage_read_fixed(StorageState *state, StorageObservation *observation)
 {
 	HeapTuple tuple;
 	uint64 rows = 0;
 
 	/* Catalog snapshots never select the first transaction data snapshot.
-	 * Descriptor preparation has ended: only fixed builtin heap fields here.
+	 * Descriptor preparation has ended: fixed fields and inline carrier copy.
 	 * Copying performs bounded native allocation; budget checks are periodic. */
 	InvalidateCatalogSnapshot();
 	observation->snapshot = RegisterSnapshot(GetNonHistoricCatalogSnapshot(RelationRelationId));
@@ -440,6 +653,19 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
 	}
+	{
+		StorageClass *attribute_catalog = hash_search(observation->classes,
+													   &fact_heap_oids[3], HASH_FIND, NULL);
+
+		if (attribute_catalog == NULL || attribute_catalog->fact.kind != RELKIND_RELATION ||
+			attribute_catalog->fact.access_method_oid != HEAP_TABLE_AM_OID ||
+			attribute_catalog->fact.is_partition ||
+			OidIsValid(attribute_catalog->fact.toast_oid) ||
+			attribute_catalog->fact.declared_attribute_count != Natts_pg_attribute)
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("native storage missing values require builtin no-TOAST pg_attribute")));
+	}
 	while ((tuple = heap_getnext(observation->scans[2], ForwardScanDirection)) != NULL)
 	{
 		Form_pg_index row = (Form_pg_index) GETSTRUCT(tuple);
@@ -486,6 +712,10 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 			if (found)
 				elog(ERROR, "duplicate positive slot in native storage observation");
 			storage_copy_attribute(&attribute->fact, row);
+			attribute->missing_carrier = NULL;
+			attribute->missing_carrier_bytes = 0;
+			if (row->atthasmissing)
+				storage_copy_missing(observation, attribute, tuple);
 			if (!row->attisdropped && OidIsValid(row->atttypid))
 			{
 				StorageType *type = hash_search(observation->type_rows, &row->atttypid,
@@ -784,6 +1014,7 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	int position = 0;
 
 	if (attributes < 0 || types < 0 || types > attributes ||
+		observation->missing_count < 0 || observation->missing_count > attributes ||
 		attributes > (long) state->count * MaxHeapAttributeNumber ||
 		(Size) attributes > MaxAllocSize / sizeof(DarmokHeapAttributeFact) ||
 		(Size) types > MaxAllocSize / sizeof(DarmokHeapTypeFact))
@@ -1070,7 +1301,9 @@ storage_compare(StorageState *state)
 	StorageObservation *b = &state->final;
 
 	if (a->fact_count != b->fact_count || a->reference_count != b->reference_count ||
-		a->attribute_count != b->attribute_count || a->type_count != b->type_count)
+		a->attribute_count != b->attribute_count || a->type_count != b->type_count ||
+		a->missing_count != b->missing_count ||
+		a->cost.missing_carrier_bytes != b->cost.missing_carrier_bytes)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("native storage graph changed without a publication identity change")));
@@ -1099,10 +1332,28 @@ storage_compare(StorageState *state)
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage exact references changed without publication")));
 	for (int i = 0; i < a->attribute_count; i++)
+	{
 		if (!storage_attribute_equal(&a->attributes[i], &b->attributes[i]))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage column definition changed without publication")));
+		if (a->attributes[i].has_missing)
+		{
+			uint64 key = ((uint64) a->attributes[i].relation_oid << 32) |
+				(uint16) a->attributes[i].number;
+			StorageAttribute *left = hash_search(a->attribute_rows, &key, HASH_FIND, NULL);
+			StorageAttribute *right = hash_search(b->attribute_rows, &key, HASH_FIND, NULL);
+
+			if (left == NULL || right == NULL || left->missing_carrier == NULL ||
+				right->missing_carrier == NULL ||
+				left->missing_carrier_bytes != right->missing_carrier_bytes ||
+				memcmp(left->missing_carrier, right->missing_carrier,
+					   left->missing_carrier_bytes) != 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg("native storage missing carrier changed without publication")));
+		}
+	}
 	for (int i = 0; i < a->type_count; i++)
 		if (!storage_type_equal(&a->types[i], &b->types[i]))
 			ereport(ERROR,
@@ -1235,6 +1486,8 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 					storage_close_reader(&state->initial);
 					storage_context_check(state);
 					storage_build_graph(state, &state->initial);
+					storage_normalize_missing(&state->initial);
+					storage_context_check(state);
 					darmok_relation_attempt_acquire(&state->physical, state->initial.references,
 												   state->initial.reference_count);
 					storage_observation_init(state, &state->final);
@@ -1257,8 +1510,12 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 							view.attribute_count = state->final.attribute_count;
 							view.types = state->final.types;
 							view.type_count = state->final.type_count;
+							view.missing = state->initial.missing;
+							view.missing_count = state->initial.missing_count;
 							view.attribute_array_bytes = sizeof(DarmokHeapAttributeFact) * (Size) view.attribute_count;
 							view.type_array_bytes = sizeof(DarmokHeapTypeFact) * (Size) view.type_count;
+							view.missing_array_bytes = sizeof(DarmokHeapMissingFact) * (Size) view.missing_count;
+							view.missing_image_bytes = state->initial.missing_image_bytes;
 							state->initial.cost.allocated_bytes = MemoryContextMemAllocated(state->initial.context, true);
 							state->final.cost.allocated_bytes = MemoryContextMemAllocated(state->final.context, true);
 							view.initial_cost = state->initial.cost;

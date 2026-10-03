@@ -120,10 +120,15 @@ fixed type declarations, filtered by exact root and live-type OIDs within one
 catalog snapshot/raw span. Both observations scan five catalogs in full. Dropped
 slots retain layout/type0; only live length/by-value/alignment redundancy is
 cross-checked. Column storage/compression, typmods, dimensions, collation and
-NOT NULL remain independent declarations. Type/default/missing/generation OID
-edges and flags are descriptive: no variable payload, provider invocation,
-TupleDesc/TypeCache construction, frontend column flags or codec admission
-follows. Scan counts, selected array bytes and observation context allocation
-are reported separately to the private consumer. See
+NOT NULL remain independent declarations. Type/default/generation OID edges and
+flags are descriptive. The invocation also copies selected inline missing-value
+carriers, normalizes their opaque native singleton array images before physical
+waits, and requires exact carrier equality in its final observation. A stored
+image does not replace a physically present NULL or admit element decoding,
+external TOAST fetch, provider invocation, TupleDesc/TypeCache construction or
+frontend column flags. Scan counts, fixed and missing record-array bytes,
+stored/normalized image bytes and observation context allocation are reported
+separately to the private consumer. See
 [`docs/native-attribute-type-facts.md`](../../docs/native-attribute-type-facts.md)
-for the finite contract, recorded verification status and remaining gates.
+and [`docs/native-missing-values.md`](../../docs/native-missing-values.md) for the
+finite contracts, separately recorded verification status and remaining gates.

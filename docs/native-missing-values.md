@@ -1,6 +1,7 @@
 # Private column missing-value images
 
-Status: proposed, not implemented or accepted. This extends the finite
+Status: implemented candidate; native verification and independent implementation
+review remain pending. This extends the finite
 [fixed column/type facts](native-attribute-type-facts.md) inside the existing
 private heap-storage invocation. It does not admit a TupleDesc, a type codec,
 SQL, an executor, default evaluation or a frontend metadata handle.
@@ -14,7 +15,7 @@ A future row reader needs the value as well as the physical column layout.
 Guessing it from the current default, substituting NULL or invoking a provider
 while holding the semantic lease would be incorrect.
 
-This component will capture the native one-element array image for every
+This component captures the native one-element array image for every
 selected live positive slot whose copied `atthasmissing` is true. The image is
 opaque, specific to the current PostgreSQL major and native architecture, and
 is not an independently usable SQL datum or an element-decoding certificate.
@@ -121,6 +122,16 @@ allocated bytes. Normalization/copying allocation events, cache effects,
 throughput, contention and full performance acceptance remain separate gates.
 Ordinary measurements retain variance and their exact source/profile scope.
 
+The candidate checks stored-byte and normalized-byte cumulative totals separately
+against 64MiB, with subtraction before addition. Before each carrier, metadata
+array or expansion allocation, the current observation context allocation plus
+the requested bytes must also fit that budget. Allocation-block overhead can
+still overshoot; the subsequent periodic context check detects it. Ordinary
+four-byte images alias their owned carrier rather than making a third copy.
+Missing record-array bytes are reported separately. Carrier tags `s`, `u`, `p`
+and `l` describe actual short, four-byte, pglz and LZ4 representations. No element
+bytes are interpreted by that classification.
+
 ## Required verification and remaining gates
 
 Required bounded ordinary fixtures on both native majors must prove no images
@@ -130,6 +141,11 @@ array/domain/enum/composite declarations remaining opaque, duplicate roots,
 inheritance and a dropped formerly-missing column. Oracles must check actual
 native array identity/envelope and image bytes, native old-row behavior and
 complete fixed/storage bindings; the product image contains no SQL probe.
+Create a row before ADD COLUMN and a later row with physically present explicit
+NULLs. A separate ordinary heap oracle must confirm their different physical
+column counts. Before and after DROP DEFAULT, the old row receives the retained
+missing value and the present NULL remains NULL. Neither the missing image nor
+the column declaration proves that every row is non-NULL.
 Fixtures cover unset and established repeatable-read data-snapshot state,
 ordinary native release/retention/subtransaction outcomes and prepared DDL
 commit/rollback where the new value differs. No new stress, malformed-catalog,
@@ -140,7 +156,7 @@ formatting/boundary/Clippy checks, artifact/input/environment binding, bounded
 ordinary costs and independent second-pass review are required before finite
 acceptance. Current fixed-fact images cannot certify changed executable inputs.
 
-This proposal does not close variable defaults/expressions, transitive types,
+This component does not close variable defaults/expressions, transitive types,
 constraints/rules/triggers, providers/collation, name/candidate/effect closure,
 immutable IR, native preparation/Parse/Bind/Describe/reanalysis, data-derived
 storage/table execution, MySQL row/read-lock equivalence, serving, cache/full

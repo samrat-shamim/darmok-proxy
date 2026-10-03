@@ -3514,3 +3514,66 @@ and ordinary fixtures. An independent design review precedes implementation.
 All implementation/runtime/native-image/performance/release acceptance for this
 proposal remains open. Existing fixed-fact test artifacts remain historical.
 Concurrent native 2PC and every previously recorded exclusion remain in force.
+
+### Inline missing-image design review and implementation candidate
+
+The design is frozen at `9c9bbf4a823ec028b665859ed87b2e0a1f55d7dc`, tree
+`5016d3beeeb57f225c0d11582f07276eafb54304`. Its independent review is a
+conditional design recommendation only, with no structural blocker in inspected
+ordinary paths. C1/P2 requires a fixture proving an old absent slot differs from
+a later physically present explicit NULL before and after DROP DEFAULT. It is
+not an implementation or runtime acceptance.
+
+Recorder `logs/native-definition-closure-9c9bbf4-68-primary-v4`0 adds paired
+tupdesc.c after verified path inventory: 62 distinct primary records, 60 cached
+and two HTTP200 fetches. Facts SHA
+`c984d232185fd7e82d26d57199cf78b32f50648502415d9e49bebe9422c83203`,
+nine-member seal SHA
+`d75d7a2fa86f14574ff76cd6246c12fca302b90f184512c47b90895e03149b6c`.
+`69-primary-audit-v2`0 verifies 181 paths and 30 function excerpts, preserving
+the earlier failed capture and separate inventories. Facts SHA
+`69e70627363257f8cd025b14b3c6109d751bc09842498f52cfcc177b7c2f69ce`,
+31-member seal SHA
+`1e3150728802936e0fbed24605fa8883a8424728d141889f1a3c92169b453239`.
+The PG18 assertion-build accessor classifier and DROP DEFAULT bodies also use
+separately verified existing paired classification/default-removal inventories;
+those are not relabeled into the 62-source bundle.
+
+Review `logs/review-native-missing-images-9c9bbf4-design-v1` report SHA
+`185fd2e47107b6d6a4a91716b4e34943a3d97f3a099c8662ee50e2fa08b3687f`,
+facts SHA `c899ef8907f99a5dfd997cff3dcf2c11d55a877c2348e5d7c7464b5476d158d4`,
+702-member structured seal SHA
+`5227230191f05f27ef8ad51fb14c848cf3491f3a4dde926886c9a93decc90ac7`.
+Executed finalization113 and independent post114 both exit0 with exact clean
+source; live reads are released. Five own passive actual1 records and root64's
+HTTP404 remain unchanged. Corrected reviewer audit112 verifies 645 paths and
+16 Git reads0. Root `70-design-rehash` actual1 preserves its bootstrap stream
+prefix assumption; distinct schema-aware `71-design-rehash-v2`0 verifies 702
+members plus companions, 716 paths. Root facts SHA
+`a51e10672562e85ef8c6c47e6bef4de0a34ecd23d9a16c14b96461324f1d3966`.
+Wrong-filename/source-key/window passive reads remain failed displays, separately
+from product verification. `72-next-worktree`0 creates
+`feat/native-missing-images` at exact design HEAD and leaves the reviewed design
+worktree frozen. Dirty personal main and the monorepo are untouched.
+
+The candidate implements checked physical access to selected inline carriers,
+native singleton-array normalization only after initial reader cleanup and
+before physical waits, cumulative/requested allocation bounds, exact final
+carrier equality, and opaque copying under the existing pure consumer contract.
+Missing count, stored bytes per observation, normalized image bytes and record
+array bytes are separate costs. No extra observation, round trip, provider,
+external storage or element codec is admitted. Ordinary test-only oracles use
+core array normalization and a bounded active-snapshot heap scan independently
+of the product copier. Fixtures add C1's physical absent/present-NULL distinction,
+actual short/four-byte/pglz/LZ4 forms, domain/enum/array/composite declarations,
+inheritance/drop/default histories and nonempty normal retention/2PC outcomes.
+Paired heap_form_tuple source confirms physical natts; fixture results remain
+pending. The packaged README is part of the candidate's native build inputs.
+
+Fresh strict product/probe builds, required paired native suites, source/input/
+artifact/environment binding, bounded ordinary costs and independent
+implementation review are required next. Existing native images certify only
+their unchanged historical inputs. C1 runtime closure, full descriptor/value/
+default/TOAST/provider/effect/preparation/IR/execution/MySQL row/read-lock,
+serving/cache/full performance/artifact/release gates, issues46/15 and the full
+goal remain open. All previously recorded exclusions remain in force.
