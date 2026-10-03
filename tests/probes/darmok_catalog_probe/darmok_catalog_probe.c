@@ -3,17 +3,23 @@
 #include "postgres.h"
 
 #include "access/xact.h"
+#include "access/relation.h"
+#include "catalog/pg_am_d.h"
 #include "catalog/pg_extension_d.h"
 #include "catalog/catalog.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "miscadmin.h"
+#include "lib/stringinfo.h"
 #include "storage/lock.h"
+#include "storage/sinval.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
+#include "utils/inval.h"
 #include "utils/memutils.h"
 #include "utils/resowner.h"
+#include "utils/rel.h"
 #include "utils/snapmgr.h"
 
 #include "statement_guard.h"
@@ -32,6 +38,18 @@ static DarmokRelationAttempt relation_token = {0};
 static DarmokRelationAttempt stale_relation_token = {0};
 static SubTransactionId relation_subid = InvalidSubTransactionId;
 static const char *relation_outcome = "idle";
+static char *clear_results = NULL;
+static bool observing_acquire = false;
+static bool caller_owner_restored = true;
+static bool callback_owner_changed = false;
+static bool callback_fence_seen = false;
+static uint64 acquire_invalidations = 0;
+static uint64 acquire_callbacks = 0;
+static uint64 watched_callbacks = 0;
+static Oid warmed_oid = InvalidOid;
+static int warmed_attributes = 0;
+static bool warm_before_snapshot = false;
+static bool warm_after_snapshot = false;
 static DarmokRelationRequest *borrowed_requests = NULL;
 static int borrowed_count = 0;
 static ResourceOwner borrowed_owner = NULL;
@@ -128,6 +146,145 @@ parse_relation_requests(const char *text, int *count)
 	return requests;
 }
 
+static bool
+probe_has_coordination(void)
+{
+	for (int sub = 0x444d; sub <= 0x444f; sub++)
+	{
+		LOCKTAG tag;
+
+		SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid, sub);
+		for (LOCKMODE mode = AccessShareLock; mode <= AccessExclusiveLock; mode++)
+			if (LockHeldByMe(&tag, mode, false))
+				return true;
+	}
+	return false;
+}
+
+static void
+observe_relcache(Datum arg, Oid relation_oid)
+{
+	(void) arg;
+	/* Passive only: no SQL, private API call, lock acquisition or ERROR. */
+	if (observing_acquire)
+	{
+		acquire_callbacks++;
+		if (relation_oid == warmed_oid)
+			watched_callbacks++;
+		callback_owner_changed |= CurrentResourceOwner != CurTransactionResourceOwner;
+		callback_fence_seen |= probe_has_coordination();
+	}
+}
+
+static void
+observe_relation_acquire(volatile DarmokRelationAttempt *token,
+						 const DarmokRelationRequest *requests, int count)
+{
+	ResourceOwner saved = CurrentResourceOwner;
+	uint64 before_invalidations = SharedInvalidMessageCounter;
+
+	before_snapshot = FirstSnapshotSet;
+	acquire_callbacks = 0;
+	watched_callbacks = 0;
+	callback_owner_changed = false;
+	callback_fence_seen = false;
+	observing_acquire = true;
+	PG_TRY();
+	{
+		relation_acquire(token, requests, count);
+	}
+	PG_FINALLY();
+	{
+		observing_acquire = false;
+		after_snapshot = FirstSnapshotSet;
+		acquire_invalidations = SharedInvalidMessageCounter - before_invalidations;
+		caller_owner_restored = CurrentResourceOwner == saved;
+	}
+	PG_END_TRY();
+}
+
+static void
+sample_relation_clear(const DarmokRelationRequest *requests, int count)
+{
+	ResourceOwner saved = CurrentResourceOwner;
+	StringInfoData result;
+
+	if (count <= 0 || count > DARMOK_RELATION_REQUEST_LIMIT)
+		elog(ERROR, "native clear sampler requires a bounded exact request list");
+	initStringInfo(&result);
+	appendStringInfoChar(&result, '[');
+	CurrentResourceOwner = CurTransactionResourceOwner;
+	PG_TRY();
+	{
+		for (int i = 0; i < count; i++)
+		{
+			LOCKTAG tag;
+			LockAcquireResult observed;
+
+			if (!OidIsValid(requests[i].relation_oid) ||
+				requests[i].lock_mode < AccessShareLock ||
+				requests[i].lock_mode > RowExclusiveLock)
+				elog(ERROR, "native clear sampler requires an exact weak mode");
+			SET_LOCKTAG_RELATION(tag,
+								IsSharedRelation(requests[i].relation_oid) ? InvalidOid : MyDatabaseId,
+								requests[i].relation_oid);
+			/* Exact mode must already be held; no sampling wait/dispatch/mark. */
+			if (!LockHeldByMe(&tag, requests[i].lock_mode, false))
+				elog(ERROR, "native clear sampler requires an already-held exact mode");
+#if PG_VERSION_NUM >= 180000
+			observed = LockAcquireExtended(&tag, requests[i].lock_mode,
+										 false, false, true, NULL, false);
+#else
+			observed = LockAcquireExtended(&tag, requests[i].lock_mode,
+										 false, false, true, NULL);
+#endif
+			if (!LockRelease(&tag, requests[i].lock_mode, false))
+				elog(ERROR, "native clear sampler lost its extra increment");
+			if (observed != LOCKACQUIRE_ALREADY_HELD &&
+				observed != LOCKACQUIRE_ALREADY_CLEAR)
+				elog(ERROR, "unexpected native clear sampler acquisition result");
+			appendStringInfo(&result, "%s\"%s\"", i == 0 ? "" : ",",
+							 observed == LOCKACQUIRE_ALREADY_CLEAR ? "already_clear" : "already_held");
+		}
+	}
+	PG_FINALLY();
+	{
+		CurrentResourceOwner = saved;
+	}
+	PG_END_TRY();
+	appendStringInfoChar(&result, ']');
+	if (clear_results != NULL)
+		pfree(clear_results);
+	clear_results = MemoryContextStrdup(TopMemoryContext, result.data);
+	pfree(result.data);
+}
+
+static void
+warm_relation(const DarmokRelationRequest *requests, int count)
+{
+	Relation relation;
+
+	if (count != 1 || requests[0].lock_mode != AccessShareLock || probe_has_coordination())
+		elog(ERROR, "native warm probe requires one AccessShare request outside exclusion");
+	warm_before_snapshot = FirstSnapshotSet;
+	relation = relation_open(requests[0].relation_oid, AccessShareLock);
+	PG_TRY();
+	{
+		if (relation->rd_rel->relkind != RELKIND_RELATION ||
+			relation->rd_rel->relam != HEAP_TABLE_AM_OID)
+			elog(ERROR, "native warm probe requires an ordinary builtin heap");
+		warmed_oid = RelationGetRelid(relation);
+		warmed_attributes = RelationGetDescr(relation)->natts;
+	}
+	PG_FINALLY();
+	{
+		/* No descriptor or warm increment survives to block prepared AX. */
+		relation_close(relation, AccessShareLock);
+	}
+	PG_END_TRY();
+	warm_after_snapshot = FirstSnapshotSet;
+}
+
 static void
 relation_command(const char *value)
 {
@@ -162,11 +319,13 @@ relation_command(const char *value)
 		relation_retain(&stale_relation_token);
 	else if (strcmp(value, "relation_empty") == 0)
 		relation_acquire(&relation_token, NULL, 0);
+	else if (strncmp(value, "relation_clear:", 15) == 0)
+		sample_relation_clear(requests, count);
+	else if (strncmp(value, "relation_warm:", 14) == 0)
+		warm_relation(requests, count);
 	else if (strncmp(value, "relation_hold:", 14) == 0)
 	{
-		before_snapshot = FirstSnapshotSet;
-		relation_acquire(&relation_token, requests, count);
-		after_snapshot = FirstSnapshotSet;
+		observe_relation_acquire(&relation_token, requests, count);
 		relation_subid = GetCurrentSubTransactionId();
 		relation_outcome = "acquired";
 	}
@@ -177,11 +336,9 @@ relation_command(const char *value)
 	{
 		volatile DarmokRelationAttempt scoped = {0};
 
-		before_snapshot = FirstSnapshotSet;
 		PG_TRY();
 		{
-			relation_acquire(&scoped, requests, count);
-			after_snapshot = FirstSnapshotSet;
+			observe_relation_acquire(&scoped, requests, count);
 			relation_outcome = "scoped";
 			if (strncmp(value, "relation_mutated:", 17) == 0)
 				memset(requests, 0, sizeof(DarmokRelationRequest) * count);
@@ -276,10 +433,17 @@ show_relation(DestReceiver *dest, QueryCompletion *completion)
 	bool snapshot = FirstSnapshotSet;
 
 	resolve_relation();
-	text = psprintf("{\"owned\":%s,\"first_snapshot\":%s,\"before_snapshot\":%s,\"after_snapshot\":%s,\"outcome\":\"%s\"}",
+	text = psprintf("{\"owned\":%s,\"first_snapshot\":%s,\"before_snapshot\":%s,\"after_snapshot\":%s,\"outcome\":\"%s\","
+					"\"clear_results\":%s,\"caller_owner_restored\":%s,\"callback_owner_changed\":%s,\"callback_fence_seen\":%s,"
+					"\"acquire_invalidations\":" UINT64_FORMAT ",\"acquire_callbacks\":" UINT64_FORMAT ",\"watched_callbacks\":" UINT64_FORMAT ","
+					"\"warmed_oid\":%u,\"warmed_attributes\":%d,\"warm_before_snapshot\":%s,\"warm_after_snapshot\":%s}",
 					relation_owned(&relation_token) ? "true" : "false",
 					snapshot ? "true" : "false", before_snapshot ? "true" : "false",
-					after_snapshot ? "true" : "false", relation_outcome);
+					after_snapshot ? "true" : "false", relation_outcome,
+					clear_results == NULL ? "[]" : clear_results,
+					caller_owner_restored ? "true" : "false", callback_owner_changed ? "true" : "false",
+					callback_fence_seen ? "true" : "false", acquire_invalidations, acquire_callbacks, watched_callbacks,
+					warmed_oid, warmed_attributes, warm_before_snapshot ? "true" : "false", warm_after_snapshot ? "true" : "false");
 	output = begin_tup_output_tupdesc(dest,
 									  GetPGVariableResultDesc("darmok_catalog_probe.relation_status"),
 									  &TTSOpsVirtual);
@@ -655,4 +819,5 @@ _PG_init(void)
 	ProcessUtility_hook = process_utility;
 	RegisterXactCallback(transaction_event, NULL);
 	RegisterSubXactCallback(subtransaction_event, NULL);
+	CacheRegisterRelcacheCallback(observe_relcache, (Datum) 0);
 }

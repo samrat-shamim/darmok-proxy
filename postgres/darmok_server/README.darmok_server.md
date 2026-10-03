@@ -36,8 +36,10 @@ Its installed C header is internal and has no stable public ABI promise. See
 The private C relation-reference attempt preserves ordered explicit OID/mode
 increments under the native transaction owner. It releases only its own
 increments or retains them for native transaction cleanup, including prepare.
-Its implementation is under verification. It does not open descriptors,
-dispatch invalidations or prove complete dependency closure. See
+Native relation acquisition now delegates exact local cache clearing to core
+outside module exclusion; that change is under verification. Per-mode clear
+does not establish globally fresh catalog facts, supported callbacks or
+complete dependency closure. See
 [`docs/native-relation-guards.md`](../../docs/native-relation-guards.md).
 
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The

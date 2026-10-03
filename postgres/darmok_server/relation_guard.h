@@ -22,8 +22,10 @@ typedef struct DarmokRelationAttempt
 
 /* An automatic token spanning PG_TRY must be volatile. Release within this C
  * invocation, or retain the actual references for native transaction cleanup.
- * Native acquisition ERROR requires normal native abort before another call.
- * No catalog, descriptor, invalidation dispatch or MarkLockClear occurs here. */
+ * Native acquisition/cache-refresh ERROR requires native abort before reuse.
+ * Native LockRelationOid dispatches invalidations and clears exact local modes
+ * before module exclusion. Already-clear modes may skip dispatch: this is not
+ * global SI freshness, callback admission or snapshot-neutral preparation. */
 extern PGDLLEXPORT void darmok_relation_attempt_acquire(
 	volatile DarmokRelationAttempt *attempt,
 	const DarmokRelationRequest *requests, int count);

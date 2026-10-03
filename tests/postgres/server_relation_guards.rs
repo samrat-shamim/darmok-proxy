@@ -179,6 +179,198 @@ async fn finish_targets(client: &Client, gids: &[&str]) {
     }
 }
 
+fn check_cache_acquisition(state: &Value, established: bool) {
+    for name in ["first_snapshot", "before_snapshot", "after_snapshot"] {
+        assert_eq!(state[name], established, "{name}: {state}");
+    }
+    assert_eq!(state["caller_owner_restored"], true);
+    assert_eq!(state["callback_owner_changed"], false);
+    assert_eq!(state["callback_fence_seen"], false);
+}
+
+async fn clear_results(client: &Client, requests: &str) -> Vec<String> {
+    command(client, &format!("relation_clear:{requests}"))
+        .await
+        .unwrap();
+    status(client).await["clear_results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+async fn native_clear_is_exact_per_mode_and_follows_remaining_owner_counts() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let modes = format!("{A}/1,{A}/2,{A}/3");
+    let outcome = AssertUnwindSafe(tokio::time::timeout(Duration::from_secs(60), async {
+        sql(&reader, "BEGIN").await.unwrap();
+        command(&reader, &format!("relation_borrow:{modes}"))
+            .await
+            .unwrap();
+        assert_eq!(
+            clear_results(&reader, &modes).await,
+            vec!["already_held"; 3]
+        );
+        let shared = format!("{modes},1262/1");
+        command(&reader, &format!("relation_hold:{shared}"))
+            .await
+            .unwrap();
+        check_cache_acquisition(&status(&reader).await, false);
+        assert_eq!(
+            clear_results(&reader, &shared).await,
+            vec!["already_clear"; 4]
+        );
+        // The sampler increments only exact already-held modes and never
+        // dispatches SI or marks them clear, including under semantic S.
+        command(&reader, "guard_hold").await.unwrap();
+        assert_eq!(
+            clear_results(&reader, &shared).await,
+            vec!["already_clear"; 4]
+        );
+        command(&reader, "guard_release").await.unwrap();
+        command(&reader, "relation_release").await.unwrap();
+        assert_eq!(
+            clear_results(&reader, &modes).await,
+            vec!["already_clear"; 3]
+        );
+        sql(&reader, "SAVEPOINT child").await.unwrap();
+        let child = format!("{modes},{B}/1");
+        command(&reader, &format!("relation_hold:{child}"))
+            .await
+            .unwrap();
+        check_cache_acquisition(&status(&reader).await, false);
+        assert_eq!(
+            clear_results(&reader, &child).await,
+            vec!["already_clear"; 4]
+        );
+        sql(&reader, "ROLLBACK TO child; RELEASE child")
+            .await
+            .unwrap();
+        assert_eq!(status(&reader).await["owned"], false);
+        assert_eq!(
+            clear_results(&reader, &modes).await,
+            vec!["already_clear"; 3]
+        );
+        assert_eq!(
+            probe.modes(&observer, Some(backend), &[A, B, 1262]).await,
+            vec![
+                (A, probe.database, "AccessShareLock".to_owned(), true),
+                (A, probe.database, "RowExclusiveLock".to_owned(), true),
+                (A, probe.database, "RowShareLock".to_owned(), true)
+            ]
+        );
+        command(&reader, "relation_unborrow").await.unwrap();
+        assert!(
+            probe
+                .modes(&observer, Some(backend), &[A, B, 1262])
+                .await
+                .is_empty()
+        );
+        // The first new raw borrow is native OK. Sampling its extra increment
+        // observes ALREADY_HELD because the final old count reset the marker.
+        command(&reader, &format!("relation_borrow:{modes}"))
+            .await
+            .unwrap();
+        assert_eq!(
+            clear_results(&reader, &modes).await,
+            vec!["already_held"; 3]
+        );
+        command(&reader, "relation_unborrow").await.unwrap();
+        probe.no_coordination(&observer, backend).await;
+        sql(&reader, "COMMIT").await.unwrap();
+    }))
+    .catch_unwind()
+    .await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    close(reader, rd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+async fn prepared_completion_refreshes_warm_builtin_cache_without_selecting_data_view() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (writer, wd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let gids = [
+        "cache_commit_first",
+        "cache_abort_first",
+        "cache_commit_established",
+        "cache_abort_established",
+    ];
+    let outcome = AssertUnwindSafe(tokio::time::timeout(Duration::from_secs(90), async {
+        sql(&observer, "CREATE TABLE relation_cache_low(id integer); CREATE TABLE relation_cache_high(id integer)").await.unwrap();
+        // The unselected-view reader performs no catalog SELECT after BEGIN.
+        let low: u32 = observer.query_one("SELECT 'relation_cache_low'::regclass::oid", &[]).await.unwrap().get(0);
+        let high: u32 = observer.query_one("SELECT 'relation_cache_high'::regclass::oid", &[]).await.unwrap().get(0);
+        assert!(low < high);
+        let mut attributes = 1_u64;
+        for (index, (established, ending)) in [(false,"COMMIT"),(false,"ROLLBACK"),(true,"COMMIT"),(true,"ROLLBACK")].into_iter().enumerate() {
+            let gid = gids[index];
+            sql(&reader, "BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { reader.query_one("SELECT 1::integer", &[]).await.unwrap(); }
+            command(&reader, &format!("relation_warm:{low}/1")).await.unwrap();
+            let state = status(&reader).await;
+            assert_eq!(state["warmed_oid"], low);
+            assert_eq!(state["warmed_attributes"], attributes);
+            for name in ["first_snapshot","warm_before_snapshot","warm_after_snapshot"] { assert_eq!(state[name], established); }
+            // Closing the warm descriptor releases its exact AS increment.
+            assert!(probe.modes(&observer, Some(backend), &[low]).await.is_empty());
+            sql(&writer, &format!("BEGIN; ALTER TABLE relation_cache_low ADD COLUMN {gid} integer; PREPARE TRANSACTION '{gid}'")).await.unwrap();
+            let requests = format!("{high}/1,{low}/1,{low}/2,{low}/3");
+            let request = format!("relation_hold:{requests}");
+            let waiting = command(&reader, &request);
+            tokio::pin!(waiting);
+            tokio::select! {
+                result = &mut waiting => panic!("warm physical acquisition unexpectedly completed: {result:?}"),
+                () = probe.wait(&observer, backend, low, false) => {},
+            }
+            assert_eq!(probe.modes(&observer, Some(backend), &[high]).await, vec![(high,probe.database,"AccessShareLock".to_owned(),true)]);
+            probe.no_coordination(&observer, backend).await;
+            sql(&observer, &format!("{ending} PREPARED '{gid}'")).await.unwrap();
+            waiting.await.unwrap();
+            let state = status(&reader).await;
+            check_cache_acquisition(&state, established);
+            assert!(state["acquire_invalidations"].as_u64().unwrap() > 0, "{state}");
+            assert!(state["watched_callbacks"].as_u64().unwrap() > 0, "{state}");
+            assert_eq!(clear_results(&reader, &requests).await, vec!["already_clear"; 4]);
+            if ending == "COMMIT" { attributes += 1; }
+            command(&reader, &format!("relation_warm:{low}/1")).await.unwrap();
+            let state = status(&reader).await;
+            assert_eq!(state["warmed_attributes"], attributes);
+            for name in ["first_snapshot","warm_before_snapshot","warm_after_snapshot"] { assert_eq!(state[name], established); }
+            command(&reader, "guard_hold").await.unwrap();
+            command(&reader, "guard_release").await.unwrap();
+            command(&reader, "relation_release").await.unwrap();
+            sql(&reader, "COMMIT").await.unwrap();
+            assert!(probe.modes(&observer, Some(backend), &[low,high]).await.is_empty());
+            probe.no_coordination(&observer, backend).await;
+        }
+    })).catch_unwind().await;
+    finish_targets(&observer, &gids).await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(&writer, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        "DROP TABLE IF EXISTS relation_cache_low, relation_cache_high",
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(writer, wd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
 #[tokio::test]
 async fn exact_modes_borrowed_counts_copy_validation_and_snapshot_neutrality() {
     let _serial = SERIAL.lock().await;

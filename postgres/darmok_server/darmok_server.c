@@ -17,6 +17,7 @@
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
 #include "storage/lock.h"
+#include "storage/lmgr.h"
 #include "storage/lwlock.h"
 #include "storage/proc.h"
 #include "storage/shmem.h"
@@ -83,6 +84,7 @@ typedef struct DarmokRelationState
 } DarmokRelationState;
 
 static DarmokRelationState *relation_attempt = NULL;
+static bool relation_acquiring = false;
 static uint64 next_relation_attempt_id = 0;
 static SubTransactionId relation_abort_required = InvalidSubTransactionId;
 static bool semantic_writer_held = false;
@@ -138,6 +140,12 @@ semantic_tag(void)
 static void
 require_ready(void)
 {
+	/* Native relation acquisition can dispatch SI callbacks. They must not
+	 * nest module exclusion or detach the partially acquired reference list. */
+	if (relation_acquiring)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("darmok_server cannot reenter during native relation cache refresh")));
 	if (shared == NULL || broken)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -188,6 +196,26 @@ transaction_lock_acquire(const LOCKTAG *tag, LOCKMODE mode,
 	PG_TRY();
 	{
 		(void) LockAcquire(tag, mode, false, false);
+	}
+	PG_FINALLY();
+	{
+		CurrentResourceOwner = saved;
+	}
+	PG_END_TRY();
+}
+
+static void
+transaction_relation_lock_acquire(Oid relation_oid, LOCKMODE mode,
+								  ResourceOwner owner)
+{
+	ResourceOwner saved = CurrentResourceOwner;
+
+	CurrentResourceOwner = owner;
+	PG_TRY();
+	{
+		/* Delegate exact LOCALLOCK clearing and recursive SI processing to
+		 * native core. This occurs before any module publication exclusion. */
+		LockRelationOid(relation_oid, mode);
 	}
 	PG_FINALLY();
 	{
@@ -344,23 +372,25 @@ darmok_relation_attempt_acquire(volatile DarmokRelationAttempt *attempt,
 	memcpy(state->requests, requests, sizeof(DarmokRelationRequest) * count);
 	relation_attempt = state;
 	attempt->identity = state->identity;
+	relation_acquiring = true;
 	PG_TRY();
 	{
 		for (int i = 0; i < relation_attempt->count; i++)
 		{
-			LOCKTAG tag = relation_tag(relation_attempt->requests[i].relation_oid);
-
-			transaction_lock_acquire(&tag, relation_attempt->requests[i].lock_mode,
-									 relation_attempt->owner);
+			transaction_relation_lock_acquire(relation_attempt->requests[i].relation_oid,
+											  relation_attempt->requests[i].lock_mode,
+											  relation_attempt->owner);
 			/* ALREADY_HELD/CLEAR also add one native per-owner increment. */
 			relation_attempt->acquired++;
 		}
 	}
 	PG_CATCH();
 	{
-		/* WaitOnLock can still have an awaited lock/raced grant. Only native
+		/* A grant can precede an SI callback ERROR; WaitOnLock can still have
+		 * an awaited lock/raced grant. Only native
 		 * abort cleanup may complete that operation. Never turn this into retry
 		 * or explicitly decrement a guessed partial acquisition here. */
+		relation_acquiring = false;
 		relation_abort_required = relation_attempt->subid;
 		state = relation_attempt;
 		relation_attempt = NULL;
@@ -369,6 +399,7 @@ darmok_relation_attempt_acquire(volatile DarmokRelationAttempt *attempt,
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
+	relation_acquiring = false;
 }
 
 static DarmokRelationState *
@@ -871,10 +902,10 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 {
 	(void) arg;
 	if (event == SUBXACT_EVENT_PRE_COMMIT_SUB &&
-		relation_abort_required != InvalidSubTransactionId)
+		(relation_acquiring || relation_abort_required != InvalidSubTransactionId))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("failed native relation acquisition requires subtransaction abort")));
+				 errmsg("unfinished native relation acquisition requires subtransaction abort")));
 	if (event == SUBXACT_EVENT_COMMIT_SUB)
 	{
 		if (relation_attempt != NULL && relation_attempt->subid == subid)
@@ -989,7 +1020,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		return;
 	}
 
-	if (preparing && (reader_active || statement_guard_id != 0))
+	if (preparing && (relation_acquiring || reader_active || statement_guard_id != 0))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("a transaction cannot prepare during catalog discovery")));
@@ -1005,7 +1036,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		{
 			LOCKTAG tag = catalog_tag();
 
-			if (reader_active || statement_guard_id != 0 || semantic_writer_held ||
+			if (relation_acquiring || reader_active || statement_guard_id != 0 || semantic_writer_held ||
 				publication_gate_held || completion_fence_held ||
 				preparing_transaction || pre_commit_started || shared_drop_pending)
 				ereport(ERROR,

@@ -2552,3 +2552,65 @@ MySQL read-view/lock equivalence, serving, driver/cache/throughput/artifact and
 release gates remain open. Issues46/15 and the goal remain active. Security,
 compiler PR4/resources, stress/forced interruption, profile restart/stop/signal,
 hosted CI/account work and release publication remain excluded.
+
+### Merged private relation-reference checkpoint
+
+PR [#52](https://github.com/samrat-shamim/darmok-proxy/pull/52) was squash-merged
+normally from reviewed leaf `5a60ef2e1227fe11638452bed187016f4a0730fb` into
+main `296667c48e3b412e172359047ce8ebf5645761ae`, with tree
+`4e084cd6421d1ca3bed0c0000d987098b350f3c6`. The two-document leaf preserves
+all 333 other Git entries and all 16 native inputs from tested `c0438c7`.
+Independent final evidence review has report SHA256
+`aa923906fca742d6ce9a8926e3183b264a3b476a0408891839ff5ea42ee0e0f2`,
+112-file seal `3f1283be9bb70332ae47e118ecf35104e0814ad1860a775908e21cf8ebd374bc`,
+separate observed actual0 invocation
+`4362700e40c2385e24ba0b4b80efd58a2ee6df3b0e20de63946495e61e29589e`.
+Thirty passive readers and corrected offline audit v3 are actual0; its earlier
+schema/navigation/builder bookkeeping failures remain distinct and preserved.
+No reviewer runtime or full workspace acceptance is claimed.
+
+Root merge/publication receipts under
+`.darmok-work/logs/native-physical-guards-5a60ef2-{25-merge,26-publication-audit}`
+are actual0. The latter verifies four GitHub reads, exact main tree, the personal
+public repository, unchanged generic description and no in-scope open PRs;
+PR4 is filtered before output. Its facts SHA256 is
+`567efe703856f85d5771a6b0b0e64a75b2c3191f1efdf4aa535ac410bca6e4f8`,
+13-file seal `61add4dba36f9b2f8df9a21e416005cbabf201d540233f025b5ca40288c5e0e3`.
+Issue46's updated remaining gates were written and read back exactly while OPEN.
+No hosted CI/admin/account or release action occurred. Issues46/15 and the
+overall goal remain open.
+
+### Native relation cache-clearing design and draft
+
+The next isolated branch begins at that merged source. The earlier pure relation
+count path cannot establish native LOCALLOCK clear state. The selected change
+delegates ordered exact declarations to native `LockRelationOid` under the
+recorded transaction owner, before module exclusion. Core owns SI recursion
+and exact `MarkLockClear`; a copied manual LOCALLOCK refresh pass is rejected.
+Mutating module reentry is denied during acquisition/cache dispatch. Any grant
+or subsequent SI ERROR remains abort-required with no guessed native decrement.
+Native two-phase transactions remain enabled.
+
+Immutable external proposals v1/v2/v3 remain preserved. Final v3 SHA256 is
+`564707f9d621e7c2d894047e3165d4a3f21824d183ca8d4b42646ad3827a16d7`.
+Independent design-only review of clean `296667c` has report SHA256
+`0c92f137d6e5898e90ccbc82b678866bd382cb0efc97d1fc7ddb036f8e8f0b6a`,
+213-file seal `66c1232ac5ff4875093255b40cbff62a0c338572314eff632db7c17d6176e907`,
+separate observed actual0 invocation
+`3d2556a92db502b2de54569062894b7a96d6d0e7d3e19ea962b13c02e87c5eb7`.
+All 56 passive readers are actual0; the first source-selection failure and
+partial copies remain preserved before the corrected 22-file capture.
+Root's separate 22-source paired rehash has facts SHA256
+`6a6ad1fdd22a5af789b7e5d5fdd4bf2fa0b737da76c7946449b7123688b49446`,
+seal `874880d544f9435ebffff021fa597149a55613b1172f42ed29bc8f8c14f6b64b`;
+`native-cache-clearing-296667c-01-primary-rehash` is actual0. These are
+design/source results, not compilation/runtime acceptance.
+
+The two new ordinary fixture drafts check exact native clear-result/borrowed
+owner state and warm builtin relcache refresh after both prepared outcomes,
+with first-unselected and established data views. The warm helper releases its
+own AS count, setup OIDs come from an observer, and passive callbacks do not
+mutate or issue SQL. Native clear is per exact mode and may skip SI processing;
+it is not global freshness, full closure, callback neutrality or preparation.
+Fresh strict product/probe images and affected PG17/18 fixtures remain required.
+All broader gates and standing exclusions remain unchanged; the goal is active.
