@@ -84,3 +84,7 @@ path = "simple_completion.rs"
 [[test]]
 name = "server_statement_guards"
 path = "server_statement_guards.rs"
+
+[[test]]
+name = "server_relation_guards"
+path = "server_relation_guards.rs"

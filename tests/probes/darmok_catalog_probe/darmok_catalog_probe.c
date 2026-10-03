@@ -4,6 +4,7 @@
 
 #include "access/xact.h"
 #include "catalog/pg_extension_d.h"
+#include "catalog/catalog.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -11,10 +12,12 @@
 #include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
+#include "utils/memutils.h"
 #include "utils/resowner.h"
 #include "utils/snapmgr.h"
 
 #include "statement_guard.h"
+#include "relation_guard.h"
 
 PG_MODULE_MAGIC;
 PGDLLEXPORT void _PG_init(void);
@@ -24,6 +27,15 @@ static ResourceOwner owner = NULL;
 static SubTransactionId subid = InvalidSubTransactionId;
 static char *command = NULL;
 static char *guard_status = NULL;
+static char *relation_status = NULL;
+static DarmokRelationAttempt relation_token = {0};
+static DarmokRelationAttempt stale_relation_token = {0};
+static SubTransactionId relation_subid = InvalidSubTransactionId;
+static const char *relation_outcome = "idle";
+static DarmokRelationRequest *borrowed_requests = NULL;
+static int borrowed_count = 0;
+static ResourceOwner borrowed_owner = NULL;
+static SubTransactionId borrowed_subid = InvalidSubTransactionId;
 /* This held token intentionally spans SET/SHOW only in the separate native
  * test image. Product callers release within one C invocation's PG_FINALLY. */
 static DarmokStatementGuard guard_token = {0};
@@ -44,6 +56,240 @@ static GuardAcquire guard_acquire = NULL;
 static GuardRelease guard_release = NULL;
 static GuardOwned guard_owned = NULL;
 static GuardCheckPrepared guard_check_prepared = NULL;
+typedef void (*RelationAcquire) (volatile DarmokRelationAttempt *, const DarmokRelationRequest *, int);
+typedef void (*RelationComplete) (volatile DarmokRelationAttempt *);
+typedef bool (*RelationOwned) (const volatile DarmokRelationAttempt *);
+static RelationAcquire relation_acquire = NULL;
+static RelationComplete relation_release = NULL;
+static RelationComplete relation_retain = NULL;
+static RelationOwned relation_owned = NULL;
+
+static void
+resolve_relation(void)
+{
+	if (relation_acquire == NULL)
+	{
+		RelationAcquire acquire;
+		RelationComplete release;
+		RelationComplete retain;
+		RelationOwned owned;
+
+		acquire = (RelationAcquire) load_external_function("$libdir/darmok_server",
+															 "darmok_relation_attempt_acquire", true, NULL);
+		release = (RelationComplete) load_external_function("$libdir/darmok_server",
+															   "darmok_relation_attempt_release", true, NULL);
+		retain = (RelationComplete) load_external_function("$libdir/darmok_server",
+															  "darmok_relation_attempt_retain", true, NULL);
+		owned = (RelationOwned) load_external_function("$libdir/darmok_server",
+															 "darmok_relation_attempt_owned", true, NULL);
+		relation_release = release;
+		relation_retain = retain;
+		relation_owned = owned;
+		relation_acquire = acquire;
+	}
+}
+
+static DarmokRelationRequest *
+parse_relation_requests(const char *text, int *count)
+{
+	DarmokRelationRequest *requests;
+	const char *cursor = text;
+	int n = 1;
+
+	for (const char *p = text; *p != '\0'; p++)
+		if (*p == ',')
+			n++;
+	if (n > DARMOK_RELATION_REQUEST_LIMIT + 1)
+		elog(ERROR, "native relation probe request is too large");
+	requests = palloc(sizeof(DarmokRelationRequest) * n);
+	for (int i = 0; i < n; i++)
+	{
+		char *end;
+		unsigned long oid;
+		unsigned long mode;
+
+		if (*cursor < '0' || *cursor > '9')
+			elog(ERROR, "native relation probe requires decimal OID/mode pairs");
+		oid = strtoul(cursor, &end, 10);
+		if (end == cursor || *end != '/' || oid > PG_UINT32_MAX)
+			elog(ERROR, "invalid native relation probe OID");
+		cursor = end + 1;
+		if (*cursor < '0' || *cursor > '9')
+			elog(ERROR, "invalid native relation probe mode");
+		mode = strtoul(cursor, &end, 10);
+		if (end == cursor || mode > INT_MAX ||
+			(i == n - 1 ? *end != '\0' : *end != ','))
+			elog(ERROR, "invalid native relation probe mode or separator");
+		requests[i].relation_oid = (Oid) oid;
+		requests[i].lock_mode = (LOCKMODE) mode;
+		cursor = end + 1;
+	}
+	*count = n;
+	return requests;
+}
+
+static void
+relation_command(const char *value)
+{
+	const char *colon = strchr(value, ':');
+	DarmokRelationRequest *requests = NULL;
+	int count = 0;
+
+	resolve_relation();
+	if (colon != NULL)
+		requests = parse_relation_requests(colon + 1, &count);
+	if (strcmp(value, "relation_release") == 0)
+	{
+		relation_release(&relation_token);
+		relation_subid = InvalidSubTransactionId;
+		relation_outcome = "released";
+	}
+	else if (strcmp(value, "relation_retain") == 0)
+	{
+		relation_retain(&relation_token);
+		relation_subid = InvalidSubTransactionId;
+		relation_outcome = "retained";
+	}
+	else if (strcmp(value, "relation_copy") == 0)
+	{
+		if (!relation_owned(&relation_token))
+			elog(ERROR, "cannot copy unowned relation token");
+		stale_relation_token.identity = relation_token.identity;
+	}
+	else if (strcmp(value, "relation_stale_release") == 0)
+		relation_release(&stale_relation_token);
+	else if (strcmp(value, "relation_stale_retain") == 0)
+		relation_retain(&stale_relation_token);
+	else if (strcmp(value, "relation_empty") == 0)
+		relation_acquire(&relation_token, NULL, 0);
+	else if (strncmp(value, "relation_hold:", 14) == 0)
+	{
+		before_snapshot = FirstSnapshotSet;
+		relation_acquire(&relation_token, requests, count);
+		after_snapshot = FirstSnapshotSet;
+		relation_subid = GetCurrentSubTransactionId();
+		relation_outcome = "acquired";
+	}
+	else if (strncmp(value, "relation_scoped:", 16) == 0 ||
+			 strncmp(value, "relation_scoped_error:", 22) == 0 ||
+			 strncmp(value, "relation_mutated:", 17) == 0 ||
+			 strncmp(value, "relation_scoped_retain:", 23) == 0)
+	{
+		volatile DarmokRelationAttempt scoped = {0};
+
+		before_snapshot = FirstSnapshotSet;
+		PG_TRY();
+		{
+			relation_acquire(&scoped, requests, count);
+			after_snapshot = FirstSnapshotSet;
+			relation_outcome = "scoped";
+			if (strncmp(value, "relation_mutated:", 17) == 0)
+				memset(requests, 0, sizeof(DarmokRelationRequest) * count);
+			if (strncmp(value, "relation_scoped_error:", 22) == 0)
+				elog(ERROR, "ordinary native scoped relation fixture error");
+			if (strncmp(value, "relation_scoped_retain:", 23) == 0)
+			{
+				relation_retain(&scoped);
+				relation_outcome = "retained";
+			}
+		}
+		PG_FINALLY();
+		{
+			if (relation_owned(&scoped))
+				relation_release(&scoped);
+		}
+		PG_END_TRY();
+	}
+	else if (strncmp(value, "relation_borrow:", 16) == 0)
+	{
+		ResourceOwner saved = CurrentResourceOwner;
+
+		if (borrowed_requests != NULL)
+			elog(ERROR, "native relation probe already owns borrowed references");
+		borrowed_requests = MemoryContextAlloc(TopTransactionContext,
+												  sizeof(DarmokRelationRequest) * count);
+		memcpy(borrowed_requests, requests, sizeof(DarmokRelationRequest) * count);
+		borrowed_count = count;
+		borrowed_owner = CurTransactionResourceOwner;
+		borrowed_subid = GetCurrentSubTransactionId();
+		CurrentResourceOwner = borrowed_owner;
+		PG_TRY();
+		{
+			for (int i = 0; i < count; i++)
+			{
+				LOCKTAG tag;
+
+				SET_LOCKTAG_RELATION(tag,
+									IsSharedRelation(requests[i].relation_oid) ? InvalidOid : MyDatabaseId,
+									requests[i].relation_oid);
+				(void) LockAcquire(&tag, requests[i].lock_mode, false, false);
+			}
+		}
+		PG_FINALLY();
+		{
+			CurrentResourceOwner = saved;
+		}
+		PG_END_TRY();
+	}
+	else if (strcmp(value, "relation_unborrow") == 0)
+	{
+		ResourceOwner saved = CurrentResourceOwner;
+
+		if (borrowed_requests == NULL)
+			elog(ERROR, "native relation probe has no borrowed references");
+		CurrentResourceOwner = borrowed_owner;
+		PG_TRY();
+		{
+			for (int i = borrowed_count - 1; i >= 0; i--)
+			{
+				LOCKTAG tag;
+
+				SET_LOCKTAG_RELATION(tag,
+									IsSharedRelation(borrowed_requests[i].relation_oid) ? InvalidOid : MyDatabaseId,
+									borrowed_requests[i].relation_oid);
+				if (!LockRelease(&tag, borrowed_requests[i].lock_mode, false))
+					elog(ERROR, "native relation probe lost borrowed reference");
+			}
+		}
+		PG_FINALLY();
+		{
+			CurrentResourceOwner = saved;
+		}
+		PG_END_TRY();
+		pfree(borrowed_requests);
+		borrowed_requests = NULL;
+		borrowed_owner = NULL;
+		borrowed_subid = InvalidSubTransactionId;
+		borrowed_count = 0;
+	}
+	else
+		elog(ERROR, "unknown native relation probe command");
+	if (requests != NULL)
+		pfree(requests);
+}
+
+static void
+show_relation(DestReceiver *dest, QueryCompletion *completion)
+{
+	TupOutputState *output;
+	char *text;
+	bool snapshot = FirstSnapshotSet;
+
+	resolve_relation();
+	text = psprintf("{\"owned\":%s,\"first_snapshot\":%s,\"before_snapshot\":%s,\"after_snapshot\":%s,\"outcome\":\"%s\"}",
+					relation_owned(&relation_token) ? "true" : "false",
+					snapshot ? "true" : "false", before_snapshot ? "true" : "false",
+					after_snapshot ? "true" : "false", relation_outcome);
+	output = begin_tup_output_tupdesc(dest,
+									  GetPGVariableResultDesc("darmok_catalog_probe.relation_status"),
+									  &TTSOpsVirtual);
+	do_text_output_oneline(output, text);
+	end_tup_output(output);
+	pfree(text);
+	if (FirstSnapshotSet != snapshot)
+		elog(ERROR, "native relation probe SHOW changed first data snapshot");
+	SetQueryCompletion(completion, CMDTAG_SHOW, 0);
+}
 
 static void
 resolve_guard(void)
@@ -183,6 +429,11 @@ probe_command(const char *value)
 		statement_command(value);
 		return;
 	}
+	if (strncmp(value, "relation_", 9) == 0)
+	{
+		relation_command(value);
+		return;
+	}
 	if (strcmp(value, "omit_prepare_coverage") == 0)
 	{
 		/* Synthetic representation fixture only. The explicitly ordered
@@ -245,6 +496,13 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		show_guard(dest, completion);
 		return;
 	}
+	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
+		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
+			   "darmok_catalog_probe.relation_status") == 0)
+	{
+		show_relation(dest, completion);
+		return;
+	}
 	if (owner != NULL && IsA(pstmt->utilityStmt, TransactionStmt) &&
 		((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_PREPARE)
 		elog(ERROR, "native test probe must release Share before PREPARE");
@@ -297,6 +555,14 @@ transaction_event(XactEvent event, void *arg)
 	}
 	if (event == XACT_EVENT_COMMIT || event == XACT_EVENT_ABORT || event == XACT_EVENT_PREPARE)
 	{
+		relation_token.identity = 0;
+		relation_subid = InvalidSubTransactionId;
+		if (borrowed_requests != NULL)
+			pfree(borrowed_requests);
+		borrowed_requests = NULL;
+		borrowed_owner = NULL;
+		borrowed_subid = InvalidSubTransactionId;
+		borrowed_count = 0;
 		owner = NULL;
 		subid = InvalidSubTransactionId;
 		guard_token.identity = 0;
@@ -311,6 +577,32 @@ subtransaction_event(SubXactEvent event, SubTransactionId child,
 					 SubTransactionId parent, void *arg)
 {
 	(void) arg;
+	if (relation_subid == child)
+	{
+		if (event == SUBXACT_EVENT_COMMIT_SUB)
+			relation_subid = parent;
+		else if (event == SUBXACT_EVENT_ABORT_SUB)
+		{
+			relation_token.identity = 0;
+			relation_subid = InvalidSubTransactionId;
+		}
+	}
+	if (borrowed_requests != NULL && borrowed_subid == child)
+	{
+		if (event == SUBXACT_EVENT_COMMIT_SUB)
+		{
+			borrowed_subid = parent;
+			borrowed_owner = ResourceOwnerGetParent(borrowed_owner);
+		}
+		else if (event == SUBXACT_EVENT_ABORT_SUB)
+		{
+			pfree(borrowed_requests);
+			borrowed_requests = NULL;
+			borrowed_owner = NULL;
+			borrowed_count = 0;
+			borrowed_subid = InvalidSubTransactionId;
+		}
+	}
 	if (guard_subid == child)
 	{
 		if (event == SUBXACT_EVENT_COMMIT_SUB)
@@ -354,6 +646,9 @@ _PG_init(void)
 							   NULL, NULL, NULL);
 	DefineCustomStringVariable("darmok_catalog_probe.guard_status", "Native test state only.",
 							   NULL, &guard_status, "native test state", PGC_USERSET, GUC_NOT_IN_SAMPLE,
+							   NULL, NULL, NULL);
+	DefineCustomStringVariable("darmok_catalog_probe.relation_status", "Native test state only.",
+							   NULL, &relation_status, "native test state", PGC_USERSET, GUC_NOT_IN_SAMPLE,
 							   NULL, NULL, NULL);
 	MarkGUCPrefixReserved("darmok_catalog_probe");
 	previous_utility = ProcessUtility_hook;
