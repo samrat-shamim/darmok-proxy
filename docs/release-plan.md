@@ -4931,3 +4931,26 @@ Documentation now records these completed checks; its subsequent revision must
 be proven identical for tested runtime/corpus/observer inputs before acceptance.
 Independent review remains pending, and all previously open native, full
 prepared, performance, serving and release gates remain OPEN.
+
+### Prepared registry accounting correction
+
+Independent review of clean `8ed1f8b4298f37bfb3b11e83fcb7598c9c470c4c`, tree
+`7a4173023edbd6f251df12134f70e0bc9e7d44dd`, finds one required correction C1.
+The new public registry `get_mut` exposed an entire statement; replacing it
+with another registry's statement could change source/ID/parameter facts without
+updating SQL-byte accounting or the map key. The owner needs only opaque plan
+mutation. The correction exposes registry `plan_mut(id) -> Option<&mut P>` and
+keeps whole registered statement metadata immutable. Its regression mutates the
+payload and verifies unchanged identity/types plus count/source limits, removal
+and monotonic IDs. No SQL execution behavior or native input changes.
+
+The rejected review remains frozen at its original worktree. Its final40,
+post41 and completion42 actually exit 0, but C1 remains OPEN at that revision;
+passing audit commands do not accept the feature. Root29 rehashes 1,071 fixed
+members and completion companions, 1,093 unique paths. Facts at
+`logs/review-prepared-frontend-8ed1f8b-v1-root-rehash-v1/facts.json` have SHA256
+`aa23d3f51aef678535adcb02f075b2695a1418f5cc4ca79066144605098f486c`.
+The review's packet-summary bookkeeping reader37 actual1 remains preserved;
+corrected position-based reader38 actually exits 0. No second product finding.
+The correction is on a separate branch/worktree; fresh validation and a finite
+C1 review remain pending. Whole-engine and release gates remain OPEN.

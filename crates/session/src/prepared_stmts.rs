@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU32;
 
-/// A prepared statement registered by the client. Mutation stays in the
-/// registry so callers cannot bypass accounting or parameter validation.
+/// A prepared statement registered by the client. Registered metadata is
+/// immutable outside the registry; only its opaque plan can be mutated.
 #[derive(Clone, PartialEq)]
 pub struct PreparedStatement<P> {
     id: u32,
@@ -29,9 +29,6 @@ impl<P> PreparedStatement<P> {
     }
     pub fn plan(&self) -> &P {
         &self.plan
-    }
-    pub fn plan_mut(&mut self) -> &mut P {
-        &mut self.plan
     }
 }
 
@@ -129,8 +126,10 @@ impl<P> PreparedStatementRegistry<P> {
         self.stmts.get(&id)
     }
 
-    pub fn get_mut(&mut self, id: u32) -> Option<&mut PreparedStatement<P>> {
-        self.stmts.get_mut(&id)
+    /// Mutate the opaque plan without exposing registered statement identity,
+    /// parameter metadata or retained-source accounting to replacement.
+    pub fn plan_mut(&mut self, id: u32) -> Option<&mut P> {
+        self.stmts.get_mut(&id).map(|statement| &mut statement.plan)
     }
 
     pub fn remove(&mut self, id: u32) -> Option<PreparedStatement<P>> {
@@ -256,6 +255,41 @@ mod tests {
             reg.set_param_types(42, vec![]),
             Err(PreparedStatementError::UnknownStatement { id: 42 })
         );
+    }
+
+    #[test]
+    fn plan_mutation_preserves_identity_parameter_metadata_and_source_accounting() {
+        let mut reg = PreparedStatementRegistry::new(PreparedStatementLimits {
+            max_statements: 2,
+            max_sql_bytes: 16,
+        });
+        let id = reg.register("SELECT ?".into(), 1, vec![1]).unwrap();
+        let types = vec![PreparedStatementParamType {
+            field_type: 0x08,
+            unsigned: true,
+        }];
+        reg.set_param_types(id, types.clone()).unwrap();
+        reg.plan_mut(id).unwrap().push(2);
+        assert!(reg.plan_mut(9999).is_none());
+        let statement = reg.get(id).unwrap();
+        assert_eq!(statement.id(), id);
+        assert_eq!(statement.original_sql(), "SELECT ?");
+        assert_eq!(statement.param_count(), 1);
+        assert_eq!(statement.last_param_types(), types);
+        assert_eq!(statement.plan(), &[1, 2]);
+        assert_eq!(reg.register("SELECT 2".into(), 0, vec![]).unwrap(), 2);
+        assert_eq!(
+            reg.register("SELECT 3".into(), 0, vec![]),
+            Err(PreparedStatementError::CountLimit { limit: 2 })
+        );
+        let removed = reg.remove(id).unwrap();
+        assert_eq!(removed.original_sql(), "SELECT ?");
+        assert_eq!(removed.plan(), &[1, 2]);
+        assert_eq!(
+            reg.register("SELECT 22".into(), 0, vec![]),
+            Err(PreparedStatementError::SqlByteLimit { limit: 16 })
+        );
+        assert_eq!(reg.register("SELECT 3".into(), 0, vec![]).unwrap(), 3);
     }
 
     #[test]

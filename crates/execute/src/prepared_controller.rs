@@ -134,13 +134,16 @@ impl PreparedCommands {
                             .set_param_types(stmt_id, types)
                             .map_err(|_| SourceProvenanceError)?;
                     }
-                    let statement = self
+                    let types = self
                         .statements
-                        .get_mut(stmt_id)
-                        .ok_or(SourceProvenanceError)?;
-                    let types = statement.last_param_types().to_vec();
-                    match statement
-                        .plan_mut()
+                        .get(stmt_id)
+                        .ok_or(SourceProvenanceError)?
+                        .last_param_types()
+                        .to_vec();
+                    match self
+                        .statements
+                        .plan_mut(stmt_id)
+                        .ok_or(SourceProvenanceError)?
                         .resolve(state, globals, &parameters.values, &types)
                     {
                         Ok(plan) => PreparedOutput::Select(plan),

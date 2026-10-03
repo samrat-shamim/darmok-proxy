@@ -1,8 +1,8 @@
 # Owned local prepared commands
 
-Status: implementation checked at `4bffee43f7ed2361b86f16381ea24dacfb0a8641`;
-independent review is pending. The subsequent documentation-only revision does
-not change the tested Rust, corpus, observer or native installation inputs.
+Status: independent review found registry API defect C1 at `8ed1f8b`; the
+correction is implemented and its fresh checks and review are pending. Earlier
+passing results remain bound to `4bffee4` and do not certify this correction.
 Table execution, native reusable plans and release certification remain open.
 
 `FrontendConnection` exclusively owns its typed statement registry. PREPARE
@@ -14,6 +14,9 @@ SQL capability, registry adoption or public prepared execution API is exposed.
 
 The registry carries opaque admitted payloads, original source and binding
 types. The connection constructor supplies explicit count and SQL-byte limits.
+Registered statement identity, source and parameter count are immutable outside
+the registry. Its payload mutation method exposes only the opaque plan, never
+a mutable reference that could replace the entire accounted statement.
 CLOSE releases the source accounting and template; IDs are not reused during
 the connection. These limits bound retained source, not total template,
 transport or parameter memory. Full resource accounting remains a separate gate.
