@@ -1,9 +1,12 @@
 # Explicit database initialization
 
-Status: combined implementation independently accepted and locally verified at
-3b9a15e. Current native packages passed checks at6217c0e; all 20 native inputs
-remain unchanged in the corrected implementation and final documentation leaf.
-Historical C1 remains open at6217 and closes only at3b9. This extends the
+Historical combined-manifest validation was independently accepted and locally
+verified at3b9a15e, using packages checked at6217c0e and the then-current
+20-input manifest. Those receipts cover that earlier corrected implementation
+and documentation. Historical C1 remains open at6217 and closes only at3b9.
+The separate setup/query owner implementation is locally verified atc5fa88e
+against existing c43443d packages with22 unchanged native inputs, as recorded
+in [private command history](native-command-history.md). This extends the
 functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
@@ -123,13 +126,14 @@ and one fixed initialization request. This adds connection/startup cost at the
 setup boundary, with no additional request or allocation per query statement.
 SQL/response allocations occur
 once per setup, not per row. The empty native request does not scan relation
-facts. Native mechanism sources and build definitions need no change. The packaged
-module README is updated for the new setup contract, so native artifacts must
-be rebuilt with that new documentation input. The existing running profiles
-remain unchanged. Their reuse requires exact equality of the 19 mechanism,
-header, control, script and build inputs plus actual library/header hashes;
-their old packaged README is explicitly historical. Current package acceptance
-requires its rebuilt README to match the new source, not just matching tags.
+facts. The historical combined-manifest change updated the packaged module
+README and required its own native rebuild; its then-current 19 mechanism,
+header, control, script and build inputs and packaged README have separate
+historical acceptance. The owner separation changes none of the current22
+native package inputs. Current Rust/CLI verification reuses existing c43443d
+packages and unchanged running profiles, with exact input equality and actual
+library/header hash observations. No additional native rebuild is claimed or
+required for this owner change.
 
 Required ordinary PG17.11/18.6 fixtures cover both installed components,
 unchanged repeats/read-only defaults, ordinary two-owner initialization and

@@ -4771,8 +4771,8 @@ These source reads do not certify complete native startup or a new runtime.
 
 The implementation separates setup/verification ownership from the query owner
 through a shared private connection mechanism. Fixed installation SQL and native
-mechanism inputs remain unchanged. Current-revision checks and independent
-review are pending. The native entry/bootstrap/whole-statement, serving and
+mechanism inputs remain unchanged. Current-revision checks are recorded below.
+The native entry/bootstrap/whole-statement, serving and
 release gates, issues46/15 and the overall goal remain open. Concurrent native
 two-phase transactions remain required; all standing exclusions remain in force.
 
@@ -4795,4 +4795,28 @@ All eight identities, start times, restart counts, settings and library/header
 bytes agree before/after; no fixture databases remain. The 22 native inputs
 are unchanged. This is current Rust/CLI validation against the existing native
 packages, not a new native build, full startup proof or release acceptance.
-Independent review is pending. All remaining gates and exclusions still apply.
+All remaining gates and exclusions still apply.
+
+The independent review at `1b0fe078063e87670bb0ed0f19d339352836de5e`, tree
+`9d474c09174c221191b1d5bc2429a68be177b5ff`, accepts the finite Rust owner
+implementation carried unchanged from testedc5. D1 remains OPEN historically
+at1b0: the old 6217/20-input package paragraph was labeled current. This separate
+documentation leaf labels the old package/README acceptance historical and
+points to current c5/22-input c434 reuse. It changes no Rust, SQL, native input
+or runtime behavior; independent correction review remains required.
+
+Reviewer audit31 succeeds after preserved own21 actual1 (wrong manifest path),
+22 actual2 (wrong directory) and27 actual1 (wrong ordered preload expectation).
+Those are evidence-reader failures, not product/runtime results. Actual final34,
+post35 and completion36 exit0. Root15 rehashes1170 fixed review members plus16
+completion companions/1192 unique paths and actually exits0; its facts SHA256 is
+`7c2f3e43477abf4d98722a0b67f4b1912c944d9d045fe9d0860ece17d99482fd`.
+Report/facts/completion-map SHA256 values are
+`dffe02e56d244862f84ef7edab19e1e9469aebb99f84efbc5628501d94b40c19`,
+`07188c80bab5ebe3287c39a9d4c5752a82b822bf7aa64ab3abe7c702bdc18f5d`
+and `70956592c8f4d03f7d5762a1f1806af5a7c769c47a3e6e87195267482aa02d21`.
+All live reads release before root16 creates the correction worktree. Prior
+818/1170/1192 graphs stay frozen; correction checks use fixed anchors only.
+No new native build/runtime/hosted-CI or release result follows. Concurrent
+native 2PC and all remaining gates/exclusions, issues46/15 and the goal remain
+open.

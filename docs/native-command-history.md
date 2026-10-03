@@ -1,7 +1,8 @@
 # Private command history and separate connection owners
 
 Status: owner separation implemented and locally verified at c5fa88e;
-independent review pending. Native entry and bootstrap admission remain open.
+the finite Rust implementation is independently reviewed at1b0fe07.
+Native entry and bootstrap admission remain open.
 
 ## Boundary and rationale
 
@@ -52,7 +53,8 @@ Fixture SQL is not a public query execution API or native admission proof.
 Read-only before/after audits observe identical identities, start times, restart
 counts, settings and native library/header bytes on all eight existing profiles,
 with no residual fixture databases. All 22 native inputs remain unchanged;
-there is no new native package build. Independent acceptance remains required.
+there is no new native package build. The finite implementation is independently
+accepted; complete native admission remains required.
 
 ## Targeted native source findings
 
