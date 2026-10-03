@@ -70,9 +70,11 @@ PG_FINALLY();
 PG_END_TRY();
 ```
 
-Product C callers must release within one invocation. Acquisition/release and
-native coverage verification require TRANS_INPROGRESS and reject unsafe
+Product C callers must release within one invocation. Acquisition and native
+coverage verification require TRANS_INPROGRESS and reject unsafe
 discovery/writer/completion/preparation/exit/historic/parallel boundaries.
+Release requires the exact owned token and TRANS_INPROGRESS, with no active
+discovery, prepare/precommit or exit cleanup.
 Lock operations temporarily select the recorded owner and restore
 CurrentResourceOwner in PG_FINALLY. Subcommit records the parent owner before
 native lock reassignment; mutating reentry during that cleanup is rejected.
@@ -127,7 +129,10 @@ Readers add one semantic acquisition/release plus their separate physical and
 discovery costs. Publishers add retained RX. Each native prepare adds coverage
 AS and metadata targets additionally add RX. Initial readiness scans configured
 prepared slots/locks under TwoPhase plus all hash partitions once per
-incarnation. No per-statement lock-table copy or allocation is added afterward.
+incarnation. There is no per-statement readiness lock-table scan or copy
+afterward. Normal native lock/owner allocations and hash-partition contention
+still apply. Releasing the last local reference frees its owner array, so
+successive scoped acquisitions can allocate again after readiness.
 
 Prepared metadata can delay new readers across all databases for its full
 prepared lifetime. Streams/backpressure lengthen ordinary reader exclusion;

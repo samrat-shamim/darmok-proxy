@@ -17,10 +17,12 @@ async fn client(
     tokio::task::JoinHandle<Result<(), tokio_postgres::Error>>,
 ) {
     let url = std::env::var(variable).expect("a disposable native guard profile is required");
-    let (client, driver) = tokio_postgres::connect(&url, NoTls).await.unwrap();
+    let (client, driver) = tokio::time::timeout(DEADLINE, tokio_postgres::connect(&url, NoTls))
+        .await
+        .expect("bounded native connection did not complete")
+        .unwrap();
     let driver = tokio::spawn(driver);
-    client
-        .batch_execute("LOAD '$libdir/darmok_catalog_probe'")
+    sql(&client, "LOAD '$libdir/darmok_catalog_probe'")
         .await
         .unwrap();
     (client, driver)
@@ -35,7 +37,10 @@ async fn database_client(
     let url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
     let mut config: tokio_postgres::Config = url.parse().unwrap();
     config.dbname(database);
-    let (client, driver) = config.connect(NoTls).await.unwrap();
+    let (client, driver) = tokio::time::timeout(DEADLINE, config.connect(NoTls))
+        .await
+        .expect("bounded native database connection did not complete")
+        .unwrap();
     let driver = tokio::spawn(driver);
     sql(&client, "LOAD '$libdir/darmok_catalog_probe'")
         .await
@@ -59,11 +64,14 @@ async fn sql(client: &Client, query: &str) -> Result<(), tokio_postgres::Error> 
 }
 
 async fn pid(client: &Client) -> i32 {
-    client
-        .query_one("SELECT pg_catalog.pg_backend_pid()", &[])
-        .await
-        .unwrap()
-        .get(0)
+    tokio::time::timeout(
+        DEADLINE,
+        client.query_one("SELECT pg_catalog.pg_backend_pid()", &[]),
+    )
+    .await
+    .expect("bounded native backend identity query did not complete")
+    .unwrap()
+    .get(0)
 }
 
 async fn show(client: &Client, name: &str) -> Value {
@@ -117,16 +125,20 @@ struct Observer {
 
 impl Observer {
     async fn new(client: &Client) -> Self {
-        sql(client, "SET plan_cache_mode = 'force_generic_plan'")
-            .await
-            .unwrap();
-        let locks = client.prepare("SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid=$1").await.unwrap();
-        let prepared = client.prepare("SELECT objsubid::integer, mode FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid IS NULL ORDER BY objsubid,mode").await.unwrap();
-        for _ in 0..4 {
-            client.query(&locks, &[&-1_i32]).await.unwrap();
-            client.query(&prepared, &[]).await.unwrap();
-        }
-        Self { locks, prepared }
+        tokio::time::timeout(DEADLINE, async {
+            sql(client, "SET plan_cache_mode = 'force_generic_plan'")
+                .await
+                .unwrap();
+            let locks = client.prepare("SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid=$1").await.unwrap();
+            let prepared = client.prepare("SELECT objsubid::integer, mode FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid IS NULL ORDER BY objsubid,mode").await.unwrap();
+            for _ in 0..4 {
+                client.query(&locks, &[&-1_i32]).await.unwrap();
+                client.query(&prepared, &[]).await.unwrap();
+            }
+            Self { locks, prepared }
+        })
+        .await
+        .expect("bounded native observer preparation did not complete")
     }
 
     async fn modes(&self, client: &Client, backend: i32) -> Vec<(i32, String, bool)> {
@@ -357,7 +369,10 @@ async fn native_coverage_checks_each_prepared_dummy_without_sql_classification()
             assert_eq!(checked["after_snapshot"], false);
             sql(&checker, "SET darmok_catalog_probe.command='guard_release'; COMMIT").await.unwrap();
         }
-        sql(&finisher, "ROLLBACK PREPARED 'guard_covered_holder'; DROP TABLE guard_coverage_rows").await.unwrap();
+        // Native Finish must be the only command in its simple query: a
+        // multi-command query creates an implicit transaction block.
+        sql(&finisher, "ROLLBACK PREPARED 'guard_covered_holder'").await.unwrap();
+        sql(&finisher, "DROP TABLE guard_coverage_rows").await.unwrap();
         assert!(probe.prepared_modes(&observer).await.is_empty());
     })).catch_unwind().await;
     finish_targets(
