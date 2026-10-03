@@ -214,6 +214,78 @@ Each new wait must still follow complete reader/snapshot closure and precede S.
 This investigation supplies concrete source obligations; it closes no
 authoritative entry, bootstrap, whole statement or implementation gate.
 
+## Passive module footprint and its limits
+
+Both pinned majors expose `EstimateLibraryStateSpace` and
+`SerializeLibraryState` through `fmgr.h`. The estimator walks the native loaded
+file list and accounts for each pathname terminator plus the final terminator.
+The serializer walks that list and copies the pathname strings, ending with an
+additional NUL. Neither selected function loads a module, opens a catalog
+reader or invokes a registered callback. They are concrete passive observation
+primitives for a future private-history proof, not an accepted entry witness.
+
+The estimator and serializer must observe the same unchanged list. The copy
+routine relies on its caller's capacity: its per-entry check is an `Assert`,
+not a production error for an undersized buffer. A proposed use must bound the
+actual total bytes, allocate outside S, prevent intervening module loads, and
+validate the copied representation within that bound. `RestoreLibraryState`
+is a different operation: it calls `internal_load_library` for every copied
+pathname and must never be substituted for passive observation.
+
+PostgreSQL 18 additionally exposes an opaque `DynamicFileList` iterator:
+`get_first_loaded_module`, `get_next_loaded_module` and
+`get_loaded_module_details`. The selected implementations return existing
+list links, pathname and magic-block metadata. Module name and version can be
+NULL. The native comment explicitly provides no protection against changes to
+the list during a scan. A proposed observer must maintain a stable traversal,
+copy any retained strings, account for their bytes, and preserve NULL rather
+than inventing a name/version. PostgreSQL 17's selected public API section
+contains the estimator/serializer but not these iterator APIs; do not emulate
+18's private struct access on17. See paired
+[PG17 loader API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/fmgr.h),
+[PG18 loader API](https://github.com/postgres/postgres/blob/REL_18_6/src/include/fmgr.h),
+[PG17 loader implementation](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/fmgr/dfmgr.c)
+and [PG18 loader implementation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/fmgr/dfmgr.c).
+
+The list's publication point matters. `internal_load_library` first searches
+by pathname, then by native device/inode identity. A new module undergoes
+`dlopen`, magic checking and its optional `_PG_init` call before being linked
+into the list. Completed nested loads can therefore be linked before their
+parent. If initialization raises an error before publication, the list cannot
+serve as a record of that initialization's earlier effects. This is a source
+path finding; no failed-load or interruption experiment was executed. Repeated
+`load_file` calls still use this coalescing loader, rather than proving a fresh
+initialization merely because a caller requested a load.
+
+The major-specific differences also constrain identity.18 stores the magic
+block pointer and compares its separate ABI fields. Its
+`load_external_function` strips a simple `$libdir/` prefix before path
+expansion, while leaving nested paths to the expansion routine. Consequently,
+a declaration string, a loaded pathname, a name/version pair and native ABI
+compatibility supply different facts. None alone binds the executable build,
+actual registry contents, callback history or descriptor-reference owners.
+The footprint proof must bind those facts independently.
+
+Shared preload processing calls `load_libraries`; session processing calls it
+for both session and local preload lists. The common loader treats NULL/empty
+lists as no work, parses declared paths and invokes `load_file` for each path.
+Invalid list syntax is logged and returns from this selected function. Its
+configuration text therefore cannot be treated as the actual successful-load
+list. The selected bodies establish loader/preload lifecycle only; they do
+not certify complete backend startup or other behavior in these source files.
+See paired [PG17 preload processing](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/init/miscinit.c)
+and [PG18 preload processing](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/init/miscinit.c).
+
+Passive pathname capture is linear in module count and total pathname bytes;
+18's iteration adds one visit per module and any copied metadata bytes. These
+selected observations add no database or protocol round trip. Their buffer,
+resource bound and stable-list construction remain design obligations, with
+no measured latency/peak-memory claim. Next establish the concrete admitted
+startup and fixed-command history, including registration and cleanup, before
+using the footprint as one part of the entry proof. The authoritative entry,
+owner, registry/provider, writer, sequence, implementation/runtime and whole
+statement gates remain OPEN; no C changes are admitted by this investigation.
+
 ## Writer coverage and remaining sequence
 
 The complete paired `AlterTableGetLockLevel` bodies distinguish rewriting,

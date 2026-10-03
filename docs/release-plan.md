@@ -4689,3 +4689,58 @@ callback/provider footprint remains an investigation direction. Independent
 review is required before C changes; all bootstrap/whole statement/runtime
 gates, issues46/15 and the overall goal remain OPEN. Concurrent native two-phase
 transactions and the standing exclusions remain in force.
+
+### Entry investigation merged; passive module-footprint source follow-up
+
+[PR62](https://github.com/samrat-shamim/darmok-proxy/pull/62) normally
+squash-merges independently accepted source investigation
+`8602fe2b90ccf1e46aa2a5a5860e14cd6fdd5e18` to public main
+`2a18f9d27cef53b29c9c7b29cd3bc6f9049a400b`, tree
+`533989d886c54d1f6e8185d8292733a0c8659a16`, parent2bfd. D1 corrects one
+missing hexadecimal character in the earlier root10 binding SHA256; it closes
+only at8602, while the frozen fbc947f review retains D1 OPEN. Root10's first
+review rehash actually exits1 because its helper assumed a nonexistent
+post-facts key; the failed streams and empty child directory stay preserved.
+The separately named corrected root10b rehash actually exits0. This is an
+evidence-reader correction, not a native product result.
+
+Root12 correction binding and13 correction-review rehash actually exit0.
+Their finite facts SHA256 values are
+`d0ff773254de462e038aa9a67c96e10f95afb58fd809460f974ab1440505fbec`
+and `c12668ea877741f6599d586b42b0ecc5bb05704263edf58ae6e4a6bb89df2195`.
+The latter rehashes220 fixed review members and16 separate completion
+companions/241 unique paths; it does not reopen older488/509-member graphs.
+All reviewer live reads release before root mutation. Root14 push,15 create,
+16 exact head/body/base readback,17 normal exact-head squash merge and18 merged
+readback actually exit0. Root18 facts SHA256 is
+`5769177a87c2afe48b9d345928543faacc1d3c28b0490fa8cb36931316620be8`;
+it confirms the PUBLIC personal repository, unchanged generic description,
+empty eligible PR list with PR4 filtered before stdout/evidence, and issues46/15
+OPEN. There is no new hosted-CI, native build/runtime or release result.
+
+The [module-footprint follow-up](native-catalog-bootstrap.md#passive-module-footprint-and-its-limits)
+starts in a separate branch/worktree from merged2a18. Distinct root01 fetch and
+02 worktree creation actually exit0. Root03 actually exits0 with six selected
+native source bodies: two cached public headers rehashed and four new HTTP-200
+loader/preload files, three per major. Primary facts/13-member nonself seal are
+`b9b6468c15efcae3d1df34a33652621278121a606608cb31b5e7ca8cceccf612`
+and `04b38ad11256c416bb5f61e446a3de043da5765ddd0691453ecaad6e936e6190`.
+Root04 actually exits0 preserving21 complete function bodies, two native struct
+definitions and two complete public API sections. Its facts/34-member nonself
+seal are `1728cbc47265a3aa8e2b018be1b428ee9ffe71d183049dab17ad70d5c4276586`
+and `92289a247dafc50ce26fba166c9b73e7cd03b41d17120ff4b2675c82ec22c2d5`.
+Root05 saves five actual paired source differences and actually exits0; facts
+SHA256 is `c3bc8e5f806abaf2c0b01fe2fa0179ef6612b95d08090a1da7778f2c62b68425`.
+
+These are exact byte/span/difference facts and targeted module-list/preload
+lifecycle findings, not complete semantic acceptance of every source file or
+backend startup. Passive getters do not certify callback/registry/reference
+history; the list publishes new entries after optional initialization. Capacity,
+stable observation, actual executable identity and closed private history need
+their concrete proof before C changes. All entry/bootstrap/whole statement,
+implementation/runtime and release gates, issues46/15 and the overall goal
+remain OPEN. Concurrent PostgreSQL two-phase transactions remain required.
+The standing exclusions remain in force, including security work, compiler
+PR4, hosted CI, publication and new stress/error/recovery/existing-profile
+lifecycle experiments. No source/helper mutation occurs during a recorded
+root command or a reviewer's live reads.
