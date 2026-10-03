@@ -210,6 +210,11 @@ and [PG18 invalidation](https://github.com/postgres/postgres/blob/REL_18_6/src/b
 Before C changes, the entry proof must bind the supported native build and
 registered callback/options footprint, establish every entered reference's
 provenance, and preserve that profile across SI, new opens, reloads and cleanup.
+The [startup reference trace](native-startup-references.md) distinguishes
+intrinsic nailed pins from owned reader items and retained locks. It also
+identifies restored init-file options/provider work and the limited assertion
+scope of end-of-transaction cleanup. Those paths belong in the entry base;
+successful startup or a critical-cache flag is insufficient.
 The [fixed private-command trace](native-fixed-command-history.md) identifies
 parse/utility/string-object hooks, GUC restoration, resource-release callbacks
 and savepoint lifecycle that this preservation proof must cover. Requiring
