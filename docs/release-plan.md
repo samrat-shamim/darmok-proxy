@@ -4421,3 +4421,98 @@ neutral statement admission, immutable IR, row execution, MySQL locking, complet
 performance, serving and release remain OPEN. Issues46/15 and the overall goal
 stay OPEN. Concurrent native two-phase transactions remain supported; the
 standing work exclusions remain in force.
+
+### Variable catalog payloads merged; transitive type investigation begun
+
+[PR59](https://github.com/samrat-shamim/darmok-proxy/pull/59) was normally
+squash-merged from independently accepted final documentation leaf
+`b103f3995e928507b900927f106a73acada0b851` to public main
+`6ad8d1314a894eeb05eafdf57a428fcc03a9afad`. Main has the exact accepted tree
+`0d0a5d4d01ea8131365cad206c1df05be7be813c`, with parent012be. C1 implementation
+closure remains at82; final documentation D1 closes only atb103. Test and build
+results retain ed847/c434 source attribution. The three final doc changes leave
+all344 other entries,22 native inputs and tested Rust fixtures identical.
+
+Root46 creates the separate final-doc worktree without altering frozen82.
+Root47 verifies the exact three-doc delta and all22 native inputs; root48 reports
+repository boundaries0 for9 packages. Both actually exit0. Final-doc binding
+facts `logs/native-variable-payloads-b103f39-final-doc-v1/facts.json` SHA256 is
+`449720626f77adffcd8050ebb3c451e2a00145ea15dadcd4dca82393d83538e7`.
+Independent final-doc report/facts/command-manifest/172-member seal SHA256 values
+are, under `logs/review-native-variable-payloads-b103f39-final-doc-v1`:
+
+- `2a84608b74a189a244f4839c85311d6ce812764c977e0ac48f4edc63205ccf77`
+- `a9df80eec2aafb3aa3e1acef411b57b46c46ca19e1cd1ee5157fd0def9796c97`
+- `10a309c287b6661c744c4fd7dc21db1c6037ff948ce818c6da3bcc98000def53`
+- `427fd65fa5a974253e1966e35e8cd143255997338b5511e77dd11c43569d6964`
+
+Actual final03/post04 exits are0; receipt SHA256 values are
+`293f7f96a598d2dac98aea81a38064b93c3a341878429b77affe630dbd607842`
+and `a62b9f08bc83bccb2602dfb29800f7b9be123bc4330abad8dbf7967de289c5f1`.
+No new review reader failed. Root49 actually exits0 rehashing172 fixed members
+plus completion companions:189 unique paths. Its facts SHA256 is
+`4c1c7bc8362fa74a0a0c84e2457a211a46ce1fb626acc79276a6ccad31741db9`.
+
+Root50 push,51 PR creation,52 exact source/body readback and53 normal squash
+merge actually exit0. Root54 independently checks merged head/tree/parent,
+PUBLIC personal ownership, unchanged generic description and an empty eligible
+PR list, with PR4 filtered before stdout/evidence. Merged readback facts SHA256
+is `3eb5888cd28e8f8b58dcf2271338f3a4c214d341d4ce38e468c72a446a52751f`.
+There is no hosted-CI or release-publication result.
+
+Root55 issue-body preparation actually exits1: its required OPEN-state check
+caught GitHub's automatic issue46 closure during merge, before creating a new
+body. The original returned JSON and raw failure remain immutable. Root56
+removes the negated closing-keyword phrase from the PR body; root57 reopens the
+unfinished full gate. Distinct root58 prepares bodyv10b and root59 updates it;
+all four actually exit0. Root60 independently observes issue46 and issue15 OPEN,
+the exact updated body, merged PR59 and its corrected wording. Its facts SHA256
+is `d7a934ca262ac765b196d4739ce0dec63aa39c32cf97782c843369da4dbe5727`.
+The issue46 body SHA256 is
+`4f4e62f7ce36b38d6549f32856e696387f77e52ca4bcedb791e4ad36c006b0f7`;
+corrected PR body SHA256 is
+`6c10291086f24d4bc7c72dcc4b6b5c05f7bde7dff203a5f8c46ce01a8fb7aaa7`.
+This bookkeeping correction changes no accepted source/artifact/runtime scope.
+
+The next [transitive type investigation](native-transitive-type-closure.md)
+begins from merged6ad8. Separate root01 fetch and02 worktree creation exit0
+without altering accepted worktrees or existing native profiles. Root03 primary
+capture actually exits0 at clean6ad8:34 pinned bodies,17 per major, with8 selected
+cached bodies rehashed and26 new HTTP-200 bodies. Facts and64-member nonself seal
+SHA256 values under `logs/native-transitive-type-closure-primary-v1` are
+`a6cbe480715de1edfa3b15184014d98f1152e3b3f0ff916bce9e80e62bdfa009`
+and `04346a5952b1cf202851e237cc2fc84ded598984909d5379331b4051d2180773`.
+
+The investigation distinguishes structural domain/element/companion/composite/
+range edges, enum labels and opaque domain constraints from executable provider
+and expression admission. A candidate coherent map/selected-payload collection
+requires33 definition-catalog passes plus an unresolved bootstrap sequence;
+neither total scan count nor descriptor writer coverage is accepted. New
+metadata heap/TOAST descriptor admission, guard-mode conflict proof and cold/
+invalidated paths remain OPEN before native implementation. This checkpoint
+changes only unpackaged documentation and claims no new runtime or artifact
+certification. Independent design-gate review is required. Full semantic closure,
+neutral statement admission, immutable IR, execution, MySQL locking, performance,
+serving/release, issues46/15 and the overall goal remain OPEN. Standing work
+exclusions and concurrent native two-phase requirements remain in force.
+
+Targeted root04 source capture actually exits0 at the still-clean acceptedb103
+worktree; its tree remains identical to merged6ad8. It rehashes the34 v1 bodies
+and adds four HTTP-200 lock/table-writer bodies, for19 per major. V2 primary
+facts/46-member nonself seal SHA256 values are
+`9496d7a04ac4211a5062e19076314dca298de00b5356e3f302038de1a84f5422`
+and `a7af45690161cb86f44560ae6c7ba47b7bfb6e0ca9a3f204500ec2265c212d17`.
+Root05 actually exits1 on an overstrict source-reader assertion that expected
+one occurrence of a native option; it occurs in both definition and parser
+tables. Its empty child folder and raw streams remain preserved. Distinct
+root05b rehashes the two pinned reloptions bodies, captures the lock-level
+function and both option occurrences, and actually exits0. This evidence is
+separate from the38-body v2 primary list and no runtime is inferred.
+
+The paired option/writer/matrix source chain shows why AS plus RX alone cannot
+freeze the proposed NULL-options bootstrap profile: selected ordinary heap
+options can use ShareUpdateExclusive, compatible with those reader modes.
+The investigation records this counterexample and leaves stronger-guard versus
+complete descriptor/provider-path admission, writer coverage, ordering,
+retention and performance OPEN. No native implementation or catalog mutation
+is introduced to bypass that unresolved proof.

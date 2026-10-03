@@ -19,6 +19,10 @@ The earlier component reviews above do not certify this changed native code.
 Its full source/carrier and pre-open descriptor contract
 is [native-variable-catalog-payloads.md](native-variable-catalog-payloads.md).
 
+The next [transitive type definition investigation](native-transitive-type-closure.md)
+records native edge/constraint/provider obligations and an open new-catalog
+descriptor bootstrap gate. It does not extend the accepted implementation profile.
+
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
