@@ -4147,3 +4147,119 @@ effect/preparation/admission/executor/serving/MySQL locking, performance,
 hosted CI/artifact/release gates, issues46/15 and the overall goal remain OPEN.
 The standing security/compiler/native-experiment/CI/account/release exclusions
 continue to apply.
+
+### Combined setup merged and variable-payload design
+
+PR57 is normally squash-merged at public main
+`41b929b7f35d893370c9ac1baefbf8b281068f58` / tree
+`02510bb377033f4efd2d79978e1c18fbab8f1d92`, exactly the independently accepted
+final documentation tree. Final review at9da393a accepts the finite leaf and
+closes D1 only there; C1 remains bound to accepted3b9. Its report/facts/179-member
+seal SHA256 values are
+`70cb87021036123c995a4f5822007fab28915ea95556c87fe2d5bd4e7d84199b`,
+`c87e83aaf4a6e6b2df8f4b4e912b2890f61abb0c98e018fd5c5f796bbaca654e`
+and `493e20424f6366284f00cf06de52649de5ed6876f5f438c4958c262644cf737c`.
+Root20 rehashes179 fixed members plus companions (190 paths), actual0, facts
+`790b532347d56d6f02cb6d4c2bc62cf61287d3b2fbfb52f11860779674883248`.
+No new runtime result is attributed to this documentation leaf.
+
+Root21–28 publication/issue actions exit0. Normal squash checks the exact
+reviewed PR head; readback confirms the public personal repository, description,
+merged PR/body, exact main tree, issues46/15 OPEN and no eligible open PRs after
+excluding4 before output. Issue46 bodyv8 SHA256 is
+`93b8d61abc1e8dad582ceb19405b2d21dd81a2fd8e446218f459b3f681bc6f10`.
+Root29's finite publication record has171 nonself members, facts SHA256
+`ac2177f21f583215824c4b623c1a51d60112b463d6c7fd2bf720e63f07da41a1`
+and seal `c42f54d321f5124f94d422731927cb907779e122647a67fc01390239c1ee6fcf`.
+Root30 fetch and31 isolated worktree creation exit0 at merged41b. Earlier tested,
+packaged and reviewed worktrees remain frozen; dirty shared checkouts are untouched.
+
+The next finite work is specified in
+[native-variable-catalog-payloads.md](native-variable-catalog-payloads.md): selected
+column default/generation and direct-type default carriers, including ordinary
+catalog TOAST values. The choice uses three coherent observations, a fresh
+registered payload-source snapshot after complete physical acquisition, direct
+builtin heap chunk assembly outside raw/S, and final carrier/definition agreement
+under S. Copying does not parse/evaluate expressions or admit their dependencies.
+Extra catalog/TOAST scanning and retained catalog-reference costs are explicit;
+new implementation/build/runtime/performance acceptance remains pending.
+
+Recorded primary commands `native-variable-catalog-payloads-41b929b-01-primary`
+and02-primary both exit0 at clean41b/tree025. They use the already read universal
+recorder, exact argv, scoped Rust homes, original streams and six source readers
+per command. V1 checks34 cached bodies against the pinned prior181-member audit
+and captures6 new HTTP-200 bodies, with40 total (20 permajor). Its facts and
+53-member nonself seal SHA256 values are
+`8c7671910d4d0cc8083d7474662311f2c7419f5331a8aa40b1f4f49d2b3e9e9b` and
+`ea11787b3a90df4396e50b86a1dea7bd9da2d274d1ce814408385bed59d29675`.
+V2 rehashes all53 members and adds8 HTTP-200 bodies:48 total (24 permajor).
+Its facts and72-member nonself seal SHA256 values are
+`f6922882d442cf81751b00d8a57e6868e60903fc2fad657fa9016f7c278dc70c` and
+`9209d7c03637577f8866a8dfb915eb43bb76f3327c5e0b711287a5dc66d40fc0`.
+Both maps are constructed before opening their own seal. Captures establish
+source bytes/provenance, not Git-blob, binary or runtime identity. A passive rg
+for scan-option names in relscan.h returns no-match1; the actual heap scan flags
+are read from current heap_storage.c rather than inferred from that file.
+
+This leaf changes only unpackaged documentation. All executable/test/dependency
+entries and20 native package inputs must stay byte-identical to public41b.
+Independent design readback is required before normal PR merge; its actual
+result belongs in the PR, without relabeling historical runtime evidence. No
+new native experiment, profile operation, security/compiler4 work, hosted CI,
+account work or release publication is included. Full gates, issues46/15 and
+the overall goal remain OPEN.
+
+### Variable-payload descriptor admission correction
+
+The first design at clean `8884e99932ec172c046a33286a4e7747e51a26a8` / tree
+`08948d9d5064f5c708c2ea7c21c12f5a1e38314e` is not accepted for implementation.
+Its independent review identifies C1: selected TOAST descriptors were opened
+before fresh actual profile validation. Native attribute construction can fetch
+missing/default/constraint metadata before AM initialization; a post-open check
+or later generation mismatch cannot undo provider execution. The original
+reviewed leaf remains frozen. A separate correction uses B's fresh raw capture
+as the pre-open checkpoint, then prepares descriptors outside raw/S with B's
+source snapshot alive and all prerequisite relation tags already owned.
+
+The corrected design names the pinned 2830/4171 bootstrap metadata TOAST heaps,
+their complete three-attribute layout, NULL options and absent descriptor-loading
+branches. It specifies native critical-index initialization/nailed support,
+cold/warm TOAST construction and minimal critical-index reload prerequisites.
+Structural/options/provider mutations of those pinned descriptor prerequisites
+remain outside the continuous builtin profile; ordinary external defaults and
+application DDL stay required. The three observations and concurrent native
+two-phase support remain; no additional full observation or provider fallback
+is introduced. Independent correction acceptance remains pending.
+
+Root03 documentation checks exit0 at888: exactly three unpackaged docs change
+from public41b, 342 tracked entries and all20 native inputs match. The facts
+SHA256 is `b3606cdd91d12c752fe6292e6b07b064142bd2fbbeb1d4fbf09ea05f8fce6f96`.
+Review `logs/review-native-variable-catalog-payloads-8884e99-design-v1` has
+report/facts/330-member structured-seal SHA256 values
+`2eee150240375a356f741ed984181b6fc4c60a7e50c54f6e6a55d7561d3ce23d`,
+`31a088185baa244de9fa749853d358f3d552b4258d27a40b8adb6b70d9020fc0`
+and `f466a75cdb56200da0e96ad3fbd1c7441b6bd0b29828c9a335339a3008aa248f`.
+Actual final25/post26 exit0; their receipt hashes are
+`fdd817a36b56cc18eedacf83315603dfa52ff0a6489c5309cdbf5f771e346fa4`
+and `cd6896a697a41892645446b9891d641bad34c9176202c312aaf741c58da078fd`.
+Reader14's actual1 request for the removed PG18 GetOldestSnapshot is preserved;
+distinct corrected reader17 exits0. Review lifetime/heap/2PC conclusions are
+conditional source conclusions, not runtime results or C1 closure.
+
+Root04 exits0 rehashing330 fixed review members plus companions (344 paths),
+facts `2110142939401edd595b436d486ac21efc15ad24ebf36ca67d02bcffc9f6842d`.
+Root05 exits0 creating the separate correction worktree. Root06 exits0 there at
+still-clean888, rehashing all72 prior source members and adding16 HTTP-200 bodies:
+64 sources (32 permajor), v3 facts
+`c6bf6baf6b4b09c49790f214488b12dd1e2409eebfc7cd29cfe619ce016abc7a`
+and107-member nonself seal
+`89d75367952654a44b252bc39eb8a6fdd7af32826327190a242957afeee0b8f6`.
+Exact root06 receipt SHA256 is
+`1a7298b01e69fead097e910ce4255026192128f24c03cbc04b0865c3f2fe6016`.
+These source/provenance records do not certify native artifacts or execution.
+
+This correction changes only unpackaged design/ledger documentation. Current
+documentation/source checks and independent C1 correction review are required
+before a normal PR merge. Native implementation, builds, ordinary paired suites,
+performance and full closure/executor/serving/release gates, issues46/15 and the
+overall goal remain OPEN. Standing work exclusions remain in force.

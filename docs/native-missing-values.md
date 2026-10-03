@@ -31,6 +31,10 @@ separate required gate. It must account for native fetch through `va_toastrelid`
 and cannot be justified by the root's declared TOAST graph. Rejecting legitimate
 TOAST-backed defaults forever is not the project plan. This component isolates
 the inline missing-array mechanism without admitting those storage operations.
+The next implementation is specified in
+[native-variable-catalog-payloads.md](native-variable-catalog-payloads.md), with
+three coherent observations and snapshot-preserving external fetch outside S.
+That specification does not extend this component's runtime acceptance.
 
 ## Source and representation contract
 
