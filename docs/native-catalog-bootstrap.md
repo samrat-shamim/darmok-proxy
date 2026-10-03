@@ -247,8 +247,9 @@ contains the estimator/serializer but not these iterator APIs; do not emulate
 [PG17 loader implementation](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/fmgr/dfmgr.c)
 and [PG18 loader implementation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/fmgr/dfmgr.c).
 
-The list's publication point matters. `internal_load_library` first searches
-by pathname, then by native device/inode identity. A new module undergoes
+The list's publication point matters. On the pinned Linux builds,
+`internal_load_library` first searches by pathname, then by device/inode
+identity. A new module undergoes
 `dlopen`, magic checking and its optional `_PG_init` call before being linked
 into the list. Completed nested loads can therefore be linked before their
 parent. If initialization raises an error before publication, the list cannot
