@@ -2416,7 +2416,7 @@ Security, compiler PR4/resources, stress/forced interruption, native-profile
 restart/stop/signal, remote CI/account work and release publication remain
 excluded.
 
-### Native interlock merged; physical reference owner selected
+### Native interlock merged; physical reference owner selection checkpoint
 
 PR [#51](https://github.com/samrat-shamim/darmok-proxy/pull/51) was normally
 squash-merged from reviewed documentation leaf
@@ -2475,3 +2475,80 @@ Fresh product/probe images and ordinary PG17/18 fixtures are required because
 native inputs now change. Earlier profiles cannot certify this draft.
 All broader closure/preparation/execution/release gates and standing exclusions
 remain open; the goal remains active.
+
+### Private native relation-reference verification
+
+Tested clean source is `c0438c7882a197227c147fe4b86e2c67bddbdd5d`, tree
+`fc64e517dfeaedc8767b1c252ce980112ba07a58`, based on merged PR51. This verifies
+the [private ordered reference owner](native-relation-guards.md), with no SQL
+registration, frontend handle, closure proof or application execution entry.
+Concurrent native PostgreSQL 2PC remains enabled.
+
+| Check | Exact command and observed result |
+| --- | --- |
+| New native relation group, 17/18 | `cargo test -p darmok-postgres-tests --test server_relation_guards --locked -- --nocapture --test-threads=1`: four passed each, 0 failed/ignored |
+| Full native package, 17/18 | `cargo test -p darmok-postgres-tests --locked -- --nocapture --test-threads=1`: 135 passed each, 0 failed/ignored, 18 summaries; includes publication and statement-interlock groups |
+| Private-owner subset, 17/18 | `cargo test -p darmok-execute --lib --locked native_backend::tests::native_catalog -- --ignored --nocapture --test-threads=1`: three passed each, 0 failed/ignored, 86 filtered |
+| Formatting and repository boundaries | `cargo fmt --all -- --check` and `python3 scripts/check_repository.py`: actual0, nine packages |
+| Strict Clippy | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` and `cargo clippy -p tokio-postgres --lib --locked -- -D warnings`: actual0 |
+| Native builds | Four new strict product/probe Docker builds against the pinned 17/18 base digests, actual0; GCC shared objects and LLVM units compiled at tested source |
+| Setup/final environment | 111 setup and 67 final read actions, all actual0; eight healthy fresh profiles with zero prepared/coordination/mock relation references |
+
+Rust/Cargo 1.96.0 ran on macOS 26.0.1 arm64, with the scoped Rustup and target
+directories and 11 nonoverlapping recorded Cargo/Cargo-spawning intervals.
+Native servers are Linux arm64/musl PostgreSQL 17.11/18.6. Four profiles per major
+cover primary preload and ordered test callback with `max_prepared_transactions=10`,
+the additional native-default zero case and an installed but unpreloaded product
+negative case with ten. Zero is not a serving requirement. Ports32831..32838
+belong to fresh `darmok-physical-guards-{17|18}-c0438c7-*-v1` profiles. Product
+negative profiles have no probe; test profiles use the separately built probe.
+Installed headers/libraries/LLVM inputs and exact image identities bind all 16
+tracked native inputs. Earlier profiles/results are historical.
+
+The four fixtures establish shared/local native tags, multiple modes, borrowed
+same-owner and parent counts, input-copy ownership, pre-lock validation,
+stale tokens, child promotion/abort, scoped completed-acquisition ERROR cleanup,
+retained native commit/rollback/prepare and both native prepared outcomes.
+An acquisition waiting on prepared DDL holds the earlier declared higher-OID
+reference and lacks all module tags, distinguishing preserved caller order from
+sorted acquisition. Normal native completion unblocks it. Scoped caller ERROR
+does not execute pending native-wait ERROR; the abort-required rule and semantic
+unwind separation are pinned source proofs. No interruption/recovery experiment
+or native session/transaction overlap-success claim follows.
+
+The finite cost helper uses 32 warmup and 128 measured sequential scopes, three
+ordered references including two modes on one OID, through one in-container
+TCP-loopback psql connection. PG17 p50/p95/max 15000/37000/46000 ns; PG18
+10000/23000/90000 ns, with 1000 ns display quantization. Final status has no
+owned token and false snapshot flags. This includes wire/utility/wrapper/native
+owner costs and is not a baseline, isolated C-call, throughput or contention
+comparison. Normal native allocation and retained count accumulation remain.
+
+Root receipts are under `.darmok-work/logs/native-physical-guards-c0438c7-*`.
+Actual0 `21-author-audit` verifies 20 command results and 1232 paths, all 16
+native inputs, 178 nested actions and preserved proposal/source-review seals.
+Its facts SHA256 is
+`93dfe561c808ef7f5aab98b31195beea02ce1ec49a97eeba1f047d31b48fe456`,
+28-file seal `dacffcdf6762866950b127a0687be4f57540cd2d2f6722e3ab60b8619bd9fd89`,
+outer stdout `bc60dd1e6dd1650fb3d0fb3d86bc29cfbd58806f96729e7738d0fdcf21df8e83`.
+Nine author audit readers are actual0. All new builds/fixtures/checks are actual0;
+earlier recorded failures remain unchanged rather than being recertified.
+
+Independent source review under
+`.darmok-work/logs/review-native-relation-guards-c0438c7-code-v1` has report
+SHA256 `233dc46ee312edce537e08cef5d56d7899d8b0a4e49cafe2b2f40511da9f0ad3`,
+136-file seal `ea1aa79323fd6fdbc6dc20ba93c42dca2ef6e4cbd0abff9807ec410561bd1668`,
+separate actual0 invocation
+`2d4ccac932a82549949fca74b156cb6efd8785c9a1314468cefc895d2271f54c`.
+All 43 passive readers are actual0, with no concrete source blocker within the
+finite admitted-caller contract. Runtime/evidence acceptance is a separate
+review; the final documentation leaf must preserve every tested executable/
+test/dependency entry and all 16 native inputs.
+
+No current full workspace test run is claimed. Exact local cache clearing,
+full physical/transitive/name/negative/overload closure, neutral preparation,
+callback/provider admission, immutable execution, Describe/materialization,
+MySQL read-view/lock equivalence, serving, driver/cache/throughput/artifact and
+release gates remain open. Issues46/15 and the goal remain active. Security,
+compiler PR4/resources, stress/forced interruption, profile restart/stop/signal,
+hosted CI/account work and release publication remain excluded.

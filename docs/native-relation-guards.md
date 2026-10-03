@@ -1,8 +1,9 @@
 # Private native relation references
 
-Status: implementation draft; compilation and PG17/18 verification pending.
-The conditional design review accepts the finite reference-owner boundary,
-not complete physical dependency closure or application statement admission.
+Status: the finite private reference-owner is locally verified on PostgreSQL
+17.11/18.6 at `c0438c7882a197227c147fe4b86e2c67bddbdd5d`.
+Complete physical dependency closure and application statement admission remain
+unaccepted; the reference primitive alone does not establish either.
 Issues46/15 remain open. Concurrent native PostgreSQL two-phase transactions
 are supported; `max_prepared_transactions=0` is not a requirement.
 
@@ -62,6 +63,10 @@ not decrement a guessed partial list. New private operations and discovery,
 commit and prepare are refused until matching native child abort or top abort.
 A failed child's veto occurs at PRE_COMMIT_SUB while state is INPROGRESS;
 successful promotion occurs at COMMIT_SUB before native reassignment.
+If a later semantic acquisition throws, completed physical references may
+unwind by exact release of their distinct relation tags, but that ERROR must
+still propagate to native abort. Releasing physical references does not clean
+the awaited semantic lock or authorize catching the error and continuing.
 
 All physical waits happen before semantic Share. Semantic/raw publication
 exclusion must end before tuple, MultiXact or XID waits: an ordinary transaction
@@ -82,7 +87,7 @@ may add native counts until transaction cleanup. No throughput or allocation
 claim follows from the design.
 
 The separate test-only probe may retain a token across bounded SET/SHOW requests
-to observe native queues/cleanup. Product artifacts contain no probe. Planned
+to observe native queues/cleanup. Product artifacts contain no probe. Four
 ordinary fixtures cover exact shared/local tags and modes, borrowed same-owner
 and parent references, copied input, stale tokens, parent/child promotion and
 rollback, scoped ERROR cleanup and native retained commit/rollback/prepare.
@@ -90,7 +95,23 @@ Prepared DDL completion must unblock ordered physical acquisition for both
 outcomes while observers see neither semantic nor raw/publication references.
 Scoped caller ERROR after completed acquisition does not certify the pending
 native-wait ERROR branch. No forced-error experiment is claimed or required for
-its pinned native-source cleanup rule. Runtime evidence remains pending.
+its pinned native-source cleanup rule. Native session/transaction overlap
+restrictions at PREPARE remain native errors, not an all-configurations success
+claim. The four fixtures passed on both majors, and all 135 package tests plus
+three private-owner discovery tests passed on each. Current images bind all
+16 native inputs; eight profiles are healthy with no prepared/coordination/mock
+relation references after the fixtures. Missing required dependencies fail.
+
+The bounded cost check sends 32 warmup and 128 measured scopes, with three
+references per scope through one in-container TCP-loopback psql connection.
+PG17 p50/p95/max is 15000/37000/46000 ns; PG18 is 10000/23000/90000 ns, with
+1000 ns psql display quantization. Each scope uses a volatile automatic token
+and releases its native references. Final status has no owned token and false
+snapshot flags; it is not a status observation for every sample. Protocol,
+utility, wrapper and native-owner allocation costs are included. There is no
+baseline comparison, isolated C-call, throughput, contention, descriptor,
+preparation, executor, recovery or full-cache acceptance. See the exact command,
+environment and immutable evidence checkpoint in [release-plan.md](release-plan.md).
 
 Full transitive/catalog/application/index/TOAST/storage/name/negative/overload
 closure, neutral preparation and exact cache clearing, callback/provider
