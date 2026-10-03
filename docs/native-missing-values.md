@@ -1,7 +1,7 @@
 # Private column missing-value images
 
 Status: finite implementation and paired evidence accepted by independent review
-at `2848c06`; this documentation correction awaits separate readback. This extends
+at `2848c06`; D1's documentation precision is accepted at `8030205`. This extends
 the finite
 [fixed column/type facts](native-attribute-type-facts.md) inside the existing
 private heap-storage invocation. It does not admit a TupleDesc, a type codec,
@@ -173,8 +173,9 @@ C1's absent-slot/present-NULL behavior is positively verified on both majors and
 closed by independent implementation review at `2848c06`. That review accepted
 the finite implementation and supplied evidence. D1 corrects the preallocation
 wording to the missing-record array; existing fixed attribute/type arrays retain
-their periodic/postallocation checks. Separate readback of this documentation
-leaf is required before final documentation acceptance.
+their periodic/postallocation checks. Documentation readback at `8030205` closes
+D1 at that leaf; the separate release-ledger attribution correction still requires
+its own readback before final documentation acceptance.
 
 One ordinary TCP loopback psql sample per major uses 32 warmups and 128 sequential
 invocations, three duplicate root bindings, five graph nodes, thirteen exact

@@ -3753,8 +3753,10 @@ facts in `logs/native-missing-images-2848c06-author-audit-v1` have SHA
 `bc2096cb987bd8e48d98d4c91c230cf6c493847231b16ff68108baae509c39fd`,
 plain seal SHA `cf4e1dd16dac029acb5d7eb164f26145b6fd6541a823808bb6a81ec4ae36ebca`.
 It verifies29 outer outcomes (26 zeros, two101 and one1),174 source readers,
-12 sequential Cargo/helper intervals, exact127/127 setup and85 environment
-actions, native inputs, costs and the preserved primary/design evidence graph.
+exact127/127 setup and85 environment actions, native inputs and the preserved
+primary/design graph. It preserves the measured cost and interval receipts.
+Independent audit50 verifies the nonoverlap of29 root intervals and12
+Cargo/helper intervals and recomputes the bounded costs.
 
 Independent passive implementation review in
 `logs/review-native-missing-images-2848c06-implementation-v1` accepts the finite
@@ -3798,3 +3800,36 @@ on `2848c06`. Normal reviewed exact-head squash merge remains required. Full
 variable/default/TOAST/transitive/provider/candidate/effect/IR/preparation/data/
 executor/MySQL row/read-lock/serving/cache/full performance/artifact/release gates,
 issues46/15 and the goal remain OPEN. The existing excluded scope remains excluded.
+
+### Missing-image documentation readback and attribution correction
+
+Frozen leaf `8030205146140e55d1bd479ccf8a9e4a59391067`, tree
+`b32b0eda568dd8c036c95eb4f8b684111b3444a5`, receives bounded independent
+documentation readback in `logs/review-native-missing-images-8030205-doc-leaf-v1`.
+Report SHA `45e1fe9ddd1aa1eb01e58a0cb5e2a9040fd3fc43cc1e39e810ca5f244adb7ce9`,
+facts SHA `1cb93c017c39b0f41070d1b9c231d6b521da5f702475ebff60a480f5cd9b8034`,
+commands SHA `5ee24d22ba2a13ad6b9bf8bb5d648470061656872649af0d6d4fbfa7827dcefb`.
+The structured4240-member seal SHA is
+`46afa459b12f9d56fc3ee87148ca58338262751ffc97384f6c98bcc2f2f2c6fd`.
+Executed `20-finalization` and `21-independent-post` both exit0, receipt SHAs
+`e10b99dd84d5e35f4255814739940c35a98275669784898520713c74572d094c` and
+`d5a75305abe770b4b02ca081765288b24eb551af9df42e2de2e6301625759f32`.
+Post facts SHA `229ac705df15a2fd13b26f89a79dc6a0272843828284eb36031ced8e7e16349d`.
+Actual before/after sources are exact and clean; live reads are released.
+D1/P3 closes only at803. D2 remains OPEN at that historical leaf: author30
+preserves interval/cost receipts, while successful independent50 proves interval
+nonoverlap and recomputes costs. This leaf corrects that attribution in the new
+acceptance paragraph; the historical803 bytes remain in frozen source and witnesses.
+
+Own reviewer11/12/18 remain actual1 passive schema/display/builder failures;
+corrected15/19/20/21/22 exit0. Root `34-doc-review-rehash` exits0 and verifies all
+4240 seal members plus separate companions (4270 unique files), raw streams,
+exact clean source and the preserved failures. Root facts SHA
+`543be44490426508796fc593346eb1f00d9b4196eda03048e70f06d61ad26b27`.
+`35-final-worktree` exits0 and
+creates this separate correction leaf; both prior worktrees remain frozen.
+This leaf updates only these two unpackaged docs. All341 other tree entries stay
+equal to tested5a; all20 native build inputs also equal built954. No runtime,
+build or cost sample is repeated or relabeled. Bounded D2 readback and normal
+exact-head reviewed squash merge remain pending. All previously open full gates,
+issues46/15 and the goal stay OPEN.
