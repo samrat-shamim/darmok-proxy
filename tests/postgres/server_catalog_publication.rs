@@ -1,10 +1,13 @@
 //! Ordinary server-module correctness fixtures. No frontend SQL support is
 //! inferred from these native observations. A missing module is a test failure.
 use darmok_catalog::{NativeCatalogStamp, decode_catalog_observation};
-use futures_util::StreamExt;
+use futures_util::{FutureExt, StreamExt};
 use std::time::Duration;
 use tokio_postgres::{Client, NoTls, error::SqlState};
 use tokio_postgres::{SimpleQueryEvent, TransactionState};
+
+#[path = "support/native_frames.rs"]
+mod native_frames;
 
 static TEST_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -12,6 +15,9 @@ const FENCE_LOCKS: &str = "SELECT mode, granted FROM pg_catalog.pg_locks
     WHERE locktype = 'object' AND COALESCE(database, 0) = 0
       AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
       AND objid = 0 AND objsubid = 17485 AND pid = $1";
+const COORDINATION_LOCKS: &str = "SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks
+    WHERE locktype = 'object' AND COALESCE(database, 0) = 0
+      AND classid = 3079 AND objid = 0 AND objsubid IN (17485, 17486) AND pid = $1";
 
 async fn client() -> (
     Client,
@@ -147,7 +153,7 @@ async fn wait_fence(observer: &Client, pid: i32, mode: &str, granted: bool) {
 async fn no_fence(observer: &Client, pid: i32) {
     assert!(
         observer
-            .query(FENCE_LOCKS, &[&pid])
+            .query(COORDINATION_LOCKS, &[&pid])
             .await
             .unwrap()
             .is_empty()
@@ -165,6 +171,422 @@ async fn wait_reader_admission(observer: &Client, backend: i32) {
         }
     }).await.expect("shared-drop reader admission wait was not observed");
     no_fence(observer, backend).await;
+}
+
+// Prepare these observation queries before the pg_class holder is prepared.
+// Force and warm generic probe plans before that holder. This controlled
+// observer history does not prove arbitrary native planning nonblocking.
+struct PublicationLocks {
+    coordination: tokio_postgres::Statement,
+    late_class_wait: tokio_postgres::Statement,
+    prepared_module_locks: tokio_postgres::Statement,
+    prepared_relation: tokio_postgres::Statement,
+}
+
+impl PublicationLocks {
+    async fn prepare(observer: &Client) -> Self {
+        observer
+            .batch_execute("SET plan_cache_mode = force_generic_plan")
+            .await
+            .unwrap();
+        Self {
+            coordination: observer.prepare(COORDINATION_LOCKS).await.unwrap(),
+            late_class_wait: observer.prepare(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype='relation' AND relation=1259 AND pid=$1 AND mode='RowExclusiveLock' AND NOT granted)"
+            ).await.unwrap(),
+            prepared_module_locks: observer.prepare(
+                "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486) AND pid IS NULL"
+            ).await.unwrap(),
+            prepared_relation: observer.prepare(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype='relation' AND relation=$1 AND granted AND pid IS NULL)"
+            ).await.unwrap(),
+        }
+    }
+
+    async fn warm(&self, observer: &Client) {
+        // Parse is insufficient: first execution builds a plan. Force generic
+        // plans and execute every probe before the prepared catalog holder.
+        observer.query(&self.coordination, &[&0_i32]).await.unwrap();
+        observer
+            .query(&self.late_class_wait, &[&0_i32])
+            .await
+            .unwrap();
+        observer
+            .query(&self.prepared_module_locks, &[])
+            .await
+            .unwrap();
+        observer
+            .query(&self.prepared_relation, &[&1259_u32])
+            .await
+            .unwrap();
+    }
+
+    async fn wait_late_cleanup(&self, observer: &Client, backend: i32) {
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                if observer
+                    .query_one(&self.late_class_wait, &[&backend])
+                    .await
+                    .unwrap()
+                    .get::<_, bool>(0)
+                {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("late native pg_class RowExclusive wait was not observed");
+        self.no_global(observer, backend).await;
+    }
+
+    async fn no_global(&self, observer: &Client, backend: i32) {
+        let locks = observer
+            .query(&self.coordination, &[&backend])
+            .await
+            .unwrap();
+        assert!(locks.iter().all(|row| row.get::<_, i32>(0) != 17485));
+    }
+
+    async fn gate(&self, observer: &Client, backend: i32, mode: &str, granted: bool) {
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let locks = observer
+                    .query(&self.coordination, &[&backend])
+                    .await
+                    .unwrap();
+                if locks.iter().any(|row| {
+                    row.get::<_, i32>(0) == 17486
+                        && row.get::<_, String>(1) == mode
+                        && row.get::<_, bool>(2) == granted
+                }) {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("expected native publication gate state was not observed");
+        self.no_global(observer, backend).await;
+    }
+
+    async fn no_prepared_module_locks(&self, observer: &Client) {
+        assert_eq!(
+            observer
+                .query_one(&self.prepared_module_locks, &[])
+                .await
+                .unwrap()
+                .get::<_, i64>(0),
+            0
+        );
+    }
+}
+
+// Cleanup never turns a failed fixture into acceptance. Native absence and
+// cleanup errors are logged; the original failure is always rethrown. A timeout
+// leaves that disposable profile quarantined instead of cancelling its backend.
+async fn cleanup_failed_prepared(finisher: &Client, gids: &[&str]) {
+    for gid in gids {
+        let sql = format!("ROLLBACK PREPARED '{gid}'");
+        match tokio::time::timeout(Duration::from_secs(20), finisher.batch_execute(&sql)).await {
+            Ok(Ok(())) => eprintln!("failed-fixture native rollback completed: {gid}"),
+            Ok(Err(error)) => eprintln!(
+                "failed-fixture native rollback error: {gid} code={:?}",
+                error.code()
+            ),
+            Err(_) => {
+                eprintln!("failed-fixture native rollback timed out; profile quarantined: {gid}")
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn late_indexed_temp_publishers_allow_both_prepared_outcomes() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (first, first_driver) = client().await;
+    let (second, second_driver) = client().await;
+    let (holder, holder_driver) = client().await;
+    let (finisher, finisher_driver) = client().await;
+    let (epochs, epochs_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let first_pid = pid(&first).await;
+    let second_pid = pid(&second).await;
+    let epochs_pid = pid(&epochs).await;
+    first.batch_execute(
+        "CREATE FUNCTION publication_late_first() RETURNS integer LANGUAGE SQL VOLATILE AS 'SELECT 1';
+         CREATE TEMP TABLE publication_late_temp(id integer) ON COMMIT DELETE ROWS;
+         CREATE INDEX ON publication_late_temp(id)"
+    ).await.unwrap();
+    second.batch_execute(
+        "CREATE FUNCTION publication_late_second() RETURNS integer LANGUAGE SQL VOLATILE AS 'SELECT 1';
+         CREATE TEMP TABLE publication_late_temp(id integer) ON COMMIT DELETE ROWS;
+         CREATE INDEX ON publication_late_temp(id)"
+    ).await.unwrap();
+    let locks = PublicationLocks::prepare(&observer).await;
+    for outcome in ["COMMIT", "ROLLBACK"] {
+        let phase = std::panic::AssertUnwindSafe(async {
+            tokio::time::timeout(Duration::from_secs(60), async {
+                first
+                    .batch_execute("ALTER FUNCTION publication_late_first() STABLE")
+                    .await
+                    .unwrap();
+                second
+                    .batch_execute("ALTER FUNCTION publication_late_second() STABLE")
+                    .await
+                    .unwrap();
+                let before = observe(&epochs).await;
+                first.batch_execute("BEGIN; ALTER FUNCTION publication_late_first() IMMUTABLE; INSERT INTO publication_late_temp VALUES (1)").await.unwrap();
+                second.batch_execute("BEGIN; ALTER FUNCTION publication_late_second() IMMUTABLE; INSERT INTO publication_late_temp VALUES (2)").await.unwrap();
+                locks.warm(&observer).await;
+                holder.batch_execute("BEGIN; LOCK TABLE pg_catalog.pg_class IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_late_pg_class'").await.unwrap();
+                locks.no_prepared_module_locks(&observer).await;
+
+                let mut first_commit = Box::pin(first.batch_execute("COMMIT"));
+                tokio::select! {
+                    result = &mut first_commit => panic!("first publisher did not reach late cleanup: {result:?}"),
+                    () = locks.wait_late_cleanup(&observer, first_pid) => {}
+                }
+                locks
+                    .gate(&observer, first_pid, "RowExclusiveLock", true)
+                    .await;
+                let mut second_commit = Box::pin(second.batch_execute("COMMIT"));
+                tokio::select! {
+                    result = &mut second_commit => panic!("second publisher did not reach late cleanup: {result:?}"),
+                    () = locks.wait_late_cleanup(&observer, second_pid) => {}
+                }
+                locks
+                    .gate(&observer, second_pid, "RowExclusiveLock", true)
+                    .await;
+
+                let mut reading = Box::pin(observe(&epochs));
+                tokio::select! {
+                    result = &mut reading => panic!("observer escaped unfinished publications: {result:?}"),
+                    () = locks.gate(&observer, epochs_pid, "ShareLock", false) => {}
+                }
+                tokio::time::timeout(
+                    Duration::from_secs(20),
+                    finisher.batch_execute(&format!("{outcome} PREPARED 'darmok_late_pg_class'")),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                tokio::time::timeout(Duration::from_secs(20), &mut first_commit)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                tokio::time::timeout(Duration::from_secs(20), &mut second_commit)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let after = tokio::time::timeout(Duration::from_secs(20), &mut reading)
+                    .await
+                    .unwrap();
+                assert!(after.generation() > before.generation());
+                drop(first_commit);
+                drop(second_commit);
+                drop(reading);
+                for (writer, backend) in [(&first, first_pid), (&second, second_pid)] {
+                    assert_eq!(
+                        writer
+                            .query_one("SELECT count(*) FROM publication_late_temp", &[])
+                            .await
+                            .unwrap()
+                            .get::<_, i64>(0),
+                        0
+                    );
+                    no_fence(&observer, backend).await;
+                }
+                assert_eq!(observer.query_one("SELECT count(*) FROM pg_catalog.pg_proc WHERE proname IN ('publication_late_first','publication_late_second') AND provolatile='i'", &[]).await.unwrap().get::<_, i64>(0), 2);
+                assert_eq!(observer.query_one("SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid='darmok_late_pg_class'", &[]).await.unwrap().get::<_, i64>(0), 0);
+                no_fence(&observer, epochs_pid).await;
+            }).await.expect("late publication fixture phase exceeded 60 seconds");
+        }).catch_unwind().await;
+        if let Err(panic) = phase {
+            cleanup_failed_prepared(&finisher, &["darmok_late_pg_class"]).await;
+            std::panic::resume_unwind(panic);
+        }
+    }
+
+    first
+        .batch_execute("DROP FUNCTION publication_late_first(), publication_late_second()")
+        .await
+        .unwrap();
+    close(first, first_driver).await;
+    close(second, second_driver).await;
+    close(holder, holder_driver).await;
+    close(finisher, finisher_driver).await;
+    close(epochs, epochs_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn prior_native_parse_bind_temp_history_releases_prepared_completion_fence() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (target, target_driver) = client().await;
+    let (holder, holder_driver) = client().await;
+    let (finisher, finisher_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let mut native = native_frames::NativeFrames::connect().await;
+    let (_, backend) = native.simple("SELECT pg_catalog.pg_backend_pid()").await;
+    let native_pid: i32 = backend[0].parse().unwrap();
+    let (commands, rows) = native
+        .simple(
+            "CREATE TEMP TABLE publication_caller_temp(id integer) ON COMMIT DELETE ROWS;
+         CREATE INDEX ON publication_caller_temp(id)",
+        )
+        .await;
+    assert_eq!(commands, ["CREATE TABLE", "CREATE INDEX"]);
+    assert!(rows.is_empty());
+    target.batch_execute("CREATE TABLE publication_caller_target(id integer PRIMARY KEY, value integer); INSERT INTO publication_caller_target VALUES(1, 1)").await.unwrap();
+    let target_oid: u32 = observer
+        .query_one(
+            "SELECT 'publication_caller_target'::pg_catalog.regclass::oid",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let locks = PublicationLocks::prepare(&observer).await;
+    let value_statement = observer
+        .prepare("SELECT value FROM publication_caller_target")
+        .await
+        .unwrap();
+    for outcome in ["COMMIT", "ROLLBACK"] {
+        let phase = std::panic::AssertUnwindSafe(async {
+            tokio::time::timeout(Duration::from_secs(60), async {
+                target
+                    .batch_execute("UPDATE publication_caller_target SET value=1")
+                    .await
+                    .unwrap();
+                target.batch_execute("BEGIN; UPDATE publication_caller_target SET value=2; PREPARE TRANSACTION 'darmok_caller_target'").await.unwrap();
+                native.trace.clear();
+                native
+                    .parse_bind(
+                        &format!("temp_history_{outcome}"),
+                        "temp_portal",
+                        "SELECT id FROM publication_caller_temp",
+                    )
+                    .await;
+                native.flush_parse_bind().await;
+                assert_eq!(native.trace, ["Parse", "Bind", "Flush"]);
+                locks.warm(&observer).await;
+                // Also warm the effect oracle's generic plan before the holder.
+                observer.query(&value_statement, &[]).await.unwrap();
+                holder.batch_execute("BEGIN; LOCK TABLE pg_catalog.pg_class IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_caller_pg_class'").await.unwrap();
+                locks.no_prepared_module_locks(&observer).await;
+                native
+                    .parse_bind(
+                        &format!("finish_target_{outcome}"),
+                        "finish_portal",
+                        &format!("{outcome} PREPARED 'darmok_caller_target'"),
+                    )
+                    .await;
+                native.execute_sync("finish_portal").await;
+                assert_eq!(
+                    native.trace,
+                    ["Parse", "Bind", "Flush", "Parse", "Bind", "Execute", "Sync"]
+                );
+                println!(
+                    "native_no_sync_trace outcome={outcome} frames={:?}",
+                    native.trace
+                );
+                locks.wait_late_cleanup(&observer, native_pid).await;
+                assert!(
+                    !observer
+                        .query_one(&locks.prepared_relation, &[&target_oid])
+                        .await
+                        .unwrap()
+                        .get::<_, bool>(0),
+                    "first prepared target retained native locks after utility completion"
+                );
+                let expected = if outcome == "COMMIT" { 2 } else { 1 };
+                assert_eq!(
+                    observer
+                        .query_one(&value_statement, &[])
+                        .await
+                        .unwrap()
+                        .get::<_, i32>(0),
+                    expected
+                );
+                tokio::time::timeout(
+                    Duration::from_secs(20),
+                    finisher.batch_execute(&format!("{outcome} PREPARED 'darmok_caller_pg_class'")),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                native.completion(&format!("{outcome} PREPARED")).await;
+                let (commands, rows) = native
+                    .simple("SELECT count(*) FROM publication_caller_temp")
+                    .await;
+                assert_eq!(commands, ["SELECT 1"]);
+                assert_eq!(rows, ["0"]);
+                no_fence(&observer, native_pid).await;
+                assert_eq!(observer.query_one("SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid IN ('darmok_caller_target','darmok_caller_pg_class')", &[]).await.unwrap().get::<_, i64>(0), 0);
+            }).await.expect("native prepared caller fixture phase exceeded 60 seconds");
+        }).catch_unwind().await;
+        if let Err(panic) = phase {
+            cleanup_failed_prepared(
+                &finisher,
+                &["darmok_caller_target", "darmok_caller_pg_class"],
+            )
+            .await;
+            std::panic::resume_unwind(panic);
+        }
+    }
+
+    native.close().await;
+    target
+        .batch_execute("DROP TABLE publication_caller_target")
+        .await
+        .unwrap();
+    close(target, target_driver).await;
+    close(holder, holder_driver).await;
+    close(finisher, finisher_driver).await;
+    close(observer, observer_driver).await;
+}
+
+#[tokio::test]
+async fn late_on_commit_drop_and_native_cleanup_error_release_publication_gate() {
+    let _serial = TEST_SERIAL.lock().await;
+    let (writer, writer_driver) = client().await;
+    let (epochs, epochs_driver) = client().await;
+    let (observer, observer_driver) = client().await;
+    let writer_pid = pid(&writer).await;
+    let before = observe(&epochs).await;
+    writer
+        .batch_execute(
+            "BEGIN; CREATE TEMP TABLE publication_drop(id integer) ON COMMIT DROP;
+         CREATE INDEX ON publication_drop(id);
+         CREATE TEMP VIEW publication_drop_view AS SELECT id FROM publication_drop;
+         COMMIT",
+        )
+        .await
+        .unwrap();
+    assert!(observe(&epochs).await.generation() > before.generation());
+    assert!(writer.query_one("SELECT pg_catalog.to_regclass('publication_drop') IS NULL AND pg_catalog.to_regclass('publication_drop_view') IS NULL", &[]).await.unwrap().get::<_, bool>(0));
+    no_fence(&observer, writer_pid).await;
+    writer.batch_execute("CREATE FUNCTION publication_cleanup_error() RETURNS integer LANGUAGE SQL VOLATILE AS 'SELECT 1'").await.unwrap();
+    writer.batch_execute(
+        "BEGIN; ALTER FUNCTION publication_cleanup_error() IMMUTABLE;
+         CREATE TEMP TABLE publication_cleanup_parent(id integer PRIMARY KEY) ON COMMIT DELETE ROWS;
+         CREATE TEMP TABLE publication_cleanup_child(id integer REFERENCES publication_cleanup_parent(id)) ON COMMIT PRESERVE ROWS;
+         INSERT INTO publication_cleanup_parent VALUES (1); INSERT INTO publication_cleanup_child VALUES (1)"
+    ).await.unwrap();
+    let error = writer.batch_execute("COMMIT").await.unwrap_err();
+    assert_eq!(error.code(), Some(&SqlState::FEATURE_NOT_SUPPORTED));
+    no_fence(&observer, writer_pid).await;
+    assert!(writer.query_one("SELECT pg_catalog.to_regclass('publication_cleanup_parent') IS NULL AND pg_catalog.to_regclass('publication_cleanup_child') IS NULL", &[]).await.unwrap().get::<_, bool>(0));
+    assert_eq!(writer.query_one("SELECT provolatile::text FROM pg_catalog.pg_proc WHERE oid='publication_cleanup_error()'::pg_catalog.regprocedure", &[]).await.unwrap().get::<_, String>(0), "v");
+    observe(&epochs).await;
+    writer
+        .batch_execute("DROP FUNCTION publication_cleanup_error()")
+        .await
+        .unwrap();
+    close(writer, writer_driver).await;
+    close(epochs, epochs_driver).await;
+    close(observer, observer_driver).await;
 }
 
 #[tokio::test]
@@ -1012,11 +1434,11 @@ async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
     writer.batch_execute("ROLLBACK").await.unwrap();
     no_fence(&observer, writer_pid).await;
     let transferred: i64 = observer.query_one(
-        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND COALESCE(database, 0) = 0 AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objid = 0 AND objsubid = 17485 AND pid IS NULL", &[]
+        "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype = 'object' AND COALESCE(database, 0) = 0 AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass AND objid = 0 AND objsubid IN (17485, 17486) AND pid IS NULL", &[]
     ).await.unwrap().get(0);
     assert_eq!(
         transferred, 0,
-        "PREPARE transferred a global publication fence"
+        "PREPARE transferred a catalog coordination lock"
     );
     other
         .batch_execute("ROLLBACK PREPARED 'darmok_prepare_cleanup'")

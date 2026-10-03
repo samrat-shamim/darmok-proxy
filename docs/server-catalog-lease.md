@@ -2,8 +2,10 @@
 
 `postgres/darmok_server` implements PostgreSQL 17/18 catalog publication and a
 one-shot reader with internal, transaction-owned read fences. The reader and
-private Rust scope integration have current-revision local PostgreSQL 17.11/18.6
-verification under the continuous private-owner profile.
+private Rust scope integration have local PostgreSQL 17.11/18.6 evidence
+under the continuous private-owner profile. Fresh current-source fixtures also
+verify the publication gate and prepared utility completion ordering below
+under the documented builtin-core profile, including late native cleanup.
 Statement admission, complete dependency guards, result definitions, plan
 caching and a MySQL table executor remain required before exposing table SQL.
 Component evidence is recorded in the release plan.
@@ -64,12 +66,17 @@ without sufficient native locking need a verified guard integration.
 
 The global fence is a synthetic object lock in PostgreSQL's default lock method:
 database zero, `pg_extension` class, object zero and sub-ID `0x444d`. A zero object
-OID cannot name an extension. Readers take `ShareLock`; metadata publishers take
-`ExclusiveLock`. User advisory locks use a separate lock method.
+OID cannot name an extension. Readers take `ShareLock`; short ordinary drains
+and prepared completions take `ExclusiveLock`. A distinct publication gate uses
+the same native tag fields with sub-ID `0x444e`. Readers take gate `ShareLock`;
+ordinary publishers retain gate `RowExclusiveLock`. User advisory locks use a
+separate lock method. The publisher modes coexist; the reader mode conflicts
+with them. Neither tag is an actual extension or a prepared-transaction marker.
 
 Ordinary metadata utilities mark the backend's private catalog identity before
-attempting changes. They acquire the global fence at native pre-commit, after
-the utility's normal dependency locks/effects and deferred triggers. The module
+attempting changes. At native pre-commit, after the utility's normal dependency
+locks/effects and deferred triggers, they acquire the publication gate before a
+short global drain. The module
 inspects PostgreSQL's pending transactional invalidations through
 [`xactGetCommittedInvalidationMessages`](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/inval.c),
 which does not consume them. Native subabort removes a child's messages. A
@@ -77,18 +84,35 @@ rolled-back child DDL or a no-effect utility does not become a surviving metadat
 publication merely because it was attempted. Private identity may still advance
 conservatively. Ordinary DML without catalog publication takes no writer fence.
 
-The pre-commit callback precedes native ON COMMIT actions. Core temporary-object
-drops are also covered by object hooks after the callback starts. Arbitrary
-extension callbacks that introduce new blocking dependencies after this boundary
-need their own ordering proof and are outside this contract. Physical statistics,
+The pre-commit callback precedes native ON COMMIT actions. Rebuilding an existing
+indexed temporary table on `ON COMMIT DELETE ROWS` can wait for `pg_class` after
+that callback. Retaining global Exclusive across this wait would prevent a
+prepared holder from finishing and releasing the catalog lock. The publisher
+therefore retains only its transaction-owned gate through late native work:
+
+1. Acquire gate RowExclusive outside the global fence.
+2. Acquire global Exclusive, drain admitted raw observers, advance generation,
+   and immediately release that exact owned reference, including ordinary ERROR.
+3. Run native ON COMMIT work, catalog waits and invalidation delivery under the
+   gate alone. Prepared completion can still acquire global Exclusive.
+4. Let native transaction lock cleanup release the gate after invalidations.
+   Resetting bookkeeping at the COMMIT callback must not release it early.
+
+Late core temporary-object drops use the same ordering through object hooks.
+Additional changes while the gate is held need no second global drain. Arbitrary
+extension callbacks need their own complete ordering proof. Physical statistics,
 storage mappings and sequence values are not immutable schema dependencies;
 this mechanism does not freeze those non-MVCC values.
 
-A writer retains its transaction fence through native catalog invalidation and
-lock cleanup. Readers observe generation, release Share, then consume native
-invalidations outside Share before an unchanged-generation reacquisition. Internal
-commits, including concurrent index phases, each get a new publication generation.
-The final valid-index transition is fenced at the final transaction's pre-commit.
+Each reader span acquires gate Share before global Share and releases global
+before gate. Both initial generation observation and raw fact scanning use this
+order. Both locks are released between spans before consuming native
+invalidations and preparing descriptors, and before native cleanup/output.
+Concurrent publishers can advance generation in a different order from their
+commits: readers remain excluded until all conflicting gates have been released
+after native invalidations. Aborts may conservatively invalidate identities.
+Internal commits, including concurrent index phases, each get a new generation.
+The final valid-index transition receives its own publication gate/drain.
 No session fence spans the old-snapshot waits between phases.
 
 `DROP DATABASE` changes its invalid marker in place before commit. Its native
@@ -105,15 +129,15 @@ catalog publication receives the ordinary commit fence.
 ## Prepared transactions
 
 PREPARE keeps metadata private. It rejects reentry during discovery or shared-drop
-intent and releases any transaction publication fence before native two-phase
-lock transfer. Private metadata invalidates the backend's local identity when
+intent or active completion and releases any tracked publication gate before
+native two-phase lock transfer. Private metadata invalidates the backend's local identity when
 preparation completes. The module adds no marker locks, GID hash gates or native
 completion-tag capture; PostgreSQL retains its normal preparation lifecycle and
 completion tags.
 
 Every SQL COMMIT PREPARED or ROLLBACK PREPARED that reaches the utility hook takes
-the transaction-owned publication fence and advances generation before native
-completion. This includes pure DML, rolled-back child DDL and attempts that later
+an invocation-owned global Exclusive reference and advances generation before
+native completion. It never acquires the publication gate. This includes pure DML, rolled-back child DDL and attempts that later
 fail native target checks. PostgreSQL alone resolves the exact GID and performs
 its database, ownership, uniqueness and busy checks. A queued PREPARE is not a
 valid target until native core makes it valid. The module does not inspect
@@ -122,13 +146,21 @@ structures or classify retained locks. In particular, a target can retain an
 exclusive lock on the prepared-transaction view without blocking its own finish
 on a classifier query.
 
-The fence remains owned by the finishing transaction through native completion
-and transaction cleanup. Native errors release it through ordinary resource
-ownership; they may conservatively invalidate generation. Prepared completions
-serialize with catalog readers even when they publish no metadata. Their fence
-duration includes native WAL/file work and any native completion waits, so it has
-no fixed short-duration guarantee. The fixtures use normal completion and do not
-run restart or interruption experiments.
+Native `FinishPreparedTransaction` sends the target's saved invalidations and
+releases the target's locks and state before returning. The utility invocation
+releases its exact global reference in `PG_FINALLY` on return or ordinary ERROR,
+before its caller's own PRE_COMMIT, ON COMMIT or abort cleanup. That caller may
+have earlier native Parse/Bind temporary-table history without a Sync; native
+transaction-block checks do not prove an empty cleanup history. Its own later
+publication uses the normal gate-first protocol. This avoids a global-to-gate
+inversion and permits a second prepared holder to release a late catalog wait.
+
+Early native errors may conservatively invalidate generation. An irreversible
+native finish must not be reported as an invented rollback or retried through a
+custom callback failure. Prepared completions serialize with catalog readers
+even when they publish no metadata. Their global span includes native WAL/file
+work and completion waits, with no fixed short-duration guarantee. Fixtures use
+normal completion without restart or interruption experiments.
 
 The creation/completion ordering covers native SQL utility entry. Direct calls
 to `FinishPreparedTransaction` by custom modules bypass that hook and are outside
@@ -150,17 +182,20 @@ barrier would likewise prevent retirement. Reader exclusion therefore belongs
 to shared-drop intent, rather than a writer lock spanning those native waits.
 
 Intent is registered before draining old leases. New lease requests wait on a
-condition variable without holding Share, and recheck the shared count after
-acquiring Share to close the admission race. An intent keeps its earliest owning
+condition variable without either lock, and recheck the shared count after
+acquiring gate Share then global Share to close the admission race. If the
+recheck finds intent, release both before waiting again. Sleeping while retaining
+gate Share could block the exiting publisher that DROP needs to retire. An intent keeps its earliest owning
 subtransaction, promotes on subcommit and clears on owning subabort or top-level
 commit/abort. Native exit cleanup also clears it. Multiple droppers each own one
 intent; completion of one cannot reopen admission while another remains. A
 backend owning intent cannot acquire its own read lease or transfer it to PREPARE.
 
-Native pre-commit reacquires and retains the ordinary publication lock through
-invalidation/lock cleanup, even when a shared drop has already advanced generation
-before irreversible effects. At commit, clearing intent wakes readers, but that
-lock still prevents acquisition before native invalidations are delivered.
+Native pre-commit acquires the ordinary publication gate and performs a short
+global drain, even when shared drop already advanced generation before
+irreversible effects. It retains the gate through invalidation/lock cleanup.
+At commit, clearing intent wakes readers, but the gate still prevents observation
+before native invalidations are delivered.
 Aborts may conservatively advance generation. Both ordinary and exit-time
 publishers use PostgreSQL's native lock queue; the module has no exit-time polling,
 barrier processing or interrupt-counter adjustment. The supported native database/
@@ -201,15 +236,17 @@ backend state, one backend-identity atomic allocation per participating connecti
 and ordinary native lock ownership.
 Two atomic intent reads are added to uncontended acquisition. Shared drops add
 one transaction-owned admission count, a short native drain lock and the ordinary
-pre-commit publication lock; ordinary exit publishers need no special wait loop.
+pre-commit publication gate/drain; ordinary exit publishers need no special wait
+loop. Ordinary publication adds one retained gate acquisition; the global drain
+ends before late cleanup. Gate contention spans that cleanup across databases.
 Publication inspection copies pending native invalidations only when present.
 Prepared completion adds one publication lock and generation advance, without
 classifier SQL, GID allocations or protocol round trips. All prepared completions
 contend with readers and conservatively invalidate catalog cache identities,
 including pure DML; ordinary pure-DML commits retain their previous behavior.
 The one-shot reader needs one SET/SHOW round trip per nonempty request. An
-uncontended successful attempt has two raw Share acquisitions and four full
-fact-heap scans. Shared-drop admission retries add acquisitions; a changed
+uncontended successful attempt has four Share acquisitions (two gate and two
+global) and four full fact-heap scans. Shared-drop admission retries add acquisitions; a changed
 generation restarts the attempt and adds acquisitions and preparation. Its
 [phase budgets and sequential fixture](catalog-discovery.md) do not establish
 proxy throughput, cache hit rates or parallel contention.
@@ -223,8 +260,14 @@ hooks, prepared DDL/DML,
 rolled-back child DDL, mixed prepared row/catalog changes, exact case-distinct
 GIDs under a schema-local text operator, prepared view locks and normal temp-backend
 exit in the target or an unrelated database during removal, plus concurrent drop
-intents and ordinary native busy-error cleanup. Missing module
-dependencies fail. The Docker build installs the shared library, LLVM bitcode,
+intents and ordinary native busy-error cleanup. Current fixtures also cover two
+simultaneous indexed TEMP ON COMMIT DELETE ROWS publishers waiting on prepared
+catalog holders, both
+prepared outcomes with prior native Parse/Bind history, late temporary cascade
+drops, and ordinary native ON COMMIT failure cleanup. Real lock assertions
+check gate ownership and the absence of global references during late waits.
+Missing module dependencies fail. The Docker build installs the shared library,
+LLVM bitcode,
 extension SQL/control files and Apache license; SDK tools stay in the build
 stage. Other platform packages, hosted CI execution and the full artifact/
 compatibility gates remain pending. Authentication, grants and other security

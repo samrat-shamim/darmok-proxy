@@ -61,12 +61,14 @@ only disposal available. This adds no asynchronous rollback or reset.
 The one-shot reader uses the publication mechanism in
 [server-catalog-lease.md](server-catalog-lease.md):
 
-1. Acquire raw synthetic Share, observe global/private generation, then release.
+1. Acquire publication gate Share then global Share, observe global/private
+   generation, then release global and gate.
 2. Outside Share, consume native invalidations, refresh catalog snapshot state,
    verify installation, open the four fixed heap catalogs with AccessShare and
    allocate byte-key maps. All catalog descriptor, cache and TOAST waits occur
    here. A prepared transaction may retain one of these locks.
-3. Reacquire raw Share and compare generations. If changed, release, clean up
+3. Reacquire gate Share then global Share and compare generations. If changed,
+   release both, clean up
    and restart before any effects. Sixteen unsuccessful attempts produce a
    native serialization error.
 4. Under unchanged Share, register one refreshed nonhistoric catalog snapshot
@@ -74,9 +76,11 @@ The one-shot reader uses the publication mechanism in
    `pg_attribute` and `pg_type`. Copy only fixed tuple prefixes. This span uses
    no index/syscache/TOAST lookup, SQL, SPI, user table AM/operator/receiver,
    invalidation dispatch or user relation/tuple/transaction-ID lock request.
-5. Release Share before ending scans, unregistering the snapshot, closing
+5. Release global Share then gate Share before ending scans, unregistering the
+   snapshot, closing
    descriptors, selecting copied domain ancestors, serializing or emitting
-   output. Ordinary ERROR cleanup releases Share first too.
+   output. Ordinary ERROR cleanup releases both first too. Shared-drop intent
+   waits hold neither lock, including after an admission-race recheck.
 
 No reader fence survives SHOW. A suspended native SHOW portal retains an old
 materialized observation; resuming it does not rediscover or renew a lease.
@@ -114,7 +118,8 @@ semantic admission and result validation remain required for statement execution
 ## Costs, bounds and fixtures
 
 A nonempty owner request has one SET/SHOW round trip. An uncontended successful
-native attempt has two short Share acquisitions and four full heap scans.
+native attempt has four short Share acquisitions (two gate and two global)
+and four full heap scans.
 Shared-drop admission retries can add acquisitions within either phase;
 generation changes restart the attempt and add acquisitions and preparation.
 These counts are not a bound on a request that encounters contention. It copies

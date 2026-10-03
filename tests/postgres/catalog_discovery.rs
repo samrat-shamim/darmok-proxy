@@ -12,7 +12,7 @@ use tokio_postgres::{
 
 static TEST_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 const SHOW: &str = "SHOW darmok_server.catalog_request_v1";
-const FENCES: &str = "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid=17485 AND pid=$1";
+const FENCES: &str = "SELECT count(*) FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486) AND pid=$1";
 
 async fn connect(
     url: Option<String>,
