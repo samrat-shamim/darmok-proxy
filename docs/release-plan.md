@@ -2847,3 +2847,190 @@ The original component worktree is frozen; the next isolated branch begins at
 this merged source. Full physical/transitive/name/candidate closure, fresh facts,
 neutral preparation, immutable execution and all other broader gates remain
 open. Issues46/15 and the overall goal remain active; standing exclusions persist.
+
+### Verified private catalog-declared heap storage
+
+This isolated branch begins at merged main
+`5184b30b99eb9333c9ee78e169a8c5e05d23c3a5`. Checkpoint
+`bded47601a74d6b705c9b0a0fcc573084de28ac6` records the preceding PR53 merge.
+On 2026-10-03, the private whole-invocation C boundary in
+[native-heap-storage.md](native-heap-storage.md) completed finite local
+verification and independent implementation review at
+`2640513033227cfe00ad5be4511b12e85491c09c`, tree
+`389b60efc8b412b9887d91f1d2bb20176254d9a9`.
+
+The accepted scope is counted literal schema/relation bindings to ordinary
+builtin heaps, all live builtin-btree indexes and catalog-declared TOAST storage.
+Duplicate root bindings and separate exact AS/RS/RX increments are preserved;
+the complete declaration is deterministic and parent-first. Actual TEMP/shared/
+tablespace identity and real mapped file numbers are checked. Other relation
+kinds/AMs and foreign TEMP fail explicitly. Traditional inheritance hints do not
+expand children. This graph describes the metadata point, not future
+data-derived `va_toastrelid` or rewrite `rd_toastoid` opens.
+
+Every observation uses the no-CV try-fence, including histories with earlier
+borrowed/retained references. Initial scans/snapshot/descriptor increments close
+before physical waits. Fresh SI, installation checks, final descriptors and
+native mapping resolution precede semantic S. A final fixed-field observation
+rechecks literal definitions, graph, generation and private/context identity.
+Only a source-admitted pure C copying consumer runs with S and physical ownership;
+raw references have ended. S ends before callback-capable native reader cleanup
+and exact physical release/retention. Entered-invocation ERROR remains native
+abort-required. No SQL/frontend storage entry point, admitted plan, arbitrary
+provider/descriptor callback or data execution is supplied.
+
+The selected immutable design is
+`.darmok-work/native-heap-storage-attempt-proposal-v4.md`, SHA256
+`72a9c4111183785bc972377401d77ce30595006f81a77269796c2f4d907fc349`.
+Its historical conditional design acceptance is under
+`.darmok-work/logs/review-native-heap-storage-attempt-bded476-design-v4`:
+report `02d4f29ee929fc606a8f9ffd9c8832abd4677b3f20cc6cdb299a3146e50b4a13`,
+facts `f874fb639a10b4949786e258e034b3077720f8ca29d7a156104a9f1747f028ff`,
+209-member seal `8e82ea4ca481ed8c37cdb65062866924a45ceefd50cfb98c5722a5f7c5eabcd7`,
+separate actual0 invocation
+`15c284c448f30234c71096c5c4db5293d137739b59d6f6d6510e413a9ba3d9d1`.
+Earlier v2 F1/D1 remain in that historical report; v4 corrects every observation
+to a try-fence and distinguishes periodic allocation checks from peak bounds.
+Design acceptance alone did not certify the implementation.
+
+Paired pinned PostgreSQL REL_17_11/REL_18_6 primary bodies and HTTP/source
+receipts remain frozen in the dependency-closure bundles and
+`.darmok-work/logs/native-heap-storage-primary-v1/verified-sources.json`, SHA256
+`9177ae30e6bc9819cd79cad9e62c49955b92a008d3c42cbf35898430a6195184`.
+Actual native namespace identities, all-live index enumeration, mapper lookup,
+TOAST opens and concurrent-index stages were checked against those bodies.
+
+Two actual failures are preserved. The initial clean
+`74a94d8d6192c54a32d544084ce9a8c129b9961b` PG17 product build exited1 under
+strict native shadow warnings: nested unsuffixed PG_TRY generated locals shadowed
+the outer PG_TRY locals. Matching documented `_cleanup` suffixes in the inner
+PG_TRY/PG_FINALLY/PG_END_TRY fix that cause without suppressing warnings or changing
+cleanup semantics. Both installed native `elog.h` bodies confirm the optional
+matching-suffix contract. The initial clean
+`589ad108f9af01f56acfb6f6ee3c6c765872c13f` storage fixture run exited101 with
+zero of six groups passing: PostgreSQL JSON OIDs were strings while C OIDs were
+numbers. The correcting `2640513` oracle uses explicit SQL bigint casts. No
+product delta or heuristic string coercion was needed. The original receipts,
+raw streams and source identities are never relabeled as successful checks.
+
+Four strict GCC/LLVM product/probe image builds are actual0 at clean
+`aacfe42cab42f6f0b4b08a3e866a9cb3e6485ab7`, tree
+`913df666034f87d73aa5adeead73dd17366a9af5`, under
+`.darmok-work/logs/native-heap-storage-aacfe42-{01-product17,02-probe17,03-product18,04-probe18}`.
+The commands are `docker build --progress plain` with the native product context,
+then the separate probe context and `DARMOK_PRODUCT_IMAGE` set to the built
+product. PG17 uses explicitly pinned
+`postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24`;
+PG18 uses the Dockerfile's pinned
+`postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873`.
+Exact argv, timestamps, source-before/after and raw streams are in each receipt.
+
+| Major | Product image SHA256 | Probe image SHA256 |
+| --- | --- | --- |
+| 17 | `cd31229e9bebceb39293e7b2dc242f6a9b2980fa229b1f133b96a104b5aa6d73` | `56ee9c2d19a76521b7bbd99b715fd05711cf8d7d55ee4fe50867481338ba64fa` |
+| 18 | `5e294e3e3b1910ad3ff7d53c6837d6ca6577ae2b6c6becdf2b28d6ed83630c2f` | `53a57b59e12a6dd18117eaf0cf42ab8cc5adebd77d0b72d9709386832d93a051` |
+
+All 20 native Docker inputs (14 product, six probe), including the installed
+README DOCS input, remain byte-identical at tested264. Product images contain
+the three module bitcode objects/index and installed headers, with no probe;
+test images add two probe bitcode objects/index and the probe library. Saved
+installed source/header/library hashes bind each running profile to its image.
+The input-binding receipt `589ad10-07-input-bind` is actual0; its facts SHA256 is
+`f4c0daff7dc1bbe373504e67f686d4d17ab5212218ad71e28c020e66503d7bfd`.
+Subsequent changes to264 affect only Rust fixture/registration inputs.
+
+Eight new profiles `darmok-heap-storage-{17|18}-aacfe42-{primary|no2pc|unpreloaded|ordered}-v1`
+remain running/healthy at host ports32847–32854. Primary/ordered profiles use
+native `max_prepared_transactions=10`; the zero-setting profile is only a required
+negative dependency. Concurrent native two-phase transactions remain supported,
+with no serving requirement to disable them. Setup facts under
+`.darmok-work/logs/native-heap-storage-aacfe42-profile-v1-actions` have SHA256
+`29ae45b808549ac958c606dc7d497bc59c83c612d8d33c3c72c6d620a1afc419`;
+all120 nested actions are actual0. No existing native profile was interrupted.
+
+Candidate264 commands are serialized through the scoped Rustup/shared target
+recorder. Native environment variables select the four explicit dependencies
+per major; disposable test URLs and exact argv are captured in local receipts.
+Under `.darmok-work/logs/native-heap-storage-2640513-*`:
+
+| Receipts | Command | Result on each major |
+| --- | --- | --- |
+| `09-storage17`, `10-storage18` | `cargo test -p darmok-postgres-tests --test server_heap_storage --locked -- --nocapture --test-threads=1` | Six passed, zero failed/ignored |
+| `11-package17`, `12-package18` | `cargo test -p darmok-postgres-tests --locked -- --nocapture --test-threads=1`, with the recorded ordered-profile variable | 19 binaries, 143 passed, zero failed/ignored; includes the six new fixtures |
+| `13-owner17`, `14-owner18` | `cargo test -p darmok-execute --lib --locked native_backend::tests::native_catalog -- --ignored --nocapture --test-threads=1` | Three explicitly selected required groups passed, zero failed/ignored |
+| `15-format` | `cargo fmt --all --check` | Actual0 |
+| `16-boundaries` | `python3 scripts/check_repository.py` | Nine packages, actual0 |
+| `17-clippy` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Actual0 |
+| `18-connector-clippy` | `cargo clippy -p tokio-postgres --lib --locked -- -D warnings` | Actual0 |
+
+The six new groups cover literal UTF8/quoted/63-byte/duplicate roots and exact
+three-mode counts; release, native retention and child abort/promotion/commit/
+prepare; real mapped/local/shared/global and own TEMP identity; explicit foreign
+TEMP and unsupported-kind/AM errors with normal abort; prepared DROP/recreate
+commit and rollback while physical readers wait without module/catalog references;
+and ordinary live invalid/not-ready and ready/invalid concurrent index phases.
+First-unselected and established repeatable-read snapshot flags are checked.
+Native catalog/path/pg_locks observations are separate from pure consumer token
+flags. All cases use normal completion and cleanup, with no forced native-wait
+ERROR, stress, interruption or recovery claim. No current full workspace test run
+is claimed; earlier totals do not certify this leaf.
+
+Finite ordinary costs (`19-cost17`, `20-cost18`) use one TCP loopback psql
+connection,32 warmups and128 sequential calls, one heap/two indexes/declared
+TOAST/index (five nodes), three duplicate-mode roots and13 exact references.
+Every call includes both full three-heap observations, graph comparison, SI/
+descriptor/native owner/lock work and pure JSON copying. PG17 p50/p95/max are
+327500/638000/3223000ns; PG18 315000/398000/511000ns. Printed psql quantization is
+1us and only the final copied status is inspected. No isolated C timing,
+allocation count, comparative baseline, throughput/contention or full cache/
+executor/performance acceptance is inferred.
+
+The final `21-environment` audit is actual0, with77 nested actual0 commands;
+facts SHA256 is `e20a6475f5ab67a00a5eae0a0f52835ba17fe804b0f1cc9ac7472edf6acc1314`.
+It binds all20 native inputs and eight profile/image/installed identities, pinned
+native versions, host/Rust/Cargo versions and zero checked prepared/module/mock
+references and named new/old fixtures. The author fresh source pass and actual0
+`22-author-audit` bind1178 sealed files; facts SHA256
+`9d2caefcb37ffffd37814685fe279feec05c0788ca36a85b4728b9c6ff5c56ac`,
+seal `737ac45a55ad41ae9084302494ad768e1a8643728a06ab817a5341250f3410c2`.
+Source/path reader mistakes and a truncated inspection remain bookkeeping
+failures/limits, distinct from recorded native checks.
+
+Independent implementation acceptance under
+`.darmok-work/logs/review-native-heap-storage-2640513-implementation-v1` has no
+open finite-component finding. Report SHA256 is
+`8aec8a8ab1c4892d009c42ca5e53262667ec45639c780435e70e57a699f5f645`,
+facts `dd0c4572dcd02038c0225608fbbd7d2cf970d0d0573acffab796517da92852b5`,
+1352-member seal `ce951de38e3cce6e123a7db56257a1d81aa6727f9b4612d1c7a8b37e1f9a229a`,
+actually executed final invocation
+`901fe2bb68795c5742b7187a369bdb87c7d5686e17bea7a3c24c980e18d6d657`
+and independent post-rehash invocation
+`a94252170f69d49484a834de17180996524dd4bb8ac30ee60065c79bd856169f`,
+both actual0. It verifies22 nonoverlapping recorded results (20 actual0 plus
+the original build1/fixture101), all1178 author members, the209-member design
+seal,20 exact Git/native inputs,120 setup/77 environment actions and raw paired
+six/143/three counts. Its45 pre-final passive commands contain43 actual0 and two
+preserved schema-assumption actual1 results; all21 Git commands are actual0.
+The separate pre-write quoting builder1 and partial recorder1 remain preserved;
+no unrecorded child exit is fabricated. End and post source checks are actual0,
+and live reads were explicitly released before this status update.
+
+Root `23-review-rehash` is actual0 and rehashes all1352 members plus separate
+final/post invocations, streams, helpers and source checks. The root rehash
+record SHA256 is `1a876f82bd55071e0876454fe260b49edba784861cd8df098320b0a426f78873`.
+The following final leaf changes only this ledger and the unpackaged storage
+contract. All executable/test/dependency entries and all20 native inputs,
+including the packaged README, must remain identical, with historical edited
+doc bytes witnessed from pinned Git rather than substituted from advancing
+working paths. Separate independent documentation acceptance is required
+before normal squash merge. No new binary/image/runtime result follows from
+the status edit.
+
+Full type/default/check/rule/trigger/domain/FK/partition/function/operator/
+collation/provider and negative/overload candidate closure, data-derived TOAST/
+rewrite opens, invocation effects, immutable IR, snapshot-neutral native
+Parse/Bind/Describe/reanalysis, table/data execution, MySQL row/current-read/
+savepoint lock equivalence, serving, driver/cache/throughput/artifact and release
+gates remain open. Issues46/15 and the overall goal remain active. Standing
+security/compiler-PR4/hosted-CI/stress/profile-interruption/account/admin/release-
+publication exclusions remain unchanged.
