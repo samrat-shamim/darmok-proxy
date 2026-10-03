@@ -2415,3 +2415,63 @@ CI and release gates remain open. Issues46/15 and the goal remain active.
 Security, compiler PR4/resources, stress/forced interruption, native-profile
 restart/stop/signal, remote CI/account work and release publication remain
 excluded.
+
+### Native interlock merged; physical reference owner selected
+
+PR [#51](https://github.com/samrat-shamim/darmok-proxy/pull/51) was normally
+squash-merged from reviewed documentation leaf
+`daeb0820cca1d3e8806a75a000c91e14de7e478d` to
+`7e0d3da410f32c87e83c5d929b925bef2e62f03f`, with matching reviewed tree
+`5bf624434793bfb7525fcfcdeb1321cc85cebcbe`. All 329 other entries and all 15
+native inputs equal the tested `22ce51b` revision. No in-scope PR remained open
+at the publication audit. Issue46 remains open with an updated dependency and
+neutral-admission gate; issue15 remains the separate MySQL data/lock gate.
+
+The independent final-leaf review has report SHA256
+`265857cd54e453cd3e21561a761cc0dff4eea9e235c6160b0b1e767cc34acf2d`,
+68-file seal `8d1d77b089373844b17ccc3c0572841e339fca43105368ce969823640ec88071`,
+and separate actual-0 invocation
+`051d8352612c1011b799698d49b44e1e31ea542681b9a09eaa4aa5f2dde7db34`.
+An additive correction records 330 unchanged entries for the earlier two-file
+implementation delta; the original report's 331-entry typo remains preserved.
+Root's final-leaf audit is actual0 with a 46-file seal
+`17ed26c7eedc98b83be2a5358f22b4e834ec737bd5d10d4b6d95a66080e702d0`.
+The normal merge receipt `native-statement-guards-daeb082-26-merge` is actual0;
+the publication audit is actual0 with 13-file seal
+`c74dbd34f8e972f05d29cb2df4868f125822c9adf7e7774268752cf65d13f071`.
+It verifies personal/public ownership, the corrected repository description,
+exact merged tree and filtered in-scope PR state without hosted CI/account
+actions. Earlier helper/navigation failures remain immutable.
+
+The next [private relation-reference owner](native-relation-guards.md) is
+drafted from clean merged main. Its external V4 proposal has SHA256
+`6b2cd3718114a51bfe57a2d5ebcbe53812b4fe2a4d6ea0fbed5b89b497f50395`.
+It preserves ordered explicit OID/mode requests, exact native increments and
+CurTransactionResourceOwner ownership; release removes only attempt increments
+and retain leaves native transaction cleanup responsible. A native acquisition
+ERROR requires matching native abort before component reuse. Failed-child veto
+belongs at PRE_COMMIT_SUB, successful promotion at COMMIT_SUB. Exact local
+cache clearing, complete closure and immutable execution remain separate gates.
+
+Conditional independent proposal review under
+`.darmok-work/logs/review-native-physical-attempt-7e0d3da-v1` accepts only that
+finite design: report SHA256
+`52d94ce5f8ccf047688de929ef0075732b90b8c9c4a1dab7c58ece01eaf8489c`,
+222-file seal `c94d2bdaae148e7baf3296a3eb4974fd151224d1cd2e6ddf8b39a56ff7fc6231`,
+separate actual-0 final invocation
+`f54971393b04a28b81bf1cf65a00c3e567ae7e7b0a547678d3fa27bfccd68e62`.
+Its 69 passive readers include 64 actual0 and five preserved navigation failures;
+a first finalizer schema failure is preserved before a corrected new helper.
+The new paired native shared-tag primary-source capture has nine-file seal
+`dfa2790e93b2828aa1605e74d7a1e430fc4fdf94acb155c19154d05e05748ec6`,
+with actual-0 outer `native-physical-guards-7e0d3da-01-shared-tag-source`.
+These are source/design results, not compilation or runtime acceptance.
+
+Physical references must precede semantic Share, and semantic/raw exclusion
+must end before tuple/MultiXact/XID execution waits. Static ordinary mixed
+DML/DDL source ordering rejects keeping semantic S through row execution;
+no hanging or forced-error experiment ran. Native 2PC remains enabled.
+Fresh product/probe images and ordinary PG17/18 fixtures are required because
+native inputs now change. Earlier profiles cannot certify this draft.
+All broader closure/preparation/execution/release gates and standing exclusions
+remain open; the goal remains active.

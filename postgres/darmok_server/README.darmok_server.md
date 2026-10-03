@@ -27,11 +27,18 @@ Prepared completion can delay catalog readers while native completion runs and
 advances the catalog generation even when no metadata changes.
 
 The private C statement interlock adds semantic reader/publisher modes and a
-compatible coverage marker in native prepared lock records. This mechanism is
-under current verification. It exposes no SQL lease or application statement
+compatible coverage marker in native prepared lock records. This mechanism has
+finite local PG17/18 verification. It exposes no SQL lease or application statement
 path; full physical/candidate closure and preparation remain separate gates.
 Its installed C header is internal and has no stable public ABI promise. See
 [`docs/native-statement-guards.md`](../../docs/native-statement-guards.md).
+
+The private C relation-reference attempt preserves ordered explicit OID/mode
+increments under the native transaction owner. It releases only its own
+increments or retains them for native transaction cleanup, including prepare.
+Its implementation is under verification. It does not open descriptors,
+dispatch invalidations or prove complete dependency closure. See
+[`docs/native-relation-guards.md`](../../docs/native-relation-guards.md).
 
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
 separate `darmok` namespace contains SQL compatibility functions. Current
@@ -92,3 +99,5 @@ native 2PC enabled. `DARMOK_TEST_ORDERED_TWO_PHASE_DATABASE_URL` selects that
 server. The ordered callback removes coverage solely in synthetic lock
 representation fixtures; it is not a production configuration or recovery test.
 Run `--test server_statement_guards` with the same primary environment.
+Run `--test server_relation_guards` on that primary for physical reference
+ownership and prepared-completion fixtures.
