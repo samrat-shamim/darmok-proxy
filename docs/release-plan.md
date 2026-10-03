@@ -2100,3 +2100,34 @@ MySQL data/current-read and lock policy, table execution, serving, real drivers,
 cache/performance/artifact checks, hosted CI and release gates remain open.
 The goal remains active; security work, compiler PR #4, stress/forced interruption,
 remote CI/account actions and release publication remain excluded.
+
+
+### Publication gate repair after PR #48
+
+[PR #48](https://github.com/samrat-shamim/darmok-proxy/pull/48) was normally
+squash-merged as `3cc6d528aa8d0943859862c5c00352a78b496503`, exact tree
+`f9052783ef7fd90bd36c8e321cc08a4e1842e691`. Its publication audit has actual exit 0,
+1726-file manifest SHA256
+`cc11d31e8944edafbc283e6e4dc22c47a75290be5433a48e393faaeccc6c544e`, and facts
+SHA256 `14a7a6dc70f0a53c1734283f62bb03ea6b8ba6aaed04548ceae6d60ce05c866a`.
+It verified the public personal repository and exact reviewed leaf; hosted CI,
+account/admin changes and release publication were not performed.
+
+Subsequent pinned-source review found the late native ON COMMIT catalog cycle
+tracked in [#49](https://github.com/samrat-shamim/darmok-proxy/issues/49). The old
+publication evidence does not certify this case. PRE_COMMIT precedes indexed
+TEMP ON COMMIT DELETE ROWS catalog waits on both supported majors; a prepared
+catalog lock holder could need the global fence retained by that publisher.
+Earlier native Parse/Bind history also means a prepared finisher can have its
+own late temporary cleanup. No baseline hanging reproduction was performed.
+
+The repair separates a retained ordinary publication gate from a short global
+drain, gates both discovery phases, and releases prepared completion's global
+reference at native utility return or ordinary ERROR before the caller cleanup.
+The source contract is updated; fresh changed-source native tests, exact new
+artifacts, bounded cost measurement, self review and independent review remain
+required. Concurrent native 2PC remains required and enabled. This does not close
+#46, snapshot-neutral preparation, dependency guards, semantic admission, MySQL
+read views/locks, table execution, driver/cache/performance/artifact or release
+gates. Security, compiler PR #4, stress/forced interruption, hosted CI/account
+work and release publication remain excluded.

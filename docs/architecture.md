@@ -162,7 +162,11 @@ generation/publication and [one-shot discovery](catalog-discovery.md) through
 the exclusive native owner. It uses a separate `darmok_server` namespace
 for native mechanisms and keeps SQL compatibility functions in `darmok`.
 The primary-server target supports concurrent native two-phase transactions.
-Discovery uses short internal Share spans and ends them before cleanup/output;
+Ordinary publication retains a distinct gate through native invalidation cleanup,
+with a short global drain before late ON COMMIT work. Prepared completion uses
+only global Exclusive and releases it at native utility return or ERROR before
+the caller's own cleanup. Discovery acquires gate Share before global Share in
+both internal spans and ends them before cleanup/output;
 returned facts and stamps are historical observations, without execution leases.
 Snapshot neutrality depends on its continuous private-owner backend profile.
 Complete native dependency guards must be acquired outside Share, rechecked

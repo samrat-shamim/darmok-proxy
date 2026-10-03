@@ -40,6 +40,7 @@ PGDLLEXPORT void _PG_init(void);
 /* OID zero cannot name an extension. The default lock method is deliberately
  * distinct from user advisory locks. Database zero makes this cluster-wide. */
 #define DARMOK_LOCK_SUBID 0x444d
+#define DARMOK_PUBLICATION_SUBID 0x444e
 #define DARMOK_CLUSTER_ID_BYTES 16
 
 typedef struct DarmokShared
@@ -57,11 +58,13 @@ static uint64 local_generation = 1;
 static bool broken = false;
 /* These flags belong only to one utility invocation, never a frontend handle. */
 static bool reader_active = false;
+static bool reader_gate_held = false;
 static bool reader_fence_held = false;
 static ResourceOwner reader_owner = NULL;
-static bool writer_transaction_lock = false;
-static SubTransactionId writer_subid = InvalidSubTransactionId;
-static ResourceOwner writer_owner = NULL;
+static bool publication_gate_held = false;
+static SubTransactionId publication_subid = InvalidSubTransactionId;
+static ResourceOwner publication_owner = NULL;
+static bool completion_fence_held = false;
 static int writer_depth = 0;
 static bool preparing_transaction = false;
 static bool pre_commit_started = false;
@@ -82,6 +85,16 @@ catalog_tag(void)
 
 	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
 					   DARMOK_LOCK_SUBID);
+	return tag;
+}
+
+static LOCKTAG
+publication_tag(void)
+{
+	LOCKTAG tag;
+
+	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
+					   DARMOK_PUBLICATION_SUBID);
 	return tag;
 }
 
@@ -184,19 +197,43 @@ clear_shared_drop_intent(int code, Datum arg)
 	}
 }
 
+/* Ordinary publishers retain reader exclusion, not the global fence, during
+ * native ON COMMIT work. A prepared transaction must be able to finish while
+ * that work waits for one of its catalog locks. */
 static void
-take_writer_transaction_lock(void)
+take_publication_gate(void)
 {
-	if (!writer_transaction_lock)
+	if (!publication_gate_held)
 	{
-		LOCKTAG tag = catalog_tag();
+		LOCKTAG tag = publication_tag();
 
-		transaction_lock_acquire(&tag, ExclusiveLock,
+		transaction_lock_acquire(&tag, RowExclusiveLock,
 								 CurTransactionResourceOwner);
-		writer_transaction_lock = true;
-		writer_subid = GetCurrentSubTransactionId();
-		writer_owner = CurTransactionResourceOwner;
+		publication_gate_held = true;
+		publication_subid = GetCurrentSubTransactionId();
+		publication_owner = CurTransactionResourceOwner;
 	}
+}
+
+static void
+drain_catalog_readers(void)
+{
+	LOCKTAG tag = catalog_tag();
+	ResourceOwner owner = CurTransactionResourceOwner;
+	volatile bool acquired = false;
+
+	PG_TRY();
+	{
+		transaction_lock_acquire(&tag, ExclusiveLock, owner);
+		acquired = true;
+		(void) advance_shared(&shared->generation);
+	}
+	PG_FINALLY();
+	{
+		if (acquired)
+			transaction_unlock(&tag, ExclusiveLock, owner);
+	}
+	PG_END_TRY();
 }
 
 static void
@@ -231,29 +268,27 @@ static void
 publish_catalog_change(void)
 {
 	require_ready();
-	if (reader_active)
+	if (reader_active || completion_fence_held)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("metadata cannot publish during catalog discovery")));
+				 errmsg("unsafe catalog publication boundary")));
 	if (preparing_transaction)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("nontransactional catalog publication cannot be prepared")));
-	if (!writer_transaction_lock)
+	if (!publication_gate_held)
 	{
-		take_writer_transaction_lock();
-		(void) advance_shared(&shared->generation);
+		take_publication_gate();
+		drain_catalog_readers();
 	}
 }
 
 static void
 begin_shared_drop_publication(void)
 {
-	LOCKTAG tag = catalog_tag();
-
 	require_ready();
 	if (reader_active || preparing_transaction || pre_commit_started ||
-		proc_exit_inprogress || writer_transaction_lock)
+		proc_exit_inprogress || publication_gate_held || completion_fence_held)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("unsafe shared-drop catalog publication boundary")));
@@ -273,10 +308,7 @@ begin_shared_drop_publication(void)
 		 * owns reader exclusion until transaction end; pre-commit takes the
 		 * ordinary publication lock independently. One intent per transaction
 		 * preserves its earliest subtransaction owner across nested drops. */
-		transaction_lock_acquire(&tag, ExclusiveLock,
-								 CurTransactionResourceOwner);
-		(void) advance_shared(&shared->generation);
-		transaction_unlock(&tag, ExclusiveLock, CurTransactionResourceOwner);
+		drain_catalog_readers();
 	}
 }
 
@@ -320,6 +352,10 @@ transaction_event(XactEvent event, void *arg)
 			/* A concurrently built index has several transactions. Fence every
 			 * publication, not the waits between phases: holding a session fence
 			 * there would deadlock readers with WaitForOlderSnapshots(). */
+			if (completion_fence_held)
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("native cleanup cannot retain a prepared completion fence")));
 			pre_commit_started = true;
 			if (shared_drop_pending || has_catalog_publication())
 			{
@@ -333,21 +369,21 @@ transaction_event(XactEvent event, void *arg)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("shared-drop catalog publication cannot be prepared")));
-			if (reader_active)
+			if (reader_active || completion_fence_held)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("a transaction cannot prepare during catalog discovery")));
+						 errmsg("unsafe catalog coordination boundary for prepare")));
 			preparing_transaction = true;
 			/* Private metadata is not published by PREPARE. Never transfer our
-			 * global publication fence into native two-phase lock records. */
-			if (writer_transaction_lock)
+			 * publication gate into native two-phase lock records. */
+			if (publication_gate_held)
 			{
-				LOCKTAG tag = catalog_tag();
+				LOCKTAG tag = publication_tag();
 
-				transaction_unlock(&tag, ExclusiveLock, writer_owner);
-				writer_transaction_lock = false;
-				writer_owner = NULL;
-				writer_subid = InvalidSubTransactionId;
+				transaction_unlock(&tag, RowExclusiveLock, publication_owner);
+				publication_gate_held = false;
+				publication_owner = NULL;
+				publication_subid = InvalidSubTransactionId;
 			}
 			break;
 		case XACT_EVENT_COMMIT:
@@ -363,11 +399,15 @@ transaction_event(XactEvent event, void *arg)
 				last_metadata_subid != InvalidSubTransactionId)
 				advance_local();
 			reader_active = false;
+			reader_gate_held = false;
 			reader_fence_held = false;
 			reader_owner = NULL;
-			writer_transaction_lock = false;
-			writer_owner = NULL;
-			writer_subid = InvalidSubTransactionId;
+			/* Native lock cleanup releases the publication gate AFTER catalog
+			 * invalidations. Do not release its actual reference here. */
+			publication_gate_held = false;
+			publication_owner = NULL;
+			publication_subid = InvalidSubTransactionId;
+			completion_fence_held = false;
 			preparing_transaction = false;
 			pre_commit_started = false;
 			last_metadata_subid = InvalidSubTransactionId;
@@ -388,10 +428,10 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 			shared_drop_subid = parent;
 		if (last_metadata_subid == subid)
 			last_metadata_subid = parent;
-		if (writer_transaction_lock && writer_subid == subid)
+		if (publication_gate_held && publication_subid == subid)
 		{
-			writer_subid = parent;
-			writer_owner = ResourceOwnerGetParent(writer_owner);
+			publication_subid = parent;
+			publication_owner = ResourceOwnerGetParent(publication_owner);
 		}
 	}
 	else if (event == SUBXACT_EVENT_ABORT_SUB)
@@ -403,10 +443,11 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 			last_metadata_subid = parent;
 			advance_local();
 		}
-		if (writer_transaction_lock && writer_subid == subid)
+		if (publication_gate_held && publication_subid == subid)
 		{
-			writer_transaction_lock = false;
-			writer_owner = NULL;
+			publication_gate_held = false;
+			publication_owner = NULL;
+			publication_subid = InvalidSubTransactionId;
 		}
 	}
 }
@@ -453,6 +494,8 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	bool finishing = IsA(pstmt->utilityStmt, TransactionStmt) &&
 		(((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_COMMIT_PREPARED ||
 		 ((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_ROLLBACK_PREPARED);
+	ResourceOwner completion_owner = CurTransactionResourceOwner;
+	volatile bool completion_acquired = false;
 
 	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
 		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
@@ -476,11 +519,21 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	{
 		if (finishing)
 		{
+			LOCKTAG tag = catalog_tag();
+
+			if (reader_active || publication_gate_held || completion_fence_held ||
+				preparing_transaction || pre_commit_started || shared_drop_pending)
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("unsafe prepared completion catalog boundary")));
 			/* Classifying a prepared target through SQL can wait on catalog
 			 * locks retained by that same target. Fence every completion instead;
 			 * native core alone resolves the exact GID and checks its state. */
 			note_metadata_attempt();
-			publish_catalog_change();
+			transaction_lock_acquire(&tag, ExclusiveLock, completion_owner);
+			completion_acquired = true;
+			completion_fence_held = true;
+			(void) advance_shared(&shared->generation);
 		}
 		if (previous_utility)
 			previous_utility(pstmt, query, read_only_tree, context, params,
@@ -502,6 +555,17 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 	{
 		if (writer)
 			writer_depth--;
+		if (completion_acquired)
+		{
+			LOCKTAG tag = catalog_tag();
+
+			/* Native FinishPreparedTransaction sends saved invalidations and
+			 * releases the target before returning. The caller may have prior
+			 * Parse/Bind temp history: its own late cleanup must run WITHOUT
+			 * this fence, using ordinary gate-first publication if necessary. */
+			completion_fence_held = false;
+			transaction_unlock(&tag, ExclusiveLock, completion_owner);
+		}
 	}
 	PG_END_TRY();
 	if (writer)
@@ -553,7 +617,8 @@ void
 darmok_catalog_reader_start(void)
 {
 	require_ready();
-	if (reader_active || writer_depth > 0 || writer_transaction_lock ||
+	if (reader_active || writer_depth > 0 || publication_gate_held ||
+		completion_fence_held ||
 		preparing_transaction || pre_commit_started || shared_drop_pending ||
 		HistoricSnapshotActive() || IsParallelWorker() || IsInParallelMode() ||
 		ParallelContextActive())
@@ -570,8 +635,9 @@ void
 darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 {
 	LOCKTAG tag = catalog_tag();
+	LOCKTAG gate = publication_tag();
 
-	Assert(reader_active && !reader_fence_held);
+	Assert(reader_active && !reader_gate_held && !reader_fence_held);
 	require_ready();
 	/* Shared drops close admission through their native lifecycle. No catalog
 	 * work occurs while waiting or while this raw observation fence is held. */
@@ -588,6 +654,11 @@ darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 			ConditionVariableCancelSleep();
 		}
 		PG_END_TRY();
+		/* Gate-first acquisition excludes unfinished ordinary publications.
+		 * Prepared completion uses only global Exclusive, so it can release
+		 * native locks needed by a publisher's late ON COMMIT cleanup. */
+		transaction_lock_acquire(&gate, ShareLock, reader_owner);
+		reader_gate_held = true;
 		transaction_lock_acquire(&tag, ShareLock, reader_owner);
 		reader_fence_held = true;
 		if (pg_atomic_read_u32(&shared->pending_shared_drops) == 0)
@@ -604,13 +675,27 @@ darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 void
 darmok_catalog_fence_release(void)
 {
-	if (reader_fence_held)
+	PG_TRY();
 	{
-		LOCKTAG tag = catalog_tag();
+		if (reader_fence_held)
+		{
+			LOCKTAG tag = catalog_tag();
 
-		transaction_unlock(&tag, ShareLock, reader_owner);
-		reader_fence_held = false;
+			reader_fence_held = false;
+			transaction_unlock(&tag, ShareLock, reader_owner);
+		}
 	}
+	PG_FINALLY();
+	{
+		if (reader_gate_held)
+		{
+			LOCKTAG gate = publication_tag();
+
+			reader_gate_held = false;
+			transaction_unlock(&gate, ShareLock, reader_owner);
+		}
+	}
+	PG_END_TRY();
 }
 
 bool
