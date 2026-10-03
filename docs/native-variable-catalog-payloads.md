@@ -1,8 +1,10 @@
 # Private variable catalog payloads
 
-Status: specification for the next implementation of the private
+Status: the private C implementation and bounded ordinary fixtures are present;
+paired product/probe builds, required runtime suites and independent implementation
+review are pending. This is the contract for the private
 [heap-storage invocation](native-heap-storage.md). Source bodies have been
-checked for PostgreSQL 17.11/18.6; no implementation, build, runtime or
+checked for PostgreSQL 17.11/18.6; no implementation, package, runtime or
 performance acceptance is claimed here. This work extends
 [missing-value images](native-missing-values.md). It keeps concurrent native
 PostgreSQL two-phase transactions supported.

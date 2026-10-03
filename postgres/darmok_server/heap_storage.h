@@ -181,7 +181,7 @@ typedef struct DarmokHeapObservationCost
 	uint64 attrdef_rows;
 	Size missing_carrier_bytes;
 	Size payload_carrier_bytes;
-	Size requested_image_bytes;
+	Size requested_copy_bytes;
 	Size allocated_bytes;
 } DarmokHeapObservationCost;
 

@@ -12,6 +12,11 @@ within that finite profile. See
 remain open. Concurrent native PostgreSQL two-phase transactions
 remain supported; disabling them is not a serving requirement.
 
+The current variable-payload implementation is awaiting paired package/runtime
+verification and independent review. Historical acceptance above does not certify
+this changed native code. Its full source/carrier and pre-open descriptor contract
+is [native-variable-catalog-payloads.md](native-variable-catalog-payloads.md).
+
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
@@ -20,15 +25,19 @@ each exact OID/mode reference is acquired once. Ordinary nonpartitioned builtin
 heaps and builtin btree live indexes are accepted; other kinds/AMs fail explicitly.
 Traditional inheritance hints are visible but do not imply child expansion.
 
-The storage component copies fixed fields from preopened builtin pg_namespace,
-pg_class and pg_index heaps. The fixed column/type extension adds pg_attribute
-and pg_type, with exact-root/live-type filtered copies in the same observation. It includes every live index, even invalid/not-ready ones,
+The storage component copies fixed fields and selected raw carriers from six
+preopened builtin heaps: pg_namespace, pg_class, pg_index, pg_attribute, pg_type
+and pg_attrdef. Exact-root/live-type filtering does not expand the application
+column set to include metadata storage nodes. It includes every live index, even invalid/not-ready ones,
 and the declared TOAST heap and all its live indexes. Conservative relhasindex
 does not suppress edges. Roots, then their index siblings in OID order, then
 TOAST heaps and their index siblings produce deterministic parent-first native
 declarations. Root index modes follow the root. Declared TOAST receives AS for
 reads and separate AS plus RX for write-capable roots; stronger modes do not
-replace exact native counts. Missing/duplicate/cyclic/inconsistent edges fail.
+replace exact native counts. Catalog graphs require AS and share exact references
+with overlapping application roots. Per-root application/catalog use records
+preserve provenance; duplicate physical nodes union modes. Missing, cyclic or
+contradictory parent edges fail.
 
 Actual namespace/temp-toast identities and the native backend are checked;
 foreign TEMP is rejected. Native hard-coded shared tags must match copied
@@ -52,8 +61,16 @@ Initial scans/snapshot/descriptor increments close before complete physical
 acquisition. Globally current SI, installation checks, final fact descriptors
 and mapping resolution occur after physical acquisition and before semantic S,
 under common native refresh reentry exclusion. S then owns the metadata point.
-A second fixed observation checks publication/private/context identity, exact
-literal bindings and all defining graph fields. Unexplained same-identity
+A middle coherent observation supplies source carriers while retaining its
+registered catalog snapshot through external assembly and inline normalization
+outside raw/S. Fresh pre-open metadata-TOAST/critical-index descriptor profiles
+must agree with the initial observation. All required relation tags are already
+owned before this snapshot; selected descriptor opens use NoLock and may not
+wait for another conflicting relation tag. Reader cleanup closes this horizon
+and descriptor increments, and invalidates the ephemeral catalog snapshot
+before final preparation or any later wait. A final coherent observation under
+S checks publication/private/context identity, exact literal bindings, carrier
+presence/bytes and all defining graph fields. Unexplained same-identity
 definition changes fail loudly; statistical/conservative hints are excluded
 from definition equality. No descriptor reload or provider lookup occurs under S.
 
@@ -74,9 +91,11 @@ owning subid as abort-required, and never guesses a partial native grant.
 Matching native abort is required before reuse/commit/prepare. Native promotion,
 child abort and retention remain governed by the reviewed reference primitive.
 
-The accepted original component performed two full three-heap observations;
-the current fixed column/type extension performs five full heap scans in each
-observation, with separately scoped selected-copy/context costs. Original
+The accepted original component performed two full three-heap observations and
+the fixed column/type extension performed two five-heap observations. The current
+variable-payload implementation requires three six-heap observations and one
+direct scan per selected metadata TOAST heap. It reports all three selected-copy/
+context costs and the additional raw, normalized and heap/chunk costs. Original
 namespace/class/index maps remain O(catalog-size) copying, O(V+E) graph traversal, sorting for deterministic roots/index siblings
 and O(D log D) exact-declaration validation, plus D native increments and SI/
 descriptor/owner costs. Unrelated publications can cause false retries. Root

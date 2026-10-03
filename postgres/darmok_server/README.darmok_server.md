@@ -120,19 +120,32 @@ pure consumer contract are required. See
 contract and the separately recorded implementation verification status.
 
 The same private invocation adds positive column slots and directly referenced
-fixed type declarations, filtered by exact root and live-type OIDs within one
-catalog snapshot/raw span. Both observations scan five catalogs in full. Dropped
+fixed type declarations, filtered by exact root and live-type OIDs. A successful
+attempt makes three coherent observations of six builtin catalogs. Dropped
 slots retain layout/type0; only live length/by-value/alignment redundancy is
 cross-checked. Column storage/compression, typmods, dimensions, collation and
 NOT NULL remain independent declarations. Type/default/generation OID edges and
-flags are descriptive. The invocation also copies selected inline missing-value
-carriers, normalizes their opaque native singleton array images before physical
-waits, and requires exact carrier equality in its final observation. A stored
-image does not replace a physically present NULL or admit element decoding,
-external TOAST fetch, provider invocation, TupleDesc/TypeCache construction or
-frontend column flags. Scan counts, fixed and missing record-array bytes,
-stored/normalized image bytes and observation context allocation are reported
-separately to the private consumer. See
+flags are descriptive. The combined physical attempt also owns catalog heaps,
+live indexes and declared TOAST storage, deduplicating each exact OID/mode while
+retaining application/catalog use provenance.
+
+Selected column default/generation expressions and direct type defaults become
+opaque owned native varlena images. Absence and present empty values are distinct.
+The middle observation keeps its registered catalog snapshot alive while
+admitted builtin TOAST heaps are scanned directly outside raw/semantic exclusion;
+the final observation requires the exact source carriers and defining facts to
+agree. Missing singleton arrays normalize in that same middle phase. Images do
+not evaluate expressions, admit providers/element decoding, replace a physically
+present NULL or establish frontend column flags. The metadata-TOAST descriptor
+path requires the continuous builtin bootstrap profile, freshly checked NULL
+options and initialized native critical catalog indexes before opening targets.
+
+All three scan costs, raw/normalized bytes, cumulative requested copy bytes,
+context allocation and TOAST heap/chunk counts are reported to the private
+consumer. Direct TOAST scans include unrelated values; these figures are not
+allocation-event counts or full performance acceptance. See
 [`docs/native-attribute-type-facts.md`](../../docs/native-attribute-type-facts.md)
-and [`docs/native-missing-values.md`](../../docs/native-missing-values.md) for the
-finite contracts, separately recorded verification status and remaining gates.
+and [`docs/native-variable-catalog-payloads.md`](../../docs/native-variable-catalog-payloads.md)
+for the finite contracts, separately recorded verification status and remaining
+gates. Changed native code requires current paired PostgreSQL 17/18 product/probe
+builds, required suites and independent implementation review.

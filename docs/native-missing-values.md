@@ -7,6 +7,12 @@ the finite
 private heap-storage invocation. It does not admit a TupleDesc, a type codec,
 SQL, an executor, default evaluation or a frontend metadata handle.
 
+The two-observation protocol and acceptance records below describe that earlier
+finite component. The current C invocation follows the three-observation
+[variable catalog payload contract](native-variable-catalog-payloads.md), with
+missing-array normalization in its snapshot-preserving middle phase. Paired
+verification and independent acceptance of that changed code remain pending.
+
 ## Problem and chosen boundary
 
 `atthasmissing` is a declaration, not the missing value. PostgreSQL can add a

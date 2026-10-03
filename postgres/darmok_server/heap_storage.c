@@ -1718,7 +1718,7 @@ storage_fetch_payloads(StorageState *state)
 {
 	StorageObservation *observation = &state->source;
 	bool selected[STORAGE_TOAST_HEAPS] = {false};
-	Relation heaps[STORAGE_TOAST_HEAPS];
+	Relation heaps[STORAGE_TOAST_HEAPS] = {NULL};
 	int heap_count = 0;
 
 	storage_fetch_context(state);
@@ -1737,56 +1737,59 @@ storage_fetch_payloads(StorageState *state)
 	 * compared before any selected TOAST descriptor path. Native startup and
 	 * continuous builtin support history remain explicit source preconditions. */
 	storage_validate_profiles(observation);
-	darmok_native_refresh_start();
-	PG_TRY();
+	if (selected[0] || selected[1])
 	{
-		AcceptInvalidationMessages();
-		if (!criticalRelcachesBuilt)
-			elog(ERROR, "native critical relcache prerequisite changed before catalog payload fetch");
-		for (int i = 0; i < STORAGE_CRITICAL_INDEXES; i++)
+		darmok_native_refresh_start();
+		PG_TRY();
 		{
-			Relation index;
-
-			observation->critical_indexes[i] = relation_open(critical_index_oids[i], NoLock);
-			index = observation->critical_indexes[i];
-			if (!index->rd_isnailed || !index->rd_isvalid || index->rd_indam == NULL ||
-				index->rd_rel->relam != BTREE_AM_OID || index->rd_options != NULL)
-				elog(ERROR, "native critical index postcheck contradicts its initialized builtin profile");
-		}
-		for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
-			if (selected[i])
+			AcceptInvalidationMessages();
+			if (!criticalRelcachesBuilt)
+				elog(ERROR, "native critical relcache prerequisite changed before catalog payload fetch");
+			for (int i = 0; i < STORAGE_CRITICAL_INDEXES; i++)
 			{
-				Relation heap;
-				TupleDesc descriptor;
+				Relation index;
 
-				/* No new conflicting relation tag is acquired while B is alive.
-				 * Nested native catalog/index opens use already-owned exact AS. */
-				observation->toast_heaps[i] = table_open(payload_toast_oids[i], NoLock);
-				heap = observation->toast_heaps[i];
-				descriptor = RelationGetDescr(heap);
-				if (heap->rd_tableam != GetHeapamTableAmRoutine() ||
-					heap->rd_rel->relkind != RELKIND_TOASTVALUE ||
-					OidIsValid(heap->rd_rel->reltoastrelid) || OidIsValid(heap->rd_rel->relrewrite) ||
-					heap->rd_options != NULL || descriptor->natts != 3)
-					elog(ERROR, "native catalog TOAST descriptor postcheck contradicts its admitted profile");
-				for (int number = 1; number <= 3; number++)
-				{
-					uint64 key = ((uint64) payload_toast_oids[i] << 32) | number;
-					StorageProfileAttribute *profile = hash_search(observation->profile_attributes, &key, HASH_FIND, NULL);
-					DarmokHeapAttributeFact actual;
-
-					storage_copy_attribute(&actual, TupleDescAttr(descriptor, number - 1));
-					if (profile == NULL || !storage_attribute_equal(&actual, &profile->fact))
-						elog(ERROR, "native catalog TOAST descriptor attributes contradict their admitted profile");
-				}
-				heaps[heap_count++] = heap;
+				observation->critical_indexes[i] = relation_open(critical_index_oids[i], NoLock);
+				index = observation->critical_indexes[i];
+				if (!index->rd_isnailed || !index->rd_isvalid || index->rd_indam == NULL ||
+					index->rd_rel->relam != BTREE_AM_OID || index->rd_options != NULL)
+					elog(ERROR, "native critical index postcheck contradicts its initialized builtin profile");
 			}
+			for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
+				if (selected[i])
+				{
+					Relation heap;
+					TupleDesc descriptor;
+
+					/* No new conflicting relation tag is acquired while B is alive.
+					 * Nested native catalog/index opens use already-owned exact AS. */
+					observation->toast_heaps[i] = table_open(payload_toast_oids[i], NoLock);
+					heap = observation->toast_heaps[i];
+					descriptor = RelationGetDescr(heap);
+					if (heap->rd_tableam != GetHeapamTableAmRoutine() ||
+						heap->rd_rel->relkind != RELKIND_TOASTVALUE ||
+						OidIsValid(heap->rd_rel->reltoastrelid) || OidIsValid(heap->rd_rel->relrewrite) ||
+						heap->rd_options != NULL || descriptor->natts != 3)
+						elog(ERROR, "native catalog TOAST descriptor postcheck contradicts its admitted profile");
+					for (int number = 1; number <= 3; number++)
+					{
+						uint64 key = ((uint64) payload_toast_oids[i] << 32) | number;
+						StorageProfileAttribute *profile = hash_search(observation->profile_attributes, &key, HASH_FIND, NULL);
+						DarmokHeapAttributeFact actual;
+
+						storage_copy_attribute(&actual, TupleDescAttr(descriptor, number - 1));
+						if (profile == NULL || !storage_attribute_equal(&actual, &profile->fact))
+							elog(ERROR, "native catalog TOAST descriptor attributes contradict their admitted profile");
+					}
+					heaps[heap_count++] = heap;
+				}
+		}
+		PG_FINALLY();
+		{
+			darmok_native_refresh_finish();
+		}
+		PG_END_TRY();
 	}
-	PG_FINALLY();
-	{
-		darmok_native_refresh_finish();
-	}
-	PG_END_TRY();
 	storage_fetch_context(state);
 	storage_normalize_missing(observation);
 	darmok_catalog_payload_images(&observation->image_budget, observation->payload_requests,
@@ -1899,9 +1902,9 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	a->cost.allocated_bytes = MemoryContextMemAllocated(a->context, true);
 	b->cost.allocated_bytes = MemoryContextMemAllocated(b->context, true);
 	c->cost.allocated_bytes = MemoryContextMemAllocated(c->context, true);
-	a->cost.requested_image_bytes = a->image_budget.requested_bytes;
-	b->cost.requested_image_bytes = b->image_budget.requested_bytes;
-	c->cost.requested_image_bytes = c->image_budget.requested_bytes;
+	a->cost.requested_copy_bytes = a->image_budget.requested_bytes;
+	b->cost.requested_copy_bytes = b->image_budget.requested_bytes;
+	c->cost.requested_copy_bytes = c->image_budget.requested_bytes;
 	view.initial_cost = a->cost;
 	view.source_cost = b->cost;
 	view.final_cost = c->cost;
