@@ -2757,3 +2757,55 @@ TOAST/storage/name/negative/overload closure, neutral preparation, callback/prov
 admission, Describe/materialization, immutable execution, MySQL data/lock behavior,
 serving, driver/cache/throughput/artifact and release gates remain open.
 Issues46/15 and the goal remain active. Standing exclusions are unchanged.
+
+### Native README correction and historical evidence
+
+The first documentation checkpoint is `12a92f17e18ea5602c1bf367f023ace4330c4d09`,
+tree `eef696e26abad45d709eaf11b642fc66d3e58c6c`, directly after tested `e829f507`.
+Its actual0 `25-documentation-leaf` proves two changed documents, 333 other
+identical Git entries and all 16 unchanged native inputs. The checkpoint's facts
+SHA256 is `92a7c304f7681750b388ccabebc97dbf7fb91a82671143cba44286360b6a9884`,
+43-file seal `46a98c2346f89dec1728023421171a80b17e6d5e2a19acc43acb6680bc569399`.
+That statement applies to this historical checkpoint, not the later README edit.
+
+Independent full evidence review under
+`.darmok-work/logs/review-native-cache-clearing-12a92f1-final-v1` is finite
+functionally positive but withholds documentation acceptance for D1/P3: the
+packaged native README still said cache clearing was under verification.
+Its report SHA256 is
+`75b6211229122246976a9e5720f3ad2ee2368d09b2471a62d1007def6c5e54c3`,
+facts `781103a20300179f27e1094880f505b72c1d89d8812aac4046fa6b17554b193c`,
+122-file seal `00edcc2618509f1b10395098e07082d858a4e4588324f9264664da3579f82ec2`,
+separate observed actual0 invocation
+`35a92dc6ddd3a6c4b05881a4033a52c7fc23ca663ab5c192bc1b765c6e1b6d49`.
+The frozen full audit verifies the complete native/image/profile/cost/source
+graph, all 24 results, 246 nested actual0 actions and 15 serialized Cargo/helper
+intervals. Thirty-two passive readers are actual0. The reviewer did no native
+runtime, Cargo, profile lifecycle, network or hosted CI work.
+
+Two finalizer actual1 attempts remain preserved: first a redundant rehash used
+the old manifest's advancing README working pathname after live reads had been
+released; next a strict reference count omitted the additional tracked
+`scripts/check_repository.py` helper. The final historical seal witnesses all
+17 tracked references through pinned Git bodies and rehashes 1793 external
+files normally. It does not reinterpret either actual1 as source/runtime failure
+or recertify the corrected working copy as tested source.
+
+The correcting leaf changes only this ledger and
+`postgres/darmok_server/README.darmok_server.md` from `12a92f1`. The README now
+states finite local PG17.11/18.6 verification at tested `e829f507` and keeps
+full freshness, closure, callback admission and neutral preparation gates open.
+Compared with the tested revision, three documentation entries change while all
+332 executable/test/dependency and other Git entries remain identical.
+
+The README is one of the 16 native build-context inputs and is installed through
+Makefile `DOCS`; it is not a compiler/link input. The other 15 inputs, native
+objects/headers/SQL and test code are unchanged. Existing test images retain the
+old packaged README and their historical 16-input manifests. The new source
+documentation is not claimed byte-identical to those complete image inputs.
+An explicit pinned `e829f507` Git-body witness must verify the old README entry
+when auditing historical graphs; the new working pathname must never silently
+stand in for that tested byte sequence. No new binary/image/profile/runtime
+check is claimed for this documentation-only correction. Separate independent
+correction acceptance is required before normal PR merge; D1 remains open in
+the historical `12a92f1` report. Broader gates, exclusions and the goal are unchanged.

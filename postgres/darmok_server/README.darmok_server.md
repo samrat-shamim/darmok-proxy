@@ -37,9 +37,10 @@ The private C relation-reference attempt preserves ordered explicit OID/mode
 increments under the native transaction owner. It releases only its own
 increments or retains them for native transaction cleanup, including prepare.
 Native relation acquisition now delegates exact local cache clearing to core
-outside module exclusion; that change is under verification. Per-mode clear
-does not establish globally fresh catalog facts, supported callbacks or
-complete dependency closure. See
+outside module exclusion, with finite local PostgreSQL 17.11/18.6 verification
+at `e829f50745ea9eb2de1531444c2e04fb9c2eac81`. Per-mode clear does not establish
+globally fresh catalog facts, supported callbacks or complete dependency closure.
+Neutral statement preparation and application admission remain separate gates. See
 [`docs/native-relation-guards.md`](../../docs/native-relation-guards.md).
 
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
