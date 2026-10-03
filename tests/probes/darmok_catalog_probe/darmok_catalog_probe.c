@@ -9,6 +9,7 @@
 #include "miscadmin.h"
 #include "storage/lock.h"
 #include "tcop/utility.h"
+#include "utils/builtins.h"
 #include "utils/guc.h"
 #include "utils/resowner.h"
 #include "utils/snapmgr.h"
