@@ -2809,3 +2809,41 @@ stand in for that tested byte sequence. No new binary/image/profile/runtime
 check is claimed for this documentation-only correction. Separate independent
 correction acceptance is required before normal PR merge; D1 remains open in
 the historical `12a92f1` report. Broader gates, exclusions and the goal are unchanged.
+
+### Merged native cache-clearing checkpoint
+
+PR [#53](https://github.com/samrat-shamim/darmok-proxy/pull/53) was normally
+squash-merged from reviewed correcting leaf
+`e2325a5d9924e842f5b29fa2b43d42ad490b335e` into personal public main
+`5184b30b99eb9333c9ee78e169a8c5e05d23c3a5`, with tree
+`0c3a411bd1c7ef34fd3f2051ffedbe5630fec7c7`. The implementation/test/dependency
+entries remain identical to tested `e829f507`; the final README DOCS distinction
+above remains explicit. Existing native test images retain their historical
+packaged documentation. No new image or runtime result is inferred from merge.
+
+Independent correcting-leaf acceptance has report SHA256
+`8316bd17e125d5f3eb6335200229e8c58173fc9b99da3988eaf81fe66911e7d5`,
+facts `f48d44bef67ddd219218cf77c954a3d3a9c2df4d7ca9934fae00ccd8640d3dfd`,
+75-file seal `36bea3f3a17d44f6f55e174390daa5de6355f1926c98067933ea07be530ed842`,
+separate observed actual0 invocation
+`9005dbd72233ac91871ddf3e6a3e6f17b841ef6943aa35142965c7a2d3adb3c4`.
+Twenty passive readers and the offline correction audit are actual0. D1 closes
+only at the correcting leaf, with no new finding; historical D1/F1 and actual
+failures remain unchanged. The separate pre-write builder actual1 is preserved.
+Root rehashed all 75 members, outer streams and finalizer; its rehash record
+SHA256 is `1dc1babcb31599363d1bf4eb5cd8dad6046ef673935ac884428a4ccb7dfee11e`.
+
+Root `28-merge` and `29-publication-audit` are actual0 under
+`.darmok-work/logs/native-cache-clearing-e2325a5-*`. Four GitHub reads verify the
+exact main tree, personal PUBLIC repository, unchanged generic description and
+no in-scope open PRs; PR4 is filtered before output. Publication facts SHA256 is
+`3792e7125a27d6e93664ac70f7975143d6655e9633d92b063ecd581a728617d8`,
+13-file seal `899d5980c78754daf1ea46bbbb924e9f6232471c03640370b341f00fb06ea021`.
+Issue46's checkpoint and remaining gates were updated while OPEN, with unchanged
+title and exact body readback. Its body SHA256 is
+`0841bcab712bd21c60ce265759574d97ac276adcda7076e278331df42ae96c60`,
+update facts `cb3cc551ba86f2cf9a2fef7b19b31049b85d83de8d5948221e56c6a6181b7dc1`.
+The original component worktree is frozen; the next isolated branch begins at
+this merged source. Full physical/transitive/name/candidate closure, fresh facts,
+neutral preparation, immutable execution and all other broader gates remain
+open. Issues46/15 and the overall goal remain active; standing exclusions persist.
