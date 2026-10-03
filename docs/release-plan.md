@@ -3833,3 +3833,70 @@ equal to tested5a; all20 native build inputs also equal built954. No runtime,
 build or cost sample is repeated or relabeled. Bounded D2 readback and normal
 exact-head reviewed squash merge remain pending. All previously open full gates,
 issues46/15 and the goal stay OPEN.
+
+### Merged inline missing images and combined database setup selection
+
+PR #56, “Copy native column missing images in private metadata reads”, was
+normally squash-merged at reviewed head
+`4b0f3e3d09f6991b77256ebaa41c0010afd9c86d`. Public main
+`19d4a9b1a44303fa334a1fc3cab31fb3174fa80b` has the exact reviewed tree
+`e4e55772c460e7dabad4cdd8be3e21111ed50bea`. The accepted final review closes
+C1 at2848, D1 at803 and D2 only at4b; historical leaves retain their findings.
+
+The final independent review is
+`logs/review-native-missing-images-4b0f3e3-final-doc-v1`: report SHA256
+`36ff378b89e5640b5060daceeaa230e69c6b1fe5c292d25b7f37f32c93311413`, facts
+`be5eb421e37935d6b3983042575bb59f904f8251759557d2f056308ea38f384d`, commands
+`bb3bc6eb931f794bb2594ad2fd57138b74ee2d8a8487e1314d1d583d359e3467`, and
+structured4893-member seal
+`c9ea84e5c3a57b44d2c94d0221f24454ec9fca2ebe37fbbf54ba7df2c55975a3`.
+Actual0 finalization08 and independent post09 have receipt SHA256s
+`43cbe68d042521a8274a79d42826b6b1e8f8f3c300a599cf15a04c4170c4fd51` and
+`c1211d67742eed773d4d9b7e207690ae9c0ec360b2b4a7dd5ca9a6dd06f58ee5`.
+Their stdout hashes are
+`31304c73f0e356b54b3776bb9e9497268c2ec023e8041422ee51dd10c2a2aa88` and
+`220ca471645270d652f3feeec73af2353740466c08a8731a64e4b774360fa60f`;
+post facts hash is
+`57557b965afc1f3f8ab30f36761677356078440e1d42839da857fa0859f510e2`.
+Root37 actual0 rehashes all4893 fixed members plus separate companions,4923
+unique paths total; its file map SHA256 is
+`776d3e1c26f2731bf3051cf6c24f4032b8aa28113d21dfe64f2e83f3f256b5c5`.
+The frozen tested/build/worktree roles and paired10/147/3 evidence do not change.
+
+Root38–46 all exit0: exact public-main/branch/body preflight, normal branch push,
+PR creation, exact head/base/body readback, ordinary squash, public repository
+and tree readback, issue46 exact body update, main fetch and creation of the
+separate `native-database-init` worktree. Publication facts/seal hashes are
+`51d1421c8dee87b12c8757d9fcb6d9981fcd5323cdeadb7f924983eb772e3035` and
+`fcd1b8d36e041c2de846c4aeedd982a3cbd51bd66b2a277b6d45515d3ca4eba0`.
+The personal repository remains PUBLIC with description “A MySQL-to-PostgreSQL
+compatibility proxy”; its README has no experimental narrative. No other
+eligible open PR remains. Issue46 remains OPEN at exact v7 body SHA256
+`0cd2a6df4c1139542fcfc20dbe5f87144eb230a0d30397b25966fa2beae78a88`;
+issue15 and the full goal remain open. Excluded compiler PR4 is not inspected.
+
+Passive display bookkeeping failures this cycle are retained as failures:
+wrong final-reader key and treating a dictionary of seal members as a list;
+the corrected schema reads and root37 pass. A publication-helper construction
+initially replaced its filename prefix before a later assertion; the existing
+body/preflight were preserved and the separately completed helper was read
+before use. None is a native runtime or product result.
+
+The next finite component is [combined explicit database setup](native-database-init.md).
+The old initializer checks the compatibility schema but not the native extension
+and live utility response. The selected boundary checks both inside an owned
+transaction, drains and decodes the exact fixed native response, then submits a
+separate checked COMMIT. It adds one setup round trip and no per-row round trip.
+The API/CLI are renamed cleanly; no schema-only success alias remains. This M3
+setup work can overlap the open M2 dependency/executor work, without closing it.
+The new design is proposed, not implementation or verification acceptance.
+
+Primary installation source capture root01 exits2 because a preceding passive
+reader wrongly assumed the saved tree's `tree` key; it actually contains a
+`paths` list and that failed display prevented helper creation. The missing
+helper invocation and raw streams are preserved. Corrected root02 exits0,
+capturing paired pinned extension source files and the two official CREATE
+EXTENSION pages in `logs/native-database-init-primary-v2`. Its manifest/seal
+hashes are recorded in the design. This is functional provenance only. No new
+native profile, native build, forced-error experiment, security work, hosted CI
+poll, account action or release publication occurs here.
