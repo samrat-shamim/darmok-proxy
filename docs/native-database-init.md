@@ -1,7 +1,8 @@
 # Explicit database initialization
 
 Status: independently reviewed design with implementation candidate; runtime
-verification and implementation review are pending. This extends the functional [schema contract](native-schema.md) without
+checks passed at the recorded implementation revision; independent implementation
+review and current packaged-artifact checks are pending. This extends the functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
 ## Problem and selected behavior
@@ -107,8 +108,13 @@ rules; an uncertain commit is never reported as a rollback or setup success.
 Setup uses two operation round trips instead of the schema-only batch's one.
 The extra trip places validation before commit. SQL/response allocations occur
 once per setup, not per row. The empty native request does not scan relation
-facts. Existing native code, product/probe inputs and native runtime artifacts
-need no change. Artifact reuse requires exact input equality, not matching tags.
+facts. Native mechanism sources and build definitions need no change. The packaged
+module README is updated for the new setup contract, so native artifacts must
+be rebuilt with that new documentation input. The existing running profiles
+remain unchanged. Their reuse requires exact equality of the 19 mechanism,
+header, control, script and build inputs plus actual library/header hashes;
+their old packaged README is explicitly historical. Current package acceptance
+requires its rebuilt README to match the new source, not just matching tags.
 
 Required ordinary PG17.11/18.6 fixtures cover both installed components,
 unchanged repeats/read-only defaults, ordinary two-owner initialization and

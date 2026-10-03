@@ -3978,3 +3978,63 @@ bookkeeping events, not runtime or product results. Compiler PR4, security work,
 new stress/forced-error/interruption/recovery experiments, hosted CI/account
 work and release publication remain excluded. All full gates, issues46/15 and
 the overall goal remain OPEN.
+
+### Combined setup verification and packaged instruction correction
+
+The implementation is tested at clean
+`07647b50af46bd215616a154bd332855d630d7c8` / tree
+`9d001170be930f4f09a396d0b5bd9e2ded4ffdef`. Root07 compile exits0. Root08's
+read-only environment audit exits0 with85 nested commands,8 unchanged existing
+profiles and20 native inputs matching built954; facts SHA256
+`4aab989e56e52938c8b6f365dd1ce521b49db769e0e7c669a82f57ef8a2947fb`.
+Primary/ordered profiles still use max_prepared_transactions10, the existing
+zero profile remains negative, and unpreloaded profiles remain unchanged.
+No profile is started, stopped, restarted or signaled.
+
+Root09 `check-native-database-init-07647b5-v1.py` exits0 with all12 sequential
+checks0: format;9-package repository boundaries; affected execute/catalog/CLI
+offline tests with default and sqlparser/bigdecimal; strict workspace
+all-target/all-feature Clippy and separate connector Clippy; then13 database
+setup groups,3 affected catalog-owner groups and4 CLI process groups on each of
+PG17.11/18.6. Required database groups run explicitly with --ignored and have
+zero failed/ignored results. Offline results retain their unrelated ignored
+fixtures; they do not certify a whole-workspace runtime test run. The matrix
+records exact source, env, argv, raw stdout/stderr and six source readers per
+check in `logs/native-database-init-07647b5-checks-v1` and its case folders.
+Matrix facts SHA256
+`8a0174faf7233e0ae13cba0b40b04194431c9b85c07d922c5ef0d1e7fc1161d6`.
+It compares exact20 native mode/type/OID/path tree entries against built954.
+
+The three mandatory ordinary cases pass on both majors: a second owner
+positively observes the setup advisory lock after checked SHOW before separate
+COMMIT, then acquires it and observes both committed components; a fresh
+unpreloaded selected database retains the strict placeholder decoding failure
+and real rollback receipt and has neither namespace nor extension afterward;
+a public function's ordinary nonmembership DEPENDS ON EXTENSION is accepted,
+while added extension members and reserved-namespace function/collation objects
+are rejected without repair. Existing repeats, read-only defaults, caller
+transaction preservation, temporary builtin-type qualification, private
+postcreation metadata mismatch and810 typed helper cases pass.
+
+Every current CLI child has an exclusive receipt and original streams:32 per
+major (15 actual0,17 expected1) and15 per offline feature set (4 actual0,5
+expected1,6 usage2). These94 children cover URI/keyword explicit physical
+databases, both component snapshots, unchanged application data, actual output
+and ordinary driver/server connection closure. This is not configured logical
+routing or serving acceptance. No new stress/forced-error/interruption/recovery
+experiment, security work, hosted CI or release publication is inferred.
+
+Self-review found two current installation paragraphs still describing the
+removed schema-only commands: the packaged native README and the server lease
+doc. Root10 exits0 and creates this separate correction leaf; the tested076
+worktree remains frozen. This changes only documentation and preserves all
+Rust/SQL/fixture/helper implementation bytes. Unlike unpackaged docs, the native
+README is one of the20 build inputs. Therefore this leaf has19 unchanged native
+mechanism/header/control/script/build inputs and one deliberately changed
+packaged README. The earlier exact20/runtime claims remain bound to076, not
+relabeled as this source. The spec now requires rebuilt current packages and
+compares their actual library/header hashes before reusing existing running
+profiles with their explicitly historical README. No running profile lifecycle
+change is needed or authorized here. Current package checks and independent
+implementation review remain pending. Full gates, issues46/15 and the goal stay
+OPEN.

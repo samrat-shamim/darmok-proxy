@@ -22,8 +22,10 @@ Build against the selected server's PGXS development files, preload
 `darmok_server` at server startup, and explicitly `CREATE EXTENSION darmok_server`
 in each selected physical database. Late loading is an error. The nonrelocatable
 extension has version `1.0`; its namespace is `darmok_server`, separate from the
-SQL compatibility functions in `darmok`. Current `init`/`schema verify` cover only
-the latter. Combined installation and exact module verification remain pending.
+SQL compatibility functions in `darmok`. `darmok init` and `darmok verify`
+check both functional components and the live native response before a separate
+COMMIT; see [combined database setup](native-database-init.md). This does not
+certify artifact fingerprints, statement admission or serving readiness.
 
 Discovery requires a primary server. Concurrent native PostgreSQL two-phase
 transactions are part of the v0.1 target; `max_prepared_transactions` may be

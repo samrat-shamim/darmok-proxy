@@ -44,9 +44,13 @@ Neutral statement preparation and application admission remain separate gates. S
 [`docs/native-relation-guards.md`](../../docs/native-relation-guards.md).
 
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
-separate `darmok` namespace contains SQL compatibility functions. Current
-`darmok init` and `schema verify` still cover only the compatibility namespace;
-combined installation/version verification remains required before serving.
+separate `darmok` namespace contains SQL compatibility functions. `darmok init`
+installs or validates both components in one owned transaction; `darmok verify`
+checks both without creation. Both require the live native handler's checked
+response before a separate confirmed COMMIT. Extension files and preloading
+must already be present. These commands establish functional setup, not table
+execution or serving readiness. See
+[`docs/native-database-init.md`](../../docs/native-database-init.md).
 The server module rejects late loading rather than supplying partial hooks.
 
 A self-contained Alpine image builds the shared object and LLVM bitcode against

@@ -75,7 +75,7 @@ Argument/settings allocations occur at startup, outside any row execution path.
 The CLI adds no SQL to the initializer's fixed transaction and no catalog cache.
 Owner connection setup retains its existing round trip. Combined setup uses
 two operation round trips, validating the native response before commit;
-ordinary failed transactions add the owner's explicit rollback request. Runtime
+a confirmed failed setup request uses explicit rollback instead of commit. Runtime
 query latency and complete artifact benchmarks remain pending.
 
 Offline tests run actual binaries for help, version, usage and ordinary settings
@@ -117,3 +117,17 @@ serving, real drivers and release readiness are not established by that smoke
 check. The complete local hashes, exact command/environment records, preserved
 bookkeeping failure and pending hosted CI are in the release plan. This historical evidence does not certify the current combined setup or relabel
 runtime executions as a later source revision.
+
+## Combined setup runtime candidate
+
+Current combined setup checks are bound to implementation
+`07647b50af46bd215616a154bd332855d630d7c8` / tree
+`9d001170be930f4f09a396d0b5bd9e2ded4ffdef`. Both PostgreSQL majors pass four
+required process groups with 32 children each: 15 exits0 and 17 expected exits1.
+Both URI and keyword settings select the explicit nondefault database. The
+default and BigDecimal offline invocations each run 15 children: four exits0,
+five expected exits1 and six expected usage exits2. Setup-library fixtures pass
+13 groups on each major, and the affected catalog-owner fixtures pass three.
+The release plan records the exact commands, source and evidence. Independent
+implementation review and the current packaged README artifact check remain
+pending. The historical schema-only results above retain their original scope.

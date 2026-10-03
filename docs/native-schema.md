@@ -122,3 +122,10 @@ reviews remain separately bound to their original revisions. The final evidence
 leaf changes documentation only and preserves all implementation, fixture,
 corpus and observer bytes and sealed runtime evidence. No hosted-CI pass,
 executable integration or complete M3 gate is inferred from these local results.
+
+The combined setup runtime candidate is
+`07647b50af46bd215616a154bd332855d630d7c8`, with 13 ordinary initialization
+groups on each PostgreSQL major, including this unchanged 810-case helper corpus.
+The [combined contract](native-database-init.md) and release ledger distinguish
+these current executions from the historical schema-only results. Independent
+implementation review and current package acceptance remain pending.
