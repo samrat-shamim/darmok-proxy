@@ -97,6 +97,12 @@ They do not certify complete startup, artifact identity or runtime behavior.
 
 ## Remaining gates
 
+The [fixed-command source trace](native-fixed-command-history.md) adds concrete
+parse/utility/string-object, GUC-restoration and resource-release callback paths.
+Fixed SQL and completed cleanup cannot replace a bound native provider/reference
+history. The existing Darmok utility hook is required, so the construction must
+admit its actual path rather than assume every hook is absent.
+
 Typed owner separation closes only the setup-to-query connection-transfer path.
 A concrete native entered-cache/reference witness, actual module/callback and
 registry/provider footprint, writer coverage, guard sequence and bootstrap

@@ -210,6 +210,10 @@ and [PG18 invalidation](https://github.com/postgres/postgres/blob/REL_18_6/src/b
 Before C changes, the entry proof must bind the supported native build and
 registered callback/options footprint, establish every entered reference's
 provenance, and preserve that profile across SI, new opens, reloads and cleanup.
+The [fixed private-command trace](native-fixed-command-history.md) identifies
+parse/utility/string-object hooks, GUC restoration, resource-release callbacks
+and savepoint lifecycle that this preservation proof must cover. Requiring
+every hook to be absent would reject Darmok's own catalog utility route.
 Each new wait must still follow complete reader/snapshot closure and precede S.
 This investigation supplies concrete source obligations; it closes no
 authoritative entry, bootstrap, whole statement or implementation gate.
