@@ -74,6 +74,9 @@ fails. Reusing parsed options requires the actual supported provenance; copying
 their bytes or checking file layout does not establish it. Fresh defining facts
 and complete callback/registration history remain necessary before a new open
 or rebuild. No post-open inspection or readiness shortcut is selected here.
+The [registry trace](native-reloptions-registry.md) adds native kind-mask,
+referenced-data and major-specific presence obligations. Binding the consumer
+registry does not retroactively certify an init file's producing backend.
 
 Core startup includes file reads, descriptor allocations, provider setup and
 physical waits. Phase3's restart scan can be quadratic; needing new init files

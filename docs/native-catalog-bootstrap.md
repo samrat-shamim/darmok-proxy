@@ -74,6 +74,10 @@ provider, allocation or option datum. A concrete profile still needs an
 authoritative registry/provider admission boundary, supported native carrier
 paths and resource accounting before it calls native parsing. Preserve actual
 NULL/empty/nonempty option images independently from parsed `rd_options`.
+The [registry construction trace](native-reloptions-registry.md) identifies
+direct kind-mask registration, referenced enum data, the missing public census
+and PostgreSQL 18's explicit-set field. The actual registration and parse-table
+correspondence must be established before those paths run.
 Native cache defaults or ignored options are not an alternative source of
 the collector's defining bytes. Unexpected carriers or histories must fail
 before opening the path that depends on them.
