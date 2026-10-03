@@ -5067,3 +5067,58 @@ root11 creates this separate review-record leaf. Acceptance of the leaf must
 bind its single changed release-plan file to the other357 unchanged entries
 of accepted80ec215, without reopening the historical review graph. All native
 admission, full-engine and release gates remain OPEN; concurrent2PC is required.
+
+### Fixed-command findings merged; startup reference provenance traced
+
+PR #66 was normally squash-merged from independently accepted
+`41d289ccd7351747a2ac7c816bccce620b121d89` to public main
+`94d86832f01e78a809317bf93b1a64506208ed42`, tree
+`a0d39304d64d419627d52b5ce76f52831a02eb2d`, parente8b0dde. The final one-file
+review record preserves357 accepted entries. Its independent160-member review
+retains actual final10/post11/completion12 exit0 and no findings. Root15
+rehashes182 fixed/completion paths and actually exits0; facts SHA256 is
+`8b31504908120ff22e3e36c435529d0756339cc381baa6778e9944060dbab230`.
+Root21 verifies exact public personal main, unchanged generic description, no
+eligible open PRs after filtering PR4, and issues46/15 OPEN. Readback facts at
+`logs/native-fixed-history-41d289c-merged-readback-v1/facts.json` have SHA256
+`6ae686208eb6387e16751ef863e761be87fd6cbb227acd842e959f35c1e0a5d0`.
+That accepted source investigation does not close native implementation gates.
+
+The next isolated branch starts at that exact merged main. The paired
+[startup/reference trace](native-startup-references.md) identifies intrinsic
+pin constructors, distinct reader items/locks/copied tuple descriptors, parsed
+init-file options and provider calls before complete file acceptance. Native
+end-of-transaction cleanup is not a production full-cache census. The selected
+PG17 startup transaction obtains GetTransactionSnapshot; PG18's does not.
+The entry base must cover both construction and restored-file histories and
+their actual provider/registration provenance before new descriptor admission.
+No native implementation or complete startup witness is certified here.
+
+At clean94d8683, root03's primary helper captures six actual HTTP-200 bodies
+and rehashes six named cached bodies, twelve files across17.11/18.6. Fresh
+relcache bytes match earlier named identities. Root04 actual1 preserves a
+nonunique startup commit-comment selection. Root05 actual1 preserves the
+PG17-only GetTransactionSnapshot-marker assumption. Both original helper and
+partial output namespaces remain frozen. Corrected root06 uses exact bounded
+transaction blocks and actually exits0, retaining34 complete function bodies,
+two macros, six bounded startup spans and four selected startup calls. Four
+of23 pairs differ;19 have identical selected bytes. Source counts and byte
+equality do not certify whole files or all function semantics.
+
+Commands are `python3 capture-native-startup-references-primary-v1.py` and
+`python3 capture-native-startup-reference-functions-v3.py` through the fixed
+root recorder. The environment fixes RUSTUP_HOME to `.darmok-work/rustup` and
+CARGO_TARGET_DIR to `.darmok-work/native-values/target`; no Cargo or native
+build/runtime command is added. Primary facts at
+`logs/native-startup-references-primary-v1/facts.json` have SHA256
+`861cdcba973269013ffb1b7b7e3c4d04880f299d78e403d5aaf8e22b408071c7`.
+Selected v3 facts/seal under `logs/native-startup-reference-functions-v3` have
+SHA256 `685e5d212ac78710cc0c1ebe6e4a70ae5946063cf0964556e6feba9f9e1bca86`
+and `cd619659b504da46c6557854a8f0cf65aa7ac8e6385364943c77c05389068438`.
+Independent review and current documentation boundary checks are required
+before merge. No C/Rust/SQL, native input/build, runtime/profile lifecycle or
+new stress/recovery result is introduced by this checkpoint. Concurrent native
+2PC remains required. Native entry/bootstrap/provider/registry/reference/writer/
+sequence, whole statement/table execution, serving, performance and release
+gates, issues46/15 and the goal stay OPEN. Security, compiler PR4, hosted CI and
+release publication remain excluded.

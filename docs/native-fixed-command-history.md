@@ -148,6 +148,9 @@ do not passively enumerate all entered relcache references or opaque owner
 items. The concrete base/witness mechanism and complete transition induction
 still need to be selected and proved. A module-path list, hook pointer, critical
 relcache flag, positive rd_refcnt or readiness receipt cannot replace them.
+The [startup trace](native-startup-references.md) identifies the intrinsic pin
+constructors, restored-file/provider history and incomplete cleanup census that
+the base must account for separately from later owned reader increments.
 Likewise, the native provider/registry and defining-writer proofs must close
 before the proposed transitive descriptors are opened. No fallback collector
 or stronger-lock shortcut is admitted by these findings.
