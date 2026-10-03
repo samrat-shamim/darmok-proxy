@@ -88,3 +88,7 @@ path = "server_statement_guards.rs"
 [[test]]
 name = "server_relation_guards"
 path = "server_relation_guards.rs"
+
+[[test]]
+name = "server_heap_storage"
+path = "server_heap_storage.rs"

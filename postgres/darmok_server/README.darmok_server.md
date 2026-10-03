@@ -104,3 +104,13 @@ representation fixtures; it is not a production configuration or recovery test.
 Run `--test server_statement_guards` with the same primary environment.
 Run `--test server_relation_guards` on that primary for physical reference
 ownership and prepared-completion fixtures.
+
+`heap_storage.h` defines a private source-admitted C consumer boundary for
+catalog-declared ordinary heap, live btree index and TOAST storage facts.
+It acquires and rechecks exact native references and literal names, uses bounded
+no-CV lifecycle retry, and ends metadata exclusion before reader cleanup and
+reference release/retention. It supplies no SQL admission, executable plan or
+data-derived TOAST closure. The continuous builtin private-owner profile and
+pure consumer contract are required. See
+[`docs/native-heap-storage.md`](../../docs/native-heap-storage.md) for its
+contract and the separately recorded implementation verification status.

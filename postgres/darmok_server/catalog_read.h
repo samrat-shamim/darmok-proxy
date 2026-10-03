@@ -3,6 +3,7 @@
 #define DARMOK_CATALOG_READ_H
 
 #include "tcop/utility.h"
+#include "access/xact.h"
 
 #define DARMOK_CATALOG_REQUEST "darmok_server.catalog_request_v1"
 
@@ -18,10 +19,18 @@ typedef struct DarmokCatalogStamp
 /* Module-internal operations. None is a SQL function or a frontend handle. */
 extern void darmok_catalog_reader_start(void);
 extern void darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp);
+/* No lifecycle CV wait. false leaves neither raw nor gate references. Native
+ * LockAcquire waits/ERROR keep their native semantics. */
+extern bool darmok_catalog_fence_try_acquire(DarmokCatalogStamp *stamp);
 extern void darmok_catalog_fence_release(void);
 extern bool darmok_catalog_stamp_equal(const DarmokCatalogStamp *left,
 									  const DarmokCatalogStamp *right);
 extern void darmok_catalog_reader_finish(void);
+extern void darmok_catalog_verify_installation(void);
+extern void darmok_native_refresh_start(void);
+extern void darmok_native_refresh_finish(void);
+extern void darmok_native_invocation_check(void);
+extern void darmok_native_invocation_require_abort(SubTransactionId subid);
 extern void darmok_catalog_define_guc(void);
 extern void darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 							   QueryCompletion *completion);
