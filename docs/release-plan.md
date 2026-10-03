@@ -3742,3 +3742,59 @@ preparation/data/executor/MySQL row/read-lock/serving/cache/full performance/
 artifact/release gates, issues46/15 and the goal remain OPEN. Security, compiler
 PR4/resources, hosted CI/account/admin, new stress/forced interruption/recovery,
 existing-profile stop/restart/signal and release publication remain excluded.
+
+### Independent finite missing-image acceptance and documentation correction
+
+Frozen implementation checkpoint `2848c06c3dab9573d20ecfac1fbaa3d1533a74b1`,
+tree `220d33ff80521ebd27c301189876ddedd2c0cbd7`, changes only the two unpackaged
+docs from tested `5a82a96`; all341 other tree entries and all20 native inputs
+remain equal. Author `30-author-audit` actually exits0 and seals2381 paths;
+facts in `logs/native-missing-images-2848c06-author-audit-v1` have SHA
+`bc2096cb987bd8e48d98d4c91c230cf6c493847231b16ff68108baae509c39fd`,
+plain seal SHA `cf4e1dd16dac029acb5d7eb164f26145b6fd6541a823808bb6a81ec4ae36ebca`.
+It verifies29 outer outcomes (26 zeros, two101 and one1),174 source readers,
+12 sequential Cargo/helper intervals, exact127/127 setup and85 environment
+actions, native inputs, costs and the preserved primary/design evidence graph.
+
+Independent passive implementation review in
+`logs/review-native-missing-images-2848c06-implementation-v1` accepts the finite
+implementation and supplied evidence. Report SHA
+`e1d12fee74bde778fbb21a69de84e39fd37a500784cbd420132fc587e2ac3df2`,
+facts SHA `81fa4b39c8da55c2dd55bdab9aaedcb8388259604402d18c70103800801c53e5`,
+commands SHA `e3d713bbe8fd47a32bcdf9c5526bb002c9a794d4cbff7c0402f04cda3dd9e002`.
+The fixed structured3531-member seal SHA is
+`0dc1928c4bcca70c41027db640d1782415df736939b22c1e44e05a3ed993730b`.
+Actual `75-finalization` and `76-independent-post` exit0; their receipt SHAs are
+`ecfc4618272d9f404945b0dab7cb6041f69644569b0feb04947977c083454868` and
+`5ff9d0b875811d4e4833ceb93a558162e229fac4feeb4223e1519f2dba5b3dd3`.
+Post facts SHA `f8031c7c4efe6138b8de3d9d09105ba90d6732e8abc1eb1b8232411e4cc8ecd5`;
+final/post/metadata companions are separate from the nonrecursive fixed seal.
+Live reads are explicitly released. C1/P2 is CLOSED: the independent physical
+natts and native old missing-value/present-NULL oracle is inspected and executed
+by both paired current suites. D1/P3 remains OPEN at that historical checkpoint:
+the preallocation sentence must name the missing-record array, not all metadata
+arrays. Fixed attribute/type arrays retain periodic/postallocation checks;
+allocation-block overhead and peak/process memory remain outside this proof.
+
+Reviewer readers45/47/65–68 remain actual1 bookkeeping failures; corrected50
+actually exits0 and verifies the supplied graph. Root `31-review-rehash` also
+remains actual1: its reader incorrectly assumed every passive command had the
+same working directory. Exact absolute-path reads used two recorded directories.
+Distinct `31-review-rehash-v2` actually exits0, verifies all3531 seal members and
+companions (3560 unique files), final/post/metadata actual0, all raw stream hashes,
+the six preserved reviewer failures and six fresh clean source readers. Facts
+in `logs/native-missing-images-2848c06-implementation-root-rehash-v2` SHA
+`2b7d14ba32168242b6c72dc7cee19bd2bce4bbdf4eae81bc4302e07ce0d1bcb1`.
+No native test, build or workload is repeated or relabeled by this readback.
+A passive optional filename search exit2 is also bookkeeping, not product evidence.
+
+`32-doc-worktree` actually exits0 and creates a separate documentation leaf at
+the frozen checkpoint; the sealed implementation worktree stays unchanged.
+This leaf fixes D1's sentence and records finite implementation acceptance in
+these two unpackaged docs only. Packaged README, every executable/test/native
+input, exact runtime/build provenance and historical failures stay unchanged.
+Independent documentation readback is pending; D1 is not retroactively closed
+on `2848c06`. Normal reviewed exact-head squash merge remains required. Full
+variable/default/TOAST/transitive/provider/candidate/effect/IR/preparation/data/
+executor/MySQL row/read-lock/serving/cache/full performance/artifact/release gates,
+issues46/15 and the goal remain OPEN. The existing excluded scope remains excluded.

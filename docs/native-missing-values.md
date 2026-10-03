@@ -1,7 +1,8 @@
 # Private column missing-value images
 
-Status: implemented candidate; paired native verification is recorded below.
-Independent implementation review remains pending. This extends the finite
+Status: finite implementation and paired evidence accepted by independent review
+at `2848c06`; this documentation correction awaits separate readback. This extends
+the finite
 [fixed column/type facts](native-attribute-type-facts.md) inside the existing
 private heap-storage invocation. It does not admit a TupleDesc, a type codec,
 SQL, an executor, default evaluation or a frontend metadata handle.
@@ -125,7 +126,7 @@ throughput, contention and full performance acceptance remain separate gates.
 Ordinary measurements retain variance and their exact source/profile scope.
 
 The candidate checks stored-byte and normalized-byte cumulative totals separately
-against 64MiB, with subtraction before addition. Before each carrier, metadata
+against 64MiB, with subtraction before addition. Before each carrier, missing-record
 array or expansion allocation, the current observation context allocation plus
 the requested bytes must also fit that budget. Allocation-block overhead can
 still overshoot; the subsequent periodic context check detects it. Ordinary
@@ -168,8 +169,12 @@ repository checks, strict workspace Clippy across all targets/features and stric
 connector-library Clippy pass. All 20 native product/probe inputs match corrected
 built leaf `954c5de` and the recorded installed artifacts. Concurrent native 2PC
 stays enabled at ten in primary/ordered profiles; zero remains a negative fixture.
-C1's absent-slot/present-NULL behavior is positively verified on both majors;
-independent closure is still pending.
+C1's absent-slot/present-NULL behavior is positively verified on both majors and
+closed by independent implementation review at `2848c06`. That review accepted
+the finite implementation and supplied evidence. D1 corrects the preallocation
+wording to the missing-record array; existing fixed attribute/type arrays retain
+their periodic/postallocation checks. Separate readback of this documentation
+leaf is required before final documentation acceptance.
 
 One ordinary TCP loopback psql sample per major uses 32 warmups and 128 sequential
 invocations, three duplicate root bindings, five graph nodes, thirteen exact
