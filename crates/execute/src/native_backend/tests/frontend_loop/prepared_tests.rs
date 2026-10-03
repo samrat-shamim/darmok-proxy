@@ -106,7 +106,8 @@ async fn frontend_loop_prepared_stock_literals_parameters_variables_and_frozen_p
             &error[..9],
             &[0xff, 0xdb, 0x04, b'#', b'H', b'Y', b'0', b'0', b'0']
         );
-        finish(input, owner).await;
+        let result = finish(input, owner).await;
+        assert_eq!(result.session.statement_condition_count_u16(), 1);
     }
 }
 
@@ -250,5 +251,9 @@ async fn frontend_loop_prepared_rejects_tables_batches_controls_and_resolves_var
     packet(&mut input, 2).await;
     assert_eq!(packet(&mut input, 3).await, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     packet(&mut input, 4).await;
-    finish(input, owner).await;
+    let result = finish(input, owner).await;
+    assert_eq!(
+        result.session.transaction_settings().unwrap().autocommit,
+        AutocommitSetting::Disabled
+    );
 }

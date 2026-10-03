@@ -12,7 +12,10 @@ pub(crate) struct PreparedSelect {
 
 enum PreparedCell {
     Constant(Value),
-    Variable { expression: Expr, label: String },
+    Variable {
+        variable: SessionVariable,
+        form: SystemVariableForm,
+    },
     Parameter(usize),
 }
 
@@ -48,9 +51,11 @@ impl PreparedSelect {
             } else {
                 let cell = evaluate(state, globals, text, source, expr, spelling)?;
                 let template = if let Some(expression) = variable_leaf(expr) {
+                    let read = classify_mysql_system_variable_read(expression)
+                        .map_err(|_| SourceProvenanceError)?;
                     PreparedCell::Variable {
-                        expression: expression.clone(),
-                        label: spelling.to_owned(),
+                        variable: read.variable,
+                        form: read.form,
                     }
                 } else {
                     PreparedCell::Constant(binary_value(&cell)?)
@@ -94,9 +99,15 @@ impl PreparedSelect {
         for (index, cell) in self.cells.iter().enumerate() {
             row.push(match cell {
                 PreparedCell::Constant(value) => value.clone(),
-                PreparedCell::Variable { expression, label } => {
-                    let cell =
-                        variable(state, globals, state.text_collation()?, expression, label)?;
+                PreparedCell::Variable { variable, form } => {
+                    let cell = variable_cell(
+                        state,
+                        globals,
+                        state.text_collation()?,
+                        *variable,
+                        *form,
+                        "",
+                    )?;
                     binary_value(&cell)?
                 }
                 PreparedCell::Parameter(parameter) => {

@@ -4867,3 +4867,11 @@ statement/table execution, native prepared/DDL validity, full MySQL coercions,
 serving, performance and release gates remain OPEN. Concurrent PostgreSQL
 native2PC remains required. Security, compiler PR4, hosted CI, new native stress
 or recovery experiments and release publication remain excluded.
+
+The first prepared candidate76ef217 has a preserved strict Clippy actual101:
+retaining a full Expr made the prepared-cell enum352 bytes, and two fixture
+reports were unused must-use values. The corrected design retains only the
+classified variable/scope facts, without boxing a whole AST or adding a per-
+variable allocation; fixtures assert their returned state. Current corrected
+checks and independent review remain pending. Earlier source/artifacts remain
+revision-bound; no passing result is inferred from compilation of a predecessor.

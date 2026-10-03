@@ -470,18 +470,29 @@ fn variable(
         SessionInputError::UnknownVariable => SelectSqlError::UnknownVariable,
         _ => SelectSqlError::Unsupported,
     })?;
+    variable_cell(state, globals, text, read.variable, read.form, label)
+}
+
+fn variable_cell(
+    state: &SessionState,
+    globals: &ServerSetValues,
+    text: &CharsetInfo,
+    variable: SessionVariable,
+    form: SystemVariableForm,
+    label: &str,
+) -> Result<Cell, SelectAdmissionError> {
     use SessionVariable as Var;
-    let global = read.form == SystemVariableForm::Qualified(ContextModifier::Global);
-    let value = match read.variable {
+    let global = form == SystemVariableForm::Qualified(ContextModifier::Global);
+    let value = match variable {
         Var::Version | Var::VersionComment | Var::VersionCompileOs => {
             if matches!(
-                read.form,
+                form,
                 SystemVariableForm::Qualified(ContextModifier::Session | ContextModifier::Local)
             ) {
                 return Err(SelectSqlError::GlobalVariable.into());
             }
             state
-                .read_variable(read.variable)
+                .read_variable(variable)
                 .map_err(|_| SelectSqlError::Unsupported)?
         }
         Var::Autocommit
@@ -490,11 +501,11 @@ fn variable(
         | Var::TransactionReadOnly
         | Var::SqlMode => {
             if global {
-                crate::set_controller::global_value(globals, read.variable)
+                crate::set_controller::global_value(globals, variable)
                     .map_err(|_| SelectSqlError::Unsupported)?
             } else {
                 state
-                    .read_variable(read.variable)
+                    .read_variable(variable)
                     .map_err(|_| SelectSqlError::Unsupported)?
             }
         }
@@ -506,7 +517,7 @@ fn variable(
             if !global =>
         {
             state
-                .read_variable(read.variable)
+                .read_variable(variable)
                 .map_err(|_| SelectSqlError::Unsupported)?
         }
         _ => return Err(SelectSqlError::Unsupported.into()),
