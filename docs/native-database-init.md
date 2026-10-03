@@ -1,8 +1,10 @@
 # Explicit database initialization
 
-Status: independently reviewed design with implementation candidate; runtime
-checks passed at the recorded implementation revision; independent implementation
-review and current packaged-artifact checks are pending. This extends the functional [schema contract](native-schema.md) without
+Status: independently reviewed design with implementation candidate. Ordinary
+runtime checks passed at 07647b5 and current package checks passed at 6217c0e.
+Independent implementation review found C1 at 6217c0e; the corrected checker
+requires its own affected checks and independent review. This extends the
+functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
 ## Problem and selected behavior
@@ -94,8 +96,13 @@ confirmed completion leaves the owner uncertain; no asynchronous cleanup is
 invented. A pre-submission invalid state leaves existing caller work unchanged.
 
 An ordinary backend error with an otherwise exact stream and confirmed failed
-transaction readiness permits an explicit awaited rollback. A completely
-observed transaction followed by a response-decoding error also permits that
+transaction readiness permits an explicit awaited rollback. Retain the first
+backend error; only terminal ReadyForQuery may follow it. Any further backend
+error, command tag, description, row or empty-query event records a mismatch,
+even when failed-transaction readiness is subsequently observed. Keep the first
+mismatch independently and drain to readiness or a terminal stream failure.
+A malformed error tail leaves the owner uncertain and permits disposal only.
+A completely observed transaction followed by a response-decoding error also permits that
 rollback, before any commit is submitted. Original submission/completion/SQLSTATE
 or decoding error and rollback outcome remain separate. Unexpected event order,
 tags, description/cell shape, readiness, stream failure or missing readiness

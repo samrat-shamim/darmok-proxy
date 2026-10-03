@@ -205,7 +205,16 @@ async fn check_events(
     while let Some(event) = events.next().await {
         let event = match event {
             Ok(SimpleQueryEvent::BackendError(error)) => {
-                failure.backend_error = Some(error);
+                if failure.backend_error.is_none() {
+                    failure.backend_error = Some(error);
+                } else {
+                    failure
+                        .mismatch
+                        .get_or_insert(NativeCatalogMismatch::Sequence {
+                            expected: "ReadyForQuery",
+                            actual: "backend error",
+                        });
+                }
                 continue;
             }
             Ok(SimpleQueryEvent::ReadyForQuery(state)) => {
@@ -218,10 +227,6 @@ async fn check_events(
             }
             Ok(event) => event,
         };
-        if failure.mismatch.is_some() || failure.backend_error.is_some() {
-            continue;
-        }
-        let position = failure.matched_events;
         let actual = match &event {
             SimpleQueryEvent::CommandComplete(_) => "command tag",
             SimpleQueryEvent::RowDescription(_) => "row description",
@@ -231,6 +236,21 @@ async fn check_events(
                 unreachable!()
             }
         };
+        if failure.backend_error.is_some() {
+            // Only readiness can terminate a backend failure. Keep draining
+            // malformed tails without replacing either original diagnosis.
+            failure
+                .mismatch
+                .get_or_insert(NativeCatalogMismatch::Sequence {
+                    expected: "ReadyForQuery",
+                    actual,
+                });
+            continue;
+        }
+        if failure.mismatch.is_some() {
+            continue;
+        }
+        let position = failure.matched_events;
         let mismatch = if position < prefix.len() {
             match event {
                 SimpleQueryEvent::CommandComplete(tag) if tag == prefix[position] => None,
@@ -404,6 +424,164 @@ impl NativeScope<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Public parsing errors provide distinct inert error values for the
+    // private event checker; these tests never connect to a database.
+    fn inert_error(marker: &str) -> Error {
+        format!("{marker}=1")
+            .parse::<tokio_postgres::Config>()
+            .unwrap_err()
+    }
+
+    fn error_marker(error: &Error) -> String {
+        error.source().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn backend_error_preserves_the_error_and_actual_readiness() {
+        use SimpleQueryEvent::{BackendError, CommandComplete as Tag, ReadyForQuery as Ready};
+        for prefix in [&[][..], &["BEGIN", "DO"][..]] {
+            for matched in 0..=prefix.len() {
+                for state in [
+                    None,
+                    Some(TransactionState::Idle),
+                    Some(TransactionState::Transaction),
+                    Some(TransactionState::FailedTransaction),
+                ] {
+                    let mut events: Vec<_> = prefix[..matched]
+                        .iter()
+                        .map(|tag| Ok(Tag((*tag).into())))
+                        .collect();
+                    events.push(Ok(BackendError(inert_error("first_marker"))));
+                    if let Some(state) = state {
+                        events.push(Ok(Ready(state)));
+                    }
+                    let failure = check_events(futures_util::stream::iter(events), prefix, false)
+                        .await
+                        .unwrap_err();
+                    assert_eq!(failure.matched_events(), matched);
+                    assert_eq!(failure.ready_state(), state);
+                    assert!(failure.mismatch().is_none() && failure.stream_error().is_none());
+                    assert_eq!(
+                        error_marker(failure.backend_error().unwrap()),
+                        "unknown option `first_marker`"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn malformed_error_tails_keep_the_first_error_and_drain_to_ready() {
+        use SimpleQueryEvent::{
+            BackendError, CommandComplete as Tag, EmptyQuery, ReadyForQuery as Ready,
+            RowDescription,
+        };
+        for (tail, actual) in [
+            (BackendError(inert_error("second_marker")), "backend error"),
+            (Tag("DO".into()), "command tag"),
+            (Tag("SET".into()), "command tag"),
+            (RowDescription(Vec::new().into()), "row description"),
+            (EmptyQuery, "empty query"),
+        ] {
+            let events = [
+                Ok(Tag("BEGIN".into())),
+                Ok(BackendError(inert_error("first_marker"))),
+                Ok(tail),
+                Ok(BackendError(inert_error("third_marker"))),
+                Ok(Tag("SHOW".into())),
+                Ok(Ready(TransactionState::FailedTransaction)),
+            ];
+            let failure = check_events(futures_util::stream::iter(events), &["BEGIN", "DO"], false)
+                .await
+                .unwrap_err();
+            assert_eq!(failure.matched_events(), 1);
+            assert_eq!(
+                failure.ready_state(),
+                Some(TransactionState::FailedTransaction)
+            );
+            assert_eq!(
+                failure.mismatch(),
+                Some(&NativeCatalogMismatch::Sequence {
+                    expected: "ReadyForQuery",
+                    actual,
+                })
+            );
+            assert_eq!(
+                error_marker(failure.backend_error().unwrap()),
+                "unknown option `first_marker`"
+            );
+            assert!(failure.stream_error().is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn backend_errors_preserve_prior_mismatches_and_terminal_stream_failures() {
+        use SimpleQueryEvent::{
+            BackendError, CommandComplete as Tag, EmptyQuery, ReadyForQuery as Ready,
+        };
+        for consumed in [false, true] {
+            let events = [
+                Ok(Tag("WRONG".into())),
+                Ok(BackendError(inert_error("first_marker"))),
+                Ok(EmptyQuery),
+                Ok(BackendError(inert_error("second_marker"))),
+                Ok(Ready(TransactionState::FailedTransaction)),
+            ];
+            let failure = check_events(
+                futures_util::stream::iter(events),
+                &["BEGIN", "DO"],
+                consumed,
+            )
+            .await
+            .unwrap_err();
+            let expected = if consumed {
+                NativeCatalogMismatch::AlreadyConsumed
+            } else {
+                NativeCatalogMismatch::Tag("WRONG".into())
+            };
+            assert_eq!(failure.mismatch(), Some(&expected));
+            assert_eq!(failure.matched_events(), 0);
+            assert_eq!(
+                failure.ready_state(),
+                Some(TransactionState::FailedTransaction)
+            );
+            assert_eq!(
+                error_marker(failure.backend_error().unwrap()),
+                "unknown option `first_marker`"
+            );
+        }
+        for with_stream_error in [false, true] {
+            let mut events = vec![
+                Ok(Tag("BEGIN".into())),
+                Ok(BackendError(inert_error("first_marker"))),
+                Ok(EmptyQuery),
+            ];
+            if with_stream_error {
+                events.push(Err(inert_error("stream_marker")));
+            }
+            let failure = check_events(futures_util::stream::iter(events), &["BEGIN", "DO"], false)
+                .await
+                .unwrap_err();
+            assert_eq!(failure.ready_state(), None);
+            assert_eq!(failure.matched_events(), 1);
+            assert_eq!(
+                failure.mismatch(),
+                Some(&NativeCatalogMismatch::Sequence {
+                    expected: "ReadyForQuery",
+                    actual: "empty query",
+                })
+            );
+            assert_eq!(
+                error_marker(failure.backend_error().unwrap()),
+                "unknown option `first_marker`"
+            );
+            assert_eq!(
+                failure.stream_error().map(error_marker),
+                with_stream_error.then(|| "unknown option `stream_marker`".into())
+            );
+        }
+    }
 
     #[test]
     fn exact_names_are_json_encoded_then_e_literal_quoted() {

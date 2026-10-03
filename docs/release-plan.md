@@ -4038,3 +4038,53 @@ profiles with their explicitly historical README. No running profile lifecycle
 change is needed or authorized here. Current package checks and independent
 implementation review remain pending. Full gates, issues46/15 and the goal stay
 OPEN.
+
+### Combined setup independent review and error-tail correction
+
+Root11 package checks at clean6217c0e exit0 with58 nested actions. Four current
+arm64/Linux product/test images include the corrected packaged README; all
+native libraries, bitcode, three headers and test probe binaries match built954.
+Product images exclude the probe. Eight existing server profiles retain their
+IDs, images, healthy state, preload and max-prepared settings, with no native
+prepared transactions or leftover fixture databases. Package facts SHA256 is
+`39b6bb60bf40ddcecbd37774c827846bf78c5051afc0b1929a05cce45c143c04`.
+No native server was started or profile lifecycle changed.
+
+Independent implementation review at6217c0e does not accept that candidate:
+C1 remains OPEN there. The shared event checker replaced the original backend
+error and ignored subsequent nonterminal events, allowing malformed tails to
+reach a reusable failed-transaction classification. Concrete connector framing
+already rejects such post-error events; this is a private-checker contract
+defect, not an observed ordinary native-wire failure. The new correction keeps
+the first backend error, records every post-error event except terminal
+readiness as malformed, preserves any earlier mismatch, and drains without
+changing transaction round trips. Offline public Config parsing errors provide
+distinct inert error carriers; no new forced native error experiment is used.
+
+Review folder `logs/review-native-database-init-6217c0e-implementation-v1` has
+report SHA256 `c0a8da6deb911c68516164df9128144b7d50c6c20311ffeda809c2f3383b46bd`,
+facts `effd075c8621c7908b7c3375c86c56bd3d8c0d8ab8f3144d75876d3bab4c0436`
+and1383-member seal
+`3bdc12d0a5294586aac053a73c735161f5b60512ba467a48a39b726b0e7555ea`.
+Actual final30 and independent post31 exit0; their receipt hashes are
+`1baad2255311e3aaf1e64bf3102fa7fe039e2a731635d3a80517aaa35b678326` and
+`f6b44ee90d129abd9c0687e581f71b6866b3a32f4097d9e2ded651442d31c1a1`.
+Reviewer20's absent-path actual2 and audit26's incorrect child-serialization
+assumption actual1 remain preserved; distinct audit28 exits0. Offline child
+groups may overlap while root Cargo/check intervals remain sequential.
+
+Root12 exits0 rehashing1383 fixed review members and separate companions
+(1394 unique paths); facts SHA256
+`3c247904950f9721f6acdd500c5c134c90e33f28920b697488fb5ff8202d773b`.
+Root13 exits0 creating a separate correction worktree. Earlier tested076 and
+reviewed/package6217 paths stay frozen. A passive root read first guessed the
+absent commands.json and exited1; inventory corrected it to commands-v1.json.
+That bookkeeping failure is not a runtime result.
+
+This correction changes Rust, offline tests and unpackaged documentation only.
+All20 native inputs must match the actually rebuilt6217 packages before their
+reuse. Current affected checks and independent C1 correction review remain
+pending. Full closure, executor, serving, MySQL locking, performance and release
+gates, issues46/15 and the overall goal remain OPEN. Security, compiler PR4,
+new native stress/error/interruption/recovery/profile experiments and hosted
+CI/account/release publication remain excluded.
