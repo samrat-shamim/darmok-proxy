@@ -915,11 +915,11 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 	}
 	PG_FINALLY();
 	{
-		PG_TRY();
+		PG_TRY(_cleanup);
 		{
 			storage_unwind(state);
 		}
-		PG_FINALLY();
+		PG_FINALLY(_cleanup);
 		{
 			if (!completed)
 				darmok_native_invocation_require_abort(state->subid);
@@ -929,7 +929,7 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 				MemoryContextDelete(state->invocation);
 			pfree(state);
 		}
-		PG_END_TRY();
+		PG_END_TRY(_cleanup);
 	}
 	PG_END_TRY();
 }
