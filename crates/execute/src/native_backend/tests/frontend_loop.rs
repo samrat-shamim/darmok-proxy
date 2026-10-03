@@ -57,7 +57,18 @@ async fn connection(
         .await
         .unwrap();
     let (transport, _) = listener.accept().await.unwrap();
-    let owner = FrontendConnection::new(transport, session, backend, globals, 0, input);
+    let owner = FrontendConnection::new(
+        transport,
+        session,
+        backend,
+        globals,
+        darmok_session::PreparedStatementLimits {
+            max_statements: 32,
+            max_sql_bytes: 65536,
+        },
+        0,
+        input,
+    );
     (client, tokio::spawn(owner.run()))
 }
 
@@ -356,18 +367,11 @@ async fn frontend_loop_unimplemented_responding_command_errors_without_closing_o
 #[tokio::test]
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn frontend_loop_unimplemented_no_response_commands_terminate_without_an_invented_packet() {
-    for (command, body, name) in [
-        (
-            darmok_protocol::constants::COM_STMT_CLOSE,
-            vec![1, 0, 0, 0],
-            "COM_STMT_CLOSE",
-        ),
-        (
-            darmok_protocol::constants::COM_STMT_SEND_LONG_DATA,
-            vec![1, 0, 0, 0, 0, 0],
-            "COM_STMT_SEND_LONG_DATA",
-        ),
-    ] {
+    for (command, body, name) in [(
+        darmok_protocol::constants::COM_STMT_SEND_LONG_DATA,
+        vec![1, 0, 0, 0, 0, 0],
+        "COM_STMT_SEND_LONG_DATA",
+    )] {
         let backend = connect_backend().await;
         let (session, globals) = fixture(false);
         let mut buffered = encoded(command, &body);
@@ -387,6 +391,8 @@ async fn frontend_loop_unimplemented_no_response_commands_terminate_without_an_i
         assert!(result.session.unconfirmed_command().is_none());
     }
 }
+
+mod prepared_tests;
 
 #[tokio::test]
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]

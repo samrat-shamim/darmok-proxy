@@ -42,12 +42,14 @@ row-warning producers remain unsupported. Ordinary pinned standard-client
 packets corroborate the PING count; full driver diagnostics/wire equivalence
 remains a separate gate.
 
-Other decoded commands requiring a response receive an explicit 1235/42000
-error before effects. They are not implemented by this component. Prepared
-close and long-data commands have no response in the MySQL protocol. Since
-prepared execution is not implemented, receiving one ends the connection with
-an explicit `FrontendError::NoResponseCommand`; it sends no invented packet and
-does not silently accept the command. Ordinary decode/framing errors are
+The connection additionally owns [local prepared commands](prepared-commands.md)
+under explicitly supplied statement limits. PREPARE, EXECUTE, RESET and CLOSE
+use its private typed registry; CLOSE has no response, including unknown IDs.
+Other decoded commands requiring a response receive an explicit1235/42000
+error before effects. Long-data commands remain unsupported and have no
+response in the MySQL protocol. Receiving one ends the connection with an
+explicit `FrontendError::NoResponseCommand`; it sends no invented packet.
+Ordinary decode/framing errors are
 terminal, rather than successful or recoverable SQL results.
 
 ## Release and termination
@@ -82,7 +84,8 @@ rolled back during disconnect; it is not reusable execution authority.
 
 The connection has one input buffer and one existing packet assembler. It
 reuses the existing per-command output buffers and native driver. No reader
-task, shared lock, cache or extra query lookup is added. Local SELECT, PING and
+task or shared lock is added. The separate prepared contract describes its
+registry and local execution costs. Local SELECT, PING and
 local SET need no native request; existing active SET commits and transaction
 requests retain their own documented costs. Normal active termination adds one
 ROLLBACK. The statement diagnostic count adds one scalar and one increment per
@@ -99,7 +102,7 @@ in receipts. CLI observations do not expose raw server flags or certify proxy
 equivalence; the resolved chain status is corroborated by the pinned server
 dispatch, separately from observable closure/data effects.
 
-Eight required native fixture groups use real ordinary TCP command-phase
+Required native fixture groups use real ordinary TCP command-phase
 exchanges on PostgreSQL17/18. They check serial selected commands/current SQL
 modes, both EOF formats, status and error/continuation output, all sixteen
 release choices, discarded prefetched input, persistent commit/rollback effects,

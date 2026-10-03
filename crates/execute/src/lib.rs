@@ -15,6 +15,7 @@ mod native_statement;
 mod native_transaction;
 mod native_value;
 mod numeric;
+mod prepared_controller;
 mod query_controller;
 mod select_controller;
 mod set_controller;

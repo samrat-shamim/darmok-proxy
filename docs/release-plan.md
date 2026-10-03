@@ -4820,3 +4820,164 @@ All live reads release before root16 creates the correction worktree. Prior
 No new native build/runtime/hosted-CI or release result follows. Concurrent
 native 2PC and all remaining gates/exclusions, issues46/15 and the goal remain
 open.
+
+
+### Separate setup/query owners merged; local prepared commands begun
+
+PR #64 was normally squash-merged from independently reviewed c7db9fd to
+`cd0e0fc6936319e8a660517c1f770a7dee1c34ee`, tree
+`a24d9b497c109694fc4c22f9c571b30ac36a2406`, parent4d2a81b. Root23 verifies
+that exact public personal main, unchanged generic description, no eligible
+open PRs after filtering PR4, and issues46/15 OPEN. Readback facts at
+`logs/native-private-history-c7db9fd-merged-readback-v1/facts.json` have SHA256
+`3d2a10566b66fff93c967338ebbd576c6964f2a8e63ef469f29768952da12457`.
+The independent correction accepts final docs only atc7; the original1b0/D1
+remains historically OPEN. Root18 rehashes162 correction fixed members and
+completion records,184 unique paths, with actual final/post/completion0.
+
+The next [local prepared-command component](prepared-commands.md) starts at
+that merged main in an isolated feature worktree. It owns source-admitted
+local templates, dynamic variable reads and direct parameter metadata under the
+TCP connection, with distinct prepare/execute/reset/close response contracts.
+No native C, SQL, catalog admission or existing-profile lifecycle is changed.
+Its current implementation checks and independent review remain pending.
+
+Ordinary stock observations use the existing MySQL8.4.11 container and pinned
+PyMySQL1.1.2. The first observer's mutable mysql:8.4 tag differs from the running
+container and fails actual1 before any SQL case. V2 binds the existing immutable
+image and completes4 cases; V3 adds initial NULL, tiny-integer and unsigned
+transitions and exposes numeric-to-string coercion/warnings. V4 additionally
+observes ROW_COUNT/FOUND_ROWS; the deprecated FOUND_ROWS call's warning is not
+proof of an earlier condition count. V5 adds independent PING counts showing
+prepare/reset clear and known/unknown close preserve. Its facts at
+`logs/prepared-frontend-reference-v5/facts.json` have SHA256
+`8d79e1ed1b946b21669cdff1f54e037f3bfa7788421185310646fc247d58010e`.
+Original failure/earlier observations stay immutable. The checked-in corpus
+retains unsupported stock conversions separately from proxy-supported paths.
+
+The pinned sql_prepare.cc primary capture is HTTP200,123236 bytes,SHA256
+`69fce8b432c0aa8dded49fdb0c10e04f3cbc476335b4682e80ebb102fe7645ea`.
+Selected preparation, precheck, execute, parameter-reset, statement reset and
+close bodies inform the component; the full file is not semantically accepted.
+Source bytes remain outside the Apache distribution. New template/packet
+allocations and unimplemented coercions are explicit in the component contract.
+
+Native entry/bootstrap/provider/registry/reference/writer/sequence, whole
+statement/table execution, native prepared/DDL validity, full MySQL coercions,
+serving, performance and release gates remain OPEN. Concurrent PostgreSQL
+native2PC remains required. Security, compiler PR4, hosted CI, new native stress
+or recovery experiments and release publication remain excluded.
+
+The first prepared candidate76ef217 has a preserved strict Clippy actual101:
+retaining a full Expr made the prepared-cell enum352 bytes, and two fixture
+reports were unused must-use values. The corrected design retains only the
+classified variable/scope facts, without boxing a whole AST or adding a per-
+variable allocation; fixtures assert their returned state. Current corrected
+checks and independent review remain pending. Earlier source/artifacts remain
+revision-bound; no passing result is inferred from compilation of a predecessor.
+
+At corrected revision `cbf5b1c9a82e48a0f9715fa48e6de67b9446720e`, format,
+workspace all-target/all-feature strict Clippy, repository boundaries and offline
+tests pass (1,691 passed, 0 failed, 93 ignored in 41 reported groups). All eight
+required PostgreSQL 17.11/18.6 suites pass: per major, 82 owner, 10 decimal
+transaction, 15 decimal frontend and 4 CLI tests. Each CLI group preserves its
+32 child exits (15 actual 0, 17 expected actual 1). Root10–17 receipts and raw
+streams are retained under `logs/prepared-frontend-cbf5b1c-*`; required-suite
+facts have SHA256 `39c03dc3c2c43d02f008b3c39c8ffcee863af3083fedf6f11f25f3049fed7850`.
+Before/after audits observe the same eight profile identities, starts, restart
+counts, libraries, headers and settings with no residual fixture databases.
+These observations certify that revision only.
+
+Root18's v6 stock observer completes 15 cases, preserving the preceding five
+and adding signed/unsigned integer-family bounds. Facts at
+`logs/prepared-frontend-reference-v6/facts.json` have SHA256
+`8b1d05ff1399791a57514babdb28103713c7fa7d6280903962618c0d63f4cac3`.
+The new INT24 inputs return stock errors 1210/1835 rather than integer rows;
+the pinned `set_parameter_value` handler has no INT24 value branch despite
+the metadata setter accepting that code. The local admission now explicitly
+rejects INT24 with 1235, and its corpus marks these as unsupported observations,
+not matching stock error packets. TINY, SHORT, LONG and LONGLONG signed/unsigned
+bounds produce the expected LONGLONG results. The generic wire decoder is not
+a semantic admission authority. Current expanded checks and independent review
+remain pending; full native execution and release gates remain OPEN.
+
+### Expanded prepared-command implementation verified
+
+At `4bffee43f7ed2361b86f16381ea24dacfb0a8641`, root20–27 all have actual exit 0.
+They execute `cargo fmt --all --check`, workspace all-target/all-feature locked
+Clippy with `-D warnings`, the committed stock observer, the locked offline
+workspace suite excluding `darmok-postgres-tests`, before/after profile audits,
+all eight required native/CLI suites and `python3 scripts/check_repository.py`.
+The offline suite reports 1,691 passed, 0 failed, 93 ignored across 41 groups.
+Per PostgreSQL 17.11/18.6 major, owner tests report 82 passed, decimal transaction
+tests 10, decimal frontend tests 15 and CLI tests 4, all with 0 failed/ignored.
+Each CLI suite's 32 child receipts retain 15 actual exit 0 and 17 expected exit 1.
+No existing profile was restarted or replaced. The 22 unchanged native build
+inputs remain bound to the existing c43443d package/profile facts. This is Rust
+and packet validation, not a new native module build or complete engine gate.
+
+Evidence under `logs/prepared-frontend-4bffee4-*` records commands, raw streams,
+source before/after and immutable identities. Required-suite facts have SHA256
+`9e460a9461c5f63135bca72c2a0e94e437c05f10a0e986da7bda1cef832750af`;
+stock observation facts have SHA256
+`34ff89f2aa3284ba2b536acc6588a5fe89bdea392d00b8dde4552aa7b8db5bd4`
+(15 cases and 4 condition-count checks). Profile before/after facts have SHA256
+`98e00dd5bd46825c6da75ae59e6a3f160f866702571d773cb9e2cc0f9ca2f41d`
+and `b2dc29fa5b40aefb224f77dc13a95c1469e23f3e89be879c88cdf1bf04199d6e`,
+with the same eight IDs, starts, restart counts, settings, libraries and headers,
+and no residual fixture databases. The intermediate d35422a format check's
+actual exit 1 remains preserved; 4bffee4 fixes only its required line wrapping.
+Documentation now records these completed checks; its subsequent revision must
+be proven identical for tested runtime/corpus/observer inputs before acceptance.
+Independent review remains pending, and all previously open native, full
+prepared, performance, serving and release gates remain OPEN.
+
+### Prepared registry accounting correction
+
+Independent review of clean `8ed1f8b4298f37bfb3b11e83fcb7598c9c470c4c`, tree
+`7a4173023edbd6f251df12134f70e0bc9e7d44dd`, finds one required correction C1.
+The new public registry `get_mut` exposed an entire statement; replacing it
+with another registry's statement could change source/ID/parameter facts without
+updating SQL-byte accounting or the map key. The owner needs only opaque plan
+mutation. The correction exposes registry `plan_mut(id) -> Option<&mut P>` and
+keeps whole registered statement metadata immutable. Its regression mutates the
+payload and verifies unchanged identity/types plus count/source limits, removal
+and monotonic IDs. No SQL execution behavior or native input changes.
+
+The rejected review remains frozen at its original worktree. Its final40,
+post41 and completion42 actually exit 0, but C1 remains OPEN at that revision;
+passing audit commands do not accept the feature. Root29 rehashes 1,071 fixed
+members and completion companions, 1,093 unique paths. Facts at
+`logs/review-prepared-frontend-8ed1f8b-v1-root-rehash-v1/facts.json` have SHA256
+`aa23d3f51aef678535adcb02f075b2695a1418f5cc4ca79066144605098f486c`.
+The review's packet-summary bookkeeping reader37 actual1 remains preserved;
+corrected position-based reader38 actually exits 0. No second product finding.
+The correction is on a separate branch/worktree; fresh validation and a finite
+C1 review remain pending. Whole-engine and release gates remain OPEN.
+
+### Prepared accounting correction freshly verified
+
+At `43f835b4037b5751a80555dbf1b054e002293b25`, root31–38 all actually exit 0:
+format, workspace all-target/all-feature locked strict Clippy, committed stock
+observer, locked offline suite, profile before/after audits, eight required
+native/CLI suites and repository boundaries. The offline suite reports 1,692
+passed, 0 failed, 93 ignored in 41 groups, including the new plan-mutation
+identity/metadata/accounting regression. Per PostgreSQL 17.11 and 18.6, the
+required suites report 82 owner, 10 decimal transaction, 15 decimal frontend
+and 4 CLI tests, all 0 failed/ignored. CLI child receipts again preserve 15
+actual exit 0 and 17 expected actual exit 1 per major. The stock observer
+reproduces all 15 cases and four condition-count checks.
+
+Raw streams and receipts remain under `logs/prepared-frontend-43f835b-*`.
+Required-suite facts have SHA256
+`dfe8e554f8f5e2392fa72796919db4013fc5a834c66374215e3903fda3de2eed`.
+Profile before/after facts have SHA256
+`cb9295a309f54b162da8fdbcb7cc17550e01e2d86beb11cb7fb66f553b53e7c0`
+and `1e9793d63430521a9f97a90938c7765f828da62a4c0492f8fb0c5d178bd9a54e`:
+all eight profiles keep identical IDs, starts, restart counts, settings,
+libraries and headers with no residual fixture databases. The same 22 native
+build inputs and existing package manifests remain fixed reuse anchors, not
+new native certification. The subsequent two-file documentation revision must
+be bound to these unchanged tested inputs. Corrective independent review still
+decides C1 closure; full native/statement/serving/performance/release gates,
+issues 46/15 and the goal remain OPEN. Concurrent PostgreSQL 2PC is required.

@@ -4,7 +4,7 @@
 
 use bytes::{Bytes, BytesMut};
 use darmok_protocol::{CapabilityFlags, Command, ErrPacket, MySqlPacketCodec, OkPacket, RawPacket};
-use darmok_session::SessionState;
+use darmok_session::{PreparedStatementLimits, SessionState};
 use darmok_types::error::ProxyError;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -70,6 +70,7 @@ pub struct FrontendConnection {
     session: SessionState,
     backend: NativeBackend,
     globals: ServerSetValues,
+    prepared: crate::prepared_controller::PreparedCommands,
 }
 
 impl FrontendConnection {
@@ -78,6 +79,7 @@ impl FrontendConnection {
         session: SessionState,
         backend: NativeBackend,
         globals: ServerSetValues,
+        prepared_limits: PreparedStatementLimits,
         max_packet_size: u32,
         buffered_input: BytesMut,
     ) -> Self {
@@ -88,6 +90,7 @@ impl FrontendConnection {
             session,
             backend,
             globals,
+            prepared: crate::prepared_controller::PreparedCommands::new(prepared_limits),
         }
     }
 
@@ -157,6 +160,7 @@ impl FrontendConnection {
                 return Err(FrontendError::Sequence(packet.header.sequence_id));
             }
             let sequence = packet.next_sequence_id();
+            self.check_contract()?;
             let command = Command::decode(&packet.payload, self.session.client_capabilities)
                 .map_err(FrontendError::Decode)?;
             match command {
@@ -178,8 +182,19 @@ impl FrontendConnection {
                     }
                 }
                 Command::Ping => self.command_response(sequence, false).await?,
-                Command::StmtClose { .. } => {
-                    return Err(FrontendError::NoResponseCommand("COM_STMT_CLOSE"));
+                command @ (Command::StmtPrepare(_)
+                | Command::StmtExecute { .. }
+                | Command::StmtReset { .. }
+                | Command::StmtClose { .. }) => {
+                    self.prepared
+                        .command(
+                            &mut self.session,
+                            &self.globals,
+                            command,
+                            sequence,
+                            &mut self.transport,
+                        )
+                        .await?;
                 }
                 Command::StmtSendLongData { .. } => {
                     return Err(FrontendError::NoResponseCommand("COM_STMT_SEND_LONG_DATA"));
@@ -192,9 +207,6 @@ impl FrontendConnection {
                 | Command::ChangeUser { .. }
                 | Command::ResetConnection
                 | Command::SetOption { .. }
-                | Command::StmtPrepare(_)
-                | Command::StmtExecute { .. }
-                | Command::StmtReset { .. }
                 | Command::StmtFetch { .. } => {
                     self.command_response(sequence, true).await?;
                 }
