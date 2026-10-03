@@ -111,6 +111,9 @@ not bound registration count or those bytes. Registry initialization/parsing
 belong in admitted setup outside S, with separate bounds on counts and bytes.
 This checkpoint adds no
 runtime operation or measured performance result.
+The [archive-bound census](native-entry-census.md) locates the selected literal
+registration names across both source trees. It does not replace generated/
+compiled path coverage or actual module and registry construction.
 
 ## Finite evidence
 

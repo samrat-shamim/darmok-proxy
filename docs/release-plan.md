@@ -5180,3 +5180,69 @@ Concurrent native2PC remains required. Entry/bootstrap/provider/registry/referen
 writer/sequence, full table execution, serving, performance and release gates,
 issues46/15 and the goal stay OPEN. Security, compiler PR4, hosted CI, new
 stress/recovery experiments and release publication remain excluded.
+
+### Native registry findings merged; archive-bound entry census traced
+
+PR #68 was normally squash-merged from independently accepted
+`8a32da42a24e050e72d191dfcaf3a56627860e56` to public main
+`470e49d32371733e948857a60f07de2bf7eaa18b`, tree
+`d5d2681c34d86430a69a28dafda3076f070c7d6a`, parent840dd53. Its four-doc
+checkpoint preserves356 other base entries and all22 native inputs. Independent
+review has no required findings and retains349 absolute fixed members. Actual
+final19/post20/completion21 exit0; a separate pre-child tool serialization
+failure retains a null actual child exit. Root08 rehashes371 fixed/completion
+paths and actually exits0; facts SHA256 at
+`logs/review-native-registry-profile-8a32da4-v1-root-rehash-v1/facts.json` is
+`7ca3b00830dea27776a62d9b84e0d66b4adb6a4ba34ab2a0bfcaa04ed4b76f6d`.
+Root14 verifies exact merged tree/parent, public personal repository and generic
+description, no eligible open PRs after filtering PR4 and issues46/15 OPEN.
+Readback facts at `logs/native-registry-profile-8a32da4-merged-readback-v1/facts.json`
+have SHA256 `d5c3e3e12ae7ded6fa378d9dd3ea6fa21c49ddd03564d6228ce45a4069cec315`.
+The accepted investigation closes no native registry or descriptor-entry gate.
+
+The next isolated branch starts from that exact main. Its
+[entry mutation census](native-entry-census.md) binds official PostgreSQL
+17.11/18.6 archives, tag observations before/after and twelve selected earlier
+source identities. Root03 actually exits0 after six HTTP-200 responses. The
+archives contain7,085/7,284 regular files, including2,387/2,463 C/header files
+under src/contrib. The tag commits are083ac033419f690758508e08c1736089384bbee8
+and724edf9bde9d356724ad384a2e196edc3c9f80f7. Archive identity does not establish
+compiled runtime identity or full program semantics.
+
+Root04's actual1 remains preserved: ripgrep's directory traversal order differed
+from a flat lexicographic list. The exact paths matched with no missing, extra
+or duplicate item. Separate corrected root05 rehashes each C/header file before
+and after five explicit literal queries on each major and actually exits0.
+Counts include definitions, declarations and comments; they are not call counts
+or live reference events. Generated/non-C sources, indirect/bulk mutations,
+external providers and the actual compiled build need separate proof.
+
+Root06 actually exits0 and selects44 complete function bodies across22 function
+pairs, one PG18-only rebuild body and six initial callback-list declarations. Four of25
+pairs differ;21 have equal selected bytes. The targeted findings distinguish
+constructor pins, returned owned references, scan/directory references,
+whole-object count-preserving rebuilds and separate callback registrations.
+PostgreSQL18's clear/rebuild split and heap-scan bitmap/batching/buffer changes
+are retained. No full constructor, provider, startup or owner census is admitted.
+
+Commands are `python3 capture-native-entry-census-primary-v1.py`,
+`python3 capture-native-entry-census-symbols-v2.py` and
+`python3 capture-native-entry-census-functions-v1.py` through the fixed root
+recorder. RUSTUP_HOME/CARGO_TARGET_DIR remain `.darmok-work/rustup` and
+`.darmok-work/native-values/target`. Primary facts/seal at
+`logs/native-entry-census-primary-v1` have SHA256
+`a76e2da7b03f8fd90d0ebda6435abcffadbad16d0dda81e08df526f2d5342edd`
+and `a6cd6136b0050491e5430a579ceedac0f4b13321e2d04e992e01b90bb302960e`.
+Symbol facts/seal under `logs/native-entry-census-symbols-v2` have SHA256
+`f9ae56f41c702f4d267c6c7c9f73cca0ce2c36d92a05f6ba5b30cc2beb47b09a`
+and `d1f3f070a89c9508cf0646a954b3b02eddb583f4778a7fc4fb855f6508a35dac`.
+Selected facts/seal under `logs/native-entry-census-functions-v1` have SHA256
+`c8be611cb6ba4ae3aa6b326200c4f199d69eb5a43e68e4b39c00ed55ca7edcf9`
+and `5f9f4dc02cf03e9b40c53852e053e83af9de4ed4167f2567ad26a1fde1cc779a`.
+Current repository/diff checks and independent review are required before merge.
+All22 native build inputs remain unchanged; no C/Rust/SQL, native build/runtime
+or profile lifecycle action is added. Concurrent native2PC remains required.
+Startup/entry/bootstrap/provider/registry/reference/writer/sequence, full table
+execution, serving, performance and release gates, issues46/15 and the goal stay
+OPEN. Security, compiler PR4, hosted CI, new stress/recovery experiments and
+release publication remain excluded.

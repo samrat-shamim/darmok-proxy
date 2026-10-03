@@ -77,6 +77,10 @@ or rebuild. No post-open inspection or readiness shortcut is selected here.
 The [registry trace](native-reloptions-registry.md) adds native kind-mask,
 referenced-data and major-specific presence obligations. Binding the consumer
 registry does not retroactively certify an init file's producing backend.
+The [archive-bound mutation census](native-entry-census.md) adds explicit count
+initialization, owned scan/directory references and whole-object rebuild copies.
+Its literal source matches are not an actual owner census or complete program
+mutation proof.
 
 Core startup includes file reads, descriptor allocations, provider setup and
 physical waits. Phase3's restart scan can be quadratic; needing new init files
