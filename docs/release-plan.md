@@ -3651,3 +3651,94 @@ their explicit complete map. No mask fallback or product code change is made.
 Only Rust fixture/ledger inputs advance; all20 native build inputs remain
 unchanged. The failed run stays failed; current binding and paired suites must
 run before finite verification or C1 acceptance.
+
+
+### Verified missing-image candidate awaiting independent implementation review
+
+Current executable/test leaf `5a82a9643bcc3e43a7a122a72cc6621fb5034482`, tree
+`392fe72b2fb7129292edfe8ff73d0529cf9464bf`, keeps all20 native product/probe
+inputs byte-identical to corrected built `954c5de`. Recorder prefix
+`logs/native-missing-images-5a82a96-` records `15-input-bind`0; binding folder
+`logs/native-missing-images-5a82a96-input-bind-v1` facts SHA
+`d2caa3114d3c1f1b6c1acc9a681bf9f672dbdc9148665092dcd53f5bc9f457e9`
+contains22 actual-zero Git readers and36 verified paths. The four corrected
+Linux/arm64 product/test image IDs, in17 product/test and18 product/test order, are
+`d6dbb5317bd65822ba4067ee661e142d4640358bb5e0a921be4f6cdc5b4573ac`,
+`7a222332d3ac25518d8acf7e0c95464e89ad20d9cb9b8d62c2239805f6a0c83b`,
+`0c88b3ab4a6c71f5613a9eb3534b2fbcb1240e176bf7f1bf9cbd9e10d7ebee5f`,
+`28bf46415948ca6e6b57626a3aecec1be004ac0f494b734a37bf139658d9c0e0`.
+
+`16-storage17` and `17-storage18` actually exit0: ten fixtures each, zero failed
+or ignored. Exact paired ordinary tests positively witness short/four-byte/pglz/
+LZ4 carriers, user compression declarations differing from stored methods,
+opaque domain/enum/array/composite identities, default removal, dropped columns,
+literal inherited relations, duplicate/mixed-mode complete graph bindings, and
+C1's old physical natts1 versus later present-NULL natts14. Both native rows
+retain their respective missing-value/NULL behavior before and after DROP DEFAULT.
+Nonempty normal subtransaction/retention/prepared commit/rollback outcomes pass.
+C1 independent implementation closure is pending, not inferred from author tests.
+
+`18-package17` and `19-package18` actually exit0:19 binaries and147 passed tests
+per major, zero failed/ignored. Child argv records the ordered-2PC URL explicitly.
+Primary/ordered endpoints are32871/32874 (17) and32875/32878 (18), native limit10;
+no2pc negative endpoints32872/32876 stay zero; product-only unpreloaded endpoints
+32873/32877 stay ten. `20-owner17`/`21-owner18` exit0 with three selected native
+owner groups each and86 filtered tests. Commands are `cargo test -p
+darmok-postgres-tests --locked -- --nocapture --test-threads=1` and the selected
+`cargo test -p darmok-execute --lib native_backend::tests::native_catalog --locked
+-- --ignored --nocapture --test-threads=1`. These pre-existing required checks
+do not authorize new stress/error/interruption experiments.
+
+`22-format` (`cargo fmt --all -- --check`), `23-boundaries` (`python3
+scripts/check_repository.py`, nine packages), `24-clippy` (`cargo clippy
+--workspace --all-targets --all-features --locked -- -D warnings`) and
+`25-connector-clippy` (`cargo clippy -p tokio-postgres --lib --locked --
+-D warnings`) all exit0. All recorded chains use scoped RUSTUP_HOME and the
+native-values target directory, execute sequentially and retain exact clean
+source reads before/after. No current full-workspace test count is claimed.
+
+`26-cost17` actually exits1: its summarizer compares an OID to an `[OID,mode]`
+pair. The child ordinary SQL/sample and cleanup actually exit0. Original helper,
+raw sample, native receipt and failed outer stderr SHA
+`1698f7972f1045de96819c6dce978e223ec648942b6c929b9da0dc03f6fdeea3`
+remain unchanged. Distinct `27-cost17-summary`0 uses a corrected offline parser
+of that verified sample, never re-executing the workload. Summary facts SHA
+`cd58311b9774090050778cb8a62b34b6de1368555d9923fc3b86f5ef2bf3d4e5`
+in `logs/native-missing-images-5a82a96-cost17-summary-v1`. `28-cost18`0 uses the
+distinct corrected v2 helper once; facts SHA
+`8b784867993f5154cbd3628dbd9c207c0023a74e2eafeec41158c652a480bbd1`
+in `logs/native-missing-images-5a82a96-cost18-v2`.
+
+Each ordinary cost sample has32 warmups/128 sequential calls, three duplicate
+root bindings, five nodes/thirteen exact references, six selected attributes,
+two actual types and four positively witnessed s/u/p/l images. p50/p95/max
+milliseconds are0.5655/0.876/1.081 (17) and0.556/0.740/0.930 (18). Both stored
+carrier totals are380 bytes per observation; normalized images total8504 bytes.
+Attribute/type/missing record arrays are624/416/160 bytes. Initial/final context
+allocations are1245280/1212512 (17) and1245280/1245280 (18). Full scanned row
+counts and160 raw printed timings per major remain in facts/stdout; only final
+copied status is inspected. This includes full metadata and pure JSON copying
+plus TCP loopback protocol/utility overhead with microsecond quantization.
+No baseline, comparative improvement, isolated C timing, throughput, contention,
+allocation-event count, peak/process-memory or full performance acceptance.
+
+`29-environment`0 records85 actions0 in
+`logs/native-missing-images-5a82a96-environment-v1`, facts SHA
+`81763bf8dd17ba77d7dcceeec58dbb0bf570b188880f3bbff25ce27693e89bbf`.
+It ties eight exact healthy profiles, four exact images, all20 inputs and
+installed libraries/bitcode/headers/packaged README to127 corrected setup actions;
+product-only profile lacks the probe. Native prepared/module/mock refs and
+checked heap/attribute/missing-image fixture relations/schemas/types are zero.
+Old and failed profiles remain untouched. Passive wrong stdout.log/seal-filename
+reader exits1 remain bookkeeping failures, not native test results.
+
+This documentation-only checkpoint updates two unpackaged docs; packaged README
+and every executable/test/native input stay unchanged. Author evidence audit
+and independent implementation review must verify the exact final candidate
+before finite acceptance and normal squash merge. Original f972 product-check
+failure,954 oracle failure,26 parser failure, earlier source/reviewer/root failures
+remain failed. Full variable/default/TOAST/transitive/provider/candidate/effect/IR/
+preparation/data/executor/MySQL row/read-lock/serving/cache/full performance/
+artifact/release gates, issues46/15 and the goal remain OPEN. Security, compiler
+PR4/resources, hosted CI/account/admin, new stress/forced interruption/recovery,
+existing-profile stop/restart/signal and release publication remain excluded.

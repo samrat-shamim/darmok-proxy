@@ -1,7 +1,7 @@
 # Private column missing-value images
 
-Status: implemented candidate; native verification and independent implementation
-review remain pending. This extends the finite
+Status: implemented candidate; paired native verification is recorded below.
+Independent implementation review remains pending. This extends the finite
 [fixed column/type facts](native-attribute-type-facts.md) inside the existing
 private heap-storage invocation. It does not admit a TupleDesc, a type codec,
 SQL, an executor, default evaluation or a frontend metadata handle.
@@ -157,6 +157,41 @@ Strict product/probe native builds, required native suites, appropriate Rust
 formatting/boundary/Clippy checks, artifact/input/environment binding, bounded
 ordinary costs and independent second-pass review are required before finite
 acceptance. Current fixed-fact images cannot certify changed executable inputs.
+
+### Candidate verification
+
+Executable/test leaf `5a82a9643bcc3e43a7a122a72cc6621fb5034482` passes all ten
+heap-storage fixtures and the complete 19-binary native package (147 tests)
+on each PostgreSQL 17.11/18.6 profile, with zero failed or ignored tests. Three
+selected native ownership groups pass on each major. Formatting, the nine-package
+repository checks, strict workspace Clippy across all targets/features and strict
+connector-library Clippy pass. All 20 native product/probe inputs match corrected
+built leaf `954c5de` and the recorded installed artifacts. Concurrent native 2PC
+stays enabled at ten in primary/ordered profiles; zero remains a negative fixture.
+C1's absent-slot/present-NULL behavior is positively verified on both majors;
+independent closure is still pending.
+
+One ordinary TCP loopback psql sample per major uses 32 warmups and 128 sequential
+invocations, three duplicate root bindings, five graph nodes, thirteen exact
+references, six selected attributes, two types and four missing images. Recorded
+p50/p95/max times in milliseconds are 0.5655/0.876/1.081 (17) and
+0.556/0.740/0.930 (18). Both samples copy 380 stored bytes per observation and
+8,504 normalized image bytes. Fixed attribute/type arrays are 624/416 bytes and
+the missing-record array is 160 bytes. Initial/final observation context allocations
+are 1,245,280/1,212,512 bytes (17) and 1,245,280/1,245,280 bytes (18).
+These include the existing complete five-catalog observations and pure JSON copy,
+plus protocol/utility overhead. Only final copied status is inspected. There is
+no comparison baseline, throughput/contention result, allocation-event count,
+peak/process-memory bound or full performance acceptance.
+
+The first 17 measurement summarizer failed on the root-pair representation after
+native SQL completed successfully and cleaned up. A separate corrected offline
+parser consumes its verified original raw sample; no second workload was run.
+The failed outer helper remains failed. The release ledger records exact commands,
+profiles, revisions, hashes, original failures and evidence locations. The final
+85-action environment check finds eight exact healthy profiles, matching installed
+libraries/bitcode/headers/README and zero checked prepared/module/mock/fixture
+references. No existing profile is stopped, restarted or signaled.
 
 This component does not close variable defaults/expressions, transitive types,
 constraints/rules/triggers, providers/collation, name/candidate/effect closure,
