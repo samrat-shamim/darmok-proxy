@@ -9,9 +9,12 @@ use crate::{
 };
 
 mod native_catalog;
-mod native_schema;
+mod native_database;
 pub use native_catalog::{NativeCatalogError, NativeCatalogFailure, NativeCatalogMismatch};
-pub use native_schema::{NATIVE_SCHEMA_VERSION, NativeSchemaCompletion, NativeSchemaFailure};
+pub use native_database::{
+    NATIVE_SCHEMA_VERSION, NATIVE_SERVER_EXTENSION_VERSION, NativeDatabaseAction,
+    NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+};
 
 /// Known lifecycle state under this owner's exclusive SQL submission boundary.
 /// Ready is a confirmed request observation, not a promise of future connectivity.
@@ -21,14 +24,15 @@ pub enum NativeBackendState {
     Controlling(NativeControl),
     Scoped(NativeScopeBoundary),
     Discovering(NativeScopeBoundary),
+    SettingUp(NativeDatabaseAction),
     /// An unfinished operation or unconfirmed cleanup permits only disposal.
     Uncertain,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeBackendOperation {
-    InitializeSchema,
-    VerifySchema,
+    InitializeDatabase,
+    VerifyDatabase,
     Begin,
     Commit,
     Rollback,
@@ -353,10 +357,6 @@ fn failure_state(failure: &NativeControlFailure) -> NativeBackendState {
             (NativeControl::Savepoint, Some(state @ (Transaction | FailedTransaction))) => {
                 return NativeBackendState::Ready(state);
             }
-            (
-                NativeControl::InitializeSchema | NativeControl::VerifySchema,
-                Some(state @ (Idle | FailedTransaction)),
-            ) => return NativeBackendState::Ready(state),
             _ => {}
         }
     }
@@ -520,9 +520,9 @@ impl StdError for NativeBackendDisposeError {
 mod tests {
     mod frontend_loop;
     mod native_catalog;
+    mod native_database;
     mod native_lookup;
     mod native_row_output;
-    mod native_schema;
     mod query_results;
     mod query_transactions;
     mod set_controller;

@@ -12,13 +12,8 @@ fn help_and_version_work_without_database_settings() {
             "--database-url-env <ENV_NAME>",
         ),
         (
-            "help-schema",
-            vec!["schema", "--help"],
-            "Usage: darmok schema <COMMAND>",
-        ),
-        (
             "help-verify",
-            vec!["schema", "verify", "--help"],
+            vec!["verify", "--help"],
             "--database-url-env <ENV_NAME>",
         ),
     ] {
@@ -42,7 +37,7 @@ fn incomplete_or_unimplemented_commands_are_usage_errors() {
         ("usage-root", vec![]),
         ("usage-init", vec!["init"]),
         ("usage-schema", vec!["schema"]),
-        ("usage-verify", vec!["schema", "verify"]),
+        ("usage-verify", vec!["verify"]),
         ("usage-empty-name", vec!["init", "--database-url-env", ""]),
         ("usage-serve", vec!["serve"]),
     ] {
@@ -56,7 +51,7 @@ fn incomplete_or_unimplemented_commands_are_usage_errors() {
 #[test]
 fn settings_errors_are_reported_before_connecting() {
     let init = ["init", "--database-url-env", SETTINGS_ENV];
-    let verify = ["schema", "verify", "--database-url-env", SETTINGS_ENV];
+    let verify = ["verify", "--database-url-env", SETTINGS_ENV];
     for (label, arguments, settings, expected) in [
         (
             "settings-missing-init",

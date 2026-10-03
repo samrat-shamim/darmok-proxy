@@ -3940,3 +3940,41 @@ and acceptance of nonmembership application dependencies while rejecting extra
 extension members and reserved-namespace objects. Bounded independent P1
 readback is pending at this correction leaf. Implementation, runtime acceptance,
 M2/M3, issues46/15 and the overall goal remain OPEN.
+
+### Combined setup implementation candidate
+
+P1 is independently CLOSED only at corrected design head
+`02240773b674894f1b2ea88409832cd8aadbc718` / tree
+`3d854213c13fd14e7320e8a5e6837898381e89d3`; historical f01 stays OPEN. The
+bounded review `logs/review-native-database-init-0224077-correction-v1` has
+report SHA256 `6387cd2bab0b47b5fa2e79c10309cbab9238bd31abde538dede65c8d343e938b`,
+facts `9ecaa9b8f16a68f8fe63dcdb664d7a2e0b301b35791e40787e9183442757e594`,
+and 139-member seal
+`95bfdcf0e7f8acfc9987b25b99a49c67f8b764ca9069749053734ea9a222189b`.
+Final10 and independent post11 exit0 with receipt hashes
+`7cb24805fcd2b7ebe70ff4092faf3a49c70fea07759d9d80c9db6cb6d580e208` and
+`3d160d1bb63343eecfa11ae5d8f95ce8702d1f28c554fb923fff540d96577aaa`.
+Root05 exits0, rehashing139 fixed members plus separate companions (149 unique
+paths); map SHA256 `9f080edbd8480ad1cb0faf5a6c1223c6d35aba0991e2693a7a5e63eea97dfe20`.
+Root06 exits0 and creates the separate implementation worktree. Both design
+worktrees remain frozen. No design review ran runtime commands.
+
+The candidate cleanly replaces schema-only API/control variants and nested CLI
+with combined `initialize_database` / `verify_database`, `init` / `verify`.
+It validates both functional inventories and the exact native empty response
+before a separately observed COMMIT, retains original errors and actual cleanup
+receipts, and requires confirmed idle before owning a transaction. The shared
+private SET/SHOW checker has a fixed prefix; public empty discovery still does
+no SQL. Tests cover all three required ordinary cases alongside existing
+fixtures. SQL kernels/native product/probe build inputs are unchanged. Current
+compile/runtime checks, artifact reuse and independent implementation review
+remain pending; no earlier pass certifies this candidate.
+
+Root passive reads guessed nonexistent nested native_control and connector
+tests paths; stderr/missing-path outcomes precede corrected inventory/source
+reads. An apply_patch delete/add targeting one filename was rejected before
+writing; the subsequent explicit replacement completed. These are tooling
+bookkeeping events, not runtime or product results. Compiler PR4, security work,
+new stress/forced-error/interruption/recovery experiments, hosted CI/account
+work and release publication remain excluded. All full gates, issues46/15 and
+the overall goal remain OPEN.

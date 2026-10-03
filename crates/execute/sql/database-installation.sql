@@ -2,6 +2,8 @@ DO $darmok_installation$
 DECLARE
     allow_create constant pg_catalog.bool := true;
     schema_oid pg_catalog.oid;
+    server_schema_oid pg_catalog.oid;
+    extension_oid pg_catalog.oid;
     table_oid pg_catalog.oid;
     index_oid pg_catalog.oid;
     row_type_oid pg_catalog.oid;
@@ -183,6 +185,53 @@ BEGIN
             WHERE singleton AND format_version = 1
                 AND profile COLLATE pg_catalog."C" = 'substring-signed64-utf8-bytes-v1') THEN
         RAISE EXCEPTION 'Darmok installation version or metadata does not match';
+    END IF;
+
+    SELECT oid INTO server_schema_oid FROM pg_catalog.pg_namespace
+        WHERE nspname::pg_catalog.text COLLATE pg_catalog."C" = 'darmok_server';
+    SELECT oid INTO extension_oid FROM pg_catalog.pg_extension
+        WHERE extname::pg_catalog.text COLLATE pg_catalog."C" = 'darmok_server';
+    IF extension_oid IS NULL THEN
+        IF NOT allow_create THEN
+            RAISE EXCEPTION 'Darmok server extension is missing; explicit initialization is required';
+        END IF;
+        IF server_schema_oid IS NOT NULL THEN
+            RAISE EXCEPTION 'Darmok server namespace exists without its extension';
+        END IF;
+        CREATE EXTENSION darmok_server VERSION '1.0';
+        SELECT oid INTO STRICT extension_oid FROM pg_catalog.pg_extension
+            WHERE extname::pg_catalog.text COLLATE pg_catalog."C" = 'darmok_server';
+        SELECT oid INTO STRICT server_schema_oid FROM pg_catalog.pg_namespace
+            WHERE nspname::pg_catalog.text COLLATE pg_catalog."C" = 'darmok_server';
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_extension
+            WHERE oid = extension_oid AND extnamespace = server_schema_oid
+                AND extversion COLLATE pg_catalog."C" = '1.0' AND NOT extrelocatable
+                AND extconfig IS NULL AND extcondition IS NULL)
+        OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_depend
+            WHERE classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+                AND objid = extension_oid) <> 1
+        OR NOT EXISTS (SELECT FROM pg_catalog.pg_depend
+            WHERE classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+                AND objid = extension_oid AND objsubid = 0
+                AND refclassid = 'pg_catalog.pg_namespace'::pg_catalog.regclass
+                AND refobjid = server_schema_oid AND refobjsubid = 0 AND deptype = 'n') THEN
+        RAISE EXCEPTION 'Darmok server extension definition does not match';
+    END IF;
+    -- The shipped extension creates no SQL objects. Ordinary incoming
+    -- application dependencies are not extension membership and are allowed.
+    IF EXISTS (SELECT FROM pg_catalog.pg_depend
+            WHERE refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+                AND refobjid = extension_oid AND deptype = 'e') THEN
+        RAISE EXCEPTION 'Darmok server extension contains unexpected members';
+    END IF;
+    IF EXISTS (SELECT FROM pg_catalog.pg_depend
+            WHERE refclassid = 'pg_catalog.pg_namespace'::pg_catalog.regclass
+                AND refobjid = server_schema_oid
+                AND NOT (classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+                    AND objid = extension_oid AND objsubid = 0
+                    AND refobjsubid = 0 AND deptype = 'n')) THEN
+        RAISE EXCEPTION 'Darmok server namespace contains unexpected objects';
     END IF;
 END
 $darmok_installation$;

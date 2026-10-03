@@ -4,14 +4,14 @@ use darmok_catalog::{
     CATALOG_REQUEST_MAX_BYTES, CATALOG_REQUEST_MAX_PAIRS, CatalogObservation,
     CatalogObservationError, NativeRelationName, decode_catalog_observation,
 };
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt};
 use tokio_postgres::{
     Error, SimpleQueryEvent, SimpleQueryEventStream, SimpleQueryRow, TransactionState,
 };
 
 use super::{NativeBackend, NativeBackendState, NativeScope, NativeScopeBoundary};
 
-const REQUEST_SETTING: &str = "darmok_server.catalog_request_v1";
+pub(super) const REQUEST_SETTING: &str = "darmok_server.catalog_request_v1";
 
 #[derive(Debug, thiserror::Error)]
 pub enum NativeCatalogError {
@@ -170,15 +170,34 @@ const EXPECTED: [&str; 5] = [
     "ReadyForQuery",
 ];
 
-async fn check_request(
-    mut events: SimpleQueryEventStream,
+pub(super) async fn check_request(
+    events: SimpleQueryEventStream,
+    prefix: &'static [&'static str],
+) -> Result<SimpleQueryRow, NativeCatalogFailure> {
+    let consumed = events.has_yielded();
+    check_events(events, prefix, consumed).await
+}
+
+fn expected_event(prefix: &'static [&'static str], position: usize) -> &'static str {
+    if position < prefix.len() {
+        prefix[position]
+    } else {
+        EXPECTED
+            .get(position - prefix.len())
+            .copied()
+            .unwrap_or("end of request")
+    }
+}
+
+async fn check_events(
+    mut events: impl Stream<Item = Result<SimpleQueryEvent, Error>> + Unpin,
+    prefix: &'static [&'static str],
+    consumed: bool,
 ) -> Result<SimpleQueryRow, NativeCatalogFailure> {
     let mut failure = NativeCatalogFailure {
         matched_events: 0,
         ready_state: None,
-        mismatch: events
-            .has_yielded()
-            .then_some(NativeCatalogMismatch::AlreadyConsumed),
+        mismatch: consumed.then_some(NativeCatalogMismatch::AlreadyConsumed),
         backend_error: None,
         stream_error: None,
     };
@@ -212,39 +231,50 @@ async fn check_request(
                 unreachable!()
             }
         };
-        let mismatch = match (position, event) {
-            (0, SimpleQueryEvent::CommandComplete(tag)) if tag == "SET" => None,
-            (3, SimpleQueryEvent::CommandComplete(tag)) if tag == "SHOW" => None,
-            (0 | 3, SimpleQueryEvent::CommandComplete(tag)) => {
-                Some(NativeCatalogMismatch::Tag(tag))
+        let mismatch = if position < prefix.len() {
+            match event {
+                SimpleQueryEvent::CommandComplete(tag) if tag == prefix[position] => None,
+                SimpleQueryEvent::CommandComplete(tag) => Some(NativeCatalogMismatch::Tag(tag)),
+                _ => Some(NativeCatalogMismatch::Sequence {
+                    expected: prefix[position],
+                    actual,
+                }),
             }
-            (1, SimpleQueryEvent::RowDescription(columns)) => {
-                if columns.len() == 1
-                    && columns[0].name() == REQUEST_SETTING
-                    && columns[0].table_oid().is_none()
-                    && columns[0].column_id().is_none()
-                    && columns[0].type_oid() == 25
-                    && columns[0].type_size() == -1
-                    && columns[0].type_modifier() == -1
-                    && columns[0].format() == 0
-                {
-                    None
-                } else {
-                    Some(NativeCatalogMismatch::Description)
+        } else {
+            match (position - prefix.len(), event) {
+                (0, SimpleQueryEvent::CommandComplete(tag)) if tag == "SET" => None,
+                (3, SimpleQueryEvent::CommandComplete(tag)) if tag == "SHOW" => None,
+                (0 | 3, SimpleQueryEvent::CommandComplete(tag)) => {
+                    Some(NativeCatalogMismatch::Tag(tag))
                 }
-            }
-            (2, SimpleQueryEvent::Row(value)) => {
-                if value.len() == 1 && value.get(0).is_some() {
-                    row = Some(value);
-                    None
-                } else {
-                    Some(NativeCatalogMismatch::Row)
+                (1, SimpleQueryEvent::RowDescription(columns)) => {
+                    if columns.len() == 1
+                        && columns[0].name() == REQUEST_SETTING
+                        && columns[0].table_oid().is_none()
+                        && columns[0].column_id().is_none()
+                        && columns[0].type_oid() == 25
+                        && columns[0].type_size() == -1
+                        && columns[0].type_modifier() == -1
+                        && columns[0].format() == 0
+                    {
+                        None
+                    } else {
+                        Some(NativeCatalogMismatch::Description)
+                    }
                 }
+                (2, SimpleQueryEvent::Row(value)) => {
+                    if value.len() == 1 && value.get(0).is_some() {
+                        row = Some(value);
+                        None
+                    } else {
+                        Some(NativeCatalogMismatch::Row)
+                    }
+                }
+                _ => Some(NativeCatalogMismatch::Sequence {
+                    expected: expected_event(prefix, position),
+                    actual,
+                }),
             }
-            _ => Some(NativeCatalogMismatch::Sequence {
-                expected: EXPECTED.get(position).copied().unwrap_or("end of request"),
-                actual,
-            }),
         };
         if let Some(mismatch) = mismatch {
             failure.mismatch = Some(mismatch);
@@ -261,10 +291,12 @@ async fn check_request(
             Some(state) if state != TransactionState::Transaction => {
                 Some(NativeCatalogMismatch::State(state))
             }
-            Some(_) if failure.matched_events != 4 => Some(NativeCatalogMismatch::Sequence {
-                expected: EXPECTED[failure.matched_events],
-                actual: "ReadyForQuery",
-            }),
+            Some(_) if failure.matched_events != prefix.len() + 4 => {
+                Some(NativeCatalogMismatch::Sequence {
+                    expected: expected_event(prefix, failure.matched_events),
+                    actual: "ReadyForQuery",
+                })
+            }
             Some(_) => None,
         };
     }
@@ -326,7 +358,7 @@ impl NativeBackend {
             .expect("live owner retains its client")
             .simple_query_events(&sql)
             .map_err(NativeCatalogError::Submit)?;
-        let row = match check_request(events).await {
+        let row = match check_request(events, &[]).await {
             Ok(row) => row,
             Err(failure) => {
                 let recoverable = failure.mismatch.is_none()
@@ -417,5 +449,114 @@ mod tests {
             }]),
             Err(NativeCatalogError::RequestLimit)
         ));
+    }
+    #[tokio::test]
+    async fn fixed_setup_prefix_and_catalog_tail_reject_incomplete_or_malformed_events() {
+        use SimpleQueryEvent::{
+            CommandComplete as Tag, EmptyQuery, ReadyForQuery as Ready, RowDescription,
+        };
+        let prefix: &'static [&'static str] = &["BEGIN", "DO"];
+        for (events, matched, expected) in [
+            (
+                vec![Tag("DO".into()), Ready(TransactionState::Transaction)],
+                0,
+                NativeCatalogMismatch::Tag("DO".into()),
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    EmptyQuery,
+                    Ready(TransactionState::Transaction),
+                ],
+                1,
+                NativeCatalogMismatch::Sequence {
+                    expected: "DO",
+                    actual: "empty query",
+                },
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    Tag("DO".into()),
+                    Ready(TransactionState::Transaction),
+                ],
+                2,
+                NativeCatalogMismatch::Sequence {
+                    expected: "SET",
+                    actual: "ReadyForQuery",
+                },
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    Tag("DO".into()),
+                    Tag("SET".into()),
+                    Ready(TransactionState::Transaction),
+                ],
+                3,
+                NativeCatalogMismatch::Sequence {
+                    expected: "TEXT description",
+                    actual: "ReadyForQuery",
+                },
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    Tag("DO".into()),
+                    Tag("SET".into()),
+                    RowDescription(Vec::new().into()),
+                    Ready(TransactionState::Transaction),
+                ],
+                3,
+                NativeCatalogMismatch::Description,
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    Tag("DO".into()),
+                    Tag("COMMIT".into()),
+                    Ready(TransactionState::Idle),
+                ],
+                2,
+                NativeCatalogMismatch::Tag("COMMIT".into()),
+            ),
+            (
+                vec![
+                    Tag("BEGIN".into()),
+                    Tag("DO".into()),
+                    Ready(TransactionState::Idle),
+                ],
+                2,
+                NativeCatalogMismatch::State(TransactionState::Idle),
+            ),
+            (
+                vec![Tag("BEGIN".into()), Tag("DO".into())],
+                2,
+                NativeCatalogMismatch::MissingReady,
+            ),
+        ] {
+            let stream = futures_util::stream::iter(events.into_iter().map(Ok));
+            let failure = check_events(stream, prefix, false).await.unwrap_err();
+            assert_eq!(failure.matched_events(), matched);
+            assert_eq!(failure.mismatch(), Some(&expected));
+            assert!(failure.backend_error().is_none() && failure.stream_error().is_none());
+        }
+        // Discovery's empty prefix still requires SET; setup cannot submit its
+        // BEGIN/DO through the existing discovery-only expectation.
+        let stream = futures_util::stream::iter([
+            Ok(Tag("BEGIN".into())),
+            Ok(Ready(TransactionState::Transaction)),
+        ]);
+        let failure = check_events(stream, &[], false).await.unwrap_err();
+        assert_eq!(
+            failure.mismatch(),
+            Some(&NativeCatalogMismatch::Tag("BEGIN".into()))
+        );
+        let stream = futures_util::stream::iter([Ok(Ready(TransactionState::Transaction))]);
+        let failure = check_events(stream, prefix, true).await.unwrap_err();
+        assert_eq!(
+            failure.mismatch(),
+            Some(&NativeCatalogMismatch::AlreadyConsumed)
+        );
     }
 }

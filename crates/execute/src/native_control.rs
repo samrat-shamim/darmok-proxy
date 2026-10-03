@@ -9,10 +9,6 @@ use tokio_postgres::{CommandEvent, CommandEventStream, Error, TransactionState};
 pub enum NativeControl {
     /// Fresh-connection ROLLBACK followed by the owner's fixed lookup setting.
     Initialize,
-    /// Explicit per-database functional schema initialization in its own transaction.
-    InitializeSchema,
-    /// Read-only functional schema verification in its own transaction.
-    VerifySchema,
     Begin,
     Commit,
     Rollback,
@@ -27,7 +23,6 @@ impl NativeControl {
     pub fn expected_tags(self) -> &'static [&'static str] {
         match self {
             Self::Initialize => &["ROLLBACK", "SET"],
-            Self::InitializeSchema | Self::VerifySchema => &["BEGIN", "DO", "COMMIT"],
             Self::Begin => &["BEGIN"],
             Self::Commit => &["COMMIT"],
             Self::Rollback | Self::RollbackTo => &["ROLLBACK"],
@@ -39,11 +34,7 @@ impl NativeControl {
 
     pub fn expected_state(self) -> TransactionState {
         match self {
-            Self::Initialize
-            | Self::InitializeSchema
-            | Self::VerifySchema
-            | Self::Commit
-            | Self::Rollback => TransactionState::Idle,
+            Self::Initialize | Self::Commit | Self::Rollback => TransactionState::Idle,
             Self::Begin
             | Self::Savepoint
             | Self::RollbackTo

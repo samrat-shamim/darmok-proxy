@@ -1,23 +1,18 @@
 # Explicit native schema initialization
 
-This component installs and verifies version 1 of the functional `darmok`
-schema in one physical PostgreSQL database. `NativeBackend::initialize_schema`
-and `verify_schema` use the existing exclusive connection owner. They expose
-no caller SQL or raw client. The [CLI component](cli.md) now wraps these
-operations with `init` and `schema verify` in a real `darmok` executable.
-Configuration, credentials, grants, routing and `serve` admission remain
-pending. This library receipt establishes functional artifacts, not privilege
-policy or runtime readiness; process evidence is recorded separately.
+The version1 compatibility format is one component of the
+[combined database setup contract](native-database-init.md). The exclusive
+owner's `initialize_database` and `verify_database` methods check the `darmok`
+schema, fixed `darmok_server` extension and live native handler. The CLI exposes
+`init` and `verify`. Only a confirmed idle owner may start; caller transactions
+are rejected before submission and their work is preserved.
 
-Both operations require confirmed idle. They reject an existing transaction
-before submission and never commit or roll back a caller's outer work. Each
-submits one fixed batch: explicit read-committed, non-deferrable `BEGIN`, a
-manifest `DO`, and `COMMIT`. Initialization uses read-write access; verification
-uses read-only access. Success requires exactly `BEGIN`, `DO`, `COMMIT` and
-observed idle `ReadyForQuery`. It does not distinguish newly created from
-already present artifacts. The CLI waits for this outcome and local driver
-disposal before printing success; the library receipt alone cannot establish a
-command-line result.
+Setup drains the fixed BEGIN/DO/SET/native response/SHOW/transaction readiness,
+strictly decodes that response, then submits and checks a separate COMMIT.
+`NativeDatabaseCompletion` records the action, both functional versions and the
+actual commit receipt. This establishes functional setup, not runtime admission
+or a catalog lease. Implementation verification is recorded separately from the
+historical schema-only evidence below.
 
 The manifest takes a database-scoped transaction advisory lock using the fixed
 signed key `4922526098346491905`. Initializers take it exclusively; verifiers
@@ -39,9 +34,9 @@ properties are deferred with the excluded security work; physical tuning
 properties are not functional version identity. No repair, replacement,
 migration, legacy behavior or application-object inference is provided.
 
-An ordinary manifest SQL error is retained with its observed prefix tags and
+An ordinary manifest SQL error is retained with its observed prefix events and
 failed-transaction readiness. The owner then awaits an explicit `ROLLBACK` and
-preserves its result separately in `NativeSchemaFailure`. Rollback failure
+preserves its result separately in `NativeDatabaseFailure`. Rollback failure
 cannot become a successful reset. Stream errors, unexpected tags or missing
 readiness retain the owner's uncertain state and require disposal. A failure
 observed in idle remains an error without inventing a rollback receipt. Dropped
@@ -82,8 +77,8 @@ creation-time dependency tracking of a parsed SQL body; see PostgreSQL's
 This component supplies no execution-validity lease. Helper name qualification
 and output metadata cannot close the dependency gate in `native-execution.md`.
 
-Successful installation/verification adds one control round trip; an observed
-failed transaction requires a second for rollback. Schema catalog work occurs
+Successful combined installation/verification uses two operation round trips;
+an observed failed setup transaction adds its separate rollback request. Schema catalog work occurs
 on these explicit operations, not per row. Shared/exclusive advisory locks
 serialize initialization rather than application query execution. Runtime
 kernel performance and frontend SQL admission remain release gates.
@@ -110,7 +105,7 @@ required by both existing PostgreSQL native-owner jobs; the stock observer is
 required by the MySQL reference job. Hosted jobs have not been run for this
 component while the account blocker persists.
 
-The final implementation/fixture check is bound to revision
+The historical schema-only implementation/fixture check is bound to revision
 `edd7361ffcd4b393986fc5e4e5e83c5edb77f622`, tree
 `6b00ffd146641108a6276b105616af881c6961bd`. All twelve revised regression
 commands passed, including nine initialization groups on both backend majors

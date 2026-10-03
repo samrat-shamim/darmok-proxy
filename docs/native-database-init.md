@@ -1,7 +1,7 @@
 # Explicit database initialization
 
-Status: independently reviewed combined setup design; implementation and
-runtime verification are pending. This extends the functional [schema contract](native-schema.md) without
+Status: independently reviewed design with implementation candidate; runtime
+verification and implementation review are pending. This extends the functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
 ## Problem and selected behavior
@@ -15,7 +15,7 @@ that the handler ran.
 
 `darmok init --database-url-env ENV_NAME` will explicitly install or validate
 both components in one owned transaction. `darmok verify` will validate both
-without creation. The library entry points become `initialize_database` and
+without creation. The library entry points are `initialize_database` and
 `verify_database`. The old schema-only entry points and nested CLI command are
 removed, with no aliases or migration machinery.
 
