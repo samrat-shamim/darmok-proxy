@@ -115,12 +115,7 @@ impl PreparedSelect {
                     let metadata = types[*parameter];
                     if !matches!(
                         metadata.field_type,
-                        ty::TINY
-                            | ty::SHORT
-                            | ty::LONG
-                            | ty::LONGLONG
-                            | ty::VAR_STRING
-                            | ty::NULL
+                        ty::TINY | ty::SHORT | ty::LONG | ty::LONGLONG | ty::VAR_STRING | ty::NULL
                     ) {
                         return Err(SelectSqlError::Unsupported.into());
                     }
