@@ -3034,3 +3034,366 @@ savepoint lock equivalence, serving, driver/cache/throughput/artifact and releas
 gates remain open. Issues46/15 and the overall goal remain active. Standing
 security/compiler-PR4/hosted-CI/stress/profile-interruption/account/admin/release-
 publication exclusions remain unchanged.
+
+### Merged private heap-storage checkpoint
+
+PR [#54](https://github.com/samrat-shamim/darmok-proxy/pull/54) was normally
+squash-merged from independently reviewed leaf
+`790abd678f80a26b06d71742d5a5af71bea011c2` into personal public main
+`8361877170c2cdd475e2c7fb136467c059e1d1d5`, tree
+`c4cf053353e5a44fd3b3ecca4abf8b4faf17e9d5`. Its two-document status leaf
+preserves 339 other tracked entries from tested `2640513` and all 20 native
+inputs from built `aacfe42`, including packaged README DOCS. Existing native
+images and their tests are not recertified merely by the merge.
+
+Independent documentation acceptance under
+`.darmok-work/logs/review-native-heap-storage-790abd6-docleaf-v1` has report
+SHA256 `a43ca49a910d239e054daf1ada6e288a374aa5a084bf1faaf59f8507c544b07a`,
+facts `1dfc9bdf2957311bff52064589df2978da963cf14feaeaba62dc798ffe3199d5`,
+1500-member seal `24303e49bb7218c97b7b797eaaaa05674a5d0fe4dc5a7f2aab463759e0fa6949`,
+separate final invocation
+`edac34c51ff1a4709af30ecc2201ca40ff7184192eed115fc723a7267d09bc66`
+and post-rehash invocation
+`6f1a5a88e2762d62f5b4be522d6903b945db20695efc8e42202b6efb83b74ec0`,
+both actual0. Twenty passive commands, including thirteen Git readers, are
+actual0, with no correction needed. Historical implementation/design failures
+remain immutable. The advancing historical document uses exact tested Git bytes.
+
+Root `25-docreview-rehash` is a preserved bookkeeping actual1: relative post-
+reader names were resolved against process cwd instead of the review folder.
+The new exclusive `26-docreview-rehash-v2` is actual0 and verifies all 1500
+members plus separate executed final/post records, raw streams, helpers and
+clean source checks. Its root record SHA256 is
+`61c528a0a4633bec26708adbd9d2523f378d0e1676a1644068be84a39c5a2eaf`.
+No product, source or runtime correction follows from that reader mistake.
+
+Root `29-merge` and `30-publication-audit` are actual0 under
+`.darmok-work/logs/native-heap-storage-790abd6-*`. Four GitHub reads verify the
+merged head/tree, personal PUBLIC repository, generic description and no
+in-scope open PRs; PR4 is filtered before output. Publication facts SHA256 is
+`388ea9a8ef71007e19d9c1f20c67a47dc06951cc88ec9bdcf843aafc9ae3a353`,
+13-member seal `4ac815b54f664ea676bb5cbacc6c167b828e654c513c913c73f87fa165330b84`.
+Issue46 remains OPEN with unchanged title and exact body readback; its updated
+body SHA256 is `bd825cd96ed3f2516432e45de2cff641351847b914bad9d29e5c7a9b8ed09847`,
+update facts `0e8ef544cb649831b38d34c92ed6dd7279351c672233c56c55b37cdab61a0e30`.
+Fetch/worktree receipts `32-fetch` and `33-next-worktree` are actual0, leaving
+the component worktree frozen at the reviewed leaf. The next isolated branch
+begins from merged main. Full semantic/candidate/physical closure, neutral
+preparation, effect/immutable-plan admission, execution and MySQL data/lock
+gates remain open. Issues46/15 and the goal stay active; exclusions persist.
+
+
+### Fixed column/type facts design checkpoint (implementation pending)
+
+Public base is PR54/main `8361877170c2cdd475e2c7fb136467c059e1d1d5`.
+The isolated `feat/native-semantic-closure` worktree is clean checkpoint
+`23842c4ca8f25f98eb879dca570a2044c4332e7b`, tree
+`2acfe8ebe6c1375fc00fd1e6c0aac076301b56f9`, before this specification append.
+No native input, test or executable change has yet been verified for this lane.
+
+The primary capture command is `record-catalog-discovery-command-v1.py
+native-semantic-closure-23842c4-01-primary <worktree> 23842c4... python3
+capture-native-semantic-closure-primary-v1.py`, actual0. Scoped RUSTUP_HOME
+is `.darmok-work/rustup`, CARGO_TARGET_DIR is `.darmok-work/native-values/target`.
+`logs/native-semantic-closure-primary-v1/verified-sources.json` contains 90
+pinned REL_17_11/REL_18_6 bodies (45 each, 52 cached/38 HTTP200 fetched), SHA
+`be0d555554e377a582e623f5429455f6a4350a6e782ac254685e40715f2ea484`;
+39-member seal SHA
+`79e8c802277b89599f61f4f73c0d2d7e845351eb956659ba91bbaa31a7023f88`.
+Capture is provenance, not full-body semantic or runtime acceptance.
+
+Immutable external proposal v1 (12976 bytes) SHA
+`1b11ef5cd2a9364925537391f321643e9d10930bc3d4b0c0cee3a20291ebdff2`
+received finite conditional design review from `/root/native_values_review`.
+`logs/review-native-attribute-type-facts-23842c4-design-v1/report.md` SHA
+`eee2814716f1f9a6e6421d2f9222c6480b10d1e17cb97a06b46ad2fd64fdeba0`,
+facts SHA `91dd57faf16bd1153679de98ba18e498f087f95dd13197ea2e1f880d35f9da39`,
+263-member seal SHA
+`5de0e494f8448cbcca18db5ddbe587b3e9a17f749f9ae5e7ba7ba599083f82b3`.
+47 passive readers0, no own failures; independent finalization/post check0.
+Live reads released. Required C1 distinguishes true live layout redundancy
+(attlen/attbyval/attalign) from legitimate column overrides. P1 recommends exact
+root→positive-attribute→live-type filtered copies in one coherent snapshot/raw
+span while retaining full scans. Paired fixed headers and complete native
+TupleDescInitEntry/BuildDescForRelation/ATExecSetStorage/RemoveAttributeById and
+RelationBuildTupleDesc/RelationBuildDesc/RelationInitTableAccessMethod paths
+support the finite declarations and expose excluded variable/provider work.
+Root `02-design-rehash` actual0 verified263+companions277 unique files; root
+facts SHA `fc9544398aa4e5c19919e2e5d29333d552652c811e46d5671248536738d06867`.
+
+New exclusive proposal v2 (16367 bytes), SHA
+`fdb494febc10315183e42c12415236c27ea4d1a8e38bc1f7d9063f7ac2b0a29c`,
+closes C1 at design stage and selects P1. It separates scanned rows, selected
+array bytes and context allocation, and adds ordinary override, builtin-like
+custom type, removed dropped type, repeated type and cold/warm cases. V1 and
+all prior evidence remain unchanged. Independent v2 finite delta review found
+no further required design correction. Review folder
+`logs/review-native-attribute-type-facts-23842c4-design-v2`: report SHA
+`c4f2a38b173754b039d34d08e02f44436d0e7a2d482be468c0d1db301a45fc50`,
+facts SHA `b35846a875ffa44869c62df670fec126da97bc9fa4b108b37f72cdef6ef933ae`,
+60-member seal SHA
+`ca69fc34e7da686d7991dc043746961aff4fe8b2d05ef30b865e61bbb45c583a`.
+10 passive readers0, 19 selected anchors rehashed, no own failures; separate
+finalization/post check0 and clean23842c4/tree2acfe8e. Live reads released.
+Root `03-design-rehash-v2` actual0 verified60+companions74 unique files;
+root facts SHA `f946d718e4ddd4693317aee7bbdbe4ca058cf37f553b6d8b290fdda0c8eaa156`.
+Both root chains use the actual-exit/raw-stream recorder; no runtime gate passed.
+
+A root passive inventory included an absent `docker` path and surfaced rg's
+error, although the display pipeline returned0; it is not verification evidence.
+A subsequent repository-wide verified filename inventory returned0. No source
+or native behavior was changed for that inventory mistake. The source capture,
+review and recorded root rehash commands above all actually returned0.
+
+The selected specification is `docs/native-attribute-type-facts.md`. It extends
+the existing private whole-invocation metadata point, with positive slots and
+direct fixed type declarations only. Five descriptors prepare before exclusion;
+all initial reader increments close before physical waits. Full semantic closure,
+variable/provider/name/effect/immutable-IR/preparation/data/executor/lock/serving/
+release gates and issues46/15 stay open. Concurrent native two-phase transactions
+remain in scope. No full-goal completion follows from these design reviews.
+
+
+### Fixed column/type facts first implementation verification (not final acceptance)
+
+Implementation `828692023861fdc31a9989658c00f9bb8dab89ad`, tree
+`dec7fba8990ac02028cb54fb014f2321baf43546`, follows specification `fbba702`.
+The private header/C boundary now copies positive root slots and direct fixed
+live-column types under one registered five-heap observation, compares explicit
+defining fields, preserves column overrides/type0 dropped layout and exposes
+separate scan/selected-array/context costs. Pure hash construction rejects
+missing/duplicate identities while observing; complete cardinality/layout/type
+namespace/graph validation stays outside raw. Such copying ERROR follows normal
+abort-required cleanup; it is never a completed false retry. This clarification
+retains the prior raw hash invariants and involves no variable/provider dispatch.
+
+Recorder `record-catalog-discovery-command-v1.py` SHA
+`27fc25286818869bd1e43351627620b59828833cc7e3a2d1bc04f3338de67122`
+records clean exact before/after source, actual argv/scoped RUSTUP_HOME and
+CARGO_TARGET_DIR, raw streams and child exit. Evidence folders use prefix
+`logs/native-attribute-facts-8286920-`: `04-grammar` captures both pinned native
+grammars0; `05-native-compile`0; strict product/probe PG17/18 builds
+`06-product17`,`07-test17`,`08-product18`,`09-test18`0. Both native compilers and
+LLVM bitcode keep warnings as errors. Twenty exact product/probe inputs include
+packaged documentation. `10-profiles`0 binds all20 inputs and four image IDs;
+127 setup commands0. Fresh eight profiles use ports32855..32862. Primary/ordered
+native maximum is10; disabled2PC is only a negative dependency. Installed native
+headers and packaged README match source. Existing native profiles stay running.
+Setup facts SHA `19d1655b39ff43bd8e5d1c4983a26806beb5c9f798ac3b7f98ff93c8f2cf0257`.
+Paired grammar facts SHA
+`20d6cae0ab7781493838502b8d3de46d22b2d5e4ec306cdd07361a8fff8510fb`;
+three-member seal SHA
+`346dee7094d3a27f43aa95310d91bb5575ca842399b5f84174efe1bacfe5d535`.
+REL_18_6 ConstraintElem uses `NOT NULL ColId` and NOT VALID; no parenthesized
+column syntax or guessed effective nullability was used.
+
+At8286920, `11-storage17`/`12-storage18` each pass9 ordinary fixtures,
+`13-package17`/`14-package18` each pass19 native binaries/146 tests with zero
+failed/ignored (including those9), and `15-owner17`/`16-owner18` explicitly select
+and pass3 private-owner checks each, zero failed/ignored and86 filtered out.
+`17-format`0 and `18-boundaries`0 (9 packages). These are exact8286920 results,
+not current/future-leaf acceptance. New ordinary variants cover fixed-field
+SQL oracles, empty/duplicate ranges,63-byte UTF8/quoted/renamed/dropped slots,
+removed custom types, builtin-like names and shared type IDs, valid storage/
+compression/collation/typmod/dimension/declaration overrides, default/missing/
+identity/stored/virtual-generation flags, PG18 invalid NOT NULL with existing
+NULL data, initial/warm invocation, own TEMP and both prepared ALTER/type rename
+outcomes. Native physical waits hold none of the five catalog reader increments
+or module fences. Complete native suites remain the pre-existing ordinary
+regression matrix, not new stress/signal/error-injection experiments.
+
+Strict workspace/all-target/all-feature Clippy `19-clippy` actually exits101;
+raw stderr SHA `88c633697fe779411174468a6e0db5c3e972cebce21daa05eaee6f1f84644879`.
+Rust1.96 Clippy flags the new test's manual `bytes % count == 0` divisibility
+predicate. The nonzero-count branch can express the same invariant through
+`bytes.is_multiple_of(count)`; use that native predicate without suppressing
+warnings or removing the assertion. Native product/probe inputs do not change.
+The original actual101 receipt and streams remain immutable. Fresh current-leaf
+fixture/static/cost/environment and independent implementation review remain
+required. No full workspace test, full descriptor/SQL/admission/executor/MySQL
+lock/serving/release gate or full-goal completion follows.
+
+A passive receipt inventory pattern for an assumed `native17` suffix returned
+no matches1; a broader known-lane inventory identified `package17` and returned0.
+This was filename discovery, not a product/runtime check. No missing path was
+read, source was unchanged, and no native failure was relabeled.
+
+### Fixed column/type facts reviewed verification and inherited-column finding
+
+Clean tested `32b4e29a0be641541b6b738bdbaba9a1f3b1e2e3`, tree
+`99a30581f292487a5010cd8e5db6578da2e192a0`, corrects only the test divisibility
+predicate and preceding ledger relative to built `8286920`. Exclusive input
+binding proves all20 native product/probe inputs, including packaged README,
+equal the built Git bytes and setup hashes; binding facts SHA
+`1cc1c5ead1de22be37bf069547a586fcfe8cdff69c8aea556d17369652fcda40`.
+No old receipt or failed Clippy result is modified.
+
+Recorder prefix `logs/native-attribute-facts-32b4e29-` records source/scoped
+environment/actual argv and exits: `20-input-bind`0; workspace all-target/
+all-feature strict `21-clippy`0; `22-format`0; `23-boundaries`0 (9 packages);
+strict tokio-postgres library `24-connector-clippy`0. `25-storage17` and
+`26-storage18` each pass9 required fixtures; `27-package17` and `28-package18`
+each pass19 binaries/146 native tests, zero failed/ignored (including the9).
+Explicit `29-owner17` and `30-owner18` each pass3 owner checks, zero failed/
+ignored and86 filtered out. These are32b4e29 results, not later-leaf acceptance.
+
+`31-cost17`/`32-cost18` wrap new exclusive ordinary measurement bodies under
+`logs/native-attribute-facts-32b4e29-cost{17|18}-v1`, actual0:32 warmups and128
+sequential SET calls per major, one TCP-loopback psql connection, five storage
+nodes/thirteen exact references/two selected positive slots/two actual types.
+PG17 p50/p95/max are525500/701000/835000ns; PG18 are499000/747000/1031000ns.
+Timings include both five-catalog observations, graph/SI/descriptor/native
+owner/lock and pure-copy/protocol work. Psql prints1us quantization; the even
+sample median has500ns granularity. Final-view attribute/type arrays are208/
+416 bytes; each observation context is1204320 bytes on17 and1237088 on18.
+Five scanned-row counts remain separate. Only the final view is inspected;
+these are not peak/process/allocation-event/throughput/contention, isolated-C,
+baseline or full-performance measurements.
+
+`33-environment`0 records85 successful commands with eight exact healthy
+running profiles, unchanged image/container IDs and installed native headers/
+libraries/bitcode/probe/packaged README. Checked prepared/module/mock refs and
+old/new fixture tables/schemas/types are zero. Primary/ordered native2PC remains
+10. Final environment facts SHA
+`347e1877b8f3de9d5fb5987bb05dbb4fff0962c6c952a37849c2c34e80ab0d69`.
+Fresh root source inspection covers the entire C/header/probe and976 fixture
+lines. `34-author-audit`0 seals1457 members, facts SHA
+`cd99a3d59f2842fc1443bd8dd35f714a606b04ea42df746417c562019ea4369e`,
+seal SHA `0074c30215d73cfc5103dfecc670b3f5f68d58632fce6be274f8f320c0eae45e`.
+
+Independent frozen implementation review is
+`logs/review-native-attribute-facts-32b4e29-implementation-v1`. Report SHA
+`94879cafac6671ab26d19c79467ff25e72c4c20dcd6d625fb98038bb90d565bb`,
+facts SHA `03a701313d8c77118005534ce4e1ffb12096717a184bd52ed058132149273d82`,
+1762-member seal SHA
+`cf22b08e5c493e5e180c0cc5fc6cc64804ff5b62cf7a6b69735723a36f94bb26`.
+Actually executed `42-final-invocation.json`0 SHA
+`6b33b1538e70b20ebebbed25aa4eb192ad578eef74efb70885b93ea719e214c1`
+and separate `43-post-invocation.json`0 SHA
+`9a73d3d17ffae3e6ae4a05a504b51a43048b5b18803e8ceb0de3927a4323ea76`
+retain three clean Git readers and post facts SHA
+`dcff3e3e90e748406f7de28971cff3c712ff32d78a561b56b326b34e312cc3d8`.
+Own passive reader failures128/128/1 remain preserved; corrected reads pass.
+Root `35-review-rehash`0 verifies1762+companions1777 unique paths, root record
+SHA `2151249066a1400b6e235a868b1092d383edfc480d168668b128683203b03f9d`.
+
+Review identifies no C defect, closes C1's layout/override requirement and
+confirms P1's selected copying, but withholds final component acceptance for
+required C2/P2 inherited-column coverage. The existing fixture creates a child
+yet selects only its parent; selected positive slots all had local=true and
+inheritance_count0. The next correction selects that actual child without
+parent/descendant expansion, asserts nonlocal/positive inherited declarations,
+compares complete native column/type oracles and checks fresh/established data
+views and release ownership. Current corrected-source tests and independent
+C2 closure remain pending. No metadata implementation change follows from
+this coverage finding, and no earlier evidence is relabeled as acceptance.
+
+A root ad-hoc commands-manifest schema peek returned1 because the JSON object
+contains reader arrays rather than being a top-level array. A key-aware reader
+returned0. This is a reader bookkeeping error, not a native/review result;
+source was unchanged and recorded full rehash35 actually returned0.
+Full closure/effects/preparation/execution/MySQL data/lock/serving/release gates,
+issues46/15 and the goal remain open. Standing exclusions are unchanged.
+
+
+### Verified private fixed column and direct-type facts
+
+Clean tested `1934034e28d7fda64953c1693104b248c37c42ea`, tree
+`f33cce9026bba70c196073d7229668b175489488`, adds positive inherited-child coverage
+to the independently inspected implementation. Both fresh unset-snapshot and
+established RR paths select the exact child, assert local=false and positive
+inheritance_count, compare complete storage/root/attribute/direct-type native
+oracles, reject parent/descendant expansion and observe no remaining checked
+physical/coordination references before ordinary COMMIT. C2 closes here only;
+the old `32b4e29` review remains unchanged with its historical finding open.
+
+Recorder prefix `logs/native-attribute-facts-1934034-` records exact clean source,
+scoped RUSTUP_HOME/CARGO_TARGET_DIR, actual argv, exits and raw streams:
+`36-input-bind`0; `37-storage17`/`38-storage18` each pass 9 required fixtures;
+`39-package17`/`40-package18` each pass 146 native tests across 19 binaries,
+including those 9, zero failed/ignored. Explicit `41-owner17`/`42-owner18` each
+pass 3 private-owner checks, zero failed/ignored and 86 filtered out.
+`43-format`0; `44-boundaries`0 (9 packages); workspace/all-target/all-feature
+strict `45-clippy`0; tokio-postgres library strict `46-connector-clippy`0.
+No current full workspace test total is claimed. Original `8286920` strict product/
+probe GCC/LLVM builds remain the native artifact evidence. Input-binding facts
+SHA `f93f130cbe3e42d9e0d259d7d5fe77a7bae2ab65121232b9ab23fcd933a1407e`
+prove all 20 native inputs at `1934034` equal built `8286920` and original setup.
+
+`47-cost17`/`48-cost18`0 preserve 32 warmups and 128 ordinary sequential SET calls
+per major under `logs/native-attribute-facts-1934034-cost{17|18}-v2`.
+PG17 p50/p95/max are 670500/969000/3103000ns; PG18 are 884000/4521000/8794000ns.
+Five storage nodes/thirteen exact native references/two selected slots/two
+actual types yield 208/416 defined array bytes. Each initial/final observation
+context is 1204320 bytes on 17 and 1237088 on 18. Full scan rows are, separately,
+namespace/class/index/attribute/type: 17 has 160/420/167/3147/619 and 18 has
+162/420/166/3182/623. Timings include both five-catalog observations, graph,
+SI/descriptor/native lock-owner and pure-copy/protocol work with 1us psql
+quantization; only the final copied view is inspected. The historical `32b4e29` timing
+run stays immutable. Variance is visible; no cause or performance improvement
+is inferred. Allocation events, peak/process memory, throughput, contention,
+isolated-C/baseline and full performance acceptance remain open.
+
+`49-environment`0 records 85 successful actions and eight healthy exact profiles,
+unchanged native images/containers/libraries/bitcode/headers/probe/packaged README
+and all 20 tested inputs. Checked prepared/module/mock refs and old/new fixture
+tables/schemas/types are zero. Primary/ordered native 2PC remains 10; no profile
+lifecycle action occurred. Environment facts SHA
+`058216105187746d5aa8e83332fe6e13e3fcc13e2eeb581e39b47b41c8b06362`.
+`50-author-audit`0 seals 2270 members; facts SHA
+`20d168abdbdac76ab5cb759a204b71ad196b0dfd618ff1b1fafcebfe416e7a14`,
+seal SHA `6a06c6e362af215d2d6e4e77dabd4a48222f5ab5c85e665bbf66bf540003a93e`.
+The old 1777-path root review is preserved with two exact Git `32b4e29` source witnesses
+for its changed test/ledger paths, rather than current working-path bytes.
+
+Independent correction review from `/root/native_values_review` is
+`logs/review-native-attribute-facts-1934034-correction-v2`. Finite implementation
+accepted; C2/P2 closed at `1934034`. Report SHA
+`0c7dabedbd06b1e892465788ad0a0343dc6eef82d9fa704da7865f05603834cc`,
+facts SHA `4048fcb8d60abb8b066c2f8f19f9137db3ade6c7bac34baf929f49aac2007884`,
+2528-member structured seal SHA
+`cfe8ab52d07fc24030f6d497f5a233dfe88b478def3134a316633ecdf013bc08`.
+Actually executed `20-final-invocation.json`0 SHA
+`190e505ca91165d94ff9fccb1ce80a0f5d31cfbf8d97fd7578cc7f328dc6fcfd`
+and independent `21-post-invocation.json`0 SHA
+`675c26d4a7cac77585a1da95279788cf2ca003eacd17889c7f985075c98f12c0`
+retain exact clean source and post facts SHA
+`08fe2d8b99c78e9f0f02a0e6a22408116545d004ae6f4663a7e5824d234f11f8`.
+73 prefinal passive records preserve 72 zero and audit 15 exit 1 (a mistyped
+historical evidence-folder prefix); distinct corrected audit 16 exits 0. Final/post
+source readers exit 0, live reads released. No reviewer runtime execution occurred.
+
+Root `51-correction-rehash` actually returns 1: its checker assumed the old plain
+seal map, while this new manifest wraps 2528 entries in `members`. That original
+helper/receipt/stderr SHA
+`d1e0579cca09cac7f62119d64bf68a009c618856cbc2762e98b5fdbe538462b8`
+remain unchanged. A distinct schema-aware `52-correction-rehash-v3` actually
+returns 0, verifies 2528 sealed members plus companions: 2550 unique paths and
+preserves the failed 51 record. Root facts SHA
+`a5c8612351e640682c1f28d8810d5364b3f8b34e09985888722c4c7ec72950ab`.
+Prior Clippy exit 101, reviewer exits 128/128/1 and root bookkeeping failures stay historical;
+none is relabeled as success or a product/runtime defect.
+
+D1/P3 requires a status-neutral packaged README pointer after finite acceptance.
+The final leaf updates that DOCS/build-context input plus the three unpackaged
+status/ledger documents. Relative to tested `1934034`, all executable/test/dependency
+entries and 19 other native inputs remain identical; existing tested images keep
+their historical README. Do not claim all 20 final-leaf inputs match old images.
+A separate exact documentation-leaf audit and independent readback must close
+D1 before normal squash merge; the PR records final leaf/tree/publication proof.
+No runtime repetition or fresh final-leaf artifact certification follows from
+this documentation-only correction.
+
+Acceptance remains limited to fixed selected positive slots and direct types
+inside the private whole-invocation metadata point. Variable/transitive/provider/
+candidate/effect/immutable-IR closure, native preparation/Parse/Bind/Describe/
+reanalysis, data-derived storage, row execution, MySQL data/read-lock semantics,
+serving, cache/full performance and artifact/release gates, issues46/15 and the
+goal remain open. Security, compiler PR4/resources, stress/forced interruptions,
+profile stop/restart/signal, hosted CI/account/admin and release publication
+remain outside current scope. No full milestone or goal completion is claimed.
+
+A draft documentation spacing edit surfaced trailing whitespace through
+`git diff --check`; the multi-command display ended0 on its later status read,
+so that display is not a successful diff check. The whitespace is removed
+before commit and the separate diff check must pass. No runtime result changes.

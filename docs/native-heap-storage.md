@@ -1,11 +1,15 @@
 # Private catalog-declared heap storage
 
-Status: the finite private C boundary has passed local PostgreSQL 17.11/18.6
+Status: the original finite private C storage component passed local PostgreSQL 17.11/18.6
 verification and independent implementation review at
 `2640513033227cfe00ad5be4511b12e85491c09c`. Acceptance is confined to the
 continuous builtin private-owner and source-admitted pure consumer profile.
 It does not certify application SQL, an executor or complete semantic closure.
-Issues 46/15 remain open. Concurrent native PostgreSQL two-phase transactions
+The fixed column/type declaration extension also passed local verification and
+independent implementation review at `1934034e28d7fda64953c1693104b248c37c42ea`
+within that finite profile. See
+[native-attribute-type-facts.md](native-attribute-type-facts.md). Issues 46/15
+remain open. Concurrent native PostgreSQL two-phase transactions
 remain supported; disabling them is not a serving requirement.
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
@@ -16,8 +20,9 @@ each exact OID/mode reference is acquired once. Ordinary nonpartitioned builtin
 heaps and builtin btree live indexes are accepted; other kinds/AMs fail explicitly.
 Traditional inheritance hints are visible but do not imply child expansion.
 
-The boundary copies fixed fields from preopened builtin pg_namespace, pg_class
-and pg_index heaps. It includes every live index, even invalid/not-ready ones,
+The storage component copies fixed fields from preopened builtin pg_namespace,
+pg_class and pg_index heaps. The fixed column/type extension adds pg_attribute
+and pg_type, with exact-root/live-type filtered copies in the same observation. It includes every live index, even invalid/not-ready ones,
 and the declared TOAST heap and all its live indexes. Conservative relhasindex
 does not suppress edges. Roots, then their index siblings in OID order, then
 TOAST heaps and their index siblings produce deterministic parent-first native
@@ -69,8 +74,10 @@ owning subid as abort-required, and never guesses a partial native grant.
 Matching native abort is required before reuse/commit/prepare. Native promotion,
 child abort and retention remain governed by the reviewed reference primitive.
 
-Uncontended work performs two full three-heap observations, O(catalog-size)
-copying, O(V+E) graph traversal, sorting for deterministic roots/index siblings
+The accepted original component performed two full three-heap observations;
+the current fixed column/type extension performs five full heap scans in each
+observation, with separately scoped selected-copy/context costs. Original
+namespace/class/index maps remain O(catalog-size) copying, O(V+E) graph traversal, sorting for deterministic roots/index siblings
 and O(D log D) exact-declaration validation, plus D native increments and SI/
 descriptor/owner costs. Unrelated publications can cause false retries. Root
 and exact reference counts are bounded to 4096, copied names to 1MiB and copied
@@ -80,15 +87,17 @@ error; these are not peak or total process-memory bounds. Retained counts accrue
 until native transaction cleanup. Finite ordinary costs are recorded; allocation,
 throughput, contention and full performance acceptance remain open.
 
-The separate native test image supplies a pure copying probe; product images
+For the accepted original component at tested `2640513`, the separate native
+test image supplies a pure copying probe; product images
 contain no probe or SQL storage entry point. Six new ordinary fixtures pass on
 both majors, including exact literal/duplicate bindings and counts, release and
 native retention, mapped/shared/own TEMP storage, explicit unsupported kinds,
 both normal prepared DDL outcomes and live not-ready/invalid concurrent indexes.
 The complete native package passes 143 tests per major, including those six;
 three explicitly selected private-owner checks also pass per major. No test is
-ignored in these runs. All 20 product/probe build inputs, including packaged
-documentation, are byte-identical to built `aacfe42cab42f6f0b4b08a3e866a9cb3e6485ab7`.
+ignored in these runs. At the accepted PR54 leaf, all 20 product/probe build inputs, including packaged
+documentation, were byte-identical to built `aacfe42cab42f6f0b4b08a3e866a9cb3e6485ab7`.
+Those historical results do not certify the current extension.
 Primary and ordered profiles keep native `max_prepared_transactions=10`.
 Type/default/check/rule/trigger/domain/FK/partition/function/operator/collation
 and candidate closure, invocation effects, immutable IR/execution, native

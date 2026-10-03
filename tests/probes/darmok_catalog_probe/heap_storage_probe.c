@@ -38,6 +38,65 @@ copy_name_json(StringInfo output, const NameData *name)
 }
 
 static void
+copy_attribute_json(StringInfo output, const DarmokHeapAttributeFact *fact)
+{
+	appendStringInfo(output, "{\"relation_oid\":%u,\"number\":%d,\"name\":",
+					 fact->relation_oid, fact->number);
+	copy_name_json(output, &fact->name);
+	appendStringInfo(output, ",\"type_oid\":%u,\"length\":%d,\"typmod\":%d,\"dimensions\":%d,"
+					 "\"by_value\":%s,\"alignment\":%u,\"storage\":%u,\"compression\":%u,"
+					 "\"not_null_declared\":%s,\"has_default\":%s,\"has_missing\":%s,"
+					 "\"identity\":%u,\"generated\":%u,\"dropped\":%s,\"local\":%s,"
+					 "\"inheritance_count\":%d,\"collation_oid\":%u}",
+					 fact->type_oid, fact->length, fact->typmod, fact->dimensions,
+					 fact->by_value ? "true" : "false", (unsigned char) fact->alignment,
+					 (unsigned char) fact->storage, (unsigned char) fact->compression,
+					 fact->not_null_declared ? "true" : "false",
+					 fact->has_default ? "true" : "false", fact->has_missing ? "true" : "false",
+					 (unsigned char) fact->identity, (unsigned char) fact->generated,
+					 fact->dropped ? "true" : "false", fact->local ? "true" : "false",
+					 fact->inheritance_count, fact->collation_oid);
+}
+
+static void
+copy_type_json(StringInfo output, const DarmokHeapTypeFact *fact)
+{
+	appendStringInfo(output, "{\"oid\":%u,\"schema_oid\":%u,\"schema\":",
+					 fact->oid, fact->schema_oid);
+	copy_name_json(output, &fact->schema_name);
+	appendStringInfoString(output, ",\"name\":");
+	copy_name_json(output, &fact->name);
+	appendStringInfo(output, ",\"length\":%d,\"by_value\":%s,\"kind\":%u,\"category\":%u,"
+					 "\"preferred\":%s,\"defined\":%s,\"delimiter\":%u,\"relation_oid\":%u,"
+					 "\"subscript_oid\":%u,\"element_oid\":%u,\"array_oid\":%u,"
+					 "\"input_oid\":%u,\"output_oid\":%u,\"receive_oid\":%u,\"send_oid\":%u,"
+					 "\"typmod_input_oid\":%u,\"typmod_output_oid\":%u,\"analyze_oid\":%u,"
+					 "\"alignment\":%u,\"storage\":%u,\"not_null_declared\":%s,"
+					 "\"base_type_oid\":%u,\"typmod\":%d,\"dimensions\":%d,\"collation_oid\":%u}",
+					 fact->length, fact->by_value ? "true" : "false",
+					 (unsigned char) fact->kind, (unsigned char) fact->category,
+					 fact->preferred ? "true" : "false", fact->defined ? "true" : "false",
+					 (unsigned char) fact->delimiter, fact->relation_oid,
+					 fact->subscript_oid, fact->element_oid, fact->array_oid,
+					 fact->input_oid, fact->output_oid, fact->receive_oid, fact->send_oid,
+					 fact->typmod_input_oid, fact->typmod_output_oid, fact->analyze_oid,
+					 (unsigned char) fact->alignment, (unsigned char) fact->storage,
+					 fact->not_null_declared ? "true" : "false", fact->base_type_oid,
+					 fact->typmod, fact->dimensions, fact->collation_oid);
+}
+
+static void
+copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
+{
+	appendStringInfo(output, "{\"namespace_rows\":" UINT64_FORMAT
+					 ",\"relation_rows\":" UINT64_FORMAT ",\"index_rows\":" UINT64_FORMAT
+					 ",\"attribute_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
+					 ",\"allocated_bytes\":" UINT64_FORMAT "}",
+					 cost->namespace_rows, cost->relation_rows, cost->index_rows,
+					 cost->attribute_rows, cost->type_rows, (uint64) cost->allocated_bytes);
+}
+
+static void
 copy_storage(const DarmokHeapStorageView *view, void *opaque)
 {
 	StorageCopy *copy = opaque;
@@ -58,6 +117,30 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 		for (int i = 0; i < view->root_count; i++)
 			appendStringInfo(output, "%s[%u,%d]", i == 0 ? "" : ",",
 							 view->roots[i].relation_oid, view->roots[i].lock_mode);
+		appendStringInfoString(output, "],\"root_facts\":[");
+		for (int i = 0; i < view->root_count; i++)
+		{
+			const DarmokHeapStorageRootFact *fact = &view->root_facts[i];
+
+			appendStringInfo(output, "%s{\"oid\":%u,\"row_type_oid\":%u,"
+							 "\"declared_attribute_count\":%d,\"attribute_offset\":%d}",
+							 i == 0 ? "" : ",", fact->oid, fact->row_type_oid,
+							 fact->declared_attribute_count, fact->attribute_offset);
+		}
+		appendStringInfoString(output, "],\"attributes\":[");
+		for (int i = 0; i < view->attribute_count; i++)
+		{
+			if (i > 0)
+				appendStringInfoChar(output, ',');
+			copy_attribute_json(output, &view->attributes[i]);
+		}
+		appendStringInfoString(output, "],\"types\":[");
+		for (int i = 0; i < view->type_count; i++)
+		{
+			if (i > 0)
+				appendStringInfoChar(output, ',');
+			copy_type_json(output, &view->types[i]);
+		}
 		appendStringInfoString(output, "],\"references\":[");
 		for (int i = 0; i < view->reference_count; i++)
 			appendStringInfo(output, "%s[%u,%d]", i == 0 ? "" : ",",
@@ -78,7 +161,8 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 "\"has_subclasses\":%s,\"live\":%s,\"ready\":%s,\"valid\":%s,"
 							 "\"check_xmin\":%s,\"tablespace_oid\":%u,\"stored_file_number\":%u,"
 							 "\"file_tablespace_oid\":%u,\"file_database_oid\":%u,"
-							 "\"file_number\":%u,\"file_proc_number\":%d}",
+							 "\"file_number\":%u,\"file_proc_number\":%d,"
+							 "\"row_type_oid\":%u,\"declared_attribute_count\":%d}",
 							 (unsigned char) fact->kind, (unsigned char) fact->persistence,
 							 fact->access_method_oid, fact->toast_oid, fact->parent_oid,
 							 fact->mode_mask, fact->shared ? "true" : "false",
@@ -91,9 +175,16 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 fact->index_check_xmin ? "true" : "false",
 							 fact->tablespace_oid, fact->stored_file_number,
 							 fact->file_tablespace_oid, fact->file_database_oid,
-							 fact->file_number, fact->file_proc_number);
+							 fact->file_number, fact->file_proc_number,
+							 fact->row_type_oid, fact->declared_attribute_count);
 		}
-		appendStringInfoString(output, "]}");
+		appendStringInfo(output, "],\"attribute_array_bytes\":" UINT64_FORMAT
+						 ",\"type_array_bytes\":" UINT64_FORMAT ",\"initial_cost\":",
+						 (uint64) view->attribute_array_bytes, (uint64) view->type_array_bytes);
+		copy_cost_json(output, &view->initial_cost);
+		appendStringInfoString(output, ",\"final_cost\":");
+		copy_cost_json(output, &view->final_cost);
+		appendStringInfoChar(output, '}');
 		copy->body = output->data;
 	}
 	PG_FINALLY();
