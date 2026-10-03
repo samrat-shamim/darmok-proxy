@@ -115,6 +115,105 @@ descriptor cannot be probed by opening/rebuilding it and checking afterward.
 No assumption of a private owner or absence of outstanding references is
 inferred from a passing direct-type fixture.
 
+## Original builtin heap dispatch
+
+The paired source narrows one provider question. When
+`RelationInitTableAccessMethod` takes its catalog branch, it selects
+`F_HEAP_TABLEAM_HANDLER`. `InitTableAmRoutine` calls `GetTableAmRoutine`, whose
+zero-argument OID call passes through `fmgr_info` to the original-builtin
+lookup. `fmgr_isbuiltin` uses the compiled OID index/function table. A hit
+initializes the function pointer and returns before the `pg_proc` lookup and
+nonbuiltin dispatch branches. `FunctionCall0Coll` invokes that pointer. The
+native heap handler returns the same static `heapam_methods` object as
+`GetHeapamTableAmRoutine`.
+
+Both pinned bootstrap data rows assign original OID 3 to
+`heap_tableam_handler`. This source finding applies to the original compiled
+identity and admitted catalog branch. A function alias goes through a catalog
+lookup; a matching name alone cannot establish this dispatch. The selected
+server build, catalog-branch prerequisites and complete options/carrier,
+loader, callback and resource profile still need their admission proof. There
+is no new runtime/build result or universal provider certificate here.
+See paired [PG17 table-AM dispatch](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/table/tableamapi.c),
+[PG18 table-AM dispatch](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/table/tableamapi.c),
+[PG17 function lookup](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/fmgr/fmgr.c),
+[PG18 function lookup](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/fmgr/fmgr.c),
+[PG17 bootstrap function rows](https://github.com/postgres/postgres/blob/REL_17_11/src/include/catalog/pg_proc.dat),
+[PG18 bootstrap function rows](https://github.com/postgres/postgres/blob/REL_18_6/src/include/catalog/pg_proc.dat),
+[PG17 heap handler](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/heap/heapam_handler.c)
+and [PG18 heap handler](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/heap/heapam_handler.c).
+
+This exact handler path uses bounded stack call/lookup state and returns a
+static routine pointer; it adds no catalog or protocol round trip. The enclosing
+descriptor build, options parsing, cache work and native owner allocations keep
+their separate costs. This source cost analysis is not a measured bootstrap
+latency or peak-memory result.
+
+## References, reset and the entry witness
+
+`RelationIncrementReferenceCount` increments `rd_refcnt` and remembers the
+reference in `CurrentResourceOwner` during normal processing.
+`RelationDecrementReferenceCount` decrements it and forgets that exact owner
+reference. Bulk release removes the owner item before invoking its release
+routine; `ResOwnerReleaseRelation` consequently decrements without forgetting
+the item again. Native relcache references use the BEFORE_LOCKS release phase.
+Actual owner provenance and exact counts must be retained through every phase.
+
+In the ordinary successful simple-query path, `exec_simple_query` runs its
+unnamed portal to completion and drops it before reporting command completion.
+`PortalDrop(..., false)` runs the remaining cleanup, releases its resource
+owner in all three phases and deletes it. Successful non-top-level lock cleanup
+reassigns locks to the parent transaction while releasing the descriptor
+references. This supports a construction proof for fixed private controls;
+it does not establish cleanup of unrelated portals or references. Portal and
+resource release can invoke callbacks, so their admitted paths must remain
+outside S. See paired [PG17 portal cleanup](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/mmgr/portalmem.c),
+[PG18 portal cleanup](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/mmgr/portalmem.c),
+[PG17 native owners](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/resowner/resowner.c)
+and [PG18 native owners](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/resowner/resowner.c).
+
+The existing [private connection owner](native-backend.md) establishes fresh
+connector ownership and fixed command submission. Its current control API and
+the C invocation's owner-identity checks supply different observations:
+
+| Observation | Established fact | Additional proof still required |
+| --- | --- | --- |
+| Exclusive Rust owner | Commands cannot interleave through an escaped client | Admitted native startup/command history and callback footprint |
+| Current and transaction ResourceOwner identity | The recorded invocation boundary is unchanged | Provenance of every entered positive descriptor reference |
+| `rd_refcnt` on an obtained descriptor | Native total reference count | Exact owners, baseline nailed references and a safe pre-open observation |
+| `criticalRelcachesBuilt` | Native critical initialization completed | Continuous provider/registry/cache history |
+
+The pinned public relcache header offers lookup and invalidation routines, but
+no passive iterator over the cache's active references. The public owner type
+is opaque. `RelationIdGetRelation` can increment and rebuild an invalid entry
+before returning, so it cannot be used as a pre-open inspection shortcut.
+Neither a caller-supplied flag nor matching owner pointers constructs the
+missing witness. Investigate building it from a closed, source-admitted
+private history and the actual native provider/registry footprint; the concrete
+mechanism and complete induction remain OPEN. See paired
+[PG17 cache API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/utils/relcache.h),
+[PG18 cache API](https://github.com/postgres/postgres/blob/REL_18_6/src/include/utils/relcache.h),
+[PG17 owner API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/utils/resowner.h)
+and [PG18 owner API](https://github.com/postgres/postgres/blob/REL_18_6/src/include/utils/resowner.h).
+
+The reset route needs its own continuous admission. Native SI receipt can call
+`InvalidateSystemCaches`; its extended form invalidates snapshots/caches,
+processes the relation cache and invokes registered callbacks. Both majors invoke
+syscache and relcache callback lists; PostgreSQL 18 additionally invokes its native
+relation-sync callback list. Reference-free entries can be discarded, while
+active entries follow the major-specific invalidate/rebuild paths described
+above. This is source investigation of the reset path, not an executed queue
+reset, interruption or recovery experiment. See paired
+[PG17 invalidation](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/cache/inval.c)
+and [PG18 invalidation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/inval.c).
+
+Before C changes, the entry proof must bind the supported native build and
+registered callback/options footprint, establish every entered reference's
+provenance, and preserve that profile across SI, new opens, reloads and cleanup.
+Each new wait must still follow complete reader/snapshot closure and precede S.
+This investigation supplies concrete source obligations; it closes no
+authoritative entry, bootstrap, whole statement or implementation gate.
+
 ## Writer coverage and remaining sequence
 
 The complete paired `AlterTableGetLockLevel` bodies distinguish rewriting,
@@ -175,3 +274,13 @@ or65 selected bodies have complete semantic admission. The new descriptor,
 registry/owner, writer and whole statement gates remain OPEN. No C, Rust, SQL,
 native build or runtime result is introduced by this checkpoint. Standing
 security/compiler/hosted-CI/publication exclusions remain in force.
+
+The entry follow-up records12 selected cached lifecycle/API bodies plus ten
+HTTP-200 handler/lookup/public-header bodies under
+`logs/native-catalog-entry-primary-v1`:11 per major. V2 rehashes those22 bodies
+and adds six HTTP-200 heap-handler/bootstrap-data/function-macro bodies:14 per
+major. Selected records preserve54 complete function bodies and six complete
+native macros/data rows; eight saved paired differences retain actual major
+variations. These are finite byte/provenance records and targeted source reads,
+not semantic acceptance of all28 files or all60 selected records. The entry,
+callback/registry, writer, sequence and implementation/runtime gates stay OPEN.
