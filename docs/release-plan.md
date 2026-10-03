@@ -3461,3 +3461,56 @@ read-lock/serving/cache/full performance/artifact/release gates and the goal
 remain open. Concurrent native two-phase transactions stay supported; security,
 compiler PR4/resources, stress/forced interruption, existing-profile lifecycle,
 hosted CI/account/admin and release publication exclusions remain in force.
+
+### Proposed inline column missing-image boundary
+
+The new isolated branch checkpoints the merged PR55 proof at `ab286db`, tree
+`d99a126eafddeca7917c3e2d0e7572d119de7656`. No executable input changes yet.
+Recorder prefix `logs/native-definition-closure-ab286db-` preserves
+`64-primary` actual1: source capture uses the wrong common/toast_helper.c path
+and receives HTTP404 after 12 cached rows and one successful HTTP200 body.
+The failed manifest SHA is
+`ad8874131f551f9bb197200a9dd78f948b44aacffce1ea797070fd3d3b67d851`,
+raw stderr SHA
+`7898a9445d1da9cf58627c0b553a3a19a18d62ccc533704e7e28a9d3edb86a08`;
+the original helper, partial folder and receipt remain unchanged.
+
+Pinned official Git tree inventories establish access/table/toast_helper.c on
+both majors. Distinct corrected `65-primary-v2` actual0 verifies 48 primary
+source records, 24 per major, with 25 cached and 23 HTTP200 fetches. The partial
+successful body is reused only after byte/hash verification, not as a successful
+complete v1 capture. Facts SHA
+`53b8ad887e0e8484ab386765694ed75687c2e188c29bb90a4afddf50e23bf69f`,
+30-member seal SHA
+`7899b30d884fd6f253881c8385cfa17f707439a9e357c23126b842ec43d1dd35`.
+Distinct `66-primary-v3` actual0 extends that inventory with native accessor,
+descriptor and builtin compression sources: 60 records, 30 per major, 48 cached
+and 12 HTTP200 fetches. Facts SHA
+`ad5b7ff00d3292f5ac0b1a8eb5dffc640bb892e6c11051b66bd49c00cc0a274c`,
+19-member seal SHA
+`f8d0b3eaf20f7f452d9c5765306a98b027e3d2680525ff9233fbffa99f838a29`.
+
+`67-primary-audit` actual0 rehashes the two manifests/seals, all 60 current source
+records, exact tree path inventories, original failed helper/manifest and all
+three outer receipts/raw streams/source reads. It preserves the failed 64 exit.
+Audit folder `logs/native-definition-closure-primary-audit-v1` contains 28 paired
+function excerpts and verifies 153 paths. Facts SHA
+`aa1c94cf5aa1e6716b2d2bc8f73e86eb880e1186409fb9f8dff199749ae74416`,
+29-member seal SHA
+`52a1f07886c1dc755700ece9f2766392ddea25ae2828594ac123136180e7f270`.
+Byte verification is not a claim that all 60 source bodies were semantically
+read. Selected writer/accessor/array/normalization/compression and snapshot
+paths were inspected. Source remains exact clean `ab286db` during these helpers.
+
+[native-missing-values.md](native-missing-values.md) proposes a finite next step:
+coherently copy actual selected inline attmissingval carriers with a checked
+preprepared native accessor, normalize only initial owned bytes outside raw/S
+and before physical waits, compare exact carriers and all fixed/identity/storage
+facts at S, then supply opaque native images to the sole pure C consumer.
+No default/expression/provider or external TOAST fetch is admitted. Actual
+pg_attribute class/profile, physical target presence, external-tag rejection,
+array envelope/type and preallocation expansion bounds must be proved in code
+and ordinary fixtures. An independent design review precedes implementation.
+All implementation/runtime/native-image/performance/release acceptance for this
+proposal remains open. Existing fixed-fact test artifacts remain historical.
+Concurrent native 2PC and every previously recorded exclusion remain in force.
