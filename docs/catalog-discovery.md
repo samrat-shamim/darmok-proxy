@@ -118,7 +118,8 @@ semantic admission and result validation remain required for statement execution
 ## Costs, bounds and fixtures
 
 A nonempty owner request has one SET/SHOW round trip. An uncontended successful
-native attempt has two short Share acquisitions and four full heap scans.
+native attempt has four short Share acquisitions (two gate and two global)
+and four full heap scans.
 Shared-drop admission retries can add acquisitions within either phase;
 generation changes restart the attempt and add acquisitions and preparation.
 These counts are not a bound on a request that encounters contention. It copies

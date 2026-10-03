@@ -2,10 +2,10 @@
 
 `postgres/darmok_server` implements PostgreSQL 17/18 catalog publication and a
 one-shot reader with internal, transaction-owned read fences. The reader and
-private Rust scope integration have prior local PostgreSQL 17.11/18.6 evidence
-under the continuous private-owner profile. The publication gate and prepared
-utility completion repair below require fresh current-revision verification;
-prior reader evidence does not certify the revised publication ordering.
+private Rust scope integration have local PostgreSQL 17.11/18.6 evidence
+under the continuous private-owner profile. Fresh current-source fixtures also
+verify the publication gate and prepared utility completion ordering below
+under the documented builtin-core profile, including late native cleanup.
 Statement admission, complete dependency guards, result definitions, plan
 caching and a MySQL table executor remain required before exposing table SQL.
 Component evidence is recorded in the release plan.
@@ -260,8 +260,14 @@ hooks, prepared DDL/DML,
 rolled-back child DDL, mixed prepared row/catalog changes, exact case-distinct
 GIDs under a schema-local text operator, prepared view locks and normal temp-backend
 exit in the target or an unrelated database during removal, plus concurrent drop
-intents and ordinary native busy-error cleanup. Missing module
-dependencies fail. The Docker build installs the shared library, LLVM bitcode,
+intents and ordinary native busy-error cleanup. Current fixtures also cover two
+simultaneous indexed TEMP ON COMMIT DELETE ROWS publishers waiting on prepared
+catalog holders, both
+prepared outcomes with prior native Parse/Bind history, late temporary cascade
+drops, and ordinary native ON COMMIT failure cleanup. Real lock assertions
+check gate ownership and the absence of global references during late waits.
+Missing module dependencies fail. The Docker build installs the shared library,
+LLVM bitcode,
 extension SQL/control files and Apache license; SDK tools stay in the build
 stage. Other platform packages, hosted CI execution and the full artifact/
 compatibility gates remain pending. Authentication, grants and other security

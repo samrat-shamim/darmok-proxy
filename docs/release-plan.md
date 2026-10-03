@@ -2125,8 +2125,9 @@ The repair separates a retained ordinary publication gate from a short global
 drain, gates both discovery phases, and releases prepared completion's global
 reference at native utility return or ordinary ERROR before the caller cleanup.
 The source contract is updated; fresh changed-source native tests, exact new
-artifacts, bounded cost measurement, self review and independent review remain
-required. Concurrent native 2PC remains required and enabled. This does not close
+artifacts, bounded cost measurement, self review and independent core review
+passed as recorded below. Concurrent native 2PC remains required and enabled.
+This does not close
 #46, snapshot-neutral preparation, dependency guards, semantic admission, MySQL
 read views/locks, table execution, driver/cache/performance/artifact or release
 gates. Security, compiler PR #4, stress/forced interruption, hosted CI/account
@@ -2158,5 +2159,90 @@ prepared catalog holder, uses an explicit integer sub-ID result, and bounds each
 critical phase. It retains a separate finishing client across caught assertion
 failure so normal prepared rollback can be attempted before rethrowing; absence,
 native errors and cleanup timeouts are logged and never convert failure to
-success. Corrected checks use six fresh disposable profiles. Their tests and
-independent review remain pending; the module inputs are unchanged.
+success. Corrected checks use six fresh disposable profiles. Their current
+results and independent review are recorded below; the module inputs are
+unchanged.
+
+### Publication gate local verification
+
+The tested clean source revision is
+`7d7fe8ec7ac903cfdd306ff4e78268a9fcd763d3`, tree
+`b4dd1efdff671a9e6bd33184a74d6c3f4b77bde1`.
+
+| Check | Executed result |
+| --- | --- |
+| Full native PostgreSQL package, PostgreSQL 17/18 | 126 passed each, 0 failed/ignored; 16 summaries each, including 11 discovery and 18 publication tests |
+| Private-owner discovery subset, PostgreSQL 17/18 | 3 passed each, 0 failed/ignored; this is the three `native_catalog` groups, with 86 other owner tests filtered |
+| New publication regressions | PG17 groups 1+1+1 passed; PG18 publication 18 passed; both prepared outcomes, exact no-Sync native history, late cascade and native cleanup errors |
+| Workspace all-feature tests/doctests | 1690 passed, 0 failed, 82 explicitly ignored; 42 summaries |
+| Formatting, repository boundaries, strict workspace/connector Clippy | Four commands, actual 0; repository boundaries cover 9 packages |
+| Fresh product/probe builds | Four actual-0 builds at `957d119`; all 14 product/probe inputs equal tested `7d7fe8e` |
+| Acceptance setup and final environment | 74 setup and 40 final environment commands, all actual 0; six healthy exact profiles with no prepared transactions, other fixture clients, named fixture tables or functions |
+
+The six acceptance profiles use the same pinned PostgreSQL 17/18 base digests
+listed above, executing native 17.11/18.6 on Linux arm64/musl. Each version has
+an installed/preloaded primary with `max_prepared_transactions=10`, a native
+default `0` case, and an installed but unpreloaded product profile with `10`.
+The `0` case is additional coverage, never a requirement. Product images have
+no probe module; exact shared-library/LLVM identities and all 14 input files
+were checked after the tests. These six profiles are retained without a stop,
+restart or forced native cleanup. The older failed primary remains separately
+quarantined and is outside acceptance. Rust/Cargo 1.96.0 ran serially on macOS
+26.0.1 arm64 with scoped Rustup and target directories.
+
+Both simultaneous late publishers retain gate RowExclusive while waiting for
+native `pg_class` RowExclusive, with no global reference. A real SHOW waits
+for gate Share outside global Share while normal prepared commit/rollback
+completes. The finisher-history fixture acknowledges Parse/Bind/Flush before
+its first Execute, then sends Parse/Bind/Execute/Sync without an intervening
+Sync. Both outcomes complete before the caller's own late catalog wait; target
+locks and effects are checked. Native cleanup failure preserves the native
+error, rolls back metadata and leaves neither module tag held.
+
+The bounded discovery sample reused the package fixture: 32 warm-up and 128
+measured requests, one SET/SHOW round trip each. PG17 scanned 27 namespaces,
+416 classes, 3133 attributes and 619 types; p50/p95/max were
+460125/536459/658084 ns. PG18 scanned 31/416/3168/623; p50/p95/max were
+429542/476708/562459 ns. The revised uncontended attempt takes four Share
+acquisitions, two gate and two global, and four heap scans. Retries add work.
+These sequential local samples do not establish causal overhead, proxy
+throughput, cache hit rates or contention; phase budgets do not bound total memory.
+
+Immutable receipts are under
+`.darmok-work/logs/publication-gate-{957d119,4fe5b2e,7d7fe8e}-*`.
+The actual-0 author audit `publication-gate-7d7fe8e-16-author-audit` has stdout
+SHA256 `fd2c2f8232d290fccefc67109ec642e352a30e16d65bed7182f48bfee0c3f829`.
+Its facts are
+`9697aa337def846f1e1ffea0ed794a5d90bb80be184adb7882f9b4d20f7c3448`;
+the 1488-file manifest is
+`71bc535724259fede7da358ebe73fcd9d3db5217a1deb5a2edf20c5e5cfd6934`.
+It rehashed 16 current and eight historical command receipts, their 144
+source readers, 188 nested setup/environment actions including the original
+74-command setup, all 14 native inputs, pinned primary sources and the prior
+334-file architecture and 58-file original source seals. The historical
+fixture exit 101 and failed normal cleanup connection exit 2 remain preserved.
+
+Independent finite core review is under
+`.darmok-work/logs/review-publication-gate-7d7fe8e-v1`. The report has SHA256
+`acf70388944a6f98b861fba3258ecafbe13dd5ce644d335fc111910983e028ee`;
+facts `fb3173f49ea7ead13e8f790451ed6a1e9baf4cc9c2bda563397de679982e0dab`;
+121-file seal `b62842fb88ec9df6cd03150b0211d4b70ef5c35d4dab64d7e44d302466e5790f`;
+separate invocation actual 0,
+`b440102fb515798d904692dd728144a34130452f6a1dc19e13503ee91f37dc8a`.
+The reviewer independently verified the frozen author graph, raw current and
+historical receipts, exact native frame traces, profile cleanup and input
+identity. It found no remaining production blocker within the documented
+builtin-core/private-reader scope. F1 statement-name reuse is corrected and
+exercised; D1's stale two-acquisition wording is corrected in this documentation
+leaf. The reviewer's earlier passive pathname failure remains preserved with
+the corrected reader and final audit's actual-0 results. No reviewer runtime
+was executed. A separate leaf audit verifies that only these three documents
+change and all executable/test/dependency and native inputs equal tested source.
+
+This establishes finite publication/utility-completion and one-shot observation
+components under their documented profiles. Complete dependency guards,
+supported preparation and statement admission remain open in #46. MySQL
+read-view/lock equivalence, table execution, serving, real-driver/cache/
+performance/artifact, hosted CI and release gates remain open. Security,
+compiler PR #4, stress/forced interruption, remote CI/account actions and
+release publication remain excluded; the goal remains active.
