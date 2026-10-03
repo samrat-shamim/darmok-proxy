@@ -4147,3 +4147,64 @@ effect/preparation/admission/executor/serving/MySQL locking, performance,
 hosted CI/artifact/release gates, issues46/15 and the overall goal remain OPEN.
 The standing security/compiler/native-experiment/CI/account/release exclusions
 continue to apply.
+
+### Combined setup merged and variable-payload design
+
+PR57 is normally squash-merged at public main
+`41b929b7f35d893370c9ac1baefbf8b281068f58` / tree
+`02510bb377033f4efd2d79978e1c18fbab8f1d92`, exactly the independently accepted
+final documentation tree. Final review at9da393a accepts the finite leaf and
+closes D1 only there; C1 remains bound to accepted3b9. Its report/facts/179-member
+seal SHA256 values are
+`70cb87021036123c995a4f5822007fab28915ea95556c87fe2d5bd4e7d84199b`,
+`c87e83aaf4a6e6b2df8f4b4e912b2890f61abb0c98e018fd5c5f796bbaca654e`
+and `493e20424f6366284f00cf06de52649de5ed6876f5f438c4958c262644cf737c`.
+Root20 rehashes179 fixed members plus companions (190 paths), actual0, facts
+`790b532347d56d6f02cb6d4c2bc62cf61287d3b2fbfb52f11860779674883248`.
+No new runtime result is attributed to this documentation leaf.
+
+Root21–28 publication/issue actions exit0. Normal squash checks the exact
+reviewed PR head; readback confirms the public personal repository, description,
+merged PR/body, exact main tree, issues46/15 OPEN and no eligible open PRs after
+excluding4 before output. Issue46 bodyv8 SHA256 is
+`93b8d61abc1e8dad582ceb19405b2d21dd81a2fd8e446218f459b3f681bc6f10`.
+Root29's finite publication record has171 nonself members, facts SHA256
+`ac2177f21f583215824c4b623c1a51d60112b463d6c7fd2bf720e63f07da41a1`
+and seal `c42f54d321f5124f94d422731927cb907779e122647a67fc01390239c1ee6fcf`.
+Root30 fetch and31 isolated worktree creation exit0 at merged41b. Earlier tested,
+packaged and reviewed worktrees remain frozen; dirty shared checkouts are untouched.
+
+The next finite work is specified in
+[native-variable-catalog-payloads.md](native-variable-catalog-payloads.md): selected
+column default/generation and direct-type default carriers, including ordinary
+catalog TOAST values. The choice uses three coherent observations, a fresh
+registered payload-source snapshot after complete physical acquisition, direct
+builtin heap chunk assembly outside raw/S, and final carrier/definition agreement
+under S. Copying does not parse/evaluate expressions or admit their dependencies.
+Extra catalog/TOAST scanning and retained catalog-reference costs are explicit;
+new implementation/build/runtime/performance acceptance remains pending.
+
+Recorded primary commands `native-variable-catalog-payloads-41b929b-01-primary`
+and02-primary both exit0 at clean41b/tree025. They use the already read universal
+recorder, exact argv, scoped Rust homes, original streams and six source readers
+per command. V1 checks34 cached bodies against the pinned prior181-member audit
+and captures6 new HTTP-200 bodies, with40 total (20 permajor). Its facts and
+53-member nonself seal SHA256 values are
+`8c7671910d4d0cc8083d7474662311f2c7419f5331a8aa40b1f4f49d2b3e9e9b` and
+`ea11787b3a90df4396e50b86a1dea7bd9da2d274d1ce814408385bed59d29675`.
+V2 rehashes all53 members and adds8 HTTP-200 bodies:48 total (24 permajor).
+Its facts and72-member nonself seal SHA256 values are
+`f6922882d442cf81751b00d8a57e6868e60903fc2fad657fa9016f7c278dc70c` and
+`9209d7c03637577f8866a8dfb915eb43bb76f3327c5e0b711287a5dc66d40fc0`.
+Both maps are constructed before opening their own seal. Captures establish
+source bytes/provenance, not Git-blob, binary or runtime identity. A passive rg
+for scan-option names in relscan.h returns no-match1; the actual heap scan flags
+are read from current heap_storage.c rather than inferred from that file.
+
+This leaf changes only unpackaged documentation. All executable/test/dependency
+entries and20 native package inputs must stay byte-identical to public41b.
+Independent design readback is required before normal PR merge; its actual
+result belongs in the PR, without relabeling historical runtime evidence. No
+new native experiment, profile operation, security/compiler4 work, hosted CI,
+account work or release publication is included. Full gates, issues46/15 and
+the overall goal remain OPEN.
