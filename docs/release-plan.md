@@ -3034,3 +3034,50 @@ savepoint lock equivalence, serving, driver/cache/throughput/artifact and releas
 gates remain open. Issues46/15 and the overall goal remain active. Standing
 security/compiler-PR4/hosted-CI/stress/profile-interruption/account/admin/release-
 publication exclusions remain unchanged.
+
+### Merged private heap-storage checkpoint
+
+PR [#54](https://github.com/samrat-shamim/darmok-proxy/pull/54) was normally
+squash-merged from independently reviewed leaf
+`790abd678f80a26b06d71742d5a5af71bea011c2` into personal public main
+`8361877170c2cdd475e2c7fb136467c059e1d1d5`, tree
+`c4cf053353e5a44fd3b3ecca4abf8b4faf17e9d5`. Its two-document status leaf
+preserves 339 other tracked entries from tested `2640513` and all 20 native
+inputs from built `aacfe42`, including packaged README DOCS. Existing native
+images and their tests are not recertified merely by the merge.
+
+Independent documentation acceptance under
+`.darmok-work/logs/review-native-heap-storage-790abd6-docleaf-v1` has report
+SHA256 `a43ca49a910d239e054daf1ada6e288a374aa5a084bf1faaf59f8507c544b07a`,
+facts `1dfc9bdf2957311bff52064589df2978da963cf14feaeaba62dc798ffe3199d5`,
+1500-member seal `24303e49bb7218c97b7b797eaaaa05674a5d0fe4dc5a7f2aab463759e0fa6949`,
+separate final invocation
+`edac34c51ff1a4709af30ecc2201ca40ff7184192eed115fc723a7267d09bc66`
+and post-rehash invocation
+`6f1a5a88e2762d62f5b4be522d6903b945db20695efc8e42202b6efb83b74ec0`,
+both actual0. Twenty passive commands, including thirteen Git readers, are
+actual0, with no correction needed. Historical implementation/design failures
+remain immutable. The advancing historical document uses exact tested Git bytes.
+
+Root `25-docreview-rehash` is a preserved bookkeeping actual1: relative post-
+reader names were resolved against process cwd instead of the review folder.
+The new exclusive `26-docreview-rehash-v2` is actual0 and verifies all 1500
+members plus separate executed final/post records, raw streams, helpers and
+clean source checks. Its root record SHA256 is
+`61c528a0a4633bec26708adbd9d2523f378d0e1676a1644068be84a39c5a2eaf`.
+No product, source or runtime correction follows from that reader mistake.
+
+Root `29-merge` and `30-publication-audit` are actual0 under
+`.darmok-work/logs/native-heap-storage-790abd6-*`. Four GitHub reads verify the
+merged head/tree, personal PUBLIC repository, generic description and no
+in-scope open PRs; PR4 is filtered before output. Publication facts SHA256 is
+`388ea9a8ef71007e19d9c1f20c67a47dc06951cc88ec9bdcf843aafc9ae3a353`,
+13-member seal `4ac815b54f664ea676bb5cbacc6c167b828e654c513c913c73f87fa165330b84`.
+Issue46 remains OPEN with unchanged title and exact body readback; its updated
+body SHA256 is `bd825cd96ed3f2516432e45de2cff641351847b914bad9d29e5c7a9b8ed09847`,
+update facts `0e8ef544cb649831b38d34c92ed6dd7279351c672233c56c55b37cdab61a0e30`.
+Fetch/worktree receipts `32-fetch` and `33-next-worktree` are actual0, leaving
+the component worktree frozen at the reviewed leaf. The next isolated branch
+begins from merged main. Full semantic/candidate/physical closure, neutral
+preparation, effect/immutable-plan admission, execution and MySQL data/lock
+gates remain open. Issues46/15 and the goal stay active; exclusions persist.
