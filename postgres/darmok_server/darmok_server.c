@@ -84,7 +84,7 @@ typedef struct DarmokRelationState
 } DarmokRelationState;
 
 static DarmokRelationState *relation_attempt = NULL;
-static bool relation_acquiring = false;
+static bool native_refresh_active = false;
 static uint64 next_relation_attempt_id = 0;
 static SubTransactionId relation_abort_required = InvalidSubTransactionId;
 static bool semantic_writer_held = false;
@@ -142,10 +142,10 @@ require_ready(void)
 {
 	/* Native relation acquisition can dispatch SI callbacks. They must not
 	 * nest module exclusion or detach the partially acquired reference list. */
-	if (relation_acquiring)
+	if (native_refresh_active)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("darmok_server cannot reenter during native relation cache refresh")));
+				 errmsg("darmok_server cannot reenter during native cache refresh")));
 	if (shared == NULL || broken)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -293,6 +293,41 @@ require_relation_boundary(void)
 				 errmsg("unsafe native relation reference boundary")));
 }
 
+void
+darmok_native_invocation_check(void)
+{
+	require_relation_boundary();
+	if (relation_attempt != NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("native storage requires an unused relation invocation")));
+}
+
+void
+darmok_native_refresh_start(void)
+{
+	require_relation_boundary();
+	/* The common ready precondition also excludes nested module operations
+	 * during descriptor/SI preparation. This admits no arbitrary callback. */
+	native_refresh_active = true;
+}
+
+void
+darmok_native_refresh_finish(void)
+{
+	native_refresh_active = false;
+}
+
+void
+darmok_native_invocation_require_abort(SubTransactionId subid)
+{
+	if (relation_abort_required != InvalidSubTransactionId &&
+		relation_abort_required != subid)
+		broken = true;
+	else
+		relation_abort_required = subid;
+}
+
 static int
 compare_relation_requests(const void *left, const void *right)
 {
@@ -372,7 +407,7 @@ darmok_relation_attempt_acquire(volatile DarmokRelationAttempt *attempt,
 	memcpy(state->requests, requests, sizeof(DarmokRelationRequest) * count);
 	relation_attempt = state;
 	attempt->identity = state->identity;
-	relation_acquiring = true;
+	native_refresh_active = true;
 	PG_TRY();
 	{
 		for (int i = 0; i < relation_attempt->count; i++)
@@ -390,7 +425,7 @@ darmok_relation_attempt_acquire(volatile DarmokRelationAttempt *attempt,
 		 * an awaited lock/raced grant. Only native
 		 * abort cleanup may complete that operation. Never turn this into retry
 		 * or explicitly decrement a guessed partial acquisition here. */
-		relation_acquiring = false;
+		native_refresh_active = false;
 		relation_abort_required = relation_attempt->subid;
 		state = relation_attempt;
 		relation_attempt = NULL;
@@ -399,7 +434,7 @@ darmok_relation_attempt_acquire(volatile DarmokRelationAttempt *attempt,
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
-	relation_acquiring = false;
+	native_refresh_active = false;
 }
 
 static DarmokRelationState *
@@ -800,7 +835,8 @@ transaction_event(XactEvent event, void *arg)
 	switch (event)
 	{
 		case XACT_EVENT_PRE_COMMIT:
-			if (relation_attempt != NULL || relation_abort_required != InvalidSubTransactionId)
+			if (native_refresh_active || reader_active || relation_attempt != NULL ||
+				relation_abort_required != InvalidSubTransactionId)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("native cleanup requires a completed relation reference attempt")));
@@ -820,7 +856,8 @@ transaction_event(XactEvent event, void *arg)
 			}
 			break;
 		case XACT_EVENT_PRE_PREPARE:
-			if (relation_attempt != NULL || relation_abort_required != InvalidSubTransactionId)
+			if (native_refresh_active || relation_attempt != NULL ||
+				relation_abort_required != InvalidSubTransactionId)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("native prepare requires a completed relation reference attempt")));
@@ -902,7 +939,7 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 {
 	(void) arg;
 	if (event == SUBXACT_EVENT_PRE_COMMIT_SUB &&
-		(relation_acquiring || relation_abort_required != InvalidSubTransactionId))
+		(native_refresh_active || relation_abort_required != InvalidSubTransactionId))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("unfinished native relation acquisition requires subtransaction abort")));
@@ -1020,7 +1057,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		return;
 	}
 
-	if (preparing && (relation_acquiring || reader_active || statement_guard_id != 0))
+	if (preparing && (native_refresh_active || reader_active || statement_guard_id != 0))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("a transaction cannot prepare during catalog discovery")));
@@ -1036,7 +1073,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		{
 			LOCKTAG tag = catalog_tag();
 
-			if (relation_acquiring || reader_active || statement_guard_id != 0 || semantic_writer_held ||
+			if (native_refresh_active || reader_active || statement_guard_id != 0 || semantic_writer_held ||
 				publication_gate_held || completion_fence_held ||
 				preparing_transaction || pre_commit_started || shared_drop_pending)
 				ereport(ERROR,
@@ -1148,6 +1185,16 @@ darmok_catalog_reader_start(void)
 	reader_active = true;
 }
 
+static void
+catalog_read_stamp(DarmokCatalogStamp *stamp)
+{
+	memcpy(stamp->cluster_id, shared->cluster_id, DARMOK_CLUSTER_ID_BYTES);
+	stamp->database_oid = MyDatabaseId;
+	stamp->backend_id = backend_id;
+	stamp->generation = pg_atomic_read_u64(&shared->generation);
+	stamp->local_generation = local_generation;
+}
+
 void
 darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 {
@@ -1187,11 +1234,42 @@ darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 			break;
 		darmok_catalog_fence_release();
 	}
-	memcpy(stamp->cluster_id, shared->cluster_id, DARMOK_CLUSTER_ID_BYTES);
-	stamp->database_oid = MyDatabaseId;
-	stamp->backend_id = backend_id;
-	stamp->generation = pg_atomic_read_u64(&shared->generation);
-	stamp->local_generation = local_generation;
+	catalog_read_stamp(stamp);
+}
+
+bool
+darmok_catalog_fence_try_acquire(DarmokCatalogStamp *stamp)
+{
+	LOCKTAG tag = catalog_tag();
+	LOCKTAG gate = publication_tag();
+
+	Assert(reader_active && !reader_gate_held && !reader_fence_held);
+	require_ready();
+	if (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+	{
+		if (statement_guard_id != 0)
+			ereport(ERROR,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("shared-drop intent cannot coexist with an owned statement guard")));
+		return false;
+	}
+	transaction_lock_acquire(&gate, ShareLock, reader_owner);
+	reader_gate_held = true;
+	transaction_lock_acquire(&tag, ShareLock, reader_owner);
+	reader_fence_held = true;
+	if (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+	{
+		/* A successful semantic postcheck excludes new intent. An impossible
+		 * contradiction is ERROR, not a generation/lifecycle retry. */
+		if (statement_guard_id != 0)
+			ereport(ERROR,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("shared-drop intent cannot coexist with an owned statement guard")));
+		darmok_catalog_fence_release();
+		return false;
+	}
+	catalog_read_stamp(stamp);
+	return true;
 }
 
 void

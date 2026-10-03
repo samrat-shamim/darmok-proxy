@@ -212,8 +212,8 @@ parse_request(ReadState *state)
 		invalid_request();
 }
 
-static void
-verify_installation(void)
+void
+darmok_catalog_verify_installation(void)
 {
 	Oid oid = get_extension_oid("darmok_server", false);
 	HeapTuple tuple = SearchSysCache1(EXTENSIONOID, ObjectIdGetDatum(oid));
@@ -256,7 +256,7 @@ prepare_attempt(ReadState *state)
 	 * outside Share; the next raw acquisition must match that observation. */
 	AcceptInvalidationMessages();
 	InvalidateCatalogSnapshot();
-	verify_installation();
+	darmok_catalog_verify_installation();
 	if (state->count == 0)
 		return;
 	for (i = 0; i < FACT_HEAPS; i++)

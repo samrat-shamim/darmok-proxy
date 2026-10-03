@@ -24,6 +24,7 @@
 
 #include "statement_guard.h"
 #include "relation_guard.h"
+#include "heap_storage_probe.h"
 
 PG_MODULE_MAGIC;
 PGDLLEXPORT void _PG_init(void);
@@ -588,6 +589,11 @@ probe_command(const char *value)
 	if (!IsTransactionBlock())
 		ereport(ERROR, (errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
 						errmsg("native test probe requires an explicit transaction")));
+	if (strncmp(value, "storage_", 8) == 0)
+	{
+		darmok_heap_storage_probe_command(value);
+		return;
+	}
 	if (strncmp(value, "guard_", 6) == 0)
 	{
 		statement_command(value);
@@ -653,6 +659,10 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 				QueryEnvironment *query_env, DestReceiver *dest,
 				QueryCompletion *completion)
 {
+	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
+		darmok_heap_storage_probe_show(((VariableShowStmt *) pstmt->utilityStmt)->name,
+									 dest, completion))
+		return;
 	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
 		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
 			   "darmok_catalog_probe.guard_status") == 0)
@@ -814,6 +824,7 @@ _PG_init(void)
 	DefineCustomStringVariable("darmok_catalog_probe.relation_status", "Native test state only.",
 							   NULL, &relation_status, "native test state", PGC_USERSET, GUC_NOT_IN_SAMPLE,
 							   NULL, NULL, NULL);
+	darmok_heap_storage_probe_define_guc();
 	MarkGUCPrefixReserved("darmok_catalog_probe");
 	previous_utility = ProcessUtility_hook;
 	ProcessUtility_hook = process_utility;
