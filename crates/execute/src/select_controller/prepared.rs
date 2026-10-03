@@ -119,7 +119,6 @@ impl PreparedSelect {
                             | ty::SHORT
                             | ty::LONG
                             | ty::LONGLONG
-                            | ty::INT24
                             | ty::VAR_STRING
                             | ty::NULL
                     ) {

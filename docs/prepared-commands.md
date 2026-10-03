@@ -1,6 +1,7 @@
 # Owned local prepared commands
 
-Status: implementation candidate; checks and independent review are pending.
+Status: implementation candidate; expanded corpus checks and independent review
+are pending. The preceding corrected revision passed the required suites.
 Table execution, native reusable plans and release certification remain open.
 
 `FrontendConnection` exclusively owns its typed statement registry. PREPARE
@@ -22,8 +23,10 @@ negotiation forms are handled. Query attributes, optional metadata, cursors and
 long data remain explicitly unsupported under the connection contract.
 
 Direct slots initially declare nullable VAR_STRING in the immutable session
-text charset. Selected bindings are NULL, signed/unsigned integer types and
-VAR_STRING with valid UTF-8 bytes. Non-NULL integers derive LONGLONG with width21
+text charset. Selected bindings are NULL, signed/unsigned TINY, SHORT, LONG and
+LONGLONG, and VAR_STRING with valid UTF-8 bytes. INT24 is explicitly unsupported:
+the recorded stock non-NULL inputs fail instead of producing integer rows.
+Non-NULL integers derive LONGLONG with width 21
 and explicit signedness. NULL preserves the derived description, even before
 the first non-NULL binding. Cached input types and derived result types are
 independent; RESET preserves both. A string input after numeric derivation
@@ -45,13 +48,15 @@ share byte buffers; decimal values currently clone stored text for encoding.
 This lane adds no PostgreSQL request, catalog cache, lock or module load.
 Measured latency, memory and allocation gates remain open.
 
-The stock corpus captures ordinary MySQL8.4.11/PyMySQL1.1.2 packets for metadata,
+The stock corpus captures ordinary MySQL 8.4.11/PyMySQL 1.1.2 packets for metadata,
 repeated bindings, reset, changed session values, frozen quoted literals and
-close. Its ROW_COUNT/FOUND_ROWS observation invokes deprecated FOUND_ROWS: the
+close, plus signed/unsigned bounds for each admitted integer input type and
+stock INT24 rejection. Its ROW_COUNT/FOUND_ROWS observation invokes deprecated FOUND_ROWS: the
 warning count includes that query's own warning, not the preceding count.
 Separate PING packets establish prepare/reset clear and close preserve behavior.
 TCP fixtures replay supported packets and reject the observed unimplemented
-numeric-string conversions. Stock legacy EOF observations and documented EOF
+numeric-string conversions and INT24 bindings with explicit 1235 errors; those
+are unsupported cases, not equivalent stock error packets. Stock legacy EOF observations and documented EOF
 negotiation remain separate evidence.
 
 Primary contracts: [PREPARE](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_prepare.html),

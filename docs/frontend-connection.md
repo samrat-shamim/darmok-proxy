@@ -102,7 +102,7 @@ in receipts. CLI observations do not expose raw server flags or certify proxy
 equivalence; the resolved chain status is corroborated by the pinned server
 dispatch, separately from observable closure/data effects.
 
-Eight required native fixture groups use real ordinary TCP command-phase
+Required native fixture groups use real ordinary TCP command-phase
 exchanges on PostgreSQL17/18. They check serial selected commands/current SQL
 modes, both EOF formats, status and error/continuation output, all sixteen
 release choices, discarded prefetched input, persistent commit/rollback effects,

@@ -4875,3 +4875,28 @@ classified variable/scope facts, without boxing a whole AST or adding a per-
 variable allocation; fixtures assert their returned state. Current corrected
 checks and independent review remain pending. Earlier source/artifacts remain
 revision-bound; no passing result is inferred from compilation of a predecessor.
+
+At corrected revision `cbf5b1c9a82e48a0f9715fa48e6de67b9446720e`, format,
+workspace all-target/all-feature strict Clippy, repository boundaries and offline
+tests pass (1,691 passed, 0 failed, 93 ignored in 41 reported groups). All eight
+required PostgreSQL 17.11/18.6 suites pass: per major, 82 owner, 10 decimal
+transaction, 15 decimal frontend and 4 CLI tests. Each CLI group preserves its
+32 child exits (15 actual 0, 17 expected actual 1). Root10–17 receipts and raw
+streams are retained under `logs/prepared-frontend-cbf5b1c-*`; required-suite
+facts have SHA256 `39c03dc3c2c43d02f008b3c39c8ffcee863af3083fedf6f11f25f3049fed7850`.
+Before/after audits observe the same eight profile identities, starts, restart
+counts, libraries, headers and settings with no residual fixture databases.
+These observations certify that revision only.
+
+Root18's v6 stock observer completes 15 cases, preserving the preceding five
+and adding signed/unsigned integer-family bounds. Facts at
+`logs/prepared-frontend-reference-v6/facts.json` have SHA256
+`8b1d05ff1399791a57514babdb28103713c7fa7d6280903962618c0d63f4cac3`.
+The new INT24 inputs return stock errors 1210/1835 rather than integer rows;
+the pinned `set_parameter_value` handler has no INT24 value branch despite
+the metadata setter accepting that code. The local admission now explicitly
+rejects INT24 with 1235, and its corpus marks these as unsupported observations,
+not matching stock error packets. TINY, SHORT, LONG and LONGLONG signed/unsigned
+bounds produce the expected LONGLONG results. The generic wire decoder is not
+a semantic admission authority. Current expanded checks and independent review
+remain pending; full native execution and release gates remain OPEN.

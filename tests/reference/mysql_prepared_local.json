@@ -2,7 +2,7 @@
   "server_version": "8.4.11",
   "image_digest": "mysql@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242",
   "client": "PyMySQL==1.1.2",
-  "scope": "Ordinary stock prepared-command packets with protocol 4.1, legacy EOF and utf8mb4_general_ci; no authentication packets. The numeric-to-string coercion/warning executions in case4 are intentionally unsupported by the proxy.",
+  "scope": "Ordinary stock prepared-command packets with protocol 4.1, legacy EOF and utf8mb4_general_ci; no authentication packets. The numeric-to-string coercion/warning executions in case4 are intentionally unsupported by the proxy. INT24 binding cases record stock rejection; the proxy explicitly rejects these unsupported types with 1235 rather than claiming matching error packets.",
   "cases": [
     {
       "prepare": {
@@ -305,6 +305,326 @@
           }
         }
       ]
+    },
+    {
+      "binding_case": "tiny-signed",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "0001010080",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f0015000000088000000000",
+              "fe00000200",
+              "000080ffffffffffffff",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "tiny-unsigned",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010180ff",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f001500000008a000000000",
+              "fe00000200",
+              "0000ff00000000000000",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "short-signed",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "000102000080",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f0015000000088000000000",
+              "fe00000200",
+              "00000080ffffffffffff",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "short-unsigned",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010280ffff",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f001500000008a000000000",
+              "fe00000200",
+              "0000ffff000000000000",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "long-signed",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "0001030000000080",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f0015000000088000000000",
+              "fe00000200",
+              "000000000080ffffffff",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "long-unsigned",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010380ffffffff",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f001500000008a000000000",
+              "fe00000200",
+              "0000ffffffff00000000",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "int24-signed",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010900000080ff",
+          "response": {
+            "error_code": 1210,
+            "message": "Incorrect arguments to mysqld_stmt_execute"
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "int24-unsigned",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010980ffffff00",
+          "response": {
+            "error_code": 1835,
+            "message": "Malformed communication packet."
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "longlong-signed",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "000108000000000000000080",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f0015000000088000000000",
+              "fe00000200",
+              "00000000000000000080",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
+    },
+    {
+      "binding_case": "longlong-unsigned",
+      "prepare": {
+        "sql": "SELECT ?",
+        "columns": 1,
+        "parameters": 1,
+        "packets": [
+          "000100000001000100000000",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200",
+          "03646566000000013f000c2d00fcff0000fd00001f0000",
+          "fe00000200"
+        ]
+      },
+      "executions": [
+        {
+          "bindings": "00010880ffffffffffffffff",
+          "response": {
+            "packets": [
+              "01",
+              "03646566000000013f000c3f001500000008a000000000",
+              "fe00000200",
+              "0000ffffffffffffffff",
+              "fe00000200"
+            ]
+          }
+        }
+      ],
+      "after_close": {
+        "error_code": 1243,
+        "message": "Unknown prepared statement handler (1) given to mysql_stmt_precheck"
+      }
     }
   ],
   "diagnostics": [

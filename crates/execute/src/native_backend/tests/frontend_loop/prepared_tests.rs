@@ -85,7 +85,10 @@ async fn frontend_loop_prepared_stock_literals_parameters_variables_and_frozen_p
             }
             let bindings = execution.get("bindings").map(hex).unwrap_or_default();
             execute(&mut input, &bindings).await;
-            if index == 4 && matches!(execution_index, 2 | 5) {
+            let unsupported_int24 = case["binding_case"]
+                .as_str()
+                .is_some_and(|name| name.starts_with("int24-"));
+            if unsupported_int24 || (index == 4 && matches!(execution_index, 2 | 5)) {
                 let error = packet(&mut input, 1).await;
                 assert_eq!(
                     &error[..9],
