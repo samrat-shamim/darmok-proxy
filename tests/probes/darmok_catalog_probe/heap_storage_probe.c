@@ -1,10 +1,16 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 /* Test-only source-admitted pure copying consumer. Never in product images. */
 #include "postgres.h"
+#include "access/heapam.h"
+#include "access/htup_details.h"
+#include "access/table.h"
+#include "access/tableam.h"
+#include "catalog/pg_type.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
+#include "utils/array.h"
 #include "utils/fmgrprotos.h"
 #include "utils/guc.h"
 #include "utils/json.h"
@@ -29,6 +35,86 @@ static StorageRun storage_run = NULL;
 static MemoryContext result_context = NULL;
 static char *result_json = NULL;
 static char *status_setting = NULL;
+
+extern PGDLLEXPORT Datum darmok_test_missing_array_image(PG_FUNCTION_ARGS);
+extern PGDLLEXPORT Datum darmok_test_heap_natts(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(darmok_test_missing_array_image);
+PG_FUNCTION_INFO_V1(darmok_test_heap_natts);
+
+/* Ordinary SQL oracles, outside the private invocation. Core normalizes the
+ * actual array; this function does not share the product carrier/envelope code.
+ * These symbols and their fixture-created SQL functions exist in test images
+ * only. No element provider or application codec is implemented here. */
+Datum
+darmok_test_missing_array_image(PG_FUNCTION_ARGS)
+{
+	ArrayType *array = PG_GETARG_ARRAYTYPE_P(0);
+	Size bytes = VARSIZE(array);
+	bytea *result;
+
+	if (bytes > MaxAllocSize - VARHDRSZ)
+		elog(ERROR, "native missing image oracle exceeds native allocation limits");
+	result = palloc(bytes + VARHDRSZ);
+	SET_VARSIZE(result, bytes + VARHDRSZ);
+	memcpy(VARDATA(result), array, bytes);
+	PG_FREE_IF_COPY(array, 0);
+	PG_RETURN_BYTEA_P(result);
+}
+
+Datum
+darmok_test_heap_natts(PG_FUNCTION_ARGS)
+{
+	Relation relation = table_open(PG_GETARG_OID(0), AccessShareLock);
+	volatile TableScanDesc scan = NULL;
+	volatile Datum result = (Datum) 0;
+
+	PG_TRY();
+	{
+		Datum values[16];
+		int count = 0;
+		HeapTuple tuple;
+
+		scan = heap_beginscan(relation, GetActiveSnapshot(), 0, NULL, NULL,
+							 SO_TYPE_SEQSCAN | SO_ALLOW_PAGEMODE);
+		while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+		{
+			if (count == (int) lengthof(values))
+				elog(ERROR, "native physical-ordinal oracle requires at most 16 fixture rows");
+			values[count++] = Int32GetDatum(HeapTupleHeaderGetNatts(tuple->t_data));
+		}
+		result = PointerGetDatum(construct_array(values, count, INT4OID, sizeof(int32),
+												true, TYPALIGN_INT));
+	}
+	PG_FINALLY();
+	{
+		if (scan != NULL)
+			heap_endscan(scan);
+		table_close(relation, AccessShareLock);
+	}
+	PG_END_TRY();
+	PG_RETURN_DATUM(result);
+}
+
+static void
+copy_image_hex(StringInfo output, const char *image, Size bytes)
+{
+	static const char digits[] = "0123456789abcdef";
+	char *dest;
+
+	if (bytes > (Size) (MaxAllocSize - 1) / 2)
+		elog(ERROR, "native storage probe image exceeds its copying limit");
+	enlargeStringInfo(output, bytes * 2);
+	dest = output->data + output->len;
+	for (Size i = 0; i < bytes; i++)
+	{
+		unsigned char value = (unsigned char) image[i];
+
+		*dest++ = digits[value >> 4];
+		*dest++ = digits[value & 15];
+	}
+	output->len += bytes * 2;
+	output->data[output->len] = '\0';
+}
 
 static void
 copy_name_json(StringInfo output, const NameData *name)
@@ -91,9 +177,11 @@ copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
 	appendStringInfo(output, "{\"namespace_rows\":" UINT64_FORMAT
 					 ",\"relation_rows\":" UINT64_FORMAT ",\"index_rows\":" UINT64_FORMAT
 					 ",\"attribute_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
+					 ",\"missing_carrier_bytes\":" UINT64_FORMAT
 					 ",\"allocated_bytes\":" UINT64_FORMAT "}",
 					 cost->namespace_rows, cost->relation_rows, cost->index_rows,
-					 cost->attribute_rows, cost->type_rows, (uint64) cost->allocated_bytes);
+					 cost->attribute_rows, cost->type_rows,
+					 (uint64) cost->missing_carrier_bytes, (uint64) cost->allocated_bytes);
 }
 
 static void
@@ -141,6 +229,23 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 				appendStringInfoChar(output, ',');
 			copy_type_json(output, &view->types[i]);
 		}
+		appendStringInfo(output, "],\"missing_count\":%d,\"missing\":[", view->missing_count);
+		for (int i = 0; i < view->missing_count; i++)
+		{
+			const DarmokHeapMissingFact *fact = &view->missing[i];
+
+			if (fact->carrier_kind != 's' && fact->carrier_kind != 'u' &&
+				fact->carrier_kind != 'p' && fact->carrier_kind != 'l')
+				elog(ERROR, "native storage probe received an unknown carrier kind");
+			appendStringInfo(output, "%s{\"relation_oid\":%u,\"number\":%d,\"type_oid\":%u,"
+							 "\"carrier_kind\":\"%c\",\"stored_bytes\":" UINT64_FORMAT
+							 ",\"image_bytes\":" UINT64_FORMAT ",\"image\":\"",
+							 i == 0 ? "" : ",", fact->relation_oid, fact->number,
+							 fact->type_oid, fact->carrier_kind, (uint64) fact->stored_bytes,
+							 (uint64) fact->image_bytes);
+			copy_image_hex(output, fact->image, fact->image_bytes);
+			appendStringInfoString(output, "\"}");
+		}
 		appendStringInfoString(output, "],\"references\":[");
 		for (int i = 0; i < view->reference_count; i++)
 			appendStringInfo(output, "%s[%u,%d]", i == 0 ? "" : ",",
@@ -179,8 +284,11 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 fact->row_type_oid, fact->declared_attribute_count);
 		}
 		appendStringInfo(output, "],\"attribute_array_bytes\":" UINT64_FORMAT
-						 ",\"type_array_bytes\":" UINT64_FORMAT ",\"initial_cost\":",
-						 (uint64) view->attribute_array_bytes, (uint64) view->type_array_bytes);
+						 ",\"type_array_bytes\":" UINT64_FORMAT
+						 ",\"missing_array_bytes\":" UINT64_FORMAT
+						 ",\"missing_image_bytes\":" UINT64_FORMAT ",\"initial_cost\":",
+						 (uint64) view->attribute_array_bytes, (uint64) view->type_array_bytes,
+						 (uint64) view->missing_array_bytes, (uint64) view->missing_image_bytes);
 		copy_cost_json(output, &view->initial_cost);
 		appendStringInfoString(output, ",\"final_cost\":");
 		copy_cost_json(output, &view->final_cost);

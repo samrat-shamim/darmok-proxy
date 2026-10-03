@@ -3397,3 +3397,439 @@ A draft documentation spacing edit surfaced trailing whitespace through
 `git diff --check`; the multi-command display ended0 on its later status read,
 so that display is not a successful diff check. The whitespace is removed
 before commit and the separate diff check must pass. No runtime result changes.
+
+
+### Merged private fixed column and direct-type checkpoint
+
+[PR #55](https://github.com/samrat-shamim/darmok-proxy/pull/55) is normally
+squash-merged. Reviewed final leaf `a493635c3ac9480e425a76f3a06e65f141219b5d`
+and public main `6c2b03cf5de5215ed36db9dd5f6ffd63b4c5b9a6` share tree
+`d63349455c8d6f474c3843fe1607e6ddb7d49529`. C2 is closed at tested `1934034`;
+D1 is closed at the separate final documentation leaf only. Historical reports
+remain unchanged. The finite accepted boundary still supplies descriptive
+fixed positive slots/direct types, not an executable statement.
+
+Independent final documentation review is
+`logs/review-native-attribute-facts-a493635-docleaf-v1`: report SHA
+`41f1ee5532c3fa1a8bcc634ecf7e35f0262729b1f84eac13b7de1b68bd504c36`,
+facts SHA `47f2f08172ef3a604b6237d61e94126333081a8c7be90a520c6aa85ae0f57ffb`,
+2805-member structured seal SHA
+`833409f1f43d1274529cddce5efa5f4a9618f3e5e981fa7d3a98bcfb5e9490af`.
+35 prefinal readers and bootstrap pass, no new failed executed reader.
+Actual `15-final-invocation.json`0 SHA
+`242f6cfc33020d934064fb714c128e2fed9169ac0905d5f9baadce6adaeed78e`
+and independent `16-post-invocation.json`0 SHA
+`b702affb664a94ee54537e53b44721b849ffcc9334db5b671552c0d97cb21a7b`
+retain exact clean source and post facts SHA
+`c521f2186a8933b579bd6b06803662c78058e8b6db0a6162015b3d856bd01c68`.
+Live reads released. Root `55-docleaf-review-rehash`0 verifies 2805 members plus
+companions: 2823 unique paths; root facts SHA
+`fb03c27114196456f16c4c2e90fedff026a8cff8ca1544fabd882d19f6040b06`.
+Four exact Git `1934034` documentation witnesses preserve advancing historical paths.
+Nineteen native inputs and all executable/test/dependency entries are unchanged;
+the sole changed native build-context input is the packaged DOCS README.
+Existing tested images retain their historical README. No runtime repetition,
+current full-workspace test or fresh final-leaf artifact claim is made.
+
+Recorder prefix `logs/native-attribute-facts-a493635-` records actual
+`56-push`0, `57-open-pr`0, `58-pr-head`0 and `59-merge`0. Merge uses squash and
+exact --match-head-commit, with no admin/auto/delete-branch action.
+`60-publication`0 independently reads merged PR/main/repository/README and the
+filtered eligible PR queue: same tree, public personal repository, generic
+description, no experimental README wording and no eligible open PRs.
+Publication facts SHA
+`63f6e2410adf7547367e95b5a81b9fad14746de73b2dbe1a14af52835ee71eae`,
+22-member seal SHA
+`e371d88f8230ffd1698b0197d420935ceee3efeea0693fd332c2f21eac827fd4`.
+No hosted checks, CI retries or release publication occurs.
+
+`61-issue 46-v6`0 verifies exact before/edit/readback and leaves issue 46 OPEN;
+body SHA `e83cb713c548528fe5baed971f18e079ee0d9c67a357252371dde25c2a8dc15f`.
+Issue 15 remains OPEN. `62-fetch-main`0 and `63-next-worktree`0 preserve the old
+reviewed branch and create isolated `feat/native-definition-closure` at public
+main `6c2b03c`, outside the dirty monorepo/personal main. Old source and evidence
+remain frozen. Original Clippy/read/helper failures are not relabeled.
+
+Next design work concerns variable catalog payloads and transitive/provider/
+name closure. Copying fixed flags/OID edges cannot justify native descriptor
+construction, expression parsing, providers or arbitrary detoast/storage opens.
+Paired pinned source must establish snapshot neutrality, physical ordering,
+variable payload provenance, provider/effect boundaries and complete cleanup
+before selecting a mechanism. No implementation or runtime acceptance follows
+from this checkpoint. Full dependency/preparation/immutable IR/execution/MySQL
+read-lock/serving/cache/full performance/artifact/release gates and the goal
+remain open. Concurrent native two-phase transactions stay supported; security,
+compiler PR4/resources, stress/forced interruption, existing-profile lifecycle,
+hosted CI/account/admin and release publication exclusions remain in force.
+
+### Proposed inline column missing-image boundary
+
+The new isolated branch checkpoints the merged PR55 proof at `ab286db`, tree
+`d99a126eafddeca7917c3e2d0e7572d119de7656`. No executable input changes yet.
+Recorder prefix `logs/native-definition-closure-ab286db-` preserves
+`64-primary` actual1: source capture uses the wrong common/toast_helper.c path
+and receives HTTP404 after 12 cached rows and one successful HTTP200 body.
+The failed manifest SHA is
+`ad8874131f551f9bb197200a9dd78f948b44aacffce1ea797070fd3d3b67d851`,
+raw stderr SHA
+`7898a9445d1da9cf58627c0b553a3a19a18d62ccc533704e7e28a9d3edb86a08`;
+the original helper, partial folder and receipt remain unchanged.
+
+Pinned official Git tree inventories establish access/table/toast_helper.c on
+both majors. Distinct corrected `65-primary-v2` actual0 verifies 48 primary
+source records, 24 per major, with 25 cached and 23 HTTP200 fetches. The partial
+successful body is reused only after byte/hash verification, not as a successful
+complete v1 capture. Facts SHA
+`53b8ad887e0e8484ab386765694ed75687c2e188c29bb90a4afddf50e23bf69f`,
+30-member seal SHA
+`7899b30d884fd6f253881c8385cfa17f707439a9e357c23126b842ec43d1dd35`.
+Distinct `66-primary-v3` actual0 extends that inventory with native accessor,
+descriptor and builtin compression sources: 60 records, 30 per major, 48 cached
+and 12 HTTP200 fetches. Facts SHA
+`ad5b7ff00d3292f5ac0b1a8eb5dffc640bb892e6c11051b66bd49c00cc0a274c`,
+19-member seal SHA
+`f8d0b3eaf20f7f452d9c5765306a98b027e3d2680525ff9233fbffa99f838a29`.
+
+`67-primary-audit` actual0 rehashes the two manifests/seals, all 60 current source
+records, exact tree path inventories, original failed helper/manifest and all
+three outer receipts/raw streams/source reads. It preserves the failed 64 exit.
+Audit folder `logs/native-definition-closure-primary-audit-v1` contains 28 paired
+function excerpts and verifies 153 paths. Facts SHA
+`aa1c94cf5aa1e6716b2d2bc8f73e86eb880e1186409fb9f8dff199749ae74416`,
+29-member seal SHA
+`52a1f07886c1dc755700ece9f2766392ddea25ae2828594ac123136180e7f270`.
+Byte verification is not a claim that all 60 source bodies were semantically
+read. Selected writer/accessor/array/normalization/compression and snapshot
+paths were inspected. Source remains exact clean `ab286db` during these helpers.
+
+[native-missing-values.md](native-missing-values.md) proposes a finite next step:
+coherently copy actual selected inline attmissingval carriers with a checked
+preprepared native accessor, normalize only initial owned bytes outside raw/S
+and before physical waits, compare exact carriers and all fixed/identity/storage
+facts at S, then supply opaque native images to the sole pure C consumer.
+No default/expression/provider or external TOAST fetch is admitted. Actual
+pg_attribute class/profile, physical target presence, external-tag rejection,
+array envelope/type and preallocation expansion bounds must be proved in code
+and ordinary fixtures. An independent design review precedes implementation.
+All implementation/runtime/native-image/performance/release acceptance for this
+proposal remains open. Existing fixed-fact test artifacts remain historical.
+Concurrent native 2PC and every previously recorded exclusion remain in force.
+
+### Inline missing-image design review and implementation candidate
+
+The design is frozen at `9c9bbf4a823ec028b665859ed87b2e0a1f55d7dc`, tree
+`5016d3beeeb57f225c0d11582f07276eafb54304`. Its independent review is a
+conditional design recommendation only, with no structural blocker in inspected
+ordinary paths. C1/P2 requires a fixture proving an old absent slot differs from
+a later physically present explicit NULL before and after DROP DEFAULT. It is
+not an implementation or runtime acceptance.
+
+Recorder `logs/native-definition-closure-9c9bbf4-68-primary-v4`0 adds paired
+tupdesc.c after verified path inventory: 62 distinct primary records, 60 cached
+and two HTTP200 fetches. Facts SHA
+`c984d232185fd7e82d26d57199cf78b32f50648502415d9e49bebe9422c83203`,
+nine-member seal SHA
+`d75d7a2fa86f14574ff76cd6246c12fca302b90f184512c47b90895e03149b6c`.
+`69-primary-audit-v2`0 verifies 181 paths and 30 function excerpts, preserving
+the earlier failed capture and separate inventories. Facts SHA
+`69e70627363257f8cd025b14b3c6109d751bc09842498f52cfcc177b7c2f69ce`,
+31-member seal SHA
+`1e3150728802936e0fbed24605fa8883a8424728d141889f1a3c92169b453239`.
+The PG18 assertion-build accessor classifier and DROP DEFAULT bodies also use
+separately verified existing paired classification/default-removal inventories;
+those are not relabeled into the 62-source bundle.
+
+Review `logs/review-native-missing-images-9c9bbf4-design-v1` report SHA
+`185fd2e47107b6d6a4a91716b4e34943a3d97f3a099c8662ee50e2fa08b3687f`,
+facts SHA `c899ef8907f99a5dfd997cff3dcf2c11d55a877c2348e5d7c7464b5476d158d4`,
+702-member structured seal SHA
+`5227230191f05f27ef8ad51fb14c848cf3491f3a4dde926886c9a93decc90ac7`.
+Executed finalization113 and independent post114 both exit0 with exact clean
+source; live reads are released. Five own passive actual1 records and root64's
+HTTP404 remain unchanged. Corrected reviewer audit112 verifies 645 paths and
+16 Git reads0. Root `70-design-rehash` actual1 preserves its bootstrap stream
+prefix assumption; distinct schema-aware `71-design-rehash-v2`0 verifies 702
+members plus companions, 716 paths. Root facts SHA
+`a51e10672562e85ef8c6c47e6bef4de0a34ecd23d9a16c14b96461324f1d3966`.
+Wrong-filename/source-key/window passive reads remain failed displays, separately
+from product verification. `72-next-worktree`0 creates
+`feat/native-missing-images` at exact design HEAD and leaves the reviewed design
+worktree frozen. Dirty personal main and the monorepo are untouched.
+
+The candidate implements checked physical access to selected inline carriers,
+native singleton-array normalization only after initial reader cleanup and
+before physical waits, cumulative/requested allocation bounds, exact final
+carrier equality, and opaque copying under the existing pure consumer contract.
+Missing count, stored bytes per observation, normalized image bytes and record
+array bytes are separate costs. No extra observation, round trip, provider,
+external storage or element codec is admitted. Ordinary test-only oracles use
+core array normalization and a bounded active-snapshot heap scan independently
+of the product copier. Fixtures add C1's physical absent/present-NULL distinction,
+actual short/four-byte/pglz/LZ4 forms, domain/enum/array/composite declarations,
+inheritance/drop/default histories and nonempty normal retention/2PC outcomes.
+Paired heap_form_tuple source confirms physical natts; fixture results remain
+pending. The packaged README is part of the candidate's native build inputs.
+
+Fresh strict product/probe builds, required paired native suites, source/input/
+artifact/environment binding, bounded ordinary costs and independent
+implementation review are required next. Existing native images certify only
+their unchanged historical inputs. C1 runtime closure, full descriptor/value/
+default/TOAST/provider/effect/preparation/IR/execution/MySQL row/read-lock,
+serving/cache/full performance/artifact/release gates, issues46/15 and the full
+goal remain open. All previously recorded exclusions remain in force.
+
+The native candidate is committed at
+`d0f607ec4861fabe64f362da933199c1590a7f0d`, tree
+`7af99eb2ffabfbf612c2b0789859348f621cfbf0`. Recorder prefix
+`logs/native-missing-images-d0f607e-` records `01-product17`, `02-probe17`,
+`03-product18` and `04-probe18`, all actual0, with GCC `-Werror`, LLVM bitcode
+and pinned official bases. Linux/arm64 image IDs in that order are
+`c0b5e05fac11e81f0ef42ffaea2c2829fbb16329d3091ce825ad406e2cfc2a23`,
+`21db83bcdd544e055e2a548433e52a64012ab5d8d1035294ef3c155da7d24be9`,
+`7748c14b3b9c649503c20cae8f6fcf90d1042c75d8d9661e5256e80214135bcc`,
+`0131b90bab3994cdd9b6e3e91f70586892f3694904a343a80a51625eb4271e5b`.
+`05-profiles`0 creates eight fresh profiles on ports32863–32870 without any
+existing-profile lifecycle action. Primary/ordered native 2PC limits are10;
+zero is only the negative profile. Setup facts SHA
+`854498b2604835c3910a0f607ec23929e95073ec9e24530c042320e413788952`
+records127 actions0, 20 tracked native inputs, exact17.11/18.6 versions,
+available LZ4, installed libraries/bitcode/headers/README, product probe absence
+and healthy profile identity.
+
+Self-review then strengthens only the Rust fixture: independently compare every
+selected root's complete graph and requested mode mask, and verify singleton
+dimension/length/lower-bound with ordinary core SQL array functions. The test
+oracle traces native expected edges rather than product facts. Native build
+inputs remain unchanged; current input binding and runtime checks are pending.
+These build/setup results do not accept the implementation, C1 or full goal.
+
+Input binding at `f9720c02523eb12facfe53648c35d29454b38f62`, tree
+`006c8ab5e83abaf266601d0b702bb36cff3620be`, records `06-input-bind`0:
+20 native inputs equal built `d0f607e`, with22 Git readers0. Binding facts SHA
+`fc736363e1bc8f8f0de30e510ae39eee5c8b3fed9d5aa616aca84aec6485117a`.
+The first ordinary `07-storage17` run actually exits101: all10 tests fail at
+the same new descriptor check before a capture completes. Raw stdout SHA
+`6d4e596b2778d0f7ba883a0745089492d0980c0ea6dceb4991a24e0a41d5559e`,
+stderr SHA `b67ae81174ad66b3e0230427b1ae21ff4ef42c45d7204564aca4d7fe7bfc8081`.
+This is a product-check defect, not a passed run or an injected error. The failed
+revision and fresh profile artifacts remain unchanged.
+
+Root cause: the new check assumed integer alignment from an array's four-byte
+header. Builtin anyarray declares double alignment. Separate source capture
+`08-alignment-primary`0 verifies two pinned pg_type.dat bodies after exact Git
+tree path inventory, generated schemapg target rows and ordinary actual catalog
+fields on both native majors. Actual target ordinals are26/25, types2277,
+lengths-1, by-reference and alignment'd'. The selected user column's alignment
+is independent. Four read-only native actions also confirm no checked prepared
+or schema fixture residue; no old profile is stopped or restarted. Facts SHA
+`5bd6922ef4b2b7f1992eee20d94f629da8a2dbf14bcbf3c255ddf109f1a1cd6a`,
+17-member seal SHA
+`7cd60058ad47cf538d996709b8bf565b63d4cc20c747d459a2bf3c158369fea1`.
+The two-source alignment inventory stays separate from the62-source design
+bundle. The correction checks TYPALIGN_DOUBLE and retains every descriptor,
+physical-presence, pointer/header/range and envelope check. Changed C input
+requires fresh strict builds/profiles and runtime evidence; none is yet claimed.
+
+Corrected native leaf `954c5dedf62564fae5d4b60d22b8bce8aebbef3e`, tree
+`8eadeaad1e7b011ef62ceae99a316c26de42458b`, records strict fresh builds
+`09-product17`, `10-probe17`, `11-product18`, `12-probe18`, all actual0.
+`13-profiles`0 records127 setup actions0, exact20 native inputs, eight new
+healthy Linux/arm64 profiles on ports32871–32878 and available LZ4. Setup facts
+SHA `fae326a8a658083c1d9feb4a836b6a5ad138bf3cb21109ea6b90cd9444d8d701`.
+Existing failed and historical profiles remain untouched.
+
+`14-storage17` actually exits101: nine fixtures pass, including the new missing
+forms/physical NULL/default-drop case and nonempty prepared/retention outcomes;
+one existing multi-root fixture fails in the newly generalized Rust oracle.
+Raw stdout SHA
+`1684cd2dc3bcd605d22c128b997592a90f1eee546eb4d773aab363aed5fd3948`,
+stderr SHA `471b607eea6552787f3eede738843ad05653d737ce85b66e03030f095ab89dc8`.
+Root cause: the uniform-mode wrapper built a map for only its first root, while
+the existing fixture supplies two. The helper now declares the requested
+uniform mask for every independent expected root; mixed-mode roots still use
+their explicit complete map. No mask fallback or product code change is made.
+Only Rust fixture/ledger inputs advance; all20 native build inputs remain
+unchanged. The failed run stays failed; current binding and paired suites must
+run before finite verification or C1 acceptance.
+
+
+### Verified missing-image candidate awaiting independent implementation review
+
+Current executable/test leaf `5a82a9643bcc3e43a7a122a72cc6621fb5034482`, tree
+`392fe72b2fb7129292edfe8ff73d0529cf9464bf`, keeps all20 native product/probe
+inputs byte-identical to corrected built `954c5de`. Recorder prefix
+`logs/native-missing-images-5a82a96-` records `15-input-bind`0; binding folder
+`logs/native-missing-images-5a82a96-input-bind-v1` facts SHA
+`d2caa3114d3c1f1b6c1acc9a681bf9f672dbdc9148665092dcd53f5bc9f457e9`
+contains22 actual-zero Git readers and36 verified paths. The four corrected
+Linux/arm64 product/test image IDs, in17 product/test and18 product/test order, are
+`d6dbb5317bd65822ba4067ee661e142d4640358bb5e0a921be4f6cdc5b4573ac`,
+`7a222332d3ac25518d8acf7e0c95464e89ad20d9cb9b8d62c2239805f6a0c83b`,
+`0c88b3ab4a6c71f5613a9eb3534b2fbcb1240e176bf7f1bf9cbd9e10d7ebee5f`,
+`28bf46415948ca6e6b57626a3aecec1be004ac0f494b734a37bf139658d9c0e0`.
+
+`16-storage17` and `17-storage18` actually exit0: ten fixtures each, zero failed
+or ignored. Exact paired ordinary tests positively witness short/four-byte/pglz/
+LZ4 carriers, user compression declarations differing from stored methods,
+opaque domain/enum/array/composite identities, default removal, dropped columns,
+literal inherited relations, duplicate/mixed-mode complete graph bindings, and
+C1's old physical natts1 versus later present-NULL natts14. Both native rows
+retain their respective missing-value/NULL behavior before and after DROP DEFAULT.
+Nonempty normal subtransaction/retention/prepared commit/rollback outcomes pass.
+C1 independent implementation closure is pending, not inferred from author tests.
+
+`18-package17` and `19-package18` actually exit0:19 binaries and147 passed tests
+per major, zero failed/ignored. Child argv records the ordered-2PC URL explicitly.
+Primary/ordered endpoints are32871/32874 (17) and32875/32878 (18), native limit10;
+no2pc negative endpoints32872/32876 stay zero; product-only unpreloaded endpoints
+32873/32877 stay ten. `20-owner17`/`21-owner18` exit0 with three selected native
+owner groups each and86 filtered tests. Commands are `cargo test -p
+darmok-postgres-tests --locked -- --nocapture --test-threads=1` and the selected
+`cargo test -p darmok-execute --lib native_backend::tests::native_catalog --locked
+-- --ignored --nocapture --test-threads=1`. These pre-existing required checks
+do not authorize new stress/error/interruption experiments.
+
+`22-format` (`cargo fmt --all -- --check`), `23-boundaries` (`python3
+scripts/check_repository.py`, nine packages), `24-clippy` (`cargo clippy
+--workspace --all-targets --all-features --locked -- -D warnings`) and
+`25-connector-clippy` (`cargo clippy -p tokio-postgres --lib --locked --
+-D warnings`) all exit0. All recorded chains use scoped RUSTUP_HOME and the
+native-values target directory, execute sequentially and retain exact clean
+source reads before/after. No current full-workspace test count is claimed.
+
+`26-cost17` actually exits1: its summarizer compares an OID to an `[OID,mode]`
+pair. The child ordinary SQL/sample and cleanup actually exit0. Original helper,
+raw sample, native receipt and failed outer stderr SHA
+`1698f7972f1045de96819c6dce978e223ec648942b6c929b9da0dc03f6fdeea3`
+remain unchanged. Distinct `27-cost17-summary`0 uses a corrected offline parser
+of that verified sample, never re-executing the workload. Summary facts SHA
+`cd58311b9774090050778cb8a62b34b6de1368555d9923fc3b86f5ef2bf3d4e5`
+in `logs/native-missing-images-5a82a96-cost17-summary-v1`. `28-cost18`0 uses the
+distinct corrected v2 helper once; facts SHA
+`8b784867993f5154cbd3628dbd9c207c0023a74e2eafeec41158c652a480bbd1`
+in `logs/native-missing-images-5a82a96-cost18-v2`.
+
+Each ordinary cost sample has32 warmups/128 sequential calls, three duplicate
+root bindings, five nodes/thirteen exact references, six selected attributes,
+two actual types and four positively witnessed s/u/p/l images. p50/p95/max
+milliseconds are0.5655/0.876/1.081 (17) and0.556/0.740/0.930 (18). Both stored
+carrier totals are380 bytes per observation; normalized images total8504 bytes.
+Attribute/type/missing record arrays are624/416/160 bytes. Initial/final context
+allocations are1245280/1212512 (17) and1245280/1245280 (18). Full scanned row
+counts and160 raw printed timings per major remain in facts/stdout; only final
+copied status is inspected. This includes full metadata and pure JSON copying
+plus TCP loopback protocol/utility overhead with microsecond quantization.
+No baseline, comparative improvement, isolated C timing, throughput, contention,
+allocation-event count, peak/process-memory or full performance acceptance.
+
+`29-environment`0 records85 actions0 in
+`logs/native-missing-images-5a82a96-environment-v1`, facts SHA
+`81763bf8dd17ba77d7dcceeec58dbb0bf570b188880f3bbff25ce27693e89bbf`.
+It ties eight exact healthy profiles, four exact images, all20 inputs and
+installed libraries/bitcode/headers/packaged README to127 corrected setup actions;
+product-only profile lacks the probe. Native prepared/module/mock refs and
+checked heap/attribute/missing-image fixture relations/schemas/types are zero.
+Old and failed profiles remain untouched. Passive wrong stdout.log/seal-filename
+reader exits1 remain bookkeeping failures, not native test results.
+
+This documentation-only checkpoint updates two unpackaged docs; packaged README
+and every executable/test/native input stay unchanged. Author evidence audit
+and independent implementation review must verify the exact final candidate
+before finite acceptance and normal squash merge. Original f972 product-check
+failure,954 oracle failure,26 parser failure, earlier source/reviewer/root failures
+remain failed. Full variable/default/TOAST/transitive/provider/candidate/effect/IR/
+preparation/data/executor/MySQL row/read-lock/serving/cache/full performance/
+artifact/release gates, issues46/15 and the goal remain OPEN. Security, compiler
+PR4/resources, hosted CI/account/admin, new stress/forced interruption/recovery,
+existing-profile stop/restart/signal and release publication remain excluded.
+
+### Independent finite missing-image acceptance and documentation correction
+
+Frozen implementation checkpoint `2848c06c3dab9573d20ecfac1fbaa3d1533a74b1`,
+tree `220d33ff80521ebd27c301189876ddedd2c0cbd7`, changes only the two unpackaged
+docs from tested `5a82a96`; all341 other tree entries and all20 native inputs
+remain equal. Author `30-author-audit` actually exits0 and seals2381 paths;
+facts in `logs/native-missing-images-2848c06-author-audit-v1` have SHA
+`bc2096cb987bd8e48d98d4c91c230cf6c493847231b16ff68108baae509c39fd`,
+plain seal SHA `cf4e1dd16dac029acb5d7eb164f26145b6fd6541a823808bb6a81ec4ae36ebca`.
+It verifies29 outer outcomes (26 zeros, two101 and one1),174 source readers,
+exact127/127 setup and85 environment actions, native inputs and the preserved
+primary/design graph. It preserves the measured cost and interval receipts.
+Independent audit50 verifies the nonoverlap of29 root intervals and12
+Cargo/helper intervals and recomputes the bounded costs.
+
+Independent passive implementation review in
+`logs/review-native-missing-images-2848c06-implementation-v1` accepts the finite
+implementation and supplied evidence. Report SHA
+`e1d12fee74bde778fbb21a69de84e39fd37a500784cbd420132fc587e2ac3df2`,
+facts SHA `81fa4b39c8da55c2dd55bdab9aaedcb8388259604402d18c70103800801c53e5`,
+commands SHA `e3d713bbe8fd47a32bcdf9c5526bb002c9a794d4cbff7c0402f04cda3dd9e002`.
+The fixed structured3531-member seal SHA is
+`0dc1928c4bcca70c41027db640d1782415df736939b22c1e44e05a3ed993730b`.
+Actual `75-finalization` and `76-independent-post` exit0; their receipt SHAs are
+`ecfc4618272d9f404945b0dab7cb6041f69644569b0feb04947977c083454868` and
+`5ff9d0b875811d4e4833ceb93a558162e229fac4feeb4223e1519f2dba5b3dd3`.
+Post facts SHA `f8031c7c4efe6138b8de3d9d09105ba90d6732e8abc1eb1b8232411e4cc8ecd5`;
+final/post/metadata companions are separate from the nonrecursive fixed seal.
+Live reads are explicitly released. C1/P2 is CLOSED: the independent physical
+natts and native old missing-value/present-NULL oracle is inspected and executed
+by both paired current suites. D1/P3 remains OPEN at that historical checkpoint:
+the preallocation sentence must name the missing-record array, not all metadata
+arrays. Fixed attribute/type arrays retain periodic/postallocation checks;
+allocation-block overhead and peak/process memory remain outside this proof.
+
+Reviewer readers45/47/65–68 remain actual1 bookkeeping failures; corrected50
+actually exits0 and verifies the supplied graph. Root `31-review-rehash` also
+remains actual1: its reader incorrectly assumed every passive command had the
+same working directory. Exact absolute-path reads used two recorded directories.
+Distinct `31-review-rehash-v2` actually exits0, verifies all3531 seal members and
+companions (3560 unique files), final/post/metadata actual0, all raw stream hashes,
+the six preserved reviewer failures and six fresh clean source readers. Facts
+in `logs/native-missing-images-2848c06-implementation-root-rehash-v2` SHA
+`2b7d14ba32168242b6c72dc7cee19bd2bce4bbdf4eae81bc4302e07ce0d1bcb1`.
+No native test, build or workload is repeated or relabeled by this readback.
+A passive optional filename search exit2 is also bookkeeping, not product evidence.
+
+`32-doc-worktree` actually exits0 and creates a separate documentation leaf at
+the frozen checkpoint; the sealed implementation worktree stays unchanged.
+This leaf fixes D1's sentence and records finite implementation acceptance in
+these two unpackaged docs only. Packaged README, every executable/test/native
+input, exact runtime/build provenance and historical failures stay unchanged.
+Independent documentation readback is pending; D1 is not retroactively closed
+on `2848c06`. Normal reviewed exact-head squash merge remains required. Full
+variable/default/TOAST/transitive/provider/candidate/effect/IR/preparation/data/
+executor/MySQL row/read-lock/serving/cache/full performance/artifact/release gates,
+issues46/15 and the goal remain OPEN. The existing excluded scope remains excluded.
+
+### Missing-image documentation readback and attribution correction
+
+Frozen leaf `8030205146140e55d1bd479ccf8a9e4a59391067`, tree
+`b32b0eda568dd8c036c95eb4f8b684111b3444a5`, receives bounded independent
+documentation readback in `logs/review-native-missing-images-8030205-doc-leaf-v1`.
+Report SHA `45e1fe9ddd1aa1eb01e58a0cb5e2a9040fd3fc43cc1e39e810ca5f244adb7ce9`,
+facts SHA `1cb93c017c39b0f41070d1b9c231d6b521da5f702475ebff60a480f5cd9b8034`,
+commands SHA `5ee24d22ba2a13ad6b9bf8bb5d648470061656872649af0d6d4fbfa7827dcefb`.
+The structured4240-member seal SHA is
+`46afa459b12f9d56fc3ee87148ca58338262751ffc97384f6c98bcc2f2f2c6fd`.
+Executed `20-finalization` and `21-independent-post` both exit0, receipt SHAs
+`e10b99dd84d5e35f4255814739940c35a98275669784898520713c74572d094c` and
+`d5a75305abe770b4b02ca081765288b24eb551af9df42e2de2e6301625759f32`.
+Post facts SHA `229ac705df15a2fd13b26f89a79dc6a0272843828284eb36031ced8e7e16349d`.
+Actual before/after sources are exact and clean; live reads are released.
+D1/P3 closes only at803. D2 remains OPEN at that historical leaf: author30
+preserves interval/cost receipts, while successful independent50 proves interval
+nonoverlap and recomputes costs. This leaf corrects that attribution in the new
+acceptance paragraph; the historical803 bytes remain in frozen source and witnesses.
+
+Own reviewer11/12/18 remain actual1 passive schema/display/builder failures;
+corrected15/19/20/21/22 exit0. Root `34-doc-review-rehash` exits0 and verifies all
+4240 seal members plus separate companions (4270 unique files), raw streams,
+exact clean source and the preserved failures. Root facts SHA
+`543be44490426508796fc593346eb1f00d9b4196eda03048e70f06d61ad26b27`.
+`35-final-worktree` exits0 and
+creates this separate correction leaf; both prior worktrees remain frozen.
+This leaf updates only these two unpackaged docs. All341 other tree entries stay
+equal to tested5a; all20 native build inputs also equal built954. No runtime,
+build or cost sample is repeated or relabeled. Bounded D2 readback and normal
+exact-head reviewed squash merge remain pending. All previously open full gates,
+issues46/15 and the goal stay OPEN.

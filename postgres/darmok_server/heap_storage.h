@@ -112,6 +112,21 @@ typedef struct DarmokHeapTypeFact
 	Oid collation_oid;
 } DarmokHeapTypeFact;
 
+/* Opaque native singleton array, not an element codec or row NULL proof.
+ * The consumer can only copy this invocation-owned, major/architecture-local
+ * image. Ordered by actual relation/positive ordinal; duplicate roots share it.
+ * Carrier kind: s=short, u=four-byte, p=pglz, l=LZ4. */
+typedef struct DarmokHeapMissingFact
+{
+	Oid relation_oid;
+	int16 number;
+	Oid type_oid;
+	char carrier_kind;
+	Size stored_bytes;
+	Size image_bytes;
+	const char *image;
+} DarmokHeapMissingFact;
+
 typedef struct DarmokHeapObservationCost
 {
 	uint64 namespace_rows;
@@ -119,6 +134,7 @@ typedef struct DarmokHeapObservationCost
 	uint64 index_rows;
 	uint64 attribute_rows;
 	uint64 type_rows;
+	Size missing_carrier_bytes;
 	Size allocated_bytes;
 } DarmokHeapObservationCost;
 
@@ -134,8 +150,12 @@ typedef struct DarmokHeapStorageView
 	int attribute_count;
 	const DarmokHeapTypeFact *types;
 	int type_count;
+	const DarmokHeapMissingFact *missing;
+	int missing_count;
 	Size attribute_array_bytes;
 	Size type_array_bytes;
+	Size missing_array_bytes;
+	Size missing_image_bytes;
 	DarmokHeapObservationCost initial_cost;
 	DarmokHeapObservationCost final_cost;
 	const DarmokHeapStorageFact *facts;
