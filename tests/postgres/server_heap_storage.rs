@@ -163,17 +163,18 @@ async fn column_oracle(client: &Client, roots: &[u32]) -> ColumnOracle {
             "SELECT pg_catalog.json_build_object('oid',t.oid::bigint,'schema_oid',t.typnamespace::bigint,'schema',n.nspname,'name',t.typname,'length',t.typlen,'by_value',t.typbyval,'kind',pg_catalog.ascii(t.typtype::text),'category',pg_catalog.ascii(t.typcategory::text),'preferred',t.typispreferred,'defined',t.typisdefined,'delimiter',pg_catalog.ascii(t.typdelim::text),'relation_oid',t.typrelid::bigint,'subscript_oid',t.typsubscript::oid::bigint,'element_oid',t.typelem::bigint,'array_oid',t.typarray::bigint,'input_oid',t.typinput::oid::bigint,'output_oid',t.typoutput::oid::bigint,'receive_oid',t.typreceive::oid::bigint,'send_oid',t.typsend::oid::bigint,'typmod_input_oid',t.typmodin::oid::bigint,'typmod_output_oid',t.typmodout::oid::bigint,'analyze_oid',t.typanalyze::oid::bigint,'alignment',pg_catalog.ascii(t.typalign::text),'storage',pg_catalog.ascii(t.typstorage::text),'not_null_declared',t.typnotnull,'base_type_oid',t.typbasetype::bigint,'typmod',t.typtypmod,'dimensions',t.typndims,'collation_oid',t.typcollation::bigint)::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE t.oid IN(SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atttypid<>0) ORDER BY t.oid", &[&oids],
         ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
         let scanned = serde_json::from_str(&client.query_one(
-            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type))::text", &[],
+            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type),'attrdef_rows',(SELECT count(*) FROM pg_catalog.pg_attrdef))::text", &[],
         ).await.unwrap().get::<_, String>(0)).unwrap();
         ColumnOracle { roots, attributes, types, scanned }
     }).await.expect("bounded independent column/type oracle did not complete")
 }
 
 async fn create_missing_oracles(client: &Client, schema: &str) {
-    let schema = quoted(schema);
+    let quoted_schema = quoted(schema);
     sql(client, &format!(
-        "CREATE FUNCTION {schema}.image(anyarray) RETURNS bytea AS '$libdir/darmok_catalog_probe','darmok_test_missing_array_image' LANGUAGE C STRICT; CREATE FUNCTION {schema}.physical_natts(regclass) RETURNS integer[] AS '$libdir/darmok_catalog_probe','darmok_test_heap_natts' LANGUAGE C STRICT"
+        "CREATE FUNCTION {quoted_schema}.image(anyarray) RETURNS bytea AS '$libdir/darmok_catalog_probe','darmok_test_missing_array_image' LANGUAGE C STRICT; CREATE FUNCTION {quoted_schema}.physical_natts(regclass) RETURNS integer[] AS '$libdir/darmok_catalog_probe','darmok_test_heap_natts' LANGUAGE C STRICT"
     )).await.unwrap();
+    create_payload_oracles(client, schema).await;
 }
 
 async fn missing_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Value> {
@@ -190,6 +191,112 @@ async fn missing_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Val
 fn check_missing(state: &Value, expected: &[Value]) {
     assert_eq!(state["metadata"]["missing"], json!(expected));
     assert_eq!(state["metadata"]["missing_count"], expected.len());
+}
+
+async fn create_payload_oracles(client: &Client, schema: &str) {
+    let schema = quoted(schema);
+    for argument in ["pg_catalog.pg_node_tree", "text"] {
+        for (name, result, symbol) in [
+            ("payload_image", "bytea", "darmok_test_varlena_image"),
+            ("payload_carrier", "text", "darmok_test_varlena_carrier"),
+        ] {
+            sql(client, &format!("CREATE FUNCTION {schema}.{name}({argument}) RETURNS {result} AS '$libdir/darmok_catalog_probe','{symbol}' LANGUAGE C STRICT")).await.unwrap();
+        }
+    }
+}
+
+fn payload_expected(
+    catalog: u32,
+    row: u32,
+    relation: u32,
+    number: i16,
+    field: i16,
+    shape: Option<String>,
+    image: Option<Vec<u8>>,
+) -> Value {
+    let mut value = if let Some(shape) = shape {
+        serde_json::from_str::<Value>(&shape).unwrap()
+    } else {
+        assert!(image.is_none());
+        json!({"present":false,"carrier_kind":"","compression_kind":0,"toast_oid":0,"value_oid":0,"carrier_bytes":0,"stored_bytes":0})
+    };
+    let bytes = image.as_ref().map_or(0, Vec::len);
+    if value["present"] == true {
+        assert!(bytes >= 4);
+    }
+    value["image_bytes"] = json!(bytes);
+    value["image"] = json!(image.map(|image| {
+        image
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    }));
+    json!({"catalog_oid":catalog,"row_oid":row,"relation_oid":relation,"number":number,"field_number":field,"value":value})
+}
+
+async fn payload_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Value> {
+    let schema = quoted(schema);
+    tokio::time::timeout(DEADLINE, async {
+        let mut payloads = Vec::new();
+        for row in client.query(&format!(
+            "SELECT 'pg_catalog.pg_attrdef'::regclass::oid,d.oid,d.adrelid,d.adnum,a.attnum,{schema}.payload_carrier(d.adbin),{schema}.payload_image(d.adbin) FROM pg_catalog.pg_attrdef d CROSS JOIN pg_catalog.pg_attribute a WHERE d.adrelid=ANY($1) AND a.attrelid='pg_catalog.pg_attrdef'::regclass AND a.attname='adbin' ORDER BY d.oid"
+        ), &[&roots]).await.unwrap() {
+            payloads.push(payload_expected(row.get(0),row.get(1),row.get(2),row.get(3),row.get(4),row.get(5),row.get(6)));
+        }
+        for field in ["typdefaultbin", "typdefault"] {
+            for row in client.query(&format!(
+                "SELECT 'pg_catalog.pg_type'::regclass::oid,t.oid,a.attnum,{schema}.payload_carrier(t.{field}),{schema}.payload_image(t.{field}) FROM pg_catalog.pg_type t CROSS JOIN pg_catalog.pg_attribute a WHERE t.oid IN(SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atttypid<>0) AND a.attrelid='pg_catalog.pg_type'::regclass AND a.attname=$2 ORDER BY t.oid"
+            ), &[&roots,&field]).await.unwrap() {
+                payloads.push(payload_expected(row.get(0),row.get(1),0,0,row.get(2),row.get(3),row.get(4)));
+            }
+        }
+        payloads.sort_by_key(|fact|(fact["catalog_oid"].as_u64().unwrap(),fact["row_oid"].as_u64().unwrap(),fact["field_number"].as_u64().unwrap()));
+        payloads
+    }).await.expect("bounded independent default payload oracle did not complete")
+}
+
+fn check_payloads(state: &Value, expected: &[Value]) {
+    assert_eq!(state["metadata"]["payloads"], json!(expected));
+    assert_eq!(state["metadata"]["payload_count"], expected.len());
+    let mut carrier_bytes = 0_u64;
+    let mut stored_bytes = 0_u64;
+    let mut image_bytes = 0_u64;
+    let mut heaps = std::collections::BTreeSet::new();
+    let mut groups = std::collections::BTreeSet::new();
+    for fact in expected {
+        let value = &fact["value"];
+        carrier_bytes += value["carrier_bytes"].as_u64().unwrap();
+        stored_bytes += value["stored_bytes"].as_u64().unwrap();
+        image_bytes += value["image_bytes"].as_u64().unwrap();
+        if value["carrier_kind"] == "e" {
+            heaps.insert(value["toast_oid"].as_u64().unwrap());
+            groups.insert((
+                value["toast_oid"].as_u64().unwrap(),
+                value["value_oid"].as_u64().unwrap(),
+            ));
+        }
+    }
+    for phase in ["initial_cost", "source_cost", "final_cost"] {
+        assert_eq!(
+            state["metadata"][phase]["payload_carrier_bytes"],
+            carrier_bytes
+        );
+        assert!(
+            state["metadata"][phase]["requested_copy_bytes"]
+                .as_u64()
+                .unwrap()
+                <= 64 * 1024 * 1024
+        );
+    }
+    assert_eq!(state["metadata"]["payload_image_bytes"], image_bytes);
+    assert_eq!(state["metadata"]["payload_stored_bytes"], stored_bytes);
+    assert_eq!(state["metadata"]["toast_heaps"], heaps.len());
+    let rows = state["metadata"]["toast_rows"].as_u64().unwrap();
+    let chunks = state["metadata"]["selected_chunks"].as_u64().unwrap();
+    assert!(rows >= chunks && chunks >= groups.len() as u64);
+    if heaps.is_empty() {
+        assert_eq!((rows, chunks), (0, 0));
+    }
 }
 
 fn check_columns(state: &Value, expected: &ColumnOracle) {
@@ -239,7 +346,7 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
         stored_bytes += image["stored_bytes"].as_u64().unwrap();
     }
     assert_eq!(metadata["missing_image_bytes"], image_bytes);
-    for phase in ["initial_cost", "final_cost"] {
+    for phase in ["initial_cost", "source_cost", "final_cost"] {
         for (name, count) in expected.scanned.as_object().unwrap() {
             assert_eq!(&metadata[phase][name], count, "{phase}/{name}: {metadata}");
         }
@@ -263,7 +370,25 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
     }
 }
 
-fn check_graph(state: &Value, expected: &[Value], root_mask: u64) {
+async fn catalog_graphs(client: &Client) -> BTreeMap<u32, Vec<Value>> {
+    let names = [
+        "pg_namespace",
+        "pg_class",
+        "pg_index",
+        "pg_attribute",
+        "pg_type",
+        "pg_attrdef",
+    ];
+    let mut graphs = BTreeMap::new();
+    for name in names {
+        let root = oid(client, "pg_catalog", name).await;
+        assert!(graphs.insert(root, oracle(client, root).await).is_none());
+    }
+    assert_eq!(graphs.len(), 6);
+    graphs
+}
+
+async fn check_graph(client: &Client, state: &Value, expected: &[Value], root_mask: u64) {
     let root_masks = expected
         .iter()
         .filter(|fact| fact["parent_oid"] == 0)
@@ -274,44 +399,98 @@ fn check_graph(state: &Value, expected: &[Value], root_mask: u64) {
             )
         })
         .collect();
-    check_graph_modes(state, expected, &root_masks);
+    check_graph_modes(client, state, expected, &root_masks).await;
 }
 
-fn check_graph_modes(state: &Value, expected_facts: &[Value], root_masks: &BTreeMap<u32, u64>) {
-    let metadata = &state["metadata"];
-    let facts = metadata["facts"].as_array().unwrap();
-    assert_eq!(facts.len(), expected_facts.len());
-    let mut references = Vec::new();
-    for (actual, expected) in facts.iter().zip(expected_facts) {
-        for (key, value) in expected.as_object().unwrap() {
-            assert_eq!(&actual[key], value, "{key}: {actual}");
+async fn check_graph_modes(
+    client: &Client,
+    state: &Value,
+    application_facts: &[Value],
+    root_masks: &BTreeMap<u32, u64>,
+) {
+    let catalogs = catalog_graphs(client).await;
+    let mut applications = BTreeMap::<u32, Vec<Value>>::new();
+    let mut root = 0;
+    for fact in application_facts {
+        if fact["parent_oid"] == 0 {
+            root = u32::try_from(fact["oid"].as_u64().unwrap()).unwrap();
         }
-        let toast = expected["kind"] == u64::from(b't')
-            || expected_facts.iter().any(|parent| {
-                parent["oid"] == expected["parent_oid"] && parent["kind"] == u64::from(b't')
-            });
-        let mut ancestor = expected;
-        while ancestor["parent_oid"] != 0 {
-            ancestor = expected_facts
-                .iter()
-                .find(|fact| fact["oid"] == ancestor["parent_oid"])
-                .unwrap();
-        }
-        let root = u32::try_from(ancestor["oid"].as_u64().unwrap()).unwrap();
-        let root_mask = root_masks[&root];
-        let mask = if toast {
-            2 | (root_mask & 8)
-        } else {
-            root_mask
-        };
-        assert_eq!(actual["mode_mask"], mask);
-        for mode in 1..=3 {
-            if mask & (1 << mode) != 0 {
-                references.push(json!([actual["oid"], mode]));
+        assert_ne!(root, 0);
+        applications.entry(root).or_default().push(fact.clone());
+    }
+    let roots = catalogs
+        .keys()
+        .chain(applications.keys())
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut expected_facts = Vec::<Value>::new();
+    let mut positions = BTreeMap::<u32, usize>::new();
+    let mut uses = Vec::new();
+    for root in roots {
+        for (catalog, graph, root_mask) in [
+            (
+                false,
+                applications.get(&root),
+                root_masks.get(&root).copied().unwrap_or(0),
+            ),
+            (true, catalogs.get(&root), 2),
+        ] {
+            let Some(graph) = graph else {
+                continue;
+            };
+            for fact in graph {
+                let oid = u32::try_from(fact["oid"].as_u64().unwrap()).unwrap();
+                let toast = fact["kind"] == u64::from(b't')
+                    || graph.iter().any(|parent| {
+                        parent["oid"] == fact["parent_oid"] && parent["kind"] == u64::from(b't')
+                    });
+                let mask = if toast {
+                    2 | (root_mask & 8)
+                } else {
+                    root_mask
+                };
+                let position = if let Some(position) = positions.get(&oid) {
+                    for (name, value) in fact.as_object().unwrap() {
+                        assert_eq!(
+                            &expected_facts[*position][name], value,
+                            "shared graph fact {oid}/{name}"
+                        );
+                    }
+                    *position
+                } else {
+                    if fact["parent_oid"] != 0 {
+                        assert!(
+                            positions.contains_key(&(fact["parent_oid"].as_u64().unwrap() as u32))
+                        );
+                    }
+                    let position = expected_facts.len();
+                    positions.insert(oid, position);
+                    let mut copied = fact.clone();
+                    copied["mode_mask"] = json!(0);
+                    expected_facts.push(copied);
+                    position
+                };
+                let previous = expected_facts[position]["mode_mask"].as_u64().unwrap();
+                expected_facts[position]["mode_mask"] = json!(previous | mask);
+                uses.push(
+                    json!({"root_oid":root,"relation_oid":oid,"mode_mask":mask,"catalog":catalog}),
+                );
             }
         }
     }
+    let metadata = &state["metadata"];
+    assert_eq!(metadata["facts"], json!(expected_facts));
+    assert_eq!(metadata["uses"], json!(uses));
+    let references = expected_facts
+        .iter()
+        .flat_map(|fact| {
+            (1..=3)
+                .filter(move |&mode| fact["mode_mask"].as_u64().unwrap() & (1 << mode) != 0)
+                .map(move |mode| json!([fact["oid"], mode]))
+        })
+        .collect::<Vec<_>>();
     assert_eq!(metadata["references"], json!(references));
+    assert!(references.len() <= 4096);
 }
 
 struct Observer {
@@ -358,6 +537,33 @@ impl Observer {
                 .unwrap()
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    async fn check_prepared_storage_wait(&self, client: &Client, pid: i32, established: bool) {
+        self.no_coordination(client, pid).await;
+        // Combined physical acquisition owns catalog AS before an application
+        // root wait. A's registered/ephemeral snapshot must already be gone;
+        // an entered RR data snapshot is preserved independently.
+        let catalogs = vec![1247_u32, 1249, 1259, 2604, 2610, 2615];
+        let locks = self.modes(client, Some(pid), &catalogs).await;
+        assert_eq!(locks.iter().map(|row| row.0).collect::<Vec<_>>(), catalogs);
+        assert!(locks.iter().all(|row| row.2 == "AccessShareLock" && row.3));
+        let horizon: Option<String> = tokio::time::timeout(
+            DEADLINE,
+            client.query_one(
+                "SELECT backend_xmin::text FROM pg_catalog.pg_stat_activity WHERE pid=$1",
+                &[&pid],
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .get(0);
+        assert_eq!(
+            horizon.is_some(),
+            established,
+            "prepared wait retained an unexpected snapshot horizon"
         );
     }
 
@@ -411,6 +617,18 @@ fn fact_oids(state: &Value) -> Vec<u32> {
         .collect()
 }
 
+fn application_fact_oids(state: &Value) -> Vec<u32> {
+    state["metadata"]["uses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|fact| fact["catalog"] == false)
+        .map(|fact| u32::try_from(fact["relation_oid"].as_u64().unwrap()).unwrap())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 fn expected_locks(state: &Value) -> Vec<(u32, u32, String, bool)> {
     let facts = state["metadata"]["facts"].as_array().unwrap();
     let mut result: Vec<_> = state["metadata"]["references"]
@@ -454,6 +672,146 @@ async fn finish_targets(client: &Client, gids: &[&str]) {
 
 fn quoted(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+fn literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+fn payload_entropy(bytes: usize, seed: u64) -> String {
+    let alphabet = (33_u8..=126)
+        .filter(|byte| !matches!(*byte, b'\'' | b'\\'))
+        .collect::<Vec<_>>();
+    let mut state = seed;
+    (0..bytes)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            char::from(alphabet[(state % alphabet.len() as u64) as usize])
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn owned_defaults_cover_actual_native_carriers_and_independent_type_presence() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "payload_facts_字";
+    let qschema = quoted(schema);
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE,async {
+        let version: i32 = observer.query_one("SELECT current_setting('server_version_num')::integer",&[]).await.unwrap().get(0);
+        assert!((170000..190000).contains(&version));
+        let entropy = payload_entropy(32768,0x2359ac4ef12389ab);
+        let repeated = payload_entropy(16384,0x5630ba981ef5cd29).repeat(3);
+        sql(&observer,&format!("CREATE SCHEMA {qschema}; SET default_toast_compression='lz4'")).await.unwrap();
+        // Native base types allow independent text-only defaults. Their fixture
+        // input/output functions are internal text ABI aliases; copying never
+        // calls these providers or substitutes their effective default.
+        for (name,default) in [("raw",Some(entropy.as_str())),("empty",Some("")),("absent",None)] {
+            let default = default.map(|value|format!(", DEFAULT={}",literal(value))).unwrap_or_default();
+            sql(&observer,&format!("CREATE TYPE {qschema}.{name}; CREATE FUNCTION {qschema}.{name}_in(cstring) RETURNS {qschema}.{name} AS 'textin' LANGUAGE internal IMMUTABLE STRICT; CREATE FUNCTION {qschema}.{name}_out({qschema}.{name}) RETURNS cstring AS 'textout' LANGUAGE internal IMMUTABLE STRICT; CREATE TYPE {qschema}.{name}(INPUT={qschema}.{name}_in,OUTPUT={qschema}.{name}_out,INTERNALLENGTH=variable,ALIGNMENT=int4,STORAGE=extended{default})")).await.unwrap();
+        }
+        sql(&observer,&format!("SET default_toast_compression='pglz'; CREATE DOMAIN {qschema}.dp AS text DEFAULT {}; CREATE DOMAIN {qschema}.inherited AS {qschema}.dp; SET default_toast_compression='lz4'; CREATE DOMAIN {qschema}.dl AS text DEFAULT {}; CREATE DOMAIN {qschema}.inline_l AS text DEFAULT {}; CREATE DOMAIN {qschema}.unselected_type AS text DEFAULT {}",literal(&repeated),literal(&repeated),literal(&"z".repeat(3000)),literal(&entropy))).await.unwrap();
+        sql(&observer,&format!("CREATE TABLE {qschema}.t(id integer,nullable text DEFAULT NULL,inline_p text,ext_p text,ext_q text,ext_l text,dp {qschema}.dp,dl {qschema}.dl,il {qschema}.inline_l,raw {qschema}.raw,empty {qschema}.empty,absent {qschema}.absent,inherited {qschema}.inherited,calc integer GENERATED ALWAYS AS(id+1) STORED); CREATE TABLE {qschema}.other(id integer,dp {qschema}.dp); INSERT INTO {qschema}.other VALUES(1,NULL); ALTER TABLE {qschema}.other ADD COLUMN missing integer DEFAULT 7; SET default_toast_compression='pglz'; ALTER TABLE {qschema}.t ALTER COLUMN inline_p SET DEFAULT {}; ALTER TABLE {qschema}.t ALTER COLUMN ext_p SET DEFAULT {}; ALTER TABLE {qschema}.t ALTER COLUMN ext_q SET DEFAULT {}; SET default_toast_compression='lz4'; ALTER TABLE {qschema}.t ALTER COLUMN ext_l SET DEFAULT {}; CREATE TABLE {qschema}.unselected(body text DEFAULT {}); ALTER TABLE {qschema}.t ALTER COLUMN ext_p SET COMPRESSION lz4,ALTER COLUMN ext_l SET COMPRESSION pglz",literal(&"abc".repeat(1000)),literal(&repeated),literal(&repeated),literal(&repeated),literal(&entropy))).await.unwrap();
+        create_missing_oracles(&observer,schema).await;
+        let root = oid(&observer,schema,"t").await;
+        let other = oid(&observer,schema,"other").await;
+        let roots = json!([[schema,"t",3],[schema,"other",1],[schema,"t",1],[schema,"t",2]]);
+        let direct_oids = [root,other];
+        let mut previous_missing = None;
+        let mut inherited_source = None;
+        for phase in 0..3 {
+            if phase==1 {
+                sql(&observer,&format!("ALTER TABLE {qschema}.t ALTER COLUMN nullable DROP DEFAULT,ALTER COLUMN ext_q DROP DEFAULT,ALTER COLUMN ext_p SET DEFAULT 'replacement'; ALTER DOMAIN {qschema}.dp SET DEFAULT 'new domain'; ALTER TABLE {qschema}.other ALTER COLUMN missing DROP DEFAULT")).await.unwrap();
+            } else if phase==2 {
+                sql(&observer,&format!("ALTER TABLE {qschema}.t RENAME COLUMN inline_p TO renamed; ALTER TABLE {qschema}.t DROP COLUMN ext_l; ALTER DOMAIN {qschema}.dl DROP DEFAULT")).await.unwrap();
+            }
+            let columns = column_oracle(&observer,&direct_oids).await;
+            let payloads = payload_oracle(&observer,schema,&direct_oids).await;
+            let inherited_oid = &columns.types.iter().find(|fact|fact["schema"]==schema && fact["name"]=="inherited").unwrap()["oid"];
+            let inherited_records = payloads.iter().filter(|fact|fact["catalog_oid"]==1247 && &fact["row_oid"]==inherited_oid).cloned().collect::<Vec<_>>();
+            assert_eq!(inherited_records.as_slice(),inherited_source.get_or_insert_with(||inherited_records.clone()).as_slice(),"a parent default change replaced the child's directly stored source");
+            let missing = missing_oracle(&observer,schema,&direct_oids).await;
+            assert_eq!(missing.len(),1);
+            if let Some(previous) = previous_missing.replace(missing.clone()) { assert_eq!(missing,previous); }
+            if phase==0 {
+                let column_value = |name: &str| {
+                    let number = &columns.attributes.iter().find(|fact|fact["relation_oid"]==root && fact["name"]==name).unwrap()["number"];
+                    &payloads.iter().find(|fact|fact["relation_oid"]==root && &fact["number"]==number).unwrap()["value"]
+                };
+                assert_eq!(column_value("ext_p")["carrier_kind"],"e");
+                assert_eq!(column_value("ext_p")["compression_kind"],u64::from(b'p'));
+                assert_eq!(column_value("ext_l")["carrier_kind"],"e");
+                assert_eq!(column_value("ext_l")["compression_kind"],u64::from(b'l'));
+                assert_eq!(column_value("inline_p")["carrier_kind"],"p");
+                assert_eq!(column_value("ext_p")["image"],column_value("ext_q")["image"]);
+                let type_values = |name: &str| {
+                    let type_oid = &columns.types.iter().find(|fact|fact["schema"]==schema && fact["name"]==name).unwrap()["oid"];
+                    payloads.iter().filter(|fact|fact["catalog_oid"]==1247 && &fact["row_oid"]==type_oid).map(|fact|&fact["value"]).collect::<Vec<_>>()
+                };
+                let raw = type_values("raw");
+                assert_eq!(raw.len(),2);
+                assert_eq!(raw[0]["present"],false);
+                assert_eq!(raw[1]["carrier_kind"],"e");
+                assert_eq!(raw[1]["compression_kind"],0);
+                let empty = type_values("empty");
+                assert_eq!(empty[0]["present"],false);
+                assert_eq!(empty[1]["present"],true);
+                assert_eq!(empty[1]["carrier_kind"],"s");
+                assert_eq!(empty[1]["image_bytes"],4);
+                let absent = type_values("absent");
+                assert_eq!(absent.len(),2);
+                assert!(absent.iter().all(|value|value["present"]==false));
+                assert!(type_values("inherited").iter().all(|value|value["present"]==true));
+                for name in ["dp","dl"] {
+                    assert!(type_values(name).iter().all(|value|value["present"]==true && value["carrier_kind"]=="e"));
+                }
+                // PGLZ cannot reuse this distant text repetition. The binary
+                // node representation still compresses; each field's actual
+                // carrier must determine its decoder independently.
+                assert_eq!(type_values("dp")[0]["compression_kind"],u64::from(b'p'));
+                assert_eq!(type_values("dp")[1]["compression_kind"],0);
+                assert!(type_values("dl").iter().all(|value|value["compression_kind"]==u64::from(b'l')));
+                assert!(type_values("inline_l").iter().all(|value|value["carrier_kind"]=="l"));
+            }
+            let mut graph = oracle(&observer,root).await;
+            graph.extend(oracle(&observer,other).await);
+            let masks = BTreeMap::from([(root,14),(other,2)]);
+            for established in [false,true] {
+                sql(&reader,if established {"BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1"} else {"BEGIN ISOLATION LEVEL REPEATABLE READ"}).await.unwrap();
+                for pass in 0..2 {
+                    let start = std::time::Instant::now();
+                    let state = capture(&reader,&roots,false).await;
+                    let elapsed = start.elapsed();
+                    check_scope(&state,established,false);
+                    check_columns(&state,&columns);
+                    check_missing(&state,&missing);
+                    check_payloads(&state,&payloads);
+                    check_graph_modes(&observer,&state,&graph,&masks).await;
+                    assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][2]);
+                    assert!(state["metadata"]["toast_rows"].as_u64().unwrap()>state["metadata"]["selected_chunks"].as_u64().unwrap());
+                    assert!(probe.modes(&observer,Some(backend),&fact_oids(&state)).await.is_empty());
+                    probe.no_coordination(&observer,backend).await;
+                    println!("native_payload_cost_sample {}",json!({"server_version":version,"phase":phase,"established_rr":established,"pass":pass,"sql_and_show_elapsed_ms":elapsed.as_secs_f64()*1000.0,"initial":state["metadata"]["initial_cost"],"source":state["metadata"]["source_cost"],"final":state["metadata"]["final_cost"],"toast_heaps":state["metadata"]["toast_heaps"],"toast_rows":state["metadata"]["toast_rows"],"selected_chunks":state["metadata"]["selected_chunks"],"payload_image_bytes":state["metadata"]["payload_image_bytes"],"references":state["metadata"]["references"].as_array().unwrap().len(),"attempts":state["metadata"]["attempts"]}));
+                }
+                sql(&reader,"ROLLBACK").await.unwrap();
+            }
+        }
+    })).catch_unwind().await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        &format!("DROP SCHEMA IF EXISTS {qschema} CASCADE; RESET default_toast_compression"),
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(observer, od).await;
+    finish(outcome);
 }
 
 #[tokio::test]
@@ -586,6 +944,7 @@ async fn missing_images_preserve_native_storage_forms_and_present_nulls() {
             }
             let columns = column_oracle(&observer,&oids).await;
             let images = missing_oracle(&observer,schema,&oids).await;
+            let payloads = payload_oracle(&observer,schema,&oids).await;
             assert_eq!(images.len(),if phase==2 {13} else {14});
             let forms = images.iter().map(|image|image["carrier_kind"].as_str().unwrap()).collect::<std::collections::BTreeSet<_>>();
             assert_eq!(forms,std::collections::BTreeSet::from(["s","u","p","l"]));
@@ -638,7 +997,8 @@ async fn missing_images_preserve_native_storage_forms_and_present_nulls() {
                     check_scope(&state,established,false);
                     check_columns(&state,&columns);
                     check_missing(&state,&images);
-                    check_graph_modes(&state,&graph,&masks);
+                    check_payloads(&state,&payloads);
+                    check_graph_modes(&observer,&state,&graph,&masks).await;
                     assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][3]);
                     assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][4]);
                     assert!(probe.modes(&observer,Some(backend),&fact_oids(&state)).await.is_empty());
@@ -670,7 +1030,7 @@ async fn prepared_column_and_type_changes_refresh_after_both_normal_outcomes() {
     let probe = Observer::new(&observer).await;
     let gids = ["attribute_facts_commit", "attribute_facts_abort"];
     let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
-        sql(&observer,"CREATE SCHEMA attribute_facts_wait; CREATE TYPE attribute_facts_wait.e AS ENUM ('value'); CREATE TABLE attribute_facts_wait.t(old_name attribute_facts_wait.e,n integer); INSERT INTO attribute_facts_wait.t VALUES('value',1); ALTER TABLE attribute_facts_wait.t ADD COLUMN stable integer DEFAULT 5").await.unwrap();
+        sql(&observer,"CREATE SCHEMA attribute_facts_wait; CREATE TYPE attribute_facts_wait.e AS ENUM ('value'); CREATE DOMAIN attribute_facts_wait.d AS text DEFAULT 'initial'; CREATE TABLE attribute_facts_wait.t(old_name attribute_facts_wait.e,n integer,dm attribute_facts_wait.d); INSERT INTO attribute_facts_wait.t(old_name,n) VALUES('value',1); ALTER TABLE attribute_facts_wait.t ADD COLUMN stable integer DEFAULT 5").await.unwrap();
         create_missing_oracles(&observer,"attribute_facts_wait").await;
         let root = oid(&observer,"attribute_facts_wait","t").await;
         let type_oid: u32 = observer.query_one("SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=$1 AND attnum=1",&[&root]).await.unwrap().get(0);
@@ -680,6 +1040,7 @@ async fn prepared_column_and_type_changes_refresh_after_both_normal_outcomes() {
             for (gid,ending) in gids.iter().zip(["COMMIT","ROLLBACK"]) {
                 let before = column_oracle(&observer,&[root]).await;
                 let before_images = missing_oracle(&observer,"attribute_facts_wait",&[root]).await;
+                let before_payloads = payload_oracle(&observer,"attribute_facts_wait",&[root]).await;
                 let current_column = before.attributes[0]["name"].as_str().unwrap();
                 let current_type = before.types.iter().find(|fact|fact["oid"]==type_oid).unwrap()["name"].as_str().unwrap();
                 let next_column = format!("renamed_{cycle}");
@@ -688,7 +1049,7 @@ async fn prepared_column_and_type_changes_refresh_after_both_normal_outcomes() {
                 let next_value = format!("v_{cycle}");
                 cycle += 1;
                 sql(&reader,if established { "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1" } else { "BEGIN" }).await.unwrap();
-                sql(&writer,&format!("BEGIN; ALTER TABLE attribute_facts_wait.t RENAME COLUMN {} TO {}; ALTER TABLE attribute_facts_wait.t ADD COLUMN {} varchar(11) DEFAULT '{next_value}'; ALTER TYPE attribute_facts_wait.{} RENAME TO {}; PREPARE TRANSACTION '{gid}'",quoted(current_column),quoted(&next_column),quoted(&next_added),quoted(current_type),quoted(&next_type))).await.unwrap();
+                sql(&writer,&format!("BEGIN; ALTER TABLE attribute_facts_wait.t RENAME COLUMN {} TO {}; ALTER TABLE attribute_facts_wait.t ADD COLUMN {} varchar(11) DEFAULT '{next_value}'; ALTER TYPE attribute_facts_wait.{} RENAME TO {}; ALTER DOMAIN attribute_facts_wait.d SET DEFAULT '{next_value}'; ALTER TABLE attribute_facts_wait.t ALTER COLUMN stable SET DEFAULT {cycle}; PREPARE TRANSACTION '{gid}'",quoted(current_column),quoted(&next_column),quoted(&next_added),quoted(current_type),quoted(&next_type))).await.unwrap();
                 let request = storage_command(&roots,false);
                 let waiting = command(&reader,&request);
                 tokio::pin!(waiting);
@@ -696,17 +1057,18 @@ async fn prepared_column_and_type_changes_refresh_after_both_normal_outcomes() {
                     result = &mut waiting => panic!("prepared attribute acquisition completed early: {result:?}"),
                     () = probe.wait_physical(&observer,backend,root) => {},
                 }
-                probe.no_coordination(&observer,backend).await;
-                assert!(probe.modes(&observer,Some(backend),&[1247,1249,1259,2610,2615]).await.is_empty());
+                probe.check_prepared_storage_wait(&observer,backend,established).await;
                 sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
                 waiting.await.unwrap();
                 let expected = column_oracle(&observer,&[root]).await;
                 let images = missing_oracle(&observer,"attribute_facts_wait",&[root]).await;
+                let payloads = payload_oracle(&observer,"attribute_facts_wait",&[root]).await;
                 let state = status(&reader).await;
                 check_scope(&state,established,false);
                 check_columns(&state,&expected);
                 check_missing(&state,&images);
-                check_graph(&state,&oracle(&observer,root).await,10);
+                check_payloads(&state,&payloads);
+                check_graph(&observer,&state,&oracle(&observer,root).await,10).await;
                 assert_eq!(expected.roots[&root]["row_type_oid"],before.roots[&root]["row_type_oid"]);
                 if ending=="COMMIT" {
                     assert_eq!(expected.attributes.len(),before.attributes.len()+1);
@@ -721,6 +1083,7 @@ async fn prepared_column_and_type_changes_refresh_after_both_normal_outcomes() {
                     assert_eq!(expected.attributes,before.attributes);
                     assert_eq!(expected.types,before.types);
                     assert_eq!(images,before_images);
+                    assert_eq!(payloads,before_payloads);
                 }
                 assert!(probe.modes(&observer,Some(backend),&fact_oids(&state)).await.is_empty());
                 probe.no_coordination(&observer,backend).await;
@@ -762,7 +1125,9 @@ async fn native_null_and_generation_bits_remain_declarations() {
         }
         let nulls: i64 = observer.query_one("SELECT count(*) FROM attribute_facts_null.t WHERE n IS NULL",&[]).await.unwrap().get(0);
         assert_eq!(nulls,1);
+        create_payload_oracles(&observer,"attribute_facts_null").await;
         let expected = column_oracle(&observer,&[root]).await;
+        let payloads = payload_oracle(&observer,"attribute_facts_null",&[root]).await;
         assert_eq!(expected.attributes[0]["not_null_declared"],true);
         assert_eq!(expected.attributes[1]["not_null_declared"],version>=180000);
         if version>=180000 {
@@ -774,6 +1139,7 @@ async fn native_null_and_generation_bits_remain_declarations() {
         let state = capture(&reader,&json!([["attribute_facts_null","t",1]]),false).await;
         check_scope(&state,false,false);
         check_columns(&state,&expected);
+        check_payloads(&state,&payloads);
         sql(&reader,"ROLLBACK").await.unwrap();
     })).catch_unwind().await;
     sql(&reader, "ROLLBACK").await.unwrap();
@@ -813,7 +1179,7 @@ async fn literal_bindings_full_graph_exact_modes_and_borrowed_counts() {
             sql(&reader, if established { "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1" } else { "BEGIN" }).await.unwrap();
             let state = capture(&reader,&roots,false).await;
             check_scope(&state,established,false);
-            check_graph(&state,&expected,14);
+            check_graph(&observer,&state,&expected,14).await;
             check_columns(&state, &columns);
             assert_eq!(state["metadata"]["roots"],json!([[b,3],[a,1],[a,3],[b,1],[a,2],[b,2],[a,1]]));
             let oids = fact_oids(&state);
@@ -824,7 +1190,7 @@ async fn literal_bindings_full_graph_exact_modes_and_borrowed_counts() {
             command(&reader,&format!("relation_borrow:{raw}")).await.unwrap();
             let again = capture(&reader,&roots,false).await;
             check_scope(&again,established,false);
-            check_graph(&again,&expected,14);
+            check_graph(&observer,&again,&expected,14).await;
             check_columns(&again, &columns);
             assert_eq!(probe.modes(&observer,Some(backend),&oids).await,expected_locks(&state));
             command(&reader,"relation_unborrow").await.unwrap();
@@ -875,7 +1241,7 @@ async fn completed_storage_retention_follows_native_children_and_prepared_outcom
         sql(&reader,"SAVEPOINT child").await.unwrap();
         let state = capture(&reader,&roots,true).await;
         check_scope(&state,false,true);
-        check_graph(&state,&expected,10);
+        check_graph(&observer,&state,&expected,10).await;
         check_columns(&state, &columns);
         check_missing(&state,&images);
         let oids = fact_oids(&state);
@@ -938,14 +1304,15 @@ async fn shared_mapped_and_actual_own_temporary_storage_identity() {
             assert_eq!(expected[0]["stored_file_number"],0);
             assert_ne!(expected[0]["file_number"],0);
             sql(&reader,"BEGIN").await.unwrap();
-            let state = capture(&reader,&json!([["pg_catalog",name,1]]),true).await;
+            let roots = if name=="pg_class" { json!([["pg_catalog",name,3],["pg_catalog",name,1]]) } else { json!([["pg_catalog",name,1]]) };
+            let state = capture(&reader,&roots,true).await;
             check_scope(&state,false,true);
-            check_graph(&state,&expected,2);
+            check_graph(&observer,&state,&expected,if name=="pg_class" {10} else {2}).await;
             check_columns(&state, &columns);
             let oids = fact_oids(&state);
             assert_eq!(probe.modes(&observer,Some(backend),&oids).await,expected_locks(&state));
             if name == "pg_database" {
-                assert!(state["metadata"]["facts"].as_array().unwrap().iter().all(|fact| fact["shared"] == true && fact["file_database_oid"] == 0 && fact["file_tablespace_oid"] == 1664));
+                assert!(state["metadata"]["facts"].as_array().unwrap().iter().filter(|fact|application_fact_oids(&state).contains(&(fact["oid"].as_u64().unwrap() as u32))).all(|fact| fact["shared"] == true && fact["file_database_oid"] == 0 && fact["file_tablespace_oid"] == 1664));
             }
             probe.no_coordination(&observer,backend).await;
             sql(&reader,"ROLLBACK").await.unwrap();
@@ -962,12 +1329,12 @@ async fn shared_mapped_and_actual_own_temporary_storage_identity() {
         sql(&reader,"BEGIN").await.unwrap();
         let state = capture(&reader,&json!([[temp_schema,"heap_storage_temp",3]]),true).await;
         check_scope(&state,false,true);
-        check_graph(&state,&expected,8);
+        check_graph(&observer,&state,&expected,8).await;
         check_columns(&state, &columns);
         let oids = fact_oids(&state);
-        let proc_number = state["metadata"]["facts"][0]["file_proc_number"].as_i64().unwrap();
+        let proc_number = state["metadata"]["facts"].as_array().unwrap().iter().find(|fact|fact["oid"]==root).unwrap()["file_proc_number"].as_i64().unwrap();
         assert!(proc_number >= 0);
-        assert!(state["metadata"]["facts"].as_array().unwrap().iter().all(|fact| fact["file_proc_number"] == proc_number && fact["persistence"] == u64::from(b't')));
+        assert!(state["metadata"]["facts"].as_array().unwrap().iter().filter(|fact|application_fact_oids(&state).contains(&(fact["oid"].as_u64().unwrap() as u32))).all(|fact| fact["file_proc_number"] == proc_number && fact["persistence"] == u64::from(b't')));
         assert_eq!(probe.modes(&observer,Some(backend),&oids).await,expected_locks(&state));
         sql(&reader,"SAVEPOINT foreign_temp").await.unwrap();
         let error = command(&reader,&storage_command(&json!([[foreign_schema,"heap_storage_foreign",1]]),false)).await.unwrap_err();
@@ -975,7 +1342,7 @@ async fn shared_mapped_and_actual_own_temporary_storage_identity() {
         sql(&reader,"ROLLBACK TO foreign_temp; RELEASE foreign_temp").await.unwrap();
         let again = capture(&reader,&json!([[temp_schema,"heap_storage_temp",1]]),false).await;
         check_scope(&again,false,false);
-        check_graph(&again,&expected,2);
+        check_graph(&observer,&again,&expected,2).await;
         assert_eq!(probe.modes(&observer,Some(backend),&oids).await,expected_locks(&state));
         probe.no_coordination(&observer,backend).await;
         sql(&reader,"ROLLBACK").await.unwrap();
@@ -1018,10 +1385,10 @@ async fn explicit_unsupported_boundaries_abort_the_child_and_allow_fresh_admissi
             sql(&reader,if established { "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1" } else { "BEGIN" }).await.unwrap();
             let child_state = capture(&reader,&json!([["heap_storage_limits","child",1]]),false).await;
             check_scope(&child_state,established,false);
-            check_graph(&child_state,&child_expected,2);
+            check_graph(&observer,&child_state,&child_expected,2).await;
             check_columns(&child_state,&child_columns);
             assert_eq!(child_state["metadata"]["roots"],json!([[child,1]]));
-            assert_eq!(fact_oids(&child_state),vec![child]);
+            assert_eq!(application_fact_oids(&child_state),vec![child]);
             assert!(probe.modes(&observer,Some(backend),&all).await.is_empty());
             probe.no_coordination(&observer,backend).await;
             sql(&reader,"COMMIT").await.unwrap();
@@ -1029,10 +1396,10 @@ async fn explicit_unsupported_boundaries_abort_the_child_and_allow_fresh_admissi
         sql(&reader,"BEGIN").await.unwrap();
         let parent_state = capture(&reader,&json!([["heap_storage_limits","parent",1]]),false).await;
         check_scope(&parent_state,false,false);
-        check_graph(&parent_state,&parent_expected,2);
+        check_graph(&observer,&parent_state,&parent_expected,2).await;
         check_columns(&parent_state, &parent_columns);
-        assert_eq!(parent_state["metadata"]["facts"].as_array().unwrap().len(),1);
-        assert_eq!(parent_state["metadata"]["facts"][0]["has_subclasses"],true);
+        assert_eq!(application_fact_oids(&parent_state),vec![parent]);
+        assert_eq!(parent_state["metadata"]["facts"].as_array().unwrap().iter().find(|fact|fact["oid"]==parent).unwrap()["has_subclasses"],true);
         for name in ["v","m","s","p","leaf","hash_table"] {
             sql(&reader,"SAVEPOINT boundary").await.unwrap();
             let error = command(&reader,&storage_command(&json!([["heap_storage_limits",name,1]]),false)).await.unwrap_err();
@@ -1040,7 +1407,7 @@ async fn explicit_unsupported_boundaries_abort_the_child_and_allow_fresh_admissi
             sql(&reader,"ROLLBACK TO boundary; RELEASE boundary").await.unwrap();
             let fresh = capture(&reader,&json!([["heap_storage_limits","good",1]]),false).await;
             check_scope(&fresh,false,false);
-            check_graph(&fresh,&expected,2);
+            check_graph(&observer,&fresh,&expected,2).await;
             assert!(probe.modes(&observer,Some(backend),&all).await.is_empty());
             probe.no_coordination(&observer,backend).await;
         }
@@ -1088,10 +1455,7 @@ async fn prepared_literal_replacement_waits_without_fences_and_rechecks_current_
                     result = &mut waiting => panic!("native storage physical acquisition unexpectedly completed: {result:?}"),
                     () = probe.wait_physical(&observer,backend,old) => {},
                 }
-                probe.no_coordination(&observer,backend).await;
-                // The first fact observation has ended all its own catalog
-                // descriptor increments before this native prepared wait.
-                assert!(probe.modes(&observer,Some(backend),&[1247,1249,1259,2610,2615]).await.is_empty());
+                probe.check_prepared_storage_wait(&observer,backend,established).await;
                 sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
                 waiting.await.unwrap();
                 let current = oid(&observer,"heap_storage_wait","t").await;
@@ -1100,7 +1464,7 @@ async fn prepared_literal_replacement_waits_without_fences_and_rechecks_current_
                 let columns = column_oracle(&observer, &[current]).await;
                 let state = status(&reader).await;
                 check_scope(&state,established,false);
-                check_graph(&state,&expected,2);
+                check_graph(&observer,&state,&expected,2).await;
             check_columns(&state, &columns);
                 assert_eq!(state["metadata"]["roots"],json!([[current,1]]));
                 assert!(state["metadata"]["attempts"].as_u64().unwrap() >= 2);
@@ -1160,7 +1524,7 @@ async fn all_live_indexes_include_ordinary_not_ready_and_ready_invalid_build_pha
             sql(&reader,"BEGIN").await.unwrap();
             let state = capture(&reader,&json!([["heap_storage_live","t",1]]),false).await;
             check_scope(&state,false,false);
-            check_graph(&state,&expected,2);
+            check_graph(&observer,&state,&expected,2).await;
             check_columns(&state, &columns);
             let fact = state["metadata"]["facts"].as_array().unwrap().iter().find(|fact| fact["oid"] == index).unwrap();
             assert_eq!(fact["live"],true);

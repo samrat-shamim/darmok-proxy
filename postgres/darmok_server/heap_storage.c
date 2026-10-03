@@ -1,19 +1,20 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 #include "postgres.h"
 
-#include "access/detoast.h"
 #include "access/heapam.h"
 #include "access/htup_details.h"
+#include "access/relation.h"
 #include "access/table.h"
 #include "access/tableam.h"
-#include "access/toast_compression.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_am_d.h"
 #include "catalog/pg_attribute.h"
+#include "catalog/pg_attrdef.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
 #include "catalog/pg_namespace.h"
+#include "catalog/pg_namespace_d.h"
 #include "catalog/pg_tablespace_d.h"
 #include "catalog/pg_type.h"
 #include "mb/pg_wchar.h"
@@ -24,17 +25,22 @@
 #include "utils/inval.h"
 #include "utils/memutils.h"
 #include "utils/relmapper.h"
+#include "utils/rel.h"
 #include "utils/resowner.h"
 #include "utils/snapmgr.h"
 
 #include "catalog_read.h"
+#include "catalog_payload.h"
 #include "heap_storage.h"
 #include "statement_guard.h"
 
 #define STORAGE_ATTEMPTS 16
 #define STORAGE_NAME_BYTES ((Size) 1024 * 1024)
-#define STORAGE_PHASE_BYTES ((Size) 64 * 1024 * 1024)
-#define STORAGE_HEAPS 5
+#define STORAGE_PHASE_BYTES DARMOK_CATALOG_PHASE_BYTES
+#define STORAGE_HEAPS 6
+#define STORAGE_TOAST_HEAPS 2
+#define STORAGE_CRITICAL_INDEXES 2
+#define STORAGE_USES (2 * DARMOK_RELATION_REQUEST_LIMIT)
 
 StaticAssertDecl(ATTRIBUTE_FIXED_PART_SIZE ==
 				 offsetof(FormData_pg_attribute, attcollation) + sizeof(Oid),
@@ -42,7 +48,13 @@ StaticAssertDecl(ATTRIBUTE_FIXED_PART_SIZE ==
 
 static const Oid fact_heap_oids[STORAGE_HEAPS] = {
 	NamespaceRelationId, RelationRelationId, IndexRelationId,
-	AttributeRelationId, TypeRelationId
+	AttributeRelationId, TypeRelationId, AttrDefaultRelationId
+};
+static const Oid payload_toast_oids[STORAGE_TOAST_HEAPS] = {
+	2830, 4171 /* Compiled bootstrap pg_attrdef and pg_type TOAST identities. */
+};
+static const Oid critical_index_oids[STORAGE_CRITICAL_INDEXES] = {
+	ClassOidIndexId, AttributeRelidNumIndexId
 };
 static bool storage_active = false;
 
@@ -85,6 +97,12 @@ typedef struct StorageClass
 	Oid oid;
 	DarmokHeapStorageFact fact;
 	List *indexes;
+	Oid rewrite_oid;
+	int16 checks;
+	bool rules;
+	bool triggers;
+	bool row_security;
+	bool options_null;
 } StorageClass;
 
 typedef struct StorageInput
@@ -98,6 +116,7 @@ typedef struct StorageMode
 {
 	Oid oid;
 	uint8 mask;
+	bool catalog;
 } StorageMode;
 
 typedef struct StorageNode
@@ -117,8 +136,7 @@ typedef struct StorageAttribute
 	/* Exact positive ordinal key, with no native struct padding in the hash. */
 	uint64 key;
 	DarmokHeapAttributeFact fact;
-	struct varlena *missing_carrier;
-	Size missing_carrier_bytes;
+	DarmokCatalogCarrier missing_carrier;
 } StorageAttribute;
 
 typedef struct StorageType
@@ -126,7 +144,33 @@ typedef struct StorageType
 	Oid oid;
 	bool copied;
 	DarmokHeapTypeFact fact;
+	DarmokCatalogCarrier binary_default;
+	DarmokCatalogCarrier text_default;
 } StorageType;
+
+typedef struct StorageExpression
+{
+	uint64 key;
+	Oid oid;
+	DarmokCatalogCarrier carrier;
+} StorageExpression;
+
+typedef struct StorageProfileAttribute
+{
+	uint64 key;
+	DarmokHeapAttributeFact fact;
+	bool missing_null;
+} StorageProfileAttribute;
+
+typedef struct StoragePayloadSource
+{
+	Oid catalog_oid;
+	Oid row_oid;
+	Oid relation_oid;
+	int16 number;
+	int16 field_number;
+	const DarmokCatalogCarrier *carrier;
+} StoragePayloadSource;
 
 typedef struct StorageObservation
 {
@@ -134,6 +178,8 @@ typedef struct StorageObservation
 	Relation heaps[STORAGE_HEAPS];
 	TableScanDesc scans[STORAGE_HEAPS];
 	Snapshot snapshot;
+	Relation toast_heaps[STORAGE_TOAST_HEAPS];
+	Relation critical_indexes[STORAGE_CRITICAL_INDEXES];
 	HTAB *namespaces;
 	HTAB *namespace_names;
 	HTAB *classes;
@@ -142,12 +188,20 @@ typedef struct StorageObservation
 	HTAB *selected_roots;
 	HTAB *attribute_rows;
 	HTAB *type_rows;
+	HTAB *expression_rows;
+	HTAB *expression_ids;
+	HTAB *profile_attributes;
+	DarmokCatalogImageBudget image_budget;
 	DarmokCatalogStamp stamp;
 	DarmokRelationRequest *roots;
 	DarmokHeapStorageRootFact *root_facts;
 	DarmokHeapAttributeFact *attributes;
 	DarmokHeapTypeFact *types;
 	DarmokHeapMissingFact *missing;
+	DarmokHeapCatalogPayloadFact *payloads;
+	DarmokCatalogPayloadRequest *payload_requests;
+	int payload_count;
+	DarmokCatalogPayloadCost payload_cost;
 	int attribute_count;
 	int type_count;
 	int missing_count;
@@ -155,9 +209,11 @@ typedef struct StorageObservation
 	DarmokHeapObservationCost cost;
 	DarmokHeapStorageFact *facts;
 	DarmokRelationRequest *references;
+	DarmokHeapStorageUse *uses;
 	HTAB *nodes;
 	int fact_count;
 	int reference_count;
+	int use_count;
 } StorageObservation;
 
 typedef struct StorageState
@@ -176,6 +232,7 @@ typedef struct StorageState
 	StorageInput *inputs;
 	int count;
 	StorageObservation initial;
+	StorageObservation source;
 	StorageObservation final;
 	volatile DarmokRelationAttempt physical;
 	volatile DarmokStatementGuard semantic;
@@ -212,21 +269,6 @@ storage_budget(StorageObservation *observation)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("native storage copied phase exceeds 64 MiB")));
-}
-
-static void
-storage_missing_budget(StorageObservation *observation, Size bytes,
-					   Size cumulative, bool allocating)
-{
-	/* Subtraction checks precede both cumulative addition and native palloc.
-	 * Context block overhead can still overshoot the periodic phase limit. */
-	if (bytes > MaxAllocSize || bytes > STORAGE_PHASE_BYTES ||
-		cumulative > STORAGE_PHASE_BYTES - bytes ||
-		(allocating && MemoryContextMemAllocated(observation->context, true) >
-		 STORAGE_PHASE_BYTES - bytes))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("native storage missing images exceed the 64 MiB phase budget")));
 }
 
 static void
@@ -276,7 +318,31 @@ storage_observation_init(StorageState *state, StorageObservation *observation)
 	observation->attribute_rows = storage_hash(observation, "storage positive slots",
 											 sizeof(uint64), sizeof(StorageAttribute));
 	observation->type_rows = storage_hash(observation, "storage live type OIDs",
-										 sizeof(Oid), sizeof(StorageType));
+									 sizeof(Oid), sizeof(StorageType));
+	observation->expression_rows = storage_hash(observation, "storage column expressions",
+												 sizeof(uint64), sizeof(StorageExpression));
+	observation->expression_ids = storage_hash(observation, "storage expression OIDs",
+												 sizeof(Oid), sizeof(Oid));
+	observation->profile_attributes = storage_hash(observation, "storage TOAST profile slots",
+													 sizeof(uint64), sizeof(StorageProfileAttribute));
+	observation->image_budget.context = observation->context;
+	observation->image_budget.limit = STORAGE_PHASE_BYTES;
+}
+
+static void
+storage_target_layout(Relation relation, int natts, AttrNumber number,
+					  Oid type_oid, char alignment)
+{
+	TupleDesc descriptor = RelationGetDescr(relation);
+	Form_pg_attribute target;
+
+	if (descriptor->natts != natts)
+		elog(ERROR, "native storage catalog descriptor has an unexpected column count");
+	target = TupleDescAttr(descriptor, number - 1);
+	if (target->attrelid != RelationGetRelid(relation) || target->attnum != number ||
+		target->attisdropped || target->atttypid != type_oid || target->attlen != -1 ||
+		target->attbyval || target->attalign != alignment)
+		elog(ERROR, "native storage catalog carrier layout is inconsistent");
 }
 
 static void
@@ -290,6 +356,8 @@ storage_prepare(StorageObservation *observation)
 		AcceptInvalidationMessages();
 		InvalidateCatalogSnapshot();
 		darmok_catalog_verify_installation();
+		if (!criticalRelcachesBuilt)
+			elog(ERROR, "native storage requires completed native critical relcache initialization");
 		for (int i = 0; i < STORAGE_HEAPS; i++)
 		{
 			observation->heaps[i] = table_open(fact_heap_oids[i], AccessShareLock);
@@ -298,19 +366,19 @@ storage_prepare(StorageObservation *observation)
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("native storage requires builtin heap catalogs")));
 		}
-		{
-			TupleDesc descriptor = RelationGetDescr(observation->heaps[3]);
-			Form_pg_attribute target;
-
-			if (descriptor->natts != Natts_pg_attribute)
-				elog(ERROR, "native storage pg_attribute descriptor has an unexpected column count");
-			target = TupleDescAttr(descriptor, Anum_pg_attribute_attmissingval - 1);
-			if (target->attrelid != AttributeRelationId ||
-				target->attnum != Anum_pg_attribute_attmissingval || target->attisdropped ||
-				target->atttypid != ANYARRAYOID || target->attlen != -1 ||
-				target->attbyval || target->attalign != TYPALIGN_DOUBLE)
-				elog(ERROR, "native storage pg_attribute missing carrier layout is inconsistent");
-		}
+		if (RelationGetDescr(observation->heaps[0])->natts != Natts_pg_namespace ||
+			RelationGetDescr(observation->heaps[2])->natts != Natts_pg_index)
+			elog(ERROR, "native storage fixed catalog layout is inconsistent");
+		storage_target_layout(observation->heaps[1], Natts_pg_class,
+			Anum_pg_class_reloptions, TEXTARRAYOID, TYPALIGN_INT);
+		storage_target_layout(observation->heaps[3], Natts_pg_attribute,
+			Anum_pg_attribute_attmissingval, ANYARRAYOID, TYPALIGN_DOUBLE);
+		storage_target_layout(observation->heaps[4], Natts_pg_type,
+			Anum_pg_type_typdefaultbin, PG_NODE_TREEOID, TYPALIGN_INT);
+		storage_target_layout(observation->heaps[4], Natts_pg_type,
+			Anum_pg_type_typdefault, TEXTOID, TYPALIGN_INT);
+		storage_target_layout(observation->heaps[5], Natts_pg_attrdef,
+			Anum_pg_attrdef_adbin, PG_NODE_TREEOID, TYPALIGN_INT);
 	}
 	PG_FINALLY();
 	{
@@ -407,76 +475,20 @@ static void
 storage_copy_missing(StorageObservation *observation, StorageAttribute *attribute,
 					 HeapTuple tuple)
 {
-	TupleDesc descriptor = RelationGetDescr(observation->heaps[3]);
-	HeapTupleHeader header = tuple->t_data;
-	int natts;
-	Size minimum;
-	Size offset;
-	Size available;
-	Size bytes;
-	uint32 aligned_header;
-	Datum datum;
-	const char *carrier;
-	bool is_null = false;
+	DarmokCatalogCarrier *carrier = &attribute->missing_carrier;
 
-	if (attribute->fact.dropped || !OidIsValid(attribute->fact.type_oid))
-		elog(ERROR, "native storage missing value has no live column type");
-	if (tuple->t_len < SizeofHeapTupleHeader)
-		elog(ERROR, "native storage missing tuple has a truncated header");
-	natts = HeapTupleHeaderGetNatts(header);
-	minimum = SizeofHeapTupleHeader;
-	if (HeapTupleHasNulls(tuple))
-		minimum += BITMAPLEN(natts);
-	if (natts < Anum_pg_attribute_attmissingval || natts > descriptor->natts ||
-		header->t_hoff < MAXALIGN(minimum) || header->t_hoff > tuple->t_len ||
-		header->t_hoff != MAXALIGN(header->t_hoff))
-		elog(ERROR, "native storage missing tuple does not physically contain its compiled ordinal");
-	/* Physical presence excludes heap_getattr/getmissingattr. The prepared
-	 * builtin fast/nocache path walks layout only; no detoast/provider/cache
-	 * construction. Native per-major offset caches remain native and private. */
-	datum = fastgetattr(tuple, Anum_pg_attribute_attmissingval, descriptor, &is_null);
-	if (is_null)
-		elog(ERROR, "native storage declared missing value has a NULL carrier");
-	carrier = DatumGetPointer(datum);
-	if ((uintptr_t) carrier < (uintptr_t) header)
-		elog(ERROR, "native storage missing carrier is outside its tuple");
-	offset = (uintptr_t) carrier - (uintptr_t) header;
-	if (offset < header->t_hoff || offset >= tuple->t_len)
-		elog(ERROR, "native storage missing carrier is outside its tuple data");
-	available = tuple->t_len - offset;
-	/* The first-byte external test precedes every tag or pointer-specific
-	 * access. No on-disk/indirect/expanded/unknown external form is admitted. */
-	if (VARATT_IS_EXTERNAL(carrier))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("native storage missing value requires an inline carrier")));
-	if (VARATT_IS_SHORT(carrier))
+	darmok_catalog_carrier_copy(&observation->image_budget, carrier, tuple,
+		RelationGetDescr(observation->heaps[3]), Anum_pg_attribute_attmissingval, false);
+	if (attribute->fact.has_missing != carrier->present ||
+		(carrier->present && (attribute->fact.dropped || !OidIsValid(attribute->fact.type_oid))))
+		elog(ERROR, "native storage missing declaration and physical carrier disagree");
+	observation->cost.missing_carrier_bytes += carrier->bytes;
+	if (carrier->present)
 	{
-		bytes = VARSIZE_SHORT(carrier);
-		if (bytes < VARHDRSZ_SHORT)
-			elog(ERROR, "native storage missing short carrier has an invalid size");
+		if (observation->missing_count == PG_INT32_MAX)
+			elog(ERROR, "native storage missing value count exceeds native limits");
+		observation->missing_count++;
 	}
-	else
-	{
-		if (available < VARHDRSZ)
-			elog(ERROR, "native storage missing carrier has a truncated length header");
-		memcpy(&aligned_header, carrier, VARHDRSZ);
-		if (!VARATT_IS_4B_U(&aligned_header) && !VARATT_IS_4B_C(&aligned_header))
-			elog(ERROR, "native storage missing carrier has an unknown inline form");
-		bytes = VARSIZE_4B(&aligned_header);
-		if (bytes < (VARATT_IS_4B_C(&aligned_header) ? VARHDRSZ_COMPRESSED : VARHDRSZ))
-			elog(ERROR, "native storage missing carrier has an invalid inline header size");
-	}
-	if (bytes > available)
-		elog(ERROR, "native storage missing carrier extends past its tuple");
-	storage_missing_budget(observation, bytes, observation->cost.missing_carrier_bytes, true);
-	attribute->missing_carrier = MemoryContextAlloc(observation->context, bytes);
-	memcpy(attribute->missing_carrier, carrier, bytes);
-	attribute->missing_carrier_bytes = bytes;
-	observation->cost.missing_carrier_bytes += bytes;
-	if (observation->missing_count == PG_INT32_MAX)
-		elog(ERROR, "native storage missing value count exceeds native limits");
-	observation->missing_count++;
 }
 
 static void
@@ -484,76 +496,35 @@ storage_normalize_missing(StorageObservation *observation)
 {
 	int position = 0;
 
-	/* Only initial invocation-owned carriers, after reader cleanup and before
-	 * any physical wait. Nothing in this function runs under raw or S. */
+	/* Only B's invocation-owned carriers, outside raw/S, with its registered
+	 * source snapshot still alive. Default declarations remain independent. */
 	MemoryContextSwitchTo(observation->context);
 	if ((Size) observation->missing_count > MaxAllocSize / sizeof(DarmokHeapMissingFact))
 		elog(ERROR, "native storage missing fact array exceeds native limits");
 	if (observation->missing_count > 0)
-	{
-		Size bytes = sizeof(DarmokHeapMissingFact) * (Size) observation->missing_count;
-
-		storage_missing_budget(observation, bytes, 0, true);
-		observation->missing = palloc0(bytes);
-	}
+		observation->missing = darmok_catalog_image_alloc(&observation->image_budget,
+			sizeof(DarmokHeapMissingFact) * (Size) observation->missing_count, true);
 	for (int i = 0; i < observation->attribute_count; i++)
 	{
 		const DarmokHeapAttributeFact *fact = &observation->attributes[i];
 		uint64 key = ((uint64) fact->relation_oid << 32) | (uint16) fact->number;
 		StorageAttribute *attribute;
-		struct varlena *carrier;
+		DarmokHeapPayloadImage value;
 		ArrayType *image;
 		DarmokHeapMissingFact *missing;
 		Size expanded;
-		char kind;
-		bool allocating;
 
 		if (!fact->has_missing)
 			continue;
 		attribute = hash_search(observation->attribute_rows, &key, HASH_FIND, NULL);
-		if (attribute == NULL || attribute->missing_carrier == NULL ||
+		if (attribute == NULL || !attribute->missing_carrier.present ||
 			position >= observation->missing_count)
 			elog(ERROR, "native storage lost a copied missing carrier");
-		carrier = attribute->missing_carrier;
-		/* Recheck before even a generic native detoast call. All accepted
-		 * branches are inline memory work on an aligned owned copy. */
-		if (VARATT_IS_EXTERNAL(carrier))
-			elog(ERROR, "native storage copied an unadmitted external missing carrier");
-		allocating = !VARATT_IS_4B_U(carrier);
-		if (VARATT_IS_SHORT(carrier))
-		{
-			expanded = attribute->missing_carrier_bytes - VARHDRSZ_SHORT + VARHDRSZ;
-			kind = 's';
-		}
-		else if (VARATT_IS_COMPRESSED(carrier))
-		{
-			Size payload = VARDATA_COMPRESSED_GET_EXTSIZE(carrier);
-			uint32 method = VARDATA_COMPRESSED_GET_COMPRESS_METHOD(carrier);
-
-			if (payload > MaxAllocSize - VARHDRSZ)
-				elog(ERROR, "native storage missing expansion size exceeds native limits");
-			expanded = payload + VARHDRSZ;
-			if (method == TOAST_PGLZ_COMPRESSION_ID)
-				kind = 'p';
-			else if (method == TOAST_LZ4_COMPRESSION_ID)
-				kind = 'l';
-			else
-				elog(ERROR, "native storage missing carrier has an unknown compression method");
-		}
-		else if (VARATT_IS_4B_U(carrier))
-		{
-			expanded = attribute->missing_carrier_bytes;
-			kind = 'u';
-		}
-		else
-			elog(ERROR, "native storage missing carrier has an unknown copied form");
-		storage_missing_budget(observation, expanded, observation->missing_image_bytes, allocating);
-		if (expanded < ARR_OVERHEAD_NONULLS(1))
-			elog(ERROR, "native storage missing image is smaller than its singleton array envelope");
-		image = (ArrayType *) detoast_attr(carrier);
-		if (!VARATT_IS_4B_U(image) || (Size) VARSIZE(image) != expanded ||
-			ARR_NDIM(image) != 1 || ARR_ELEMTYPE(image) != fact->type_oid ||
-			ARR_DIMS(image)[0] != 1 || ARR_LBOUND(image)[0] != 1)
+		darmok_catalog_carrier_image(&observation->image_budget, &attribute->missing_carrier, &value);
+		image = (ArrayType *) value.image;
+		expanded = value.image_bytes;
+		if (expanded < ARR_OVERHEAD_NONULLS(1) || ARR_NDIM(image) != 1 ||
+			ARR_ELEMTYPE(image) != fact->type_oid || ARR_DIMS(image)[0] != 1 || ARR_LBOUND(image)[0] != 1)
 			elog(ERROR, "native storage missing image has an inconsistent singleton array envelope");
 		if (ARR_HASNULL(image))
 		{
@@ -568,16 +539,31 @@ storage_normalize_missing(StorageObservation *observation)
 		missing->relation_oid = fact->relation_oid;
 		missing->number = fact->number;
 		missing->type_oid = fact->type_oid;
-		missing->carrier_kind = kind;
-		missing->stored_bytes = attribute->missing_carrier_bytes;
+		missing->carrier_kind = value.carrier_kind;
+		missing->stored_bytes = value.stored_bytes;
 		missing->image_bytes = expanded;
-		missing->image = (const char *) image;
+		missing->image = value.image;
+		if (expanded > STORAGE_PHASE_BYTES - observation->missing_image_bytes)
+			elog(ERROR, "native storage missing image accounting exceeds phase limits");
 		observation->missing_image_bytes += expanded;
 		storage_budget(observation);
 	}
 	if (position != observation->missing_count)
 		elog(ERROR, "native storage copied missing count disagrees with selected columns");
 	storage_budget(observation);
+}
+
+static bool
+storage_toast_profile_oid(Oid oid)
+{
+	return oid == payload_toast_oids[0] || oid == payload_toast_oids[1];
+}
+
+static bool
+storage_descriptor_profile_oid(Oid oid)
+{
+	return storage_toast_profile_oid(oid) || oid == critical_index_oids[0] ||
+		oid == critical_index_oids[1];
 }
 
 static void
@@ -587,7 +573,7 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 	uint64 rows = 0;
 
 	/* Catalog snapshots never select the first transaction data snapshot.
-	 * Descriptor preparation has ended: fixed fields and inline carrier copy.
+	 * Descriptor preparation has ended: fixed fields and raw carrier copy.
 	 * Copying performs bounded native allocation; budget checks are periodic. */
 	InvalidateCatalogSnapshot();
 	observation->snapshot = RegisterSnapshot(GetNonHistoricCatalogSnapshot(RelationRelationId));
@@ -650,6 +636,19 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 		fact->fact.is_partition = row->relispartition;
 		fact->fact.has_indexes = row->relhasindex;
 		fact->fact.has_subclasses = row->relhassubclass;
+		fact->rewrite_oid = row->relrewrite;
+		fact->checks = row->relchecks;
+		fact->rules = row->relhasrules;
+		fact->triggers = row->relhastriggers;
+		fact->row_security = row->relrowsecurity;
+		if (storage_descriptor_profile_oid(row->oid))
+		{
+			bool is_null = false;
+
+			(void) darmok_catalog_present_attr(tuple, RelationGetDescr(observation->heaps[1]),
+				Anum_pg_class_reloptions, &is_null);
+			fact->options_null = is_null;
+		}
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
 	}
@@ -701,6 +700,21 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 		Form_pg_attribute row = (Form_pg_attribute) GETSTRUCT(tuple);
 
 		observation->cost.attribute_rows++;
+		if (row->attnum > 0 && storage_toast_profile_oid(row->attrelid))
+		{
+			uint64 key = ((uint64) row->attrelid << 32) | (uint16) row->attnum;
+			StorageProfileAttribute *profile;
+			bool found;
+			bool is_null = false;
+
+			profile = hash_search(observation->profile_attributes, &key, HASH_ENTER, &found);
+			if (found)
+				elog(ERROR, "duplicate native catalog TOAST profile ordinal");
+			storage_copy_attribute(&profile->fact, row);
+			(void) darmok_catalog_present_attr(tuple, RelationGetDescr(observation->heaps[3]),
+				Anum_pg_attribute_attmissingval, &is_null);
+			profile->missing_null = is_null;
+		}
 		if (row->attnum > 0 &&
 			hash_search(observation->selected_roots, &row->attrelid, HASH_FIND, NULL) != NULL)
 		{
@@ -712,10 +726,7 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 			if (found)
 				elog(ERROR, "duplicate positive slot in native storage observation");
 			storage_copy_attribute(&attribute->fact, row);
-			attribute->missing_carrier = NULL;
-			attribute->missing_carrier_bytes = 0;
-			if (row->atthasmissing)
-				storage_copy_missing(observation, attribute, tuple);
+			storage_copy_missing(observation, attribute, tuple);
 			if (!row->attisdropped && OidIsValid(row->atttypid))
 			{
 				StorageType *type = hash_search(observation->type_rows, &row->atttypid,
@@ -725,6 +736,8 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 				{
 					type->copied = false;
 					memset(&type->fact, 0, sizeof(type->fact));
+					memset(&type->binary_default, 0, sizeof(type->binary_default));
+					memset(&type->text_default, 0, sizeof(type->text_default));
 				}
 			}
 		}
@@ -743,7 +756,52 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 			if (type->copied)
 				elog(ERROR, "duplicate live type OID in native storage observation");
 			storage_copy_type(&type->fact, row);
+			darmok_catalog_carrier_copy(&observation->image_budget, &type->binary_default,
+				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefaultbin, true);
+			darmok_catalog_carrier_copy(&observation->image_budget, &type->text_default,
+				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefault, true);
+			if (type->binary_default.present && !type->text_default.present)
+				elog(ERROR, "native type binary default has no text default");
+			observation->cost.payload_carrier_bytes += type->binary_default.bytes + type->text_default.bytes;
 			type->copied = true;
+		}
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	while ((tuple = heap_getnext(observation->scans[5], ForwardScanDirection)) != NULL)
+	{
+		Form_pg_attrdef row = (Form_pg_attrdef) GETSTRUCT(tuple);
+
+		observation->cost.attrdef_rows++;
+		if (storage_toast_profile_oid(row->adrelid))
+			elog(ERROR, "native catalog TOAST profile has a contradictory expression row");
+		if (hash_search(observation->selected_roots, &row->adrelid, HASH_FIND, NULL) != NULL)
+		{
+			uint64 key;
+			StorageAttribute *attribute;
+			StorageExpression *expression;
+			bool found;
+
+			/* Inspect actual relation/ordinal even when its declaration says no
+			 * default. Do not filter contradictory/out-of-range rows away. */
+			if (row->adnum <= 0 || !OidIsValid(row->oid))
+				elog(ERROR, "native column expression has an invalid source identity");
+			key = ((uint64) row->adrelid << 32) | (uint16) row->adnum;
+			attribute = hash_search(observation->attribute_rows, &key, HASH_FIND, NULL);
+			if (attribute == NULL || attribute->fact.dropped || !attribute->fact.has_default)
+				elog(ERROR, "native column expression contradicts its positive column declaration");
+			(void) hash_search(observation->expression_ids, &row->oid, HASH_ENTER, &found);
+			if (found)
+				elog(ERROR, "duplicate native column expression source OID");
+			expression = hash_search(observation->expression_rows, &key, HASH_ENTER, &found);
+			if (found)
+				elog(ERROR, "duplicate native column expression ordinal");
+			expression->oid = row->oid;
+			darmok_catalog_carrier_copy(&observation->image_budget, &expression->carrier,
+				tuple, RelationGetDescr(observation->heaps[5]), Anum_pg_attrdef_adbin, true);
+			if (!expression->carrier.present)
+				elog(ERROR, "native column expression has a NULL binary carrier");
+			observation->cost.payload_carrier_bytes += expression->carrier.bytes;
 		}
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
@@ -752,7 +810,7 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 }
 
 static void
-storage_close_reader(StorageObservation *observation)
+storage_end_scans(StorageObservation *observation)
 {
 	for (int i = 0; i < STORAGE_HEAPS; i++)
 		if (observation->scans[i] != NULL)
@@ -760,11 +818,30 @@ storage_close_reader(StorageObservation *observation)
 			heap_endscan(observation->scans[i]);
 			observation->scans[i] = NULL;
 		}
+}
+
+static void
+storage_close_reader(StorageObservation *observation)
+{
+	storage_end_scans(observation);
 	if (observation->snapshot != NULL)
 	{
 		UnregisterSnapshot(observation->snapshot);
 		observation->snapshot = NULL;
+		InvalidateCatalogSnapshot();
 	}
+	for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
+		if (observation->toast_heaps[i] != NULL)
+		{
+			table_close(observation->toast_heaps[i], NoLock);
+			observation->toast_heaps[i] = NULL;
+		}
+	for (int i = 0; i < STORAGE_CRITICAL_INDEXES; i++)
+		if (observation->critical_indexes[i] != NULL)
+		{
+			relation_close(observation->critical_indexes[i], NoLock);
+			observation->critical_indexes[i] = NULL;
+		}
 	for (int i = 0; i < STORAGE_HEAPS; i++)
 		if (observation->heaps[i] != NULL)
 		{
@@ -886,40 +963,38 @@ storage_validate_fact(StorageState *state, StorageObservation *observation,
 
 static DarmokHeapStorageFact *
 storage_append(StorageState *state, StorageObservation *observation,
-			   StorageClass *source, Oid parent, uint8 mask)
+			   StorageClass *source, Oid parent, uint8 mask, Oid root_oid, bool catalog)
 {
 	StorageNode *node;
 	DarmokHeapStorageFact *fact;
 	bool found;
 
 	node = hash_search(observation->nodes, &source->oid, HASH_ENTER, &found);
-	if (found)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_CORRUPTED),
-				 errmsg("duplicate or cyclic native storage edge")));
-	if (observation->fact_count >= DARMOK_RELATION_REQUEST_LIMIT)
+	if (OidIsValid(parent) &&
+		(parent == source->oid || hash_search(observation->nodes, &parent, HASH_FIND, NULL) == NULL))
+		elog(ERROR, "native storage graph has a cyclic or non-parent-first edge");
+	if (!found && observation->fact_count >= DARMOK_RELATION_REQUEST_LIMIT)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("native storage graph exceeds 4096 relations")));
-	node->position = observation->fact_count++;
+	if (!found)
+	{
+		node->position = observation->fact_count++;
+		fact = &observation->facts[node->position];
+		*fact = source->fact;
+		fact->parent_oid = parent;
+		fact->mode_mask = 0;
+		storage_validate_fact(state, observation, fact);
+	}
 	fact = &observation->facts[node->position];
-	*fact = source->fact;
-	fact->parent_oid = parent;
-	fact->mode_mask = mask;
-	storage_validate_fact(state, observation, fact);
-	for (LOCKMODE mode = AccessShareLock; mode <= RowExclusiveLock; mode++)
-		if (mask & (1 << mode))
-		{
-			DarmokRelationRequest *request;
-
-			if (observation->reference_count >= DARMOK_RELATION_REQUEST_LIMIT)
-				ereport(ERROR,
-						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-						 errmsg("native storage graph exceeds 4096 exact references")));
-			request = &observation->references[observation->reference_count++];
-			request->relation_oid = fact->oid;
-			request->lock_mode = mode;
-		}
+	if (fact->parent_oid != parent)
+		elog(ERROR, "native storage shared node has contradictory parent identity");
+	fact->mode_mask |= mask;
+	if (observation->use_count >= STORAGE_USES)
+		elog(ERROR, "native storage use provenance exceeds its combined graph bound");
+	observation->uses[observation->use_count++] = (DarmokHeapStorageUse) {
+		.root_oid = root_oid, .relation_oid = source->oid, .mode_mask = mask, .catalog = catalog
+	};
 	return fact;
 }
 
@@ -934,7 +1009,7 @@ storage_index_order(const ListCell *a, const ListCell *b)
 
 static void
 storage_append_indexes(StorageState *state, StorageObservation *observation,
-					   StorageClass *heap, uint8 mask)
+					   StorageClass *heap, uint8 mask, Oid root_oid, bool catalog)
 {
 	ListCell *cell;
 	bool valid = false;
@@ -959,7 +1034,7 @@ storage_append_indexes(StorageState *state, StorageObservation *observation,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("native storage admits only builtin btree indexes")));
-		fact = storage_append(state, observation, source, heap->oid, mask);
+		fact = storage_append(state, observation, source, heap->oid, mask, root_oid, catalog);
 		fact->index_live = index->live;
 		fact->index_ready = index->ready;
 		fact->index_valid = index->valid;
@@ -1002,6 +1077,166 @@ storage_type_order(const void *a, const void *b)
 	return (left->oid > right->oid) - (left->oid < right->oid);
 }
 
+static int
+storage_payload_order(const void *a, const void *b)
+{
+	const StoragePayloadSource *left = a;
+	const StoragePayloadSource *right = b;
+
+	if (left->catalog_oid != right->catalog_oid)
+		return (left->catalog_oid > right->catalog_oid) - (left->catalog_oid < right->catalog_oid);
+	if (left->row_oid != right->row_oid)
+		return (left->row_oid > right->row_oid) - (left->row_oid < right->row_oid);
+	return (left->field_number > right->field_number) - (left->field_number < right->field_number);
+}
+
+static void
+storage_validate_profiles(StorageObservation *observation)
+{
+	static const Oid chunk_types[3] = {OIDOID, INT4OID, BYTEAOID};
+	static const int16 chunk_lengths[3] = {sizeof(Oid), sizeof(int32), -1};
+	static const char *const chunk_names[3] = {"chunk_id", "chunk_seq", "chunk_data"};
+
+	if (storage_class(observation, AttrDefaultRelationId)->fact.toast_oid != payload_toast_oids[0] ||
+		storage_class(observation, TypeRelationId)->fact.toast_oid != payload_toast_oids[1])
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("native catalog payloads require their compiled bootstrap TOAST targets")));
+	if (hash_get_num_entries(observation->profile_attributes) != 3 * STORAGE_TOAST_HEAPS)
+		elog(ERROR, "native catalog TOAST profile has missing or extra positive attributes");
+	for (int i = 0; i < STORAGE_TOAST_HEAPS + STORAGE_CRITICAL_INDEXES; i++)
+	{
+		bool toast = i < STORAGE_TOAST_HEAPS;
+		Oid oid = toast ? payload_toast_oids[i] : critical_index_oids[i - STORAGE_TOAST_HEAPS];
+		StorageClass *source = storage_class(observation, oid);
+		DarmokHeapStorageFact *fact = &source->fact;
+
+		if (!IsCatalogRelationOid(oid) || fact->kind != (toast ? RELKIND_TOASTVALUE : RELKIND_INDEX) ||
+			fact->access_method_oid != (toast ? HEAP_TABLE_AM_OID : BTREE_AM_OID) ||
+			fact->schema_oid != (toast ? PG_TOAST_NAMESPACE : PG_CATALOG_NAMESPACE) ||
+			fact->persistence != RELPERSISTENCE_PERMANENT || fact->shared ||
+			fact->is_partition || OidIsValid(fact->toast_oid) || OidIsValid(source->rewrite_oid) ||
+			source->checks != 0 || source->rules || source->triggers || source->row_security ||
+			!source->options_null || fact->declared_attribute_count !=
+			(toast ? 3 : (oid == ClassOidIndexId ? 1 : 2)))
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("native catalog descriptor is outside its builtin bootstrap profile")));
+		if (!toast)
+		{
+			StorageIndex *index = hash_search(observation->indexes, &oid, HASH_FIND, NULL);
+			Oid parent = oid == ClassOidIndexId ? RelationRelationId : AttributeRelationId;
+
+			if (index == NULL || index->heap_oid != parent || !index->live || !index->ready ||
+				!index->valid || index->check_xmin)
+				elog(ERROR, "native critical catalog index has an inconsistent initialized profile");
+			continue;
+		}
+		for (int number = 1; number <= 3; number++)
+		{
+			uint64 key = ((uint64) oid << 32) | number;
+			StorageProfileAttribute *profile = hash_search(observation->profile_attributes, &key, HASH_FIND, NULL);
+			DarmokHeapAttributeFact *attribute;
+
+			if (profile == NULL)
+				elog(ERROR, "native catalog TOAST profile has a missing compiled ordinal");
+			attribute = &profile->fact;
+			if (attribute->relation_oid != oid || attribute->number != number ||
+				strcmp(NameStr(attribute->name), chunk_names[number - 1]) != 0 ||
+				attribute->type_oid != chunk_types[number - 1] ||
+				attribute->length != chunk_lengths[number - 1] ||
+				attribute->by_value != (number != 3) || attribute->alignment != TYPALIGN_INT ||
+				attribute->storage != TYPSTORAGE_PLAIN || attribute->compression != 0 ||
+				attribute->typmod != -1 || attribute->dimensions != 0 ||
+				OidIsValid(attribute->collation_oid) || attribute->dropped || attribute->has_missing ||
+				attribute->has_default || attribute->generated != 0 || attribute->identity != 0 ||
+				!profile->missing_null || !attribute->local || attribute->inheritance_count != 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("native catalog TOAST attributes are outside their bootstrap profile")));
+		}
+	}
+}
+
+static void
+storage_build_payloads(StorageObservation *observation)
+{
+	long expressions = hash_get_num_entries(observation->expression_rows);
+	Size count;
+	StoragePayloadSource *sources;
+	HASH_SEQ_STATUS iter;
+	StorageExpression *expression;
+	Size position = 0;
+
+	if (expressions < 0 || expressions > PG_INT32_MAX || observation->type_count < 0 ||
+		observation->type_count > (PG_INT32_MAX - expressions) / 2)
+		elog(ERROR, "native catalog payload source count exceeds native limits");
+	count = (Size) observation->type_count * 2 + (Size) expressions;
+	if (count > MaxAllocSize / sizeof(StoragePayloadSource) ||
+		count > MaxAllocSize / sizeof(DarmokHeapCatalogPayloadFact) ||
+		count > MaxAllocSize / sizeof(DarmokCatalogPayloadRequest))
+		elog(ERROR, "native catalog payload source count exceeds native limits");
+	observation->payload_count = count;
+	sources = darmok_catalog_image_alloc(&observation->image_budget,
+		count * sizeof(StoragePayloadSource), true);
+	for (int i = 0; i < observation->type_count; i++)
+	{
+		StorageType *type = hash_search(observation->type_rows, &observation->types[i].oid, HASH_FIND, NULL);
+
+		if (type == NULL)
+			elog(ERROR, "native catalog lost a copied type default source");
+		for (int field = 0; field < 2; field++)
+		{
+			StoragePayloadSource *source = &sources[position++];
+
+			source->catalog_oid = TypeRelationId;
+			source->row_oid = type->oid;
+			source->field_number = field == 0 ? Anum_pg_type_typdefaultbin : Anum_pg_type_typdefault;
+			source->carrier = field == 0 ? &type->binary_default : &type->text_default;
+		}
+	}
+	hash_seq_init(&iter, observation->expression_rows);
+	while ((expression = hash_seq_search(&iter)) != NULL)
+	{
+		StoragePayloadSource *source = &sources[position++];
+
+		source->catalog_oid = AttrDefaultRelationId;
+		source->row_oid = expression->oid;
+		source->relation_oid = expression->key >> 32;
+		source->number = expression->key & 0xffff;
+		source->field_number = Anum_pg_attrdef_adbin;
+		source->carrier = &expression->carrier;
+	}
+	if (position != count)
+		elog(ERROR, "native catalog payload source count changed during copied validation");
+	if (count > 1)
+		qsort(sources, count, sizeof(StoragePayloadSource), storage_payload_order);
+	observation->payloads = darmok_catalog_image_alloc(&observation->image_budget,
+		count * sizeof(DarmokHeapCatalogPayloadFact), true);
+	observation->payload_requests = darmok_catalog_image_alloc(&observation->image_budget,
+		count * sizeof(DarmokCatalogPayloadRequest), true);
+	for (Size i = 0; i < count; i++)
+	{
+		const StoragePayloadSource *source = &sources[i];
+		DarmokHeapCatalogPayloadFact *fact = &observation->payloads[i];
+		Oid toast_oid = darmok_catalog_carrier_toast(source->carrier);
+
+		if (OidIsValid(toast_oid) &&
+			toast_oid != storage_class(observation, source->catalog_oid)->fact.toast_oid)
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("native catalog external pointer does not target its declared TOAST heap")));
+		fact->catalog_oid = source->catalog_oid;
+		fact->row_oid = source->row_oid;
+		fact->relation_oid = source->relation_oid;
+		fact->number = source->number;
+		fact->field_number = source->field_number;
+		observation->payload_requests[i].carrier = source->carrier;
+		observation->payload_requests[i].image = &fact->value;
+	}
+	pfree(sources);
+}
+
 static void
 storage_build_columns(StorageState *state, StorageObservation *observation,
 					  const Oid *oids, int oid_count)
@@ -1024,11 +1259,14 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	observation->attribute_count = (int) attributes;
 	observation->type_count = (int) types;
 	if (attributes > 0)
-		observation->attributes = palloc(sizeof(DarmokHeapAttributeFact) * (Size) attributes);
+		observation->attributes = darmok_catalog_image_alloc(&observation->image_budget,
+			sizeof(DarmokHeapAttributeFact) * (Size) attributes, false);
 	storage_budget(observation);
 	if (types > 0)
-		observation->types = palloc(sizeof(DarmokHeapTypeFact) * (Size) types);
-	observation->root_facts = palloc0(sizeof(DarmokHeapStorageRootFact) * state->count);
+		observation->types = darmok_catalog_image_alloc(&observation->image_budget,
+			sizeof(DarmokHeapTypeFact) * (Size) types, false);
+	observation->root_facts = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokHeapStorageRootFact) * state->count, true);
 	storage_budget(observation);
 	hash_seq_init(&iter, observation->attribute_rows);
 	while ((attribute = hash_seq_search(&iter)) != NULL)
@@ -1079,6 +1317,20 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 						(errcode(ERRCODE_DATA_CORRUPTED),
 						 errmsg("native storage positive column ordinals do not match relnatts")));
 			fact = &observation->attributes[position++];
+			{
+				uint64 key = ((uint64) fact->relation_oid << 32) | (uint16) fact->number;
+				StorageExpression *expression = hash_search(observation->expression_rows, &key, HASH_FIND, NULL);
+				bool generation_valid = fact->generated == 0 || fact->generated == ATTRIBUTE_GENERATED_STORED;
+
+#if PG_VERSION_NUM >= 180000
+				generation_valid |= fact->generated == ATTRIBUTE_GENERATED_VIRTUAL;
+#endif
+				if (fact->has_default != (expression != NULL) || !generation_valid ||
+					(fact->generated != 0 && (!fact->has_default || fact->identity != 0)) ||
+					(fact->dropped && (fact->has_default || fact->has_missing ||
+					 fact->generated != 0 || fact->identity != 0)))
+					elog(ERROR, "native column default/generation declaration is inconsistent");
+			}
 			if (fact->dropped)
 			{
 				if (OidIsValid(fact->type_oid))
@@ -1126,17 +1378,53 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 }
 
 static void
+storage_append_root_graph(StorageState *state, StorageObservation *observation,
+						  Oid oid, uint8 mask, bool catalog)
+{
+	StorageClass *heap = storage_class(observation, oid);
+
+	storage_append(state, observation, heap, InvalidOid, mask, oid, catalog);
+	storage_append_indexes(state, observation, heap, mask, oid, catalog);
+	if (OidIsValid(heap->fact.toast_oid))
+	{
+		StorageClass *toast = storage_class(observation, heap->fact.toast_oid);
+		uint8 toast_mask = 1 << AccessShareLock;
+
+		if (toast->fact.kind != RELKIND_TOASTVALUE || toast->fact.is_partition ||
+			toast->fact.access_method_oid != HEAP_TABLE_AM_OID ||
+			OidIsValid(toast->fact.toast_oid) ||
+			toast->fact.persistence != heap->fact.persistence || toast->fact.shared != heap->fact.shared)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("inconsistent native storage TOAST edge")));
+		if (mask & (1 << RowExclusiveLock))
+			toast_mask |= 1 << RowExclusiveLock;
+		storage_append(state, observation, toast, heap->oid, toast_mask, oid, catalog);
+		storage_append_indexes(state, observation, toast, toast_mask, oid, catalog);
+	}
+}
+
+static void
 storage_build_graph(StorageState *state, StorageObservation *observation)
 {
 	HTAB *modes = storage_hash(observation, "storage root modes", sizeof(Oid), sizeof(StorageMode));
 	HASH_SEQ_STATUS iter;
 	StorageIndex *index;
-	Oid *oids = palloc(sizeof(Oid) * state->count);
+	Oid *oids = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(Oid) * (state->count + STORAGE_HEAPS), false);
+	Oid *application_oids = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(Oid) * state->count, false);
 	int oid_count = 0;
+	int application_count = 0;
 
-	observation->roots = palloc0(sizeof(DarmokRelationRequest) * state->count);
-	observation->facts = palloc0(sizeof(DarmokHeapStorageFact) * DARMOK_RELATION_REQUEST_LIMIT);
-	observation->references = palloc0(sizeof(DarmokRelationRequest) * DARMOK_RELATION_REQUEST_LIMIT);
+	observation->roots = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokRelationRequest) * state->count, true);
+	observation->facts = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokHeapStorageFact) * DARMOK_RELATION_REQUEST_LIMIT, true);
+	observation->references = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokRelationRequest) * DARMOK_RELATION_REQUEST_LIMIT, true);
+	observation->uses = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokHeapStorageUse) * STORAGE_USES, true);
 	observation->nodes = storage_hash(observation, "storage graph OIDs", sizeof(Oid), sizeof(StorageNode));
 	hash_seq_init(&iter, observation->indexes);
 	while ((index = hash_seq_search(&iter)) != NULL)
@@ -1151,11 +1439,10 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 	{
 		StorageInput *input = &state->inputs[i];
 		Oid oid = storage_literal_oid(observation, input, i);
-		StorageClass *heap;
+		StorageClass *heap = storage_class(observation, oid);
 		StorageMode *mode;
 		bool found;
 
-		heap = storage_class(observation, oid);
 		if (heap->fact.kind != RELKIND_RELATION || heap->fact.is_partition ||
 			heap->fact.access_method_oid != HEAP_TABLE_AM_OID)
 			ereport(ERROR,
@@ -1167,38 +1454,60 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 		if (!found)
 		{
 			mode->mask = 0;
+			mode->catalog = false;
 			oids[oid_count++] = oid;
+			application_oids[application_count++] = oid;
 		}
 		mode->mask |= 1 << input->mode;
+	}
+	for (int i = 0; i < STORAGE_HEAPS; i++)
+	{
+		StorageClass *heap = storage_class(observation, fact_heap_oids[i]);
+		StorageMode *mode;
+		bool found;
+
+		if (heap->fact.kind != RELKIND_RELATION || heap->fact.is_partition ||
+			heap->fact.access_method_oid != HEAP_TABLE_AM_OID || heap->fact.shared ||
+			heap->fact.persistence != RELPERSISTENCE_PERMANENT ||
+			heap->fact.schema_oid != PG_CATALOG_NAMESPACE || OidIsValid(heap->rewrite_oid))
+			elog(ERROR, "native fact catalog is outside its ordinary builtin storage profile");
+		mode = hash_search(modes, &heap->oid, HASH_ENTER, &found);
+		if (!found)
+		{
+			mode->mask = 0;
+			oids[oid_count++] = heap->oid;
+		}
+		mode->catalog = true;
 	}
 	qsort(oids, oid_count, sizeof(Oid), storage_oid_order);
 	for (int i = 0; i < oid_count; i++)
 	{
-		StorageClass *heap = storage_class(observation, oids[i]);
 		StorageMode *mode = hash_search(modes, &oids[i], HASH_FIND, NULL);
 
-		storage_append(state, observation, heap, InvalidOid, mode->mask);
-		storage_append_indexes(state, observation, heap, mode->mask);
-		if (OidIsValid(heap->fact.toast_oid))
-		{
-			StorageClass *toast = storage_class(observation, heap->fact.toast_oid);
-			uint8 mask = 1 << AccessShareLock;
-
-			if (toast->fact.kind != RELKIND_TOASTVALUE || toast->fact.is_partition ||
-				toast->fact.access_method_oid != HEAP_TABLE_AM_OID ||
-				OidIsValid(toast->fact.toast_oid) ||
-				toast->fact.persistence != heap->fact.persistence ||
-				toast->fact.shared != heap->fact.shared)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATA_CORRUPTED),
-						 errmsg("inconsistent native storage TOAST edge")));
-			if (mode->mask & (1 << RowExclusiveLock))
-				mask |= 1 << RowExclusiveLock;
-			storage_append(state, observation, toast, heap->oid, mask);
-			storage_append_indexes(state, observation, toast, mask);
-		}
+		if (mode->mask != 0)
+			storage_append_root_graph(state, observation, oids[i], mode->mask, false);
+		if (mode->catalog)
+			storage_append_root_graph(state, observation, oids[i], 1 << AccessShareLock, true);
 	}
-	storage_build_columns(state, observation, oids, oid_count);
+	/* Mode union is complete before exact-reference emission: one physical
+	 * increment per OID/mode, with independent per-root use provenance. */
+	for (int i = 0; i < observation->fact_count; i++)
+		for (LOCKMODE mode = AccessShareLock; mode <= RowExclusiveLock; mode++)
+			if (observation->facts[i].mode_mask & (1 << mode))
+			{
+				DarmokRelationRequest *reference;
+
+				if (observation->reference_count >= DARMOK_RELATION_REQUEST_LIMIT)
+					elog(ERROR, "native storage graph exceeds 4096 exact references");
+				reference = &observation->references[observation->reference_count++];
+				reference->relation_oid = observation->facts[i].oid;
+				reference->lock_mode = mode;
+			}
+	qsort(application_oids, application_count, sizeof(Oid), storage_oid_order);
+	storage_build_columns(state, observation, application_oids, application_count);
+	storage_validate_profiles(observation);
+	storage_build_payloads(observation);
+	pfree(application_oids);
 	pfree(oids);
 	storage_budget(observation);
 }
@@ -1294,16 +1603,23 @@ storage_type_equal(const DarmokHeapTypeFact *a, const DarmokHeapTypeFact *b)
 		a->collation_oid == b->collation_oid;
 }
 
-static void
-storage_compare(StorageState *state)
+static bool
+storage_carrier_equal(const DarmokCatalogCarrier *a, const DarmokCatalogCarrier *b)
 {
-	StorageObservation *a = &state->initial;
-	StorageObservation *b = &state->final;
+	return a->present == b->present && a->bytes == b->bytes &&
+		(a->bytes == 0 || (a->data != NULL && b->data != NULL && memcmp(a->data, b->data, a->bytes) == 0));
+}
 
+static void
+storage_compare(StorageState *state, StorageObservation *a, StorageObservation *b)
+{
 	if (a->fact_count != b->fact_count || a->reference_count != b->reference_count ||
 		a->attribute_count != b->attribute_count || a->type_count != b->type_count ||
-		a->missing_count != b->missing_count ||
-		a->cost.missing_carrier_bytes != b->cost.missing_carrier_bytes)
+		a->missing_count != b->missing_count || a->payload_count != b->payload_count ||
+		a->use_count != b->use_count ||
+		a->cost.missing_carrier_bytes != b->cost.missing_carrier_bytes ||
+		a->cost.payload_carrier_bytes != b->cost.payload_carrier_bytes ||
+		!storage_stamp_equal(&a->stamp, &b->stamp))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("native storage graph changed without a publication identity change")));
@@ -1344,11 +1660,8 @@ storage_compare(StorageState *state)
 			StorageAttribute *left = hash_search(a->attribute_rows, &key, HASH_FIND, NULL);
 			StorageAttribute *right = hash_search(b->attribute_rows, &key, HASH_FIND, NULL);
 
-			if (left == NULL || right == NULL || left->missing_carrier == NULL ||
-				right->missing_carrier == NULL ||
-				left->missing_carrier_bytes != right->missing_carrier_bytes ||
-				memcmp(left->missing_carrier, right->missing_carrier,
-					   left->missing_carrier_bytes) != 0)
+			if (left == NULL || right == NULL ||
+				!storage_carrier_equal(&left->missing_carrier, &right->missing_carrier))
 				ereport(ERROR,
 						(errcode(ERRCODE_DATA_CORRUPTED),
 						 errmsg("native storage missing carrier changed without publication")));
@@ -1359,6 +1672,130 @@ storage_compare(StorageState *state)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage type definition changed without publication")));
+	for (int i = 0; i < a->payload_count; i++)
+	{
+		DarmokHeapCatalogPayloadFact *left = &a->payloads[i];
+		DarmokHeapCatalogPayloadFact *right = &b->payloads[i];
+
+		if (left->catalog_oid != right->catalog_oid || left->row_oid != right->row_oid ||
+			left->relation_oid != right->relation_oid || left->number != right->number ||
+			left->field_number != right->field_number ||
+			!storage_carrier_equal(a->payload_requests[i].carrier, b->payload_requests[i].carrier))
+			elog(ERROR, "native catalog payload source changed without publication");
+	}
+	for (int i = 0; i < a->use_count; i++)
+		if (a->uses[i].root_oid != b->uses[i].root_oid ||
+			a->uses[i].relation_oid != b->uses[i].relation_oid ||
+			a->uses[i].mode_mask != b->uses[i].mode_mask || a->uses[i].catalog != b->uses[i].catalog)
+			elog(ERROR, "native catalog/application storage use changed without publication");
+	for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
+		for (int number = 1; number <= 3; number++)
+		{
+			uint64 key = ((uint64) payload_toast_oids[i] << 32) | number;
+			StorageProfileAttribute *left = hash_search(a->profile_attributes, &key, HASH_FIND, NULL);
+			StorageProfileAttribute *right = hash_search(b->profile_attributes, &key, HASH_FIND, NULL);
+
+			if (left == NULL || right == NULL || left->missing_null != right->missing_null ||
+				!storage_attribute_equal(&left->fact, &right->fact))
+				elog(ERROR, "native catalog TOAST descriptor profile changed without publication");
+		}
+}
+
+static void
+storage_fetch_context(void *context)
+{
+	StorageState *state = context;
+
+	storage_context_check(state);
+	if (state->source.snapshot == NULL || darmok_statement_guard_owned(&state->semantic) ||
+		!darmok_relation_attempt_owned(&state->physical))
+		elog(ERROR, "native catalog fetch lost its source snapshot or physical boundary");
+	storage_budget(&state->source);
+}
+
+static void
+storage_fetch_payloads(StorageState *state)
+{
+	StorageObservation *observation = &state->source;
+	bool selected[STORAGE_TOAST_HEAPS] = {false};
+	Relation heaps[STORAGE_TOAST_HEAPS] = {NULL};
+	int heap_count = 0;
+
+	storage_fetch_context(state);
+	for (int i = 0; i < observation->payload_count; i++)
+	{
+		Oid oid = darmok_catalog_carrier_toast(observation->payload_requests[i].carrier);
+
+		if (!OidIsValid(oid))
+			continue;
+		if (!storage_toast_profile_oid(oid))
+			elog(ERROR, "native catalog fetch has an unadmitted pointer target");
+		for (int j = 0; j < STORAGE_TOAST_HEAPS; j++)
+			selected[j] |= oid == payload_toast_oids[j];
+	}
+	/* B's fresh class/positive-slot/NULL-option profile was established and
+	 * compared before any selected TOAST descriptor path. Native startup and
+	 * continuous builtin support history remain explicit source preconditions. */
+	storage_validate_profiles(observation);
+	if (selected[0] || selected[1])
+	{
+		darmok_native_refresh_start();
+		PG_TRY();
+		{
+			AcceptInvalidationMessages();
+			if (!criticalRelcachesBuilt)
+				elog(ERROR, "native critical relcache prerequisite changed before catalog payload fetch");
+			for (int i = 0; i < STORAGE_CRITICAL_INDEXES; i++)
+			{
+				Relation index;
+
+				observation->critical_indexes[i] = relation_open(critical_index_oids[i], NoLock);
+				index = observation->critical_indexes[i];
+				if (!index->rd_isnailed || !index->rd_isvalid || index->rd_indam == NULL ||
+					index->rd_rel->relam != BTREE_AM_OID || index->rd_options != NULL)
+					elog(ERROR, "native critical index postcheck contradicts its initialized builtin profile");
+			}
+			for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
+				if (selected[i])
+				{
+					Relation heap;
+					TupleDesc descriptor;
+
+					/* No new conflicting relation tag is acquired while B is alive.
+					 * Nested native catalog/index opens use already-owned exact AS. */
+					observation->toast_heaps[i] = table_open(payload_toast_oids[i], NoLock);
+					heap = observation->toast_heaps[i];
+					descriptor = RelationGetDescr(heap);
+					if (heap->rd_tableam != GetHeapamTableAmRoutine() ||
+						heap->rd_rel->relkind != RELKIND_TOASTVALUE ||
+						OidIsValid(heap->rd_rel->reltoastrelid) || OidIsValid(heap->rd_rel->relrewrite) ||
+						heap->rd_options != NULL || descriptor->natts != 3)
+						elog(ERROR, "native catalog TOAST descriptor postcheck contradicts its admitted profile");
+					for (int number = 1; number <= 3; number++)
+					{
+						uint64 key = ((uint64) payload_toast_oids[i] << 32) | number;
+						StorageProfileAttribute *profile = hash_search(observation->profile_attributes, &key, HASH_FIND, NULL);
+						DarmokHeapAttributeFact actual;
+
+						storage_copy_attribute(&actual, TupleDescAttr(descriptor, number - 1));
+						if (profile == NULL || !storage_attribute_equal(&actual, &profile->fact))
+							elog(ERROR, "native catalog TOAST descriptor attributes contradict their admitted profile");
+					}
+					heaps[heap_count++] = heap;
+				}
+		}
+		PG_FINALLY();
+		{
+			darmok_native_refresh_finish();
+		}
+		PG_END_TRY();
+	}
+	storage_fetch_context(state);
+	storage_normalize_missing(observation);
+	darmok_catalog_payload_images(&observation->image_budget, observation->payload_requests,
+		observation->payload_count, heaps, heap_count, &observation->payload_cost,
+		storage_fetch_context, state);
+	storage_fetch_context(state);
 }
 
 static void
@@ -1368,6 +1805,7 @@ storage_end_metadata(StorageState *state)
 	if (darmok_statement_guard_owned(&state->semantic))
 		darmok_statement_guard_release(&state->semantic);
 	storage_close_reader(&state->initial);
+	storage_close_reader(&state->source);
 	storage_close_reader(&state->final);
 }
 
@@ -1385,10 +1823,114 @@ storage_reset(StorageState *state)
 	MemoryContextSwitchTo(state->invocation);
 	if (state->initial.context != NULL)
 		MemoryContextDelete(state->initial.context);
+	if (state->source.context != NULL)
+		MemoryContextDelete(state->source.context);
 	if (state->final.context != NULL)
 		MemoryContextDelete(state->final.context);
 	memset(&state->initial, 0, sizeof(state->initial));
+	memset(&state->source, 0, sizeof(state->source));
 	memset(&state->final, 0, sizeof(state->final));
+}
+
+static bool
+storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attempt,
+				DarmokHeapStorageConsumer consumer, void *consumer_state, bool retain)
+{
+	DarmokHeapStorageView view = {0};
+	StorageObservation *a = &state->initial;
+	StorageObservation *b = &state->source;
+	StorageObservation *c = &state->final;
+
+	storage_observation_init(state, a);
+	storage_prepare(a);
+	storage_context_check(state);
+	if (!storage_capture(state, a, before))
+		return false;
+	storage_close_reader(a); /* No A snapshot/descriptors through physical waits. */
+	storage_context_check(state);
+	storage_build_graph(state, a);
+	darmok_relation_attempt_acquire(&state->physical, a->references, a->reference_count);
+	storage_observation_init(state, b);
+	storage_prepare(b);
+	storage_resolve_maps(a);
+	storage_context_check(state);
+	if (!storage_capture(state, b, &a->stamp))
+		return false;
+	storage_end_scans(b); /* Retain the registered source snapshot only. */
+	storage_build_graph(state, b);
+	storage_compare(state, a, b);
+	storage_context_check(state);
+	storage_fetch_payloads(state);
+	storage_close_reader(b); /* Close horizon and increments before any later wait. */
+	storage_context_check(state);
+	storage_observation_init(state, c);
+	storage_prepare(c);
+	storage_context_check(state);
+	if (!darmok_statement_guard_acquire(&state->semantic))
+		return false;
+	if (!storage_capture(state, c, &a->stamp))
+		return false;
+	/* Raw/gate have ended; only copied C facts are processed under S.
+	 * No descriptor opening, external fetching or decoding occurs here. */
+	storage_build_graph(state, c);
+	storage_compare(state, a, c);
+	storage_compare(state, b, c);
+	storage_context_check(state);
+	for (int i = 0; i < c->payload_count; i++)
+		c->payloads[i].value = b->payloads[i].value;
+	view.roots = c->roots;
+	view.root_count = state->count;
+	view.root_facts = c->root_facts;
+	view.attributes = c->attributes;
+	view.attribute_count = c->attribute_count;
+	view.types = c->types;
+	view.type_count = c->type_count;
+	view.missing = b->missing;
+	view.missing_count = b->missing_count;
+	view.attribute_array_bytes = sizeof(DarmokHeapAttributeFact) * (Size) view.attribute_count;
+	view.type_array_bytes = sizeof(DarmokHeapTypeFact) * (Size) view.type_count;
+	view.missing_array_bytes = sizeof(DarmokHeapMissingFact) * (Size) view.missing_count;
+	view.missing_image_bytes = b->missing_image_bytes;
+	view.payloads = c->payloads;
+	view.payload_count = c->payload_count;
+	view.payload_array_bytes = sizeof(DarmokHeapCatalogPayloadFact) * (Size) c->payload_count;
+	view.payload_image_bytes = b->payload_cost.image_bytes;
+	view.toast_heaps = b->payload_cost.toast_heaps;
+	view.toast_rows = b->payload_cost.toast_rows;
+	view.selected_chunks = b->payload_cost.selected_chunks;
+	view.payload_stored_bytes = b->payload_cost.stored_bytes;
+	a->cost.allocated_bytes = MemoryContextMemAllocated(a->context, true);
+	b->cost.allocated_bytes = MemoryContextMemAllocated(b->context, true);
+	c->cost.allocated_bytes = MemoryContextMemAllocated(c->context, true);
+	a->cost.requested_copy_bytes = a->image_budget.requested_bytes;
+	b->cost.requested_copy_bytes = b->image_budget.requested_bytes;
+	c->cost.requested_copy_bytes = c->image_budget.requested_bytes;
+	view.initial_cost = a->cost;
+	view.source_cost = b->cost;
+	view.final_cost = c->cost;
+	view.facts = c->facts;
+	view.fact_count = c->fact_count;
+	view.uses = c->uses;
+	view.use_count = c->use_count;
+	view.references = c->references;
+	view.reference_count = c->reference_count;
+	view.generation = c->stamp.generation;
+	view.local_generation = c->stamp.local_generation;
+	view.attempts = attempt + 1;
+	view.physical_owned = darmok_relation_attempt_owned(&state->physical);
+	view.metadata_owned = darmok_statement_guard_owned(&state->semantic);
+	view.first_snapshot_set = FirstSnapshotSet;
+	if (!view.physical_owned || !view.metadata_owned)
+		elog(ERROR, "native storage lost its owned metadata or physical attempt");
+	consumer(&view, consumer_state);
+	storage_context_check(state);
+	storage_end_metadata(state);
+	storage_context_check(state);
+	if (retain)
+		darmok_relation_attempt_retain(&state->physical);
+	else
+		darmok_relation_attempt_release(&state->physical);
+	return true;
 }
 
 static void
@@ -1476,75 +2018,11 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 		{
 			DarmokCatalogStamp before;
 
-			if (storage_observe_stamp(&before))
+			if (storage_observe_stamp(&before) &&
+				storage_attempt(state, &before, attempt, consumer, consumer_state, retain))
 			{
-				storage_observation_init(state, &state->initial);
-				storage_prepare(&state->initial);
-				storage_context_check(state);
-				if (storage_capture(state, &state->initial, &before))
-				{
-					storage_close_reader(&state->initial);
-					storage_context_check(state);
-					storage_build_graph(state, &state->initial);
-					storage_normalize_missing(&state->initial);
-					storage_context_check(state);
-					darmok_relation_attempt_acquire(&state->physical, state->initial.references,
-												   state->initial.reference_count);
-					storage_observation_init(state, &state->final);
-					storage_prepare(&state->final);
-					storage_resolve_maps(&state->initial);
-					storage_context_check(state);
-					if (darmok_statement_guard_acquire(&state->semantic))
-					{
-						if (storage_capture(state, &state->final, &state->initial.stamp))
-						{
-							DarmokHeapStorageView view;
-
-							storage_build_graph(state, &state->final);
-							storage_compare(state);
-							storage_context_check(state);
-							view.roots = state->final.roots;
-							view.root_count = state->count;
-							view.root_facts = state->final.root_facts;
-							view.attributes = state->final.attributes;
-							view.attribute_count = state->final.attribute_count;
-							view.types = state->final.types;
-							view.type_count = state->final.type_count;
-							view.missing = state->initial.missing;
-							view.missing_count = state->initial.missing_count;
-							view.attribute_array_bytes = sizeof(DarmokHeapAttributeFact) * (Size) view.attribute_count;
-							view.type_array_bytes = sizeof(DarmokHeapTypeFact) * (Size) view.type_count;
-							view.missing_array_bytes = sizeof(DarmokHeapMissingFact) * (Size) view.missing_count;
-							view.missing_image_bytes = state->initial.missing_image_bytes;
-							state->initial.cost.allocated_bytes = MemoryContextMemAllocated(state->initial.context, true);
-							state->final.cost.allocated_bytes = MemoryContextMemAllocated(state->final.context, true);
-							view.initial_cost = state->initial.cost;
-							view.final_cost = state->final.cost;
-							view.facts = state->final.facts;
-							view.fact_count = state->final.fact_count;
-							view.references = state->final.references;
-							view.reference_count = state->final.reference_count;
-							view.generation = state->final.stamp.generation;
-							view.local_generation = state->final.stamp.local_generation;
-							view.attempts = attempt + 1;
-							view.physical_owned = darmok_relation_attempt_owned(&state->physical);
-							view.metadata_owned = darmok_statement_guard_owned(&state->semantic);
-							view.first_snapshot_set = FirstSnapshotSet;
-							if (!view.physical_owned || !view.metadata_owned)
-								elog(ERROR, "native storage lost its owned metadata or physical attempt");
-							consumer(&view, consumer_state);
-							storage_context_check(state);
-							storage_end_metadata(state);
-							storage_context_check(state);
-							if (retain)
-								darmok_relation_attempt_retain(&state->physical);
-							else
-								darmok_relation_attempt_release(&state->physical);
-							completed = true;
-							break;
-						}
-					}
-				}
+				completed = true;
+				break;
 			}
 			/* False is only a completed pre-effect intent/generation result.
 			 * Never CV-sleep with this or earlier borrowed native counts. */

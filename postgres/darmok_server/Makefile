@@ -1,6 +1,6 @@
 EXTENSION = darmok_server
 MODULE_big = darmok_server
-OBJS = darmok_server.o catalog_read.o heap_storage.o
+OBJS = darmok_server.o catalog_read.o heap_storage.o catalog_payload.o
 DATA = darmok_server--1.0.sql
 DOCS = LICENSE.darmok_server README.darmok_server.md
 HEADERS = statement_guard.h relation_guard.h heap_storage.h

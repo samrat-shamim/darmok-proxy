@@ -51,6 +51,17 @@ typedef struct DarmokHeapStorageRootFact
 	int attribute_offset;
 } DarmokHeapStorageRootFact;
 
+/* One use per distinct application or metadata root and storage node. Physical
+ * facts/references are deduplicated independently. Input bindings keep their
+ * duplicates and modes in roots/root_facts. */
+typedef struct DarmokHeapStorageUse
+{
+	Oid root_oid;
+	Oid relation_oid;
+	uint8 mode_mask;
+	bool catalog;
+} DarmokHeapStorageUse;
+
 /* Positive native slots, including dropped layout/type0. These are fixed
  * declarations, not a TupleDesc, value codec or frontend nullability proof. */
 typedef struct DarmokHeapAttributeFact
@@ -127,6 +138,39 @@ typedef struct DarmokHeapMissingFact
 	const char *image;
 } DarmokHeapMissingFact;
 
+/* Owned flat native varlena; presence is independent of zero payload bytes.
+ * Carrier s/u/p/l is inline, e is an on-disk external pointer. Compression is
+ * zero, pglz=p or LZ4=l, from stored bytes rather than a column declaration.
+ * External stored_bytes excludes the reconstructed four-byte header;
+ * carrier_bytes is always the exact source carrier length. */
+typedef struct DarmokHeapPayloadImage
+{
+	bool present;
+	char carrier_kind;
+	char compression_kind;
+	Oid toast_oid;
+	Oid value_oid;
+	Size carrier_bytes;
+	Size stored_bytes;
+	Size image_bytes;
+	const char *image;
+} DarmokHeapPayloadImage;
+
+/* Source identity is never merged because two images happen to match.
+ * Type records include independently absent binary/text fields. An attrdef
+ * record additionally names its actual relation and positive column ordinal.
+ * field_number identifies the native source-catalog field, not a wire column.
+ * These opaque bytes do not admit their expression/type dependencies. */
+typedef struct DarmokHeapCatalogPayloadFact
+{
+	Oid catalog_oid;
+	Oid row_oid;
+	Oid relation_oid;
+	int16 number;
+	int16 field_number;
+	DarmokHeapPayloadImage value;
+} DarmokHeapCatalogPayloadFact;
+
 typedef struct DarmokHeapObservationCost
 {
 	uint64 namespace_rows;
@@ -134,7 +178,10 @@ typedef struct DarmokHeapObservationCost
 	uint64 index_rows;
 	uint64 attribute_rows;
 	uint64 type_rows;
+	uint64 attrdef_rows;
 	Size missing_carrier_bytes;
+	Size payload_carrier_bytes;
+	Size requested_copy_bytes;
 	Size allocated_bytes;
 } DarmokHeapObservationCost;
 
@@ -156,10 +203,21 @@ typedef struct DarmokHeapStorageView
 	Size type_array_bytes;
 	Size missing_array_bytes;
 	Size missing_image_bytes;
+	const DarmokHeapCatalogPayloadFact *payloads;
+	int payload_count;
+	Size payload_array_bytes;
+	Size payload_image_bytes;
+	uint64 toast_heaps;
+	uint64 toast_rows;
+	uint64 selected_chunks;
+	Size payload_stored_bytes;
 	DarmokHeapObservationCost initial_cost;
+	DarmokHeapObservationCost source_cost;
 	DarmokHeapObservationCost final_cost;
 	const DarmokHeapStorageFact *facts;
 	int fact_count;
+	const DarmokHeapStorageUse *uses;
+	int use_count;
 	const DarmokRelationRequest *references;
 	int reference_count;
 	uint64 generation;
