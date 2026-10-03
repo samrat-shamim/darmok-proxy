@@ -15,16 +15,18 @@ fn assert_success(output: &Output, action: &str) {
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        format!("Darmok schema {action} completed for format version 1\n")
+        format!(
+            "Darmok database {action} completed for compatibility format version 1 and server extension 1.0\n"
+        )
     );
 }
 
-fn assert_schema_error(output: &Output, action: &str, reason: &str) {
+fn assert_database_error(output: &Output, action: &str, reason: &str) {
     assert_eq!(output.status.code(), Some(1), "{output:?}");
     assert!(output.stdout.is_empty(), "{output:?}");
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
-        format!("darmok: schema {action} failed: SQLSTATE P0001: {reason}; rollback confirmed\n")
+        format!("darmok: database {action} failed: SQLSTATE P0001: {reason}; rollback confirmed\n")
     );
 }
 
@@ -169,7 +171,7 @@ impl Fixture {
         let arguments = if initialize {
             vec!["init", "--database-url-env", SETTINGS_ENV]
         } else {
-            vec!["schema", "verify", "--database-url-env", SETTINGS_ENV]
+            vec!["verify", "--database-url-env", SETTINGS_ENV]
         };
         let label = label.to_owned();
         let output =
@@ -201,6 +203,8 @@ impl Fixture {
         let catalog: String = client.query_one(
             "SELECT pg_catalog.jsonb_build_object(\
                 'namespace', (SELECT pg_catalog.jsonb_build_object('oid', n.oid, 'name', n.nspname, 'xmin', n.xmin::pg_catalog.text) FROM pg_catalog.pg_namespace n WHERE nspname = 'darmok'), \
+                'server_namespace', (SELECT pg_catalog.jsonb_build_object('oid', n.oid, 'name', n.nspname, 'xmin', n.xmin::pg_catalog.text) FROM pg_catalog.pg_namespace n WHERE nspname = 'darmok_server'), \
+                'server_extension', (SELECT (pg_catalog.to_jsonb(e) - 'extowner') || pg_catalog.jsonb_build_object('xmin', e.xmin::pg_catalog.text) FROM pg_catalog.pg_extension e WHERE extname = 'darmok_server'), \
                 'relations', (SELECT pg_catalog.jsonb_agg((pg_catalog.to_jsonb(c) - 'relacl' - 'relowner') || pg_catalog.jsonb_build_object('xmin', c.xmin::pg_catalog.text) ORDER BY c.oid) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'darmok'), \
                 'functions', (SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('definition', pg_catalog.pg_get_functiondef(p.oid), 'oid', p.oid, 'xmin', p.xmin::pg_catalog.text) ORDER BY p.oid) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'darmok')\
             )::pg_catalog.text", &[]
@@ -255,7 +259,7 @@ async fn fresh_repeat_and_readonly_verification_preserve_application_and_install
     let original_application = application().await;
     let absent = fixture.snapshot().await;
     let missing = fixture.command("fresh-missing-verify", false, true).await;
-    assert_schema_error(
+    assert_database_error(
         &missing,
         "verification",
         "Darmok schema is missing; explicit initialization is required",
@@ -336,7 +340,7 @@ async fn partial_and_changed_installations_fail_without_repair() {
         for initialize in [true, false] {
             let label = format!("{state}-{}", if initialize { "init" } else { "verify" });
             let output = fixture.command(&label, initialize, false).await;
-            assert_schema_error(
+            assert_database_error(
                 &output,
                 if initialize {
                     "initialization"
@@ -375,7 +379,7 @@ async fn partial_and_changed_installations_fail_without_repair() {
         for initialize in [true, false] {
             let label = format!("{state}-{}", if initialize { "init" } else { "verify" });
             let output = fixture.command(&label, initialize, false).await;
-            assert_schema_error(
+            assert_database_error(
                 &output,
                 if initialize {
                     "initialization"
@@ -436,7 +440,7 @@ async fn explicit_physical_databases_have_independent_installations() {
         &first.command("databases-first-verify", false, false).await,
         "verification",
     );
-    assert_schema_error(
+    assert_database_error(
         &second
             .command("databases-second-missing", false, false)
             .await,
@@ -455,7 +459,7 @@ async fn explicit_physical_databases_have_independent_installations() {
         .batch_execute("UPDATE darmok.installation SET format_version = 2")
         .await
         .unwrap();
-    assert_schema_error(
+    assert_database_error(
         &first.command("databases-first-drift", false, false).await,
         "verification",
         "Darmok installation version or metadata does not match",
@@ -467,4 +471,99 @@ async fn explicit_physical_databases_have_independent_installations() {
     assert_eq!(second.snapshot().await, second_installed);
     first.close().await;
     second.close().await;
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 CLI process CI"]
+async fn extension_nonmember_dependencies_and_conflicts_have_real_process_outcomes() {
+    let fixture = Fixture::new().await;
+    fixture
+        .observer
+        .client
+        .batch_execute("CREATE SCHEMA darmok_server")
+        .await
+        .unwrap();
+    let before = fixture.snapshot().await;
+    assert_database_error(
+        &fixture.command("extension-partial-init", true, false).await,
+        "initialization",
+        "Darmok server namespace exists without its extension",
+    );
+    assert_eq!(fixture.snapshot().await, before);
+    fixture
+        .observer
+        .client
+        .batch_execute("DROP SCHEMA darmok_server")
+        .await
+        .unwrap();
+    assert_success(
+        &fixture
+            .command("extension-baseline-init", true, false)
+            .await,
+        "initialization",
+    );
+    fixture.observer.client.batch_execute("CREATE FUNCTION public.application_helper() RETURNS pg_catalog.int4 LANGUAGE sql AS 'SELECT 7'; ALTER FUNCTION public.application_helper() DEPENDS ON EXTENSION darmok_server").await.unwrap();
+    let installed = fixture.snapshot().await;
+    for (label, initialize) in [
+        ("extension-nonmember-init", true),
+        ("extension-nonmember-verify", false),
+    ] {
+        let output = fixture.command(label, initialize, false).await;
+        assert_success(
+            &output,
+            if initialize {
+                "initialization"
+            } else {
+                "verification"
+            },
+        );
+        assert_eq!(fixture.snapshot().await, installed);
+    }
+    for (state, mutation, undo, reason) in [
+        (
+            "member",
+            "ALTER EXTENSION darmok_server ADD FUNCTION public.application_helper()",
+            "ALTER EXTENSION darmok_server DROP FUNCTION public.application_helper()",
+            "Darmok server extension contains unexpected members",
+        ),
+        (
+            "namespace",
+            "CREATE COLLATION darmok_server.extra FROM pg_catalog.\"C\"",
+            "DROP COLLATION darmok_server.extra",
+            "Darmok server namespace contains unexpected objects",
+        ),
+    ] {
+        fixture
+            .observer
+            .client
+            .batch_execute(mutation)
+            .await
+            .unwrap();
+        let before = fixture.snapshot().await;
+        for initialize in [true, false] {
+            let label = format!(
+                "extension-{state}-{}",
+                if initialize { "init" } else { "verify" }
+            );
+            let output = fixture.command(&label, initialize, false).await;
+            assert_database_error(
+                &output,
+                if initialize {
+                    "initialization"
+                } else {
+                    "verification"
+                },
+                reason,
+            );
+            assert_eq!(fixture.snapshot().await, before);
+        }
+        fixture.observer.client.batch_execute(undo).await.unwrap();
+    }
+    assert_success(
+        &fixture
+            .command("extension-restored-verify", false, false)
+            .await,
+        "verification",
+    );
+    fixture.close().await;
 }

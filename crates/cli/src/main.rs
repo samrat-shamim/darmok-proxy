@@ -1,9 +1,10 @@
-//! Explicit physical-database schema commands using the existing native owner.
+//! Explicit physical-database setup commands using the existing native owner.
 use std::{fmt, process::ExitCode};
 
 use clap::{Args, Parser, Subcommand};
 use darmok_execute::{
-    NativeBackend, NativeBackendDisposeError, NativeBackendError, NativeSchemaFailure,
+    NativeBackend, NativeBackendDisposeError, NativeBackendError, NativeDatabaseAction,
+    NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
 };
 use tokio_postgres::{Config, NoTls};
 
@@ -11,7 +12,7 @@ use tokio_postgres::{Config, NoTls};
 #[command(
     name = "darmok",
     version,
-    about = "Darmok PostgreSQL compatibility schema tools"
+    about = "Darmok PostgreSQL database setup tools"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -20,16 +21,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Install or verify an exact existing compatibility schema in one database.
+    /// Install or validate both Darmok components in one existing database.
     Init(DatabaseInput),
-    /// Inspect a physical database's compatibility schema.
-    #[command(subcommand)]
-    Schema(SchemaCommand),
-}
-
-#[derive(Subcommand)]
-enum SchemaCommand {
-    /// Verify an existing installation without creating or repairing objects.
+    /// Verify both components and the live native handler without object creation.
     Verify(DatabaseInput),
 }
 
@@ -40,35 +34,20 @@ struct DatabaseInput {
     database_url_env: String,
 }
 
-#[derive(Clone, Copy)]
-enum SchemaAction {
-    Initialize,
-    Verify,
-}
-
-impl fmt::Display for SchemaAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Initialize => "schema initialization",
-            Self::Verify => "schema verification",
-        })
-    }
-}
-
 enum CommandFailure {
     MissingEnvironment(String),
     NonUnicodeEnvironment(String),
     InvalidSettings(String),
     MissingDatabase(String),
     Connection(NativeBackendError),
-    Schema {
-        action: SchemaAction,
-        original: Box<NativeSchemaFailure>,
+    Database {
+        action: NativeDatabaseAction,
+        original: Box<NativeDatabaseFailure>,
         disposal: Option<NativeBackendDisposeError>,
     },
     DisposalAfterSuccess {
-        action: SchemaAction,
-        version: i32,
+        action: NativeDatabaseAction,
+        completion: NativeDatabaseCompletion,
         original: NativeBackendDisposeError,
     },
 }
@@ -97,7 +76,7 @@ impl fmt::Display for CommandFailure {
                 }
                 Ok(())
             }
-            Self::Schema {
+            Self::Database {
                 action,
                 original,
                 disposal,
@@ -105,7 +84,7 @@ impl fmt::Display for CommandFailure {
                 write!(
                     f,
                     "{action} failed: {}",
-                    BackendDiagnostic(original.original())
+                    DatabaseDiagnostic(original.original())
                 )?;
                 if let Some(cleanup) = original.cleanup() {
                     match cleanup {
@@ -120,13 +99,35 @@ impl fmt::Display for CommandFailure {
             }
             Self::DisposalAfterSuccess {
                 action,
-                version,
+                completion,
                 original,
             } => write!(
                 f,
-                "{action} completed for format version {version}, but local driver disposal failed: {original}"
+                "{action} completed for compatibility format version {} and server extension {}, but local driver disposal failed: {original}",
+                completion.schema_version(),
+                completion.server_extension_version()
             ),
         }
+    }
+}
+
+struct DatabaseDiagnostic<'a>(&'a NativeDatabaseError);
+
+impl fmt::Display for DatabaseDiagnostic<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(database) = self
+            .0
+            .backend_error()
+            .and_then(tokio_postgres::Error::as_db_error)
+        {
+            return write!(
+                f,
+                "SQLSTATE {}: {}",
+                database.code().code(),
+                database.message()
+            );
+        }
+        write!(f, "{}", self.0)
     }
 }
 
@@ -171,32 +172,33 @@ fn configuration(input: DatabaseInput) -> Result<Config, CommandFailure> {
 
 async fn run(command: Command) -> Result<(), CommandFailure> {
     let (action, input) = match command {
-        Command::Init(input) => (SchemaAction::Initialize, input),
-        Command::Schema(SchemaCommand::Verify(input)) => (SchemaAction::Verify, input),
+        Command::Init(input) => (NativeDatabaseAction::Initialize, input),
+        Command::Verify(input) => (NativeDatabaseAction::Verify, input),
     };
     let config = configuration(input)?;
     let mut backend = NativeBackend::connect(&config, NoTls)
         .await
         .map_err(CommandFailure::Connection)?;
     let result = match action {
-        SchemaAction::Initialize => backend.initialize_schema().await,
-        SchemaAction::Verify => backend.verify_schema().await,
+        NativeDatabaseAction::Initialize => backend.initialize_database().await,
+        NativeDatabaseAction::Verify => backend.verify_database().await,
     };
     let disposal = backend.dispose().await;
     match (result, disposal) {
         (Ok(completion), Ok(_)) => {
             println!(
-                "Darmok {action} completed for format version {}",
-                completion.version()
+                "Darmok {action} completed for compatibility format version {} and server extension {}",
+                completion.schema_version(),
+                completion.server_extension_version()
             );
             Ok(())
         }
         (Ok(completion), Err(original)) => Err(CommandFailure::DisposalAfterSuccess {
             action,
-            version: completion.version(),
+            completion,
             original,
         }),
-        (Err(original), disposal) => Err(CommandFailure::Schema {
+        (Err(original), disposal) => Err(CommandFailure::Database {
             action,
             original: Box::new(original),
             disposal: disposal.err(),

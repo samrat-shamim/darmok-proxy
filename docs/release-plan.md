@@ -3833,3 +3833,317 @@ equal to tested5a; all20 native build inputs also equal built954. No runtime,
 build or cost sample is repeated or relabeled. Bounded D2 readback and normal
 exact-head reviewed squash merge remain pending. All previously open full gates,
 issues46/15 and the goal stay OPEN.
+
+### Merged inline missing images and combined database setup selection
+
+PR #56, “Copy native column missing images in private metadata reads”, was
+normally squash-merged at reviewed head
+`4b0f3e3d09f6991b77256ebaa41c0010afd9c86d`. Public main
+`19d4a9b1a44303fa334a1fc3cab31fb3174fa80b` has the exact reviewed tree
+`e4e55772c460e7dabad4cdd8be3e21111ed50bea`. The accepted final review closes
+C1 at2848, D1 at803 and D2 only at4b; historical leaves retain their findings.
+
+The final independent review is
+`logs/review-native-missing-images-4b0f3e3-final-doc-v1`: report SHA256
+`36ff378b89e5640b5060daceeaa230e69c6b1fe5c292d25b7f37f32c93311413`, facts
+`be5eb421e37935d6b3983042575bb59f904f8251759557d2f056308ea38f384d`, commands
+`bb3bc6eb931f794bb2594ad2fd57138b74ee2d8a8487e1314d1d583d359e3467`, and
+structured4893-member seal
+`c9ea84e5c3a57b44d2c94d0221f24454ec9fca2ebe37fbbf54ba7df2c55975a3`.
+Actual0 finalization08 and independent post09 have receipt SHA256s
+`43cbe68d042521a8274a79d42826b6b1e8f8f3c300a599cf15a04c4170c4fd51` and
+`c1211d67742eed773d4d9b7e207690ae9c0ec360b2b4a7dd5ca9a6dd06f58ee5`.
+Their stdout hashes are
+`31304c73f0e356b54b3776bb9e9497268c2ec023e8041422ee51dd10c2a2aa88` and
+`220ca471645270d652f3feeec73af2353740466c08a8731a64e4b774360fa60f`;
+post facts hash is
+`57557b965afc1f3f8ab30f36761677356078440e1d42839da857fa0859f510e2`.
+Root37 actual0 rehashes all4893 fixed members plus separate companions,4923
+unique paths total; its file map SHA256 is
+`776d3e1c26f2731bf3051cf6c24f4032b8aa28113d21dfe64f2e83f3f256b5c5`.
+The frozen tested/build/worktree roles and paired10/147/3 evidence do not change.
+
+Root38–46 all exit0: exact public-main/branch/body preflight, normal branch push,
+PR creation, exact head/base/body readback, ordinary squash, public repository
+and tree readback, issue46 exact body update, main fetch and creation of the
+separate `native-database-init` worktree. Publication facts/seal hashes are
+`51d1421c8dee87b12c8757d9fcb6d9981fcd5323cdeadb7f924983eb772e3035` and
+`fcd1b8d36e041c2de846c4aeedd982a3cbd51bd66b2a277b6d45515d3ca4eba0`.
+The personal repository remains PUBLIC with description “A MySQL-to-PostgreSQL
+compatibility proxy”; its README has no experimental narrative. No other
+eligible open PR remains. Issue46 remains OPEN at exact v7 body SHA256
+`0cd2a6df4c1139542fcfc20dbe5f87144eb230a0d30397b25966fa2beae78a88`;
+issue15 and the full goal remain open. Excluded compiler PR4 is not inspected.
+
+Passive display bookkeeping failures this cycle are retained as failures:
+wrong final-reader key and treating a dictionary of seal members as a list;
+the corrected schema reads and root37 pass. A publication-helper construction
+initially replaced its filename prefix before a later assertion; the existing
+body/preflight were preserved and the separately completed helper was read
+before use. None is a native runtime or product result.
+
+The next finite component is [combined explicit database setup](native-database-init.md).
+The old initializer checks the compatibility schema but not the native extension
+and live utility response. The selected boundary checks both inside an owned
+transaction, drains and decodes the exact fixed native response, then submits a
+separate checked COMMIT. It adds one setup round trip and no per-row round trip.
+The API/CLI are renamed cleanly; no schema-only success alias remains. This M3
+setup work can overlap the open M2 dependency/executor work, without closing it.
+The new design is proposed, not implementation or verification acceptance.
+
+Primary installation source capture root01 exits2 because a preceding passive
+reader wrongly assumed the saved tree's `tree` key; it actually contains a
+`paths` list and that failed display prevented helper creation. The missing
+helper invocation and raw streams are preserved. Corrected root02 exits0,
+capturing paired pinned extension source files and the two official CREATE
+EXTENSION pages in `logs/native-database-init-primary-v2`. Its manifest/seal
+hashes are recorded in the design. This is functional provenance only. No new
+native profile, native build, forced-error experiment, security work, hosted CI
+poll, account action or release publication occurs here.
+
+### Combined database setup design review and provenance correction
+
+The independent review at clean design head
+`f01e2aaa67fe2f5f251f45e2b8de62b35c078ac2` / tree
+`7b921f589c304c5688e2bb7657eaa446ba669e2e` conditionally recommends
+implementation with no architectural blocker. It does not accept implementation
+or runtime. `logs/review-native-database-init-f01e2aa-design-v1` contains report
+SHA256 `a9b15f8d68233c1b318105937ff4a493d14b14e4188970f292c894d196818a6a`,
+facts `1ae6f8e4731c74af78ec3ec480c33ddadd8db8831a25f3089feda2211fc20db8`,
+commands `6838353d6a72a5394d63aacf10f9f3b79f2e2b2e4c882ae87e6d08f2fb68d052`,
+and 217-member nonrecursive seal
+`5e4b3130ba54971636e6bb65e82526f35fce61d45855aa1962ce38932d332cc1`.
+Actual finalization38 and independent post39 both exit0; their receipt hashes
+are `70cdc0068bc43fe98e48a83fed7137f5c0bc2e79d02c269a4f00aa1ae2d10306`
+and `26b153815a915ac46b7bdba4a30c7beb4870df65139eea5762cf82f42c5f189d`.
+Passive reader20 wrong-path failure, reader31's real primary self-seal failure,
+and finalizer-builder36 quoting failure remain actual1. Corrected readers and
+final/post checks do not relabel them. No runtime command ran.
+
+P1 remains OPEN at the original f01 design: root02's actual0 HTTP capture
+created its seal file before constructing members, so it recorded itself as
+empty. All six sources and seven nonself members are valid. The original
+helper, files, seal and exit remain unchanged. Root03 exits0, rehashing all217
+review members plus separate companions (233 unique paths), and constructs a
+distinct 11-member primary-v3 seal with the manifest evaluated before opening
+the seal. Corrected seal/facts hashes are
+`1aad1279e0b23ffadbbfe7170747a3ec98e86200b58632b566bf3d12e605028c` and
+`6cebe6b5f618eb472b23551f61844b2938ffa9c0f85b6133682e774db3d3d8a9`.
+This corrects saved provenance only, without a new HTTP capture, Git-blob
+identity claim, native build or runtime result. Root04 exits0 and creates this
+separate docs correction worktree; the reviewed f01 worktree remains frozen.
+
+The design explicitly carries all three mandatory ordinary coverage conditions:
+positive advisory-lock observation after checked SHOW before COMMIT, atomic
+rollback of both new components after unpreloaded placeholder decoding failure,
+and acceptance of nonmembership application dependencies while rejecting extra
+extension members and reserved-namespace objects. Bounded independent P1
+readback is pending at this correction leaf. Implementation, runtime acceptance,
+M2/M3, issues46/15 and the overall goal remain OPEN.
+
+### Combined setup implementation candidate
+
+P1 is independently CLOSED only at corrected design head
+`02240773b674894f1b2ea88409832cd8aadbc718` / tree
+`3d854213c13fd14e7320e8a5e6837898381e89d3`; historical f01 stays OPEN. The
+bounded review `logs/review-native-database-init-0224077-correction-v1` has
+report SHA256 `6387cd2bab0b47b5fa2e79c10309cbab9238bd31abde538dede65c8d343e938b`,
+facts `9ecaa9b8f16a68f8fe63dcdb664d7a2e0b301b35791e40787e9183442757e594`,
+and 139-member seal
+`95bfdcf0e7f8acfc9987b25b99a49c67f8b764ca9069749053734ea9a222189b`.
+Final10 and independent post11 exit0 with receipt hashes
+`7cb24805fcd2b7ebe70ff4092faf3a49c70fea07759d9d80c9db6cb6d580e208` and
+`3d160d1bb63343eecfa11ae5d8f95ce8702d1f28c554fb923fff540d96577aaa`.
+Root05 exits0, rehashing139 fixed members plus separate companions (149 unique
+paths); map SHA256 `9f080edbd8480ad1cb0faf5a6c1223c6d35aba0991e2693a7a5e63eea97dfe20`.
+Root06 exits0 and creates the separate implementation worktree. Both design
+worktrees remain frozen. No design review ran runtime commands.
+
+The candidate cleanly replaces schema-only API/control variants and nested CLI
+with combined `initialize_database` / `verify_database`, `init` / `verify`.
+It validates both functional inventories and the exact native empty response
+before a separately observed COMMIT, retains original errors and actual cleanup
+receipts, and requires confirmed idle before owning a transaction. The shared
+private SET/SHOW checker has a fixed prefix; public empty discovery still does
+no SQL. Tests cover all three required ordinary cases alongside existing
+fixtures. SQL kernels/native product/probe build inputs are unchanged. Current
+compile/runtime checks, artifact reuse and independent implementation review
+remain pending; no earlier pass certifies this candidate.
+
+Root passive reads guessed nonexistent nested native_control and connector
+tests paths; stderr/missing-path outcomes precede corrected inventory/source
+reads. An apply_patch delete/add targeting one filename was rejected before
+writing; the subsequent explicit replacement completed. These are tooling
+bookkeeping events, not runtime or product results. Compiler PR4, security work,
+new stress/forced-error/interruption/recovery experiments, hosted CI/account
+work and release publication remain excluded. All full gates, issues46/15 and
+the overall goal remain OPEN.
+
+### Combined setup verification and packaged instruction correction
+
+The implementation is tested at clean
+`07647b50af46bd215616a154bd332855d630d7c8` / tree
+`9d001170be930f4f09a396d0b5bd9e2ded4ffdef`. Root07 compile exits0. Root08's
+read-only environment audit exits0 with85 nested commands,8 unchanged existing
+profiles and20 native inputs matching built954; facts SHA256
+`4aab989e56e52938c8b6f365dd1ce521b49db769e0e7c669a82f57ef8a2947fb`.
+Primary/ordered profiles still use max_prepared_transactions10, the existing
+zero profile remains negative, and unpreloaded profiles remain unchanged.
+No profile is started, stopped, restarted or signaled.
+
+Root09 `check-native-database-init-07647b5-v1.py` exits0 with all12 sequential
+checks0: format;9-package repository boundaries; affected execute/catalog/CLI
+offline tests with default and sqlparser/bigdecimal; strict workspace
+all-target/all-feature Clippy and separate connector Clippy; then13 database
+setup groups,3 affected catalog-owner groups and4 CLI process groups on each of
+PG17.11/18.6. Required database groups run explicitly with --ignored and have
+zero failed/ignored results. Offline results retain their unrelated ignored
+fixtures; they do not certify a whole-workspace runtime test run. The matrix
+records exact source, env, argv, raw stdout/stderr and six source readers per
+check in `logs/native-database-init-07647b5-checks-v1` and its case folders.
+Matrix facts SHA256
+`8a0174faf7233e0ae13cba0b40b04194431c9b85c07d922c5ef0d1e7fc1161d6`.
+It compares exact20 native mode/type/OID/path tree entries against built954.
+
+The three mandatory ordinary cases pass on both majors: a second owner
+positively observes the setup advisory lock after checked SHOW before separate
+COMMIT, then acquires it and observes both committed components; a fresh
+unpreloaded selected database retains the strict placeholder decoding failure
+and real rollback receipt and has neither namespace nor extension afterward;
+a public function's ordinary nonmembership DEPENDS ON EXTENSION is accepted,
+while added extension members and reserved-namespace function/collation objects
+are rejected without repair. Existing repeats, read-only defaults, caller
+transaction preservation, temporary builtin-type qualification, private
+postcreation metadata mismatch and810 typed helper cases pass.
+
+Every current CLI child has an exclusive receipt and original streams:32 per
+major (15 actual0,17 expected1) and15 per offline feature set (4 actual0,5
+expected1,6 usage2). These94 children cover URI/keyword explicit physical
+databases, both component snapshots, unchanged application data, actual output
+and ordinary driver/server connection closure. This is not configured logical
+routing or serving acceptance. No new stress/forced-error/interruption/recovery
+experiment, security work, hosted CI or release publication is inferred.
+
+Self-review found two current installation paragraphs still describing the
+removed schema-only commands: the packaged native README and the server lease
+doc. Root10 exits0 and creates this separate correction leaf; the tested076
+worktree remains frozen. This changes only documentation and preserves all
+Rust/SQL/fixture/helper implementation bytes. Unlike unpackaged docs, the native
+README is one of the20 build inputs. Therefore this leaf has19 unchanged native
+mechanism/header/control/script/build inputs and one deliberately changed
+packaged README. The earlier exact20/runtime claims remain bound to076, not
+relabeled as this source. The spec now requires rebuilt current packages and
+compares their actual library/header hashes before reusing existing running
+profiles with their explicitly historical README. No running profile lifecycle
+change is needed or authorized here. Current package checks and independent
+implementation review remain pending. Full gates, issues46/15 and the goal stay
+OPEN.
+
+### Combined setup independent review and error-tail correction
+
+Root11 package checks at clean6217c0e exit0 with58 nested actions. Four current
+arm64/Linux product/test images include the corrected packaged README; all
+native libraries, bitcode, three headers and test probe binaries match built954.
+Product images exclude the probe. Eight existing server profiles retain their
+IDs, images, healthy state, preload and max-prepared settings, with no native
+prepared transactions or leftover fixture databases. Package facts SHA256 is
+`39b6bb60bf40ddcecbd37774c827846bf78c5051afc0b1929a05cce45c143c04`.
+No native server was started or profile lifecycle changed.
+
+Independent implementation review at6217c0e does not accept that candidate:
+C1 remains OPEN there. The shared event checker replaced the original backend
+error and ignored subsequent nonterminal events, allowing malformed tails to
+reach a reusable failed-transaction classification. Concrete connector framing
+already rejects such post-error events; this is a private-checker contract
+defect, not an observed ordinary native-wire failure. The new correction keeps
+the first backend error, records every post-error event except terminal
+readiness as malformed, preserves any earlier mismatch, and drains without
+changing transaction round trips. Offline public Config parsing errors provide
+distinct inert error carriers; no new forced native error experiment is used.
+
+Review folder `logs/review-native-database-init-6217c0e-implementation-v1` has
+report SHA256 `c0a8da6deb911c68516164df9128144b7d50c6c20311ffeda809c2f3383b46bd`,
+facts `effd075c8621c7908b7c3375c86c56bd3d8c0d8ab8f3144d75876d3bab4c0436`
+and1383-member seal
+`3bdc12d0a5294586aac053a73c735161f5b60512ba467a48a39b726b0e7555ea`.
+Actual final30 and independent post31 exit0; their receipt hashes are
+`1baad2255311e3aaf1e64bf3102fa7fe039e2a731635d3a80517aaa35b678326` and
+`f6b44ee90d129abd9c0687e581f71b6866b3a32f4097d9e2ded651442d31c1a1`.
+Reviewer20's absent-path actual2 and audit26's incorrect child-serialization
+assumption actual1 remain preserved; distinct audit28 exits0. Offline child
+groups may overlap while root Cargo/check intervals remain sequential.
+
+Root12 exits0 rehashing1383 fixed review members and separate companions
+(1394 unique paths); facts SHA256
+`3c247904950f9721f6acdd500c5c134c90e33f28920b697488fb5ff8202d773b`.
+Root13 exits0 creating a separate correction worktree. Earlier tested076 and
+reviewed/package6217 paths stay frozen. A passive root read first guessed the
+absent commands.json and exited1; inventory corrected it to commands-v1.json.
+That bookkeeping failure is not a runtime result.
+
+This correction changes Rust, offline tests and unpackaged documentation only.
+All20 native inputs must match the actually rebuilt6217 packages before their
+reuse. Current affected checks and independent C1 correction review remain
+pending. Full closure, executor, serving, MySQL locking, performance and release
+gates, issues46/15 and the overall goal remain OPEN. Security, compiler PR4,
+new native stress/error/interruption/recovery/profile experiments and hosted
+CI/account/release publication remain excluded.
+
+### Combined setup accepted implementation and final instructions
+
+The corrected implementation is independently accepted at clean
+`3b9a15e2523a15624efb35e186bb20a4401061c8` / tree
+`1b7f4a1020e2c1d5ccf688469c556d46e8038446`. C1 closes only there; the old6217
+rejection and saved076 checks retain their original scopes. Root14 exits0 with
+all12 sequential affected checks0. Default and explicit sqlparser/bigdecimal
+each pass5 catalog/3 CLI/22 execute, retaining4 CLI and76 execute ignored
+unrelated fixtures. PG17.11/18.6 each pass13 setup/3 catalog-owner/4 CLI process
+groups, with zero failed/ignored required native tests. Every actual CLI child
+has its original receipt and streams:32 permajor (15 actual0/17 expected1) and15
+per offline feature (4 actual0/5 expected1/6 usage2),94 total. Matrix facts SHA256
+`a1e69d1546c9cef4536d5fa136552d01c25b9b3e3e20f807183fe66eded4fe47`.
+
+Root15 exits0, rehashing current check/child records and running28 ordinary
+read-only package/profile observations. Four built6217 package IDs match; all20
+native inputs equal that source, including its current README. Eight running954
+profiles keep their IDs/images/healthy state/settings/native libraries and
+historical packaged README. Prepared and fixture-database counts are zero.
+Primary/ordered max-prepared remains10; the zero profile stays negative.
+Audit facts SHA256
+`20bcb353155f8cea36948236072f20488b2db22100985cb848f3ba6c2783ef3e`.
+No new build, native server or profile lifecycle operation occurred for C1.
+
+Independent folder `logs/review-native-database-init-3b9a15e-correction-v1` has
+report SHA256 `699a5b3cc826889bd93fd9a47849eff68c8f3911b49c486007051a70de4a3264`,
+facts `d4ec2a1ccc11ad153400f4f3fe9895ee6ee1bc2a01bfc705519786459779e1aa`,
+and732-member structured seal
+`e8f20efafb86eb65d4953776e3ced56ae99b59a9954ac1cbf2a19b273980e4d1`.
+Actual final13/post14 exit0; receipt hashes are
+`293e727cfce951dfed4d117ce9864d8e8c99f7754ef7003363206b9bfaa5469f` and
+`9518ef855241cbb1508bc1653249f7623c9e7c80d109becf74909ac44cffef61`.
+Reader07's actual1 wrong-file no-match is preserved; inventory09/full reader10
+correct it. The review independently accounts for25 offline vectors and the
+common row-event branch, preserving first errors/mismatches and actual readiness.
+No new implementation blocker remains within this finite component.
+
+Root16 actually exits1 because its new rehash helper assumes flat anchor JSON;
+the review's observed anchor format is a keyed map. Original helper/raw/partial
+output stay preserved. Distinct helper v2/root17 exits0, verifying732 fixed
+members plus companions/failure witnesses (747 paths); facts SHA256
+`41bcfb9186a0565cbce4dd42d5d0a89b31a34d090fcc7f2d2a28b1341a9ec3ed`.
+Root18 exits0 creating this final documentation worktree. Tested/reviewed3b9
+stays frozen. The reader failure is bookkeeping, not a product/runtime failure.
+
+D1 is historically OPEN in the3b9 review: CLI instructions omit the fourth
+extension-dependency/conflict group and still label076 checks current/package
+checks pending. This leaf corrects the general four-group description, marks076
+historical, records exact current3b9 verification and6217 packaging, and updates
+the database-init status. It changes only three unpackaged documentation files;
+executable/test/dependency and all20 native inputs must remain exactly equal to
+the accepted3b9 source. A bounded independent final-doc readback is required
+before merge, with its result recorded in the PR rather than fabricating a
+runtime execution at this leaf. Full closure/provider/default/missing/constraint/
+effect/preparation/admission/executor/serving/MySQL locking, performance,
+hosted CI/artifact/release gates, issues46/15 and the overall goal remain OPEN.
+The standing security/compiler/native-experiment/CI/account/release exclusions
+continue to apply.

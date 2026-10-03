@@ -22,10 +22,11 @@ mod transaction_controller;
 
 pub use frontend_connection::{FrontendConnection, FrontendEnd, FrontendError, FrontendReport};
 pub use native_backend::{
-    NATIVE_SCHEMA_VERSION, NativeBackend, NativeBackendDisposeError, NativeBackendDisposed,
-    NativeBackendError, NativeBackendOperation, NativeBackendState, NativeCatalogError,
-    NativeCatalogFailure, NativeCatalogMismatch, NativeRecovery, NativeSchemaCompletion,
-    NativeSchemaFailure, NativeScope, NativeScopeBoundary,
+    NATIVE_SCHEMA_VERSION, NATIVE_SERVER_EXTENSION_VERSION, NativeBackend,
+    NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError, NativeBackendOperation,
+    NativeBackendState, NativeCatalogError, NativeCatalogFailure, NativeCatalogMismatch,
+    NativeDatabaseAction, NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+    NativeRecovery, NativeScope, NativeScopeBoundary,
 };
 pub use native_control::{
     NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,

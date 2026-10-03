@@ -13,7 +13,7 @@ authorized database/schema aliases, and map separate MySQL credentials to
 PostgreSQL roles. Compatibility objects require an explicit initialization
 command. PostgreSQL grants remain authoritative.
 
-The development workspace provides a `darmok` executable for explicit schema
+The development workspace provides a `darmok` executable for explicit database
 initialization and verification. **The serving proxy and first release are
 still in progress.** Parser acceptance does not imply that Darmok can execute
 a statement correctly.
@@ -27,16 +27,19 @@ target/debug/darmok --version
 ```
 
 Select one existing physical PostgreSQL database through an environment
-variable, then install or verify its compatibility schema:
+variable, then install or verify both Darmok components:
 
 ```sh
 export DARMOK_DATABASE_URL='postgresql://db_user@localhost/my_database'
 target/debug/darmok init --database-url-env DARMOK_DATABASE_URL
-target/debug/darmok schema verify --database-url-env DARMOK_DATABASE_URL
+target/debug/darmok verify --database-url-env DARMOK_DATABASE_URL
 ```
 
-Initialization is transactional and accepts an existing installation only when
-it matches. Verification never creates or repairs objects. See the
+PostgreSQL 17/18 with UTF8 and an already installed and preloaded
+[`darmok_server` module](postgres/darmok_server/README.darmok_server.md) are
+prerequisites. Initialization checks the compatibility schema, server extension
+and live native handler transactionally, and accepts an existing installation
+only when it matches. Verification never creates or repairs objects. See the
 [command contract](docs/cli.md) for current behavior and requirements.
 
 See the [execution plan](docs/release-plan.md), [architecture contract](docs/architecture.md),
