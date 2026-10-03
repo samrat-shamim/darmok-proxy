@@ -4516,3 +4516,96 @@ The investigation records this counterexample and leaves stronger-guard versus
 complete descriptor/provider-path admission, writer coverage, ordering,
 retention and performance OPEN. No native implementation or catalog mutation
 is introduced to bypass that unresolved proof.
+
+### Transitive investigation merged; metadata bootstrap paths narrowed
+
+[PR60](https://github.com/samrat-shamim/darmok-proxy/pull/60) normally
+squash-merges independently accepted documentation source
+`75de1386f4a5b2cb4645a3f382eef4e55c31fc8f` to public main
+`7de81ccf392105e85f888bfd7ea9845f9dff3d80`. The exact accepted/main tree is
+`a573edc282c675ef7fa514d93be88e3357371de0`, parent6ad8. This closes only the
+finite source-investigation checkpoint; the new descriptor bootstrap and full
+type/provider/statement/runtime gates remain OPEN.
+
+Root06 investigation binding actually exits0:348 entries versus347 in its
+merged parent, one new and three modified unpackaged docs,344 unchanged prior
+entries,22 unchanged native inputs and unchanged tested Rust fixture. Root07
+boundary check actually exits0 for9 packages. Binding facts SHA256 is
+`0278d1831f2fee031b0a90f562d90e21fa25b1087010d65129b4601576aab891`.
+
+Independent review under `logs/review-native-transitive-type-closure-75de138-investigation-v1`
+accepts only that investigation. Report/facts/commands/616-member nonself seal
+SHA256 values are:
+
+- `9d14d8c7945bfd4a56c1474f9852928cb3753b5a8663c8da169c4fb1f414c389`
+- `fe877c01f381c520e84f51dcfedd59b95d9604f5e5820e510212bc02d920839a`
+- `c152a240e68b8e6b43675d04ef139b5b650be531459284e33d7109761008b5b5`
+- `f036de72177467656123e7015e6e01f0a88f51732af430acc3bcf3ff15488f43`
+
+Actual final14/post15 exits are0, with receipt SHA256 values
+`d8badbe569b16c0653cc7ff459d3f69b405383272df5ab2f7caaaa6f6442b04a`
+and `14631e00ca8c3d22ba533ba78b31b9d3a601499fc72135669d5a11f736393a3a`.
+No new required correction is found; all live reads release before root mutation.
+Root08 actually exits0 rehashing616 fixed members and16 separate completion
+companions/637 unique paths, without recursively reopening earlier runtime
+review graphs. Its facts SHA256 is
+`0c3432690431563c204f214df62ab3666b209e46fe4c7c611ce2017f69f2d0c6`.
+
+Root09 push,10 create,11 exact source/body/base readback and12 normal exact-head
+squash merge actually exit0. PR wording relates to issues46/15 and contains no
+closing directive. Root13 independently reads merged source/main/tree/parent,
+PUBLIC personal ownership, unchanged generic description, an empty eligible
+open PR list with PR4 filtered before stdout/evidence, and both issues OPEN.
+Its facts SHA256 is
+`7c004c882993faf85c49d50cbe7d0153194c55539a246399522020a3724eb490`.
+The PR body SHA256 is
+`de4b2d985e63e99887c400d8bb92deba9beae14123c8c15d03068b52ce64f57b`.
+There is no new hosted-CI, native runtime/artifact or release result.
+
+The [metadata bootstrap follow-up](native-catalog-bootstrap.md) begins from
+merged7de8 in a separate branch/worktree. Its distinct root01 fetch and02
+worktree creation actually exit0 without changing frozen accepted sources or
+existing native profile lifecycles. Root03 actually exits0:26 selected cached
+bodies rehashed plus eight HTTP-200 trigger/index/vacuum/analyze bodies,17 per
+major. V1 primary facts/47-member nonself seal SHA256 values are
+`7a5dbd8882cb8c58e27da3b403ffc75a275373ad363d4010eac1953de32fd2b5`
+and `944c1b1126b165ea07edb61160c1542e83cf8d498a8c063a012fb7949751b3fa`.
+Root04 passive path inventory actually exits0; its complete raw output is
+preserved even though the wrapper displays only its tail.
+
+Root05 actually exits0 capturing38 exact selected cold/options/writer bodies.
+Facts/41-member seal SHA256 values are
+`3ba8fc22f68310b2b81871c1748db489b37aa34a5192442af787768408a836e1`
+and `82b491a77259e8f3410e63d6c68f058599b3397758735080a6b45860572c0d2d`.
+Distinct root06 captures11 additional native rebuild bodies, including18's
+separate rebuild function, and actually exits0. Its facts/14-member seal are
+`dbf0816b616b7d0c6ca4cfb9bb1f4307c8a5bf886c80c8679829d6cc3c9f28aa`
+and `d650f1b5e5d83acaad4fe222a6cc502f7578c8936f50e24e98b5576f84c666d2`.
+No native invalidation or error experiment is inferred from these source reads.
+
+Root07 actually exits0 rehashing the34 v1 bodies plus four selected array/btree
+bodies and capturing two HTTP-200 btree utility bodies:20 per major. V2 primary
+facts/48-member seal SHA256 values are
+`a13755f9ec985ccddcb06df32197d784e1e0dc8ef0ebd38858cacf90452e6bc4`
+and `78b61856fca1b4cbeb7f9a8b771f666ed522d2898710eea46468b06891e87ea7`.
+Root08 actually exits0 capturing16 selected global/local/array/btree bodies.
+Its facts/19-member seal are
+`8e49bf80aea0a3b7a196a712e827ff65e7991ff2b6c42f33cc3c440bc545054a`
+and `e5313ad065aab8917f3ca7c03f9716daf1814331e5b70e4cf8ccd1764e6063b9`.
+Root09 saves five actual native-major source differences and actually exits0;
+facts SHA256 is
+`dcd790588ea2628063f5394be446376cdff04919bb7efda6123a1e14583f5d2d`.
+These are source byte/comparison facts, not complete semantic reviews of all
+40 files/65 bodies or new runtime results. No helper/source mutation occurs
+during any recorded root command.
+
+The follow-up prefers investigating complete supported global heap/builtin-btree
+option admission with AS/RX over adding global SUE/Share coupling. It traces
+global NULL fillers versus callback-capable local registrations, major-specific
+descriptor rebuilds, and the missing entered-cache/owner witness. This does
+not close registry/profile, writer, bootstrap, whole closure or implementation
+gates and does not select a final observation/pass count. Independent review
+is required before changing C. Concurrent native two-phase support remains
+required; issues46/15 and the overall goal stay OPEN. Standing exclusions remain
+in force, including security work, compiler PR4, hosted CI, publication and new
+stress/error/recovery/existing-profile lifecycle experiments.
