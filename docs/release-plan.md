@@ -4981,3 +4981,61 @@ new native certification. The subsequent two-file documentation revision must
 be bound to these unchanged tested inputs. Corrective independent review still
 decides C1 closure; full native/statement/serving/performance/release gates,
 issues 46/15 and the goal remain OPEN. Concurrent PostgreSQL 2PC is required.
+
+### Prepared commands merged; fixed native callback history traced
+
+PR #65 was normally squash-merged from independently accepted
+`5064131adf1cc1cfda5421a406f83e8823909f0a` to public main
+`e8b0dde48e4484ad4f9bf0308f4c5a5d79a0787b`, tree
+`e70405281d7e2067fda7c3fdd0a3bb381e9372ea`, parentcd0e0fc. Its two-file
+documentation leaf preserves the 355 other entries of tested43f835b. C1 is
+CLOSED only at506; the original8ed review remains historically OPEN. The finite
+correction review retains984 fixed members, actual final13/post14/completion15
+exit0, and root40 rehashes1,006 unique paths with actual0. Its facts at
+`logs/review-prepared-frontend-5064131-correction-v1-root-rehash-v1/facts.json`
+have SHA256
+`297177b3e3702114832468786faf2db82586287a3156137c6f7ca1f8a7cbd48e`.
+Root46 verifies the exact public personal main, generic description, no eligible
+open PRs after filtering PR4, and issues46/15 OPEN. Merge readback facts at
+`logs/prepared-frontend-5064131-merged-readback-v1/facts.json` have SHA256
+`059dd1e71e78eced95cb21c1a6332e548371a390e190c7ba349471856885322d`.
+The local prepared component is accepted; native/table prepared execution and
+the complete engine gate remain OPEN.
+
+The next isolated branch starts from that exact main and traces the query
+owner's fixed native commands. The [paired source findings](native-fixed-command-history.md)
+identify post-parse and utility hooks, the distinct string object hook after
+SET, GUC assignment/restoration hooks, native resource-release callbacks and
+savepoint completion. The current Darmok utility interception is a required
+provider path; an all-NULL hook profile is not the proposed witness. The
+construction requires a bound startup base, preservation through every allowed
+transition and exact pre-open descriptor/reference facts before new C readers.
+Those implementation gates are still OPEN.
+
+Root03/04's actual0 primary captures at basee8 rehash eight then twenty cached
+bodies and add twelve then eight HTTP-200 bodies, yielding28 pinned source files
+across PostgreSQL17.11/18.6. Root05 selected reader actual1 remains preserved:
+the assignment calls live in set_config_with_handle rather than the delegating
+set_config_option_ext wrapper. Corrected root06 actually exits0 and saves120
+selected records:92 complete function bodies,8 GUC rows,2 macros,12 bounded
+call sites and6 bounded utility spans. Eight of60 paired selections differ,
+including PG18 search-path reporting, AIO/type-cache cleanup and parallel-worker
+check variants;52 have equal selected bytes. Source counts and extraction
+success do not mean complete semantic acceptance of those files or variants.
+
+Commands use `python3 capture-native-fixed-history-primary-v1.py`, its v2
+callback capture and `python3 capture-native-fixed-history-functions-v2.py`
+through the fixed root recorder with unchanged clean e8 source before/after.
+Primary v2 facts at `logs/native-fixed-history-primary-v2/facts.json` have SHA256
+`8948e9836c6fb9aaa7059a6704cbd66ffe893ea4287f7a04d1aa0126ae2f7990`.
+Selected v2 facts/seal at `logs/native-fixed-history-functions-v2` have SHA256
+`4f7d0c9a48a9f67f757568fce117cf996ff4b9dbc9d7845c9a251e6f1fd16dd1`
+and `f9a976c28d5c876f32009ad69703ae5ff11ddb105a4c253996ae21137fbcedc9`.
+These are finite targeted source/provenance findings, not a new native build,
+runtime experiment or recertification of historical review graphs. The same22
+native build inputs remain unchanged. Independent review of this documentation
+checkpoint is pending. Entry/bootstrap/provider/registry/reference/writer/sequence,
+whole-statement/table execution, serving, performance and release gates remain
+OPEN. Concurrent native2PC stays required; security, compiler PR4, hosted CI,
+new stress/recovery or profile lifecycle experiments and release publication
+remain excluded.
