@@ -74,7 +74,7 @@ setting/result operations add no native request; an active autocommit commit
 sends one. Transaction-control requests are specified in their own contract. End-to-end performance
 measurements remain pending.
 
-The [local prepared-command candidate](prepared-commands.md) separately owns
+The [local prepared-command component](prepared-commands.md) separately owns
 source-admitted local SELECT templates; it does not enable native reusable plans.
 Table row execution, complete transaction behavior, full prepared execution, catalog coherence, a
 runnable proxy and real-driver/release gates remain incomplete. Required account

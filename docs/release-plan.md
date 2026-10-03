@@ -4900,3 +4900,34 @@ not matching stock error packets. TINY, SHORT, LONG and LONGLONG signed/unsigned
 bounds produce the expected LONGLONG results. The generic wire decoder is not
 a semantic admission authority. Current expanded checks and independent review
 remain pending; full native execution and release gates remain OPEN.
+
+### Expanded prepared-command implementation verified
+
+At `4bffee43f7ed2361b86f16381ea24dacfb0a8641`, root20–27 all have actual exit 0.
+They execute `cargo fmt --all --check`, workspace all-target/all-feature locked
+Clippy with `-D warnings`, the committed stock observer, the locked offline
+workspace suite excluding `darmok-postgres-tests`, before/after profile audits,
+all eight required native/CLI suites and `python3 scripts/check_repository.py`.
+The offline suite reports 1,691 passed, 0 failed, 93 ignored across 41 groups.
+Per PostgreSQL 17.11/18.6 major, owner tests report 82 passed, decimal transaction
+tests 10, decimal frontend tests 15 and CLI tests 4, all with 0 failed/ignored.
+Each CLI suite's 32 child receipts retain 15 actual exit 0 and 17 expected exit 1.
+No existing profile was restarted or replaced. The 22 unchanged native build
+inputs remain bound to the existing c43443d package/profile facts. This is Rust
+and packet validation, not a new native module build or complete engine gate.
+
+Evidence under `logs/prepared-frontend-4bffee4-*` records commands, raw streams,
+source before/after and immutable identities. Required-suite facts have SHA256
+`9e460a9461c5f63135bca72c2a0e94e437c05f10a0e986da7bda1cef832750af`;
+stock observation facts have SHA256
+`34ff89f2aa3284ba2b536acc6588a5fe89bdea392d00b8dde4552aa7b8db5bd4`
+(15 cases and 4 condition-count checks). Profile before/after facts have SHA256
+`98e00dd5bd46825c6da75ae59e6a3f160f866702571d773cb9e2cc0f9ca2f41d`
+and `b2dc29fa5b40aefb224f77dc13a95c1469e23f3e89be879c88cdf1bf04199d6e`,
+with the same eight IDs, starts, restart counts, settings, libraries and headers,
+and no residual fixture databases. The intermediate d35422a format check's
+actual exit 1 remains preserved; 4bffee4 fixes only its required line wrapping.
+Documentation now records these completed checks; its subsequent revision must
+be proven identical for tested runtime/corpus/observer inputs before acceptance.
+Independent review remains pending, and all previously open native, full
+prepared, performance, serving and release gates remain OPEN.

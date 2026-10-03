@@ -1,7 +1,8 @@
 # Owned local prepared commands
 
-Status: implementation candidate; expanded corpus checks and independent review
-are pending. The preceding corrected revision passed the required suites.
+Status: implementation checked at `4bffee43f7ed2361b86f16381ea24dacfb0a8641`;
+independent review is pending. The subsequent documentation-only revision does
+not change the tested Rust, corpus, observer or native installation inputs.
 Table execution, native reusable plans and release certification remain open.
 
 `FrontendConnection` exclusively owns its typed statement registry. PREPARE
@@ -26,19 +27,19 @@ Direct slots initially declare nullable VAR_STRING in the immutable session
 text charset. Selected bindings are NULL, signed/unsigned TINY, SHORT, LONG and
 LONGLONG, and VAR_STRING with valid UTF-8 bytes. INT24 is explicitly unsupported:
 the recorded stock non-NULL inputs fail instead of producing integer rows.
-Non-NULL integers derive LONGLONG with width 21
-and explicit signedness. NULL preserves the derived description, even before
+Non-NULL integers derive LONGLONG with width 21 and explicit signedness.
+NULL preserves the derived description, even before
 the first non-NULL binding. Cached input types and derived result types are
 independent; RESET preserves both. A string input after numeric derivation
-requires unimplemented MySQL coercion/warnings and returns1235 before result
+requires unimplemented MySQL coercion/warnings and returns 1235 before result
 output, without resetting the derived type. Other parameter types, parameter
 expressions, tables, clauses, SET/transaction preparation and batches fail
 explicitly. The remaining coercion/native prepared gates are not satisfied.
 
 PREPARE clears diagnostics and preserves ROW_COUNT, FOUND_ROWS and insert ID;
 it does not execute SELECT. EXECUTE records a one-row SELECT. RESET clears
-conditions and records ROW_COUNT0. CLOSE sends no packet, including unknown
-IDs, and preserves diagnostics. Unknown EXECUTE/RESET IDs return1243.
+conditions and records ROW_COUNT 0. CLOSE sends no packet, including unknown
+IDs, and preserves diagnostics. Unknown EXECUTE/RESET IDs return 1243.
 Output guards settle only after packets are written and flushed. Transport or
 internal-contract errors terminate the owner and dispose the native connection.
 
@@ -51,13 +52,20 @@ Measured latency, memory and allocation gates remain open.
 The stock corpus captures ordinary MySQL 8.4.11/PyMySQL 1.1.2 packets for metadata,
 repeated bindings, reset, changed session values, frozen quoted literals and
 close, plus signed/unsigned bounds for each admitted integer input type and
-stock INT24 rejection. Its ROW_COUNT/FOUND_ROWS observation invokes deprecated FOUND_ROWS: the
-warning count includes that query's own warning, not the preceding count.
+stock INT24 rejection. Its ROW_COUNT/FOUND_ROWS observation invokes deprecated
+FOUND_ROWS: the warning count includes that query's own warning, not the preceding count.
 Separate PING packets establish prepare/reset clear and close preserve behavior.
 TCP fixtures replay supported packets and reject the observed unimplemented
 numeric-string conversions and INT24 bindings with explicit 1235 errors; those
-are unsupported cases, not equivalent stock error packets. Stock legacy EOF observations and documented EOF
-negotiation remain separate evidence.
+are unsupported cases, not equivalent stock error packets. Stock legacy EOF
+observations and documented EOF negotiation remain separate evidence.
+
+The committed observer reproduces 15 stock cases and four condition-count
+checks. Five additional required ordinary TCP groups pass on PostgreSQL 17.11
+and 18.6 with both default and BigDecimal parser representations. The full
+required suites, offline tests, strict Clippy, format and repository boundary
+checks also pass. Exact commands and revision-bound evidence appear in the
+release plan. These results do not certify the open native/full-prepared gates.
 
 Primary contracts: [PREPARE](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_prepare.html),
 [EXECUTE](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html),
