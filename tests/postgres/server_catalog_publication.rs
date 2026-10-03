@@ -409,7 +409,7 @@ async fn prior_native_parse_bind_temp_history_releases_prepared_completion_fence
         native.trace.clear();
         native
             .parse_bind(
-                "temp_history",
+                &format!("temp_history_{outcome}"),
                 "temp_portal",
                 "SELECT id FROM publication_caller_temp",
             )
@@ -420,7 +420,7 @@ async fn prior_native_parse_bind_temp_history_releases_prepared_completion_fence
         locks.no_prepared_module_locks(&observer).await;
         native
             .parse_bind(
-                "finish_target",
+                &format!("finish_target_{outcome}"),
                 "finish_portal",
                 &format!("{outcome} PREPARED 'darmok_caller_target'"),
             )
