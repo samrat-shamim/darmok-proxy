@@ -3397,3 +3397,67 @@ A draft documentation spacing edit surfaced trailing whitespace through
 `git diff --check`; the multi-command display ended0 on its later status read,
 so that display is not a successful diff check. The whitespace is removed
 before commit and the separate diff check must pass. No runtime result changes.
+
+
+### Merged private fixed column and direct-type checkpoint
+
+[PR #55](https://github.com/samrat-shamim/darmok-proxy/pull/55) is normally
+squash-merged. Reviewed final leaf `a493635c3ac9480e425a76f3a06e65f141219b5d`
+and public main `6c2b03cf5de5215ed36db9dd5f6ffd63b4c5b9a6` share tree
+`d63349455c8d6f474c3843fe1607e6ddb7d49529`. C2 is closed at tested `1934034`;
+D1 is closed at the separate final documentation leaf only. Historical reports
+remain unchanged. The finite accepted boundary still supplies descriptive
+fixed positive slots/direct types, not an executable statement.
+
+Independent final documentation review is
+`logs/review-native-attribute-facts-a493635-docleaf-v1`: report SHA
+`41f1ee5532c3fa1a8bcc634ecf7e35f0262729b1f84eac13b7de1b68bd504c36`,
+facts SHA `47f2f08172ef3a604b6237d61e94126333081a8c7be90a520c6aa85ae0f57ffb`,
+2805-member structured seal SHA
+`833409f1f43d1274529cddce5efa5f4a9618f3e5e981fa7d3a98bcfb5e9490af`.
+35 prefinal readers and bootstrap pass, no new failed executed reader.
+Actual `15-final-invocation.json`0 SHA
+`242f6cfc33020d934064fb714c128e2fed9169ac0905d5f9baadce6adaeed78e`
+and independent `16-post-invocation.json`0 SHA
+`b702affb664a94ee54537e53b44721b849ffcc9334db5b671552c0d97cb21a7b`
+retain exact clean source and post facts SHA
+`c521f2186a8933b579bd6b06803662c78058e8b6db0a6162015b3d856bd01c68`.
+Live reads released. Root `55-docleaf-review-rehash`0 verifies 2805 members plus
+companions: 2823 unique paths; root facts SHA
+`fb03c27114196456f16c4c2e90fedff026a8cff8ca1544fabd882d19f6040b06`.
+Four exact Git `1934034` documentation witnesses preserve advancing historical paths.
+Nineteen native inputs and all executable/test/dependency entries are unchanged;
+the sole changed native build-context input is the packaged DOCS README.
+Existing tested images retain their historical README. No runtime repetition,
+current full-workspace test or fresh final-leaf artifact claim is made.
+
+Recorder prefix `logs/native-attribute-facts-a493635-` records actual
+`56-push`0, `57-open-pr`0, `58-pr-head`0 and `59-merge`0. Merge uses squash and
+exact --match-head-commit, with no admin/auto/delete-branch action.
+`60-publication`0 independently reads merged PR/main/repository/README and the
+filtered eligible PR queue: same tree, public personal repository, generic
+description, no experimental README wording and no eligible open PRs.
+Publication facts SHA
+`63f6e2410adf7547367e95b5a81b9fad14746de73b2dbe1a14af52835ee71eae`,
+22-member seal SHA
+`e371d88f8230ffd1698b0197d420935ceee3efeea0693fd332c2f21eac827fd4`.
+No hosted checks, CI retries or release publication occurs.
+
+`61-issue 46-v6`0 verifies exact before/edit/readback and leaves issue 46 OPEN;
+body SHA `e83cb713c548528fe5baed971f18e079ee0d9c67a357252371dde25c2a8dc15f`.
+Issue 15 remains OPEN. `62-fetch-main`0 and `63-next-worktree`0 preserve the old
+reviewed branch and create isolated `feat/native-definition-closure` at public
+main `6c2b03c`, outside the dirty monorepo/personal main. Old source and evidence
+remain frozen. Original Clippy/read/helper failures are not relabeled.
+
+Next design work concerns variable catalog payloads and transitive/provider/
+name closure. Copying fixed flags/OID edges cannot justify native descriptor
+construction, expression parsing, providers or arbitrary detoast/storage opens.
+Paired pinned source must establish snapshot neutrality, physical ordering,
+variable payload provenance, provider/effect boundaries and complete cleanup
+before selecting a mechanism. No implementation or runtime acceptance follows
+from this checkpoint. Full dependency/preparation/immutable IR/execution/MySQL
+read-lock/serving/cache/full performance/artifact/release gates and the goal
+remain open. Concurrent native two-phase transactions stay supported; security,
+compiler PR4/resources, stress/forced interruption, existing-profile lifecycle,
+hosted CI/account/admin and release publication exclusions remain in force.
