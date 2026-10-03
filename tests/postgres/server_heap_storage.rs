@@ -264,8 +264,17 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
 }
 
 fn check_graph(state: &Value, expected: &[Value], root_mask: u64) {
-    let root = u32::try_from(expected[0]["oid"].as_u64().unwrap()).unwrap();
-    check_graph_modes(state, expected, &BTreeMap::from([(root, root_mask)]));
+    let root_masks = expected
+        .iter()
+        .filter(|fact| fact["parent_oid"] == 0)
+        .map(|fact| {
+            (
+                u32::try_from(fact["oid"].as_u64().unwrap()).unwrap(),
+                root_mask,
+            )
+        })
+        .collect();
+    check_graph_modes(state, expected, &root_masks);
 }
 
 fn check_graph_modes(state: &Value, expected_facts: &[Value], root_masks: &BTreeMap<u32, u64>) {

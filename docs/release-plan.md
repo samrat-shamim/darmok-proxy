@@ -3629,3 +3629,25 @@ The two-source alignment inventory stays separate from the62-source design
 bundle. The correction checks TYPALIGN_DOUBLE and retains every descriptor,
 physical-presence, pointer/header/range and envelope check. Changed C input
 requires fresh strict builds/profiles and runtime evidence; none is yet claimed.
+
+Corrected native leaf `954c5dedf62564fae5d4b60d22b8bce8aebbef3e`, tree
+`8eadeaad1e7b011ef62ceae99a316c26de42458b`, records strict fresh builds
+`09-product17`, `10-probe17`, `11-product18`, `12-probe18`, all actual0.
+`13-profiles`0 records127 setup actions0, exact20 native inputs, eight new
+healthy Linux/arm64 profiles on ports32871–32878 and available LZ4. Setup facts
+SHA `fae326a8a658083c1d9feb4a836b6a5ad138bf3cb21109ea6b90cd9444d8d701`.
+Existing failed and historical profiles remain untouched.
+
+`14-storage17` actually exits101: nine fixtures pass, including the new missing
+forms/physical NULL/default-drop case and nonempty prepared/retention outcomes;
+one existing multi-root fixture fails in the newly generalized Rust oracle.
+Raw stdout SHA
+`1684cd2dc3bcd605d22c128b997592a90f1eee546eb4d773aab363aed5fd3948`,
+stderr SHA `471b607eea6552787f3eede738843ad05653d737ce85b66e03030f095ab89dc8`.
+Root cause: the uniform-mode wrapper built a map for only its first root, while
+the existing fixture supplies two. The helper now declares the requested
+uniform mask for every independent expected root; mixed-mode roots still use
+their explicit complete map. No mask fallback or product code change is made.
+Only Rust fixture/ledger inputs advance; all20 native build inputs remain
+unchanged. The failed run stays failed; current binding and paired suites must
+run before finite verification or C1 acceptance.
