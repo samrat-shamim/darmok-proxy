@@ -4744,3 +4744,34 @@ The standing exclusions remain in force, including security work, compiler
 PR4, hosted CI, publication and new stress/error/recovery/existing-profile
 lifecycle experiments. No source/helper mutation occurs during a recorded
 root command or a reviewer's live reads.
+
+### Module-footprint merge and private command ownership
+
+[PR63](https://github.com/samrat-shamim/darmok-proxy/pull/63) normally
+squash-merges the corrected source-investigation leaf
+`ee481de178485e62cbb2e52d1dba9bfc40033406` to public main
+`4d2a81b5432474b0ac714cf3ffc4c140773f4f08`, tree
+`e601044b7d81bbe6ca2fe3654ab0a6c015b7ac62`, parent2a18. D1's Linux
+qualification closes only at ee481de; the historical a6e0b29 finding stays
+open. The correction review accepts source investigation only. Root11's finite
+review rehash and root16's merged readback facts SHA256 values are
+`c99322e3db9682eeaf55f2ec06b9ca2a53e7b7807993a05e77f45e0c73fda1e4`
+and `c6f70dc4b804458c98f582f8065691d63009effe779aca56b161e3542ab075c1`.
+All live reads release before subsequent mutation. The readback confirms the
+public personal repository, generic description, empty eligible PR queue and
+issues46/15 open, with PR4 filtered before stdout/evidence.
+
+The [private command-history boundary](native-command-history.md) starts from
+merged4d2 in a new isolated worktree. Root03/04 source capture,05 selected
+functions/spans and06 paired differences actually exit0. The primary v2
+13-member nonself seal and selected-functions 35-member nonself seal SHA256
+values are `ddbf02877f61ddf6a19fdffc40fd9b93e854f82a84f32bd7094c156071031a01`
+and `50fa4db037696cf715bfaccf7cc5daf7cc3370e85be81f2dc004826bc4ccdc0f`.
+These source reads do not certify complete native startup or a new runtime.
+
+The implementation separates setup/verification ownership from the query owner
+through a shared private connection mechanism. Fixed installation SQL and native
+mechanism inputs remain unchanged. Current-revision checks and independent
+review are pending. The native entry/bootstrap/whole-statement, serving and
+release gates, issues46/15 and the overall goal remain open. Concurrent native
+two-phase transactions remain required; all standing exclusions remain in force.

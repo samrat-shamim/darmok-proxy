@@ -26,6 +26,8 @@ pub use native_backend::{
     NativeBackendDisposeError, NativeBackendDisposed, NativeBackendError, NativeBackendOperation,
     NativeBackendState, NativeCatalogError, NativeCatalogFailure, NativeCatalogMismatch,
     NativeDatabaseAction, NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+    NativeDatabaseSetup, NativeDatabaseSetupDisposeError, NativeDatabaseSetupDisposed,
+    NativeDatabaseSetupError, NativeDatabaseSetupOperation, NativeDatabaseSetupState,
     NativeRecovery, NativeScope, NativeScopeBoundary,
 };
 pub use native_control::{

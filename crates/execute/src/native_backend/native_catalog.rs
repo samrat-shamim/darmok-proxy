@@ -373,9 +373,8 @@ impl NativeBackend {
         let sql = request_sql(names)?;
         let pending = PendingRead::new(&mut self.state, boundary);
         let events = self
-            .client
-            .as_ref()
-            .expect("live owner retains its client")
+            .connection
+            .client()
             .simple_query_events(&sql)
             .map_err(NativeCatalogError::Submit)?;
         let row = match check_request(events, &[]).await {

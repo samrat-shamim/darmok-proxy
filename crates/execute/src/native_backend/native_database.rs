@@ -1,14 +1,12 @@
-use std::fmt;
+use std::{error::Error as StdError, fmt};
 
 use darmok_catalog::{CatalogObservationError, decode_catalog_observation};
-use tokio_postgres::{Error, TransactionState};
+use tokio_postgres::{Config, Error, Socket, TransactionState, tls::MakeTlsConnect};
 
+use super::NativeCatalogFailure;
 use super::native_catalog::{REQUEST_SETTING, check_request};
-use super::{
-    NativeBackend, NativeBackendError, NativeBackendOperation, NativeBackendState,
-    NativeCatalogFailure,
-};
-use crate::NativeControlCompletion;
+use super::native_connection::{DisposeSource, NativeConnection, confirmed_failure_state};
+use crate::{NativeControl, NativeControlCompletion, NativeControlFailure, check_native_control};
 
 pub(super) const DATABASE_SQL: &str = include_str!("../../sql/database-installation.sql");
 const CREATE_MARKER: &str = "allow_create constant pg_catalog.bool := true;";
@@ -25,10 +23,10 @@ pub enum NativeDatabaseAction {
 }
 
 impl NativeDatabaseAction {
-    fn operation(self) -> NativeBackendOperation {
+    fn operation(self) -> NativeDatabaseSetupOperation {
         match self {
-            Self::Initialize => NativeBackendOperation::InitializeDatabase,
-            Self::Verify => NativeBackendOperation::VerifyDatabase,
+            Self::Initialize => NativeDatabaseSetupOperation::Initialize,
+            Self::Verify => NativeDatabaseSetupOperation::Verify,
         }
     }
 
@@ -37,6 +35,75 @@ impl NativeDatabaseAction {
             Self::Initialize => "READ WRITE",
             Self::Verify => "READ ONLY",
         }
+    }
+}
+
+/// Setup history belongs to its own connection and never to a query backend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeDatabaseSetupState {
+    Ready(TransactionState),
+    Controlling(NativeControl),
+    Checking(NativeDatabaseAction),
+    Uncertain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeDatabaseSetupOperation {
+    Initialize,
+    Verify,
+    Commit,
+    Rollback,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum NativeDatabaseSetupError {
+    #[error("native setup connection establishment failed: {0}")]
+    Connect(#[source] Error),
+    #[error("cannot {operation:?} while native database setup is {state:?}")]
+    InvalidState {
+        operation: NativeDatabaseSetupOperation,
+        state: NativeDatabaseSetupState,
+    },
+    #[error("native setup {control:?} submission failed: {source}")]
+    Submit {
+        control: NativeControl,
+        #[source]
+        source: Error,
+    },
+    #[error(transparent)]
+    Control(#[from] NativeControlFailure),
+}
+
+/// Owns a fresh connection exclusively for the fixed initialization and
+/// verification manifests. It exposes no query scopes, raw SQL or conversion
+/// into NativeBackend. Query work must establish a different connection.
+///
+/// Setup cannot be used as a query backend:
+/// ```compile_fail
+/// use darmok_execute::{NativeBackend, NativeDatabaseSetup};
+/// fn reuse(setup: NativeDatabaseSetup) -> NativeBackend {
+///     setup.into()
+/// }
+/// ```
+/// Nor can it open a query scope:
+/// ```compile_fail
+/// use darmok_execute::{NativeDatabaseSetup, NativeTransactionSpec};
+/// async fn query(setup: &mut NativeDatabaseSetup, spec: NativeTransactionSpec) {
+///     let _ = setup.transaction_scope(spec).await;
+/// }
+/// ```
+#[must_use]
+pub struct NativeDatabaseSetup {
+    connection: NativeConnection,
+    state: NativeDatabaseSetupState,
+}
+
+impl fmt::Debug for NativeDatabaseSetup {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeDatabaseSetup")
+            .field("state", &self.state)
+            .finish_non_exhaustive()
     }
 }
 
@@ -79,7 +146,7 @@ impl NativeDatabaseCompletion {
 #[derive(Debug, thiserror::Error)]
 pub enum NativeDatabaseError {
     #[error(transparent)]
-    Owner(#[from] NativeBackendError),
+    Owner(#[from] NativeDatabaseSetupError),
     #[error("database setup submission failed: {0}")]
     Submit(#[source] Error),
     #[error(transparent)]
@@ -91,9 +158,11 @@ pub enum NativeDatabaseError {
 impl NativeDatabaseError {
     pub fn backend_error(&self) -> Option<&Error> {
         match self {
-            Self::Owner(NativeBackendError::Connect(error)) | Self::Submit(error) => Some(error),
-            Self::Owner(NativeBackendError::Submit { source, .. }) => Some(source),
-            Self::Owner(NativeBackendError::Control(failure)) => failure.backend_error(),
+            Self::Owner(NativeDatabaseSetupError::Connect(error)) | Self::Submit(error) => {
+                Some(error)
+            }
+            Self::Owner(NativeDatabaseSetupError::Submit { source, .. }) => Some(source),
+            Self::Owner(NativeDatabaseSetupError::Control(failure)) => failure.backend_error(),
             Self::Completion(failure) => failure.backend_error(),
             Self::Owner(_) | Self::Observation(_) => None,
         }
@@ -108,7 +177,7 @@ pub struct NativeDatabaseFailure {
     action: NativeDatabaseAction,
     #[source]
     original: NativeDatabaseError,
-    cleanup: Option<Result<NativeControlCompletion, NativeBackendError>>,
+    cleanup: Option<Result<NativeControlCompletion, NativeDatabaseSetupError>>,
 }
 
 impl NativeDatabaseFailure {
@@ -120,12 +189,44 @@ impl NativeDatabaseFailure {
         &self.original
     }
 
-    pub fn cleanup(&self) -> Option<&Result<NativeControlCompletion, NativeBackendError>> {
+    pub fn cleanup(&self) -> Option<&Result<NativeControlCompletion, NativeDatabaseSetupError>> {
         self.cleanup.as_ref()
     }
 }
 
-impl NativeBackend {
+impl NativeDatabaseSetup {
+    /// Retain a fresh connector-owned client and driver, then observe the same
+    /// fixed idle lookup context as a query owner. No existing Client is adopted.
+    pub async fn connect<T>(config: &Config, connector: T) -> Result<Self, NativeDatabaseSetupError>
+    where
+        T: MakeTlsConnect<Socket>,
+        T::Stream: Send + 'static,
+    {
+        let connection = NativeConnection::connect(config, connector)
+            .await
+            .map_err(NativeDatabaseSetupError::Connect)?;
+        let mut setup = Self {
+            connection,
+            state: NativeDatabaseSetupState::Uncertain,
+        };
+        let _ = setup
+            .control(
+                NativeControl::Initialize,
+                "ROLLBACK; SET search_path = pg_catalog",
+            )
+            .await?;
+        Ok(setup)
+    }
+
+    pub fn state(&self) -> NativeDatabaseSetupState {
+        self.state
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_client(&self) -> &tokio_postgres::Client {
+        self.connection.client()
+    }
+
     /// Install or validate both reserved components in this physical database.
     /// The database and preloaded module must already exist. No repair occurs.
     pub async fn initialize_database(
@@ -168,7 +269,7 @@ impl NativeBackend {
         if let Err(original) = self.check_database_installation(action, &manifest).await {
             let cleanup = if matches!(
                 self.state,
-                NativeBackendState::Ready(
+                NativeDatabaseSetupState::Ready(
                     TransactionState::Transaction | TransactionState::FailedTransaction
                 )
             ) {
@@ -207,9 +308,8 @@ impl NativeBackend {
         );
         let pending = PendingSetup::new(&mut self.state, action);
         let events = self
-            .client
-            .as_ref()
-            .expect("live owner retains its client")
+            .connection
+            .client()
             .simple_query_events(&sql)
             .map_err(NativeDatabaseError::Submit)?;
         let row = match check_request(events, &["BEGIN", "DO"]).await {
@@ -221,15 +321,15 @@ impl NativeBackend {
                 {
                     match failure.ready_state() {
                         Some(TransactionState::FailedTransaction) => {
-                            NativeBackendState::Ready(TransactionState::FailedTransaction)
+                            NativeDatabaseSetupState::Ready(TransactionState::FailedTransaction)
                         }
                         Some(TransactionState::Idle) if failure.matched_events() == 0 => {
-                            NativeBackendState::Ready(TransactionState::Idle)
+                            NativeDatabaseSetupState::Ready(TransactionState::Idle)
                         }
-                        _ => NativeBackendState::Uncertain,
+                        _ => NativeDatabaseSetupState::Uncertain,
                     }
                 } else {
-                    NativeBackendState::Uncertain
+                    NativeDatabaseSetupState::Uncertain
                 };
                 pending.complete(state);
                 return Err(failure.into());
@@ -238,27 +338,122 @@ impl NativeBackend {
         // The exact complete request confirmed Transaction. Decoder failure
         // can therefore roll back safely, unlike a malformed wire sequence.
         let decoded = decode_catalog_observation(row.get(0).expect("checked non-NULL cell"), &[]);
-        pending.complete(NativeBackendState::Ready(TransactionState::Transaction));
+        pending.complete(NativeDatabaseSetupState::Ready(
+            TransactionState::Transaction,
+        ));
         let _ = decoded?;
         Ok(())
+    }
+
+    /// Stop and await only this setup owner's local driver. This does not
+    /// resolve an uncertain commit or certify server rollback.
+    pub async fn dispose(
+        mut self,
+    ) -> Result<NativeDatabaseSetupDisposed, NativeDatabaseSetupDisposeError> {
+        let previous_state = self.state;
+        self.connection
+            .dispose()
+            .await
+            .map(|()| NativeDatabaseSetupDisposed { previous_state })
+            .map_err(|source| NativeDatabaseSetupDisposeError {
+                previous_state,
+                source,
+            })
+    }
+
+    fn require(
+        &self,
+        operation: NativeDatabaseSetupOperation,
+        states: &[TransactionState],
+    ) -> Result<(), NativeDatabaseSetupError> {
+        if let NativeDatabaseSetupState::Ready(state) = self.state
+            && states.contains(&state)
+        {
+            Ok(())
+        } else {
+            Err(NativeDatabaseSetupError::InvalidState {
+                operation,
+                state: self.state,
+            })
+        }
+    }
+
+    pub(super) async fn commit(
+        &mut self,
+    ) -> Result<NativeControlCompletion, NativeDatabaseSetupError> {
+        self.require(
+            NativeDatabaseSetupOperation::Commit,
+            &[
+                TransactionState::Transaction,
+                TransactionState::FailedTransaction,
+            ],
+        )?;
+        self.control(NativeControl::Commit, "COMMIT").await
+    }
+
+    pub(super) async fn rollback(
+        &mut self,
+    ) -> Result<NativeControlCompletion, NativeDatabaseSetupError> {
+        self.require(
+            NativeDatabaseSetupOperation::Rollback,
+            &[
+                TransactionState::Transaction,
+                TransactionState::FailedTransaction,
+            ],
+        )?;
+        self.control(NativeControl::Rollback, "ROLLBACK").await
+    }
+
+    pub(super) async fn control(
+        &mut self,
+        control: NativeControl,
+        sql: &str,
+    ) -> Result<NativeControlCompletion, NativeDatabaseSetupError> {
+        let pending = PendingSetup::control(&mut self.state, control);
+        let events = self
+            .connection
+            .client()
+            .command_events(sql)
+            .map_err(|source| NativeDatabaseSetupError::Submit { control, source })?;
+        match check_native_control(control, events).await {
+            Ok(completion) => {
+                pending.complete(NativeDatabaseSetupState::Ready(completion.ready_state()));
+                Ok(completion)
+            }
+            Err(failure) => {
+                let state = confirmed_failure_state(&failure)
+                    .map(NativeDatabaseSetupState::Ready)
+                    .unwrap_or(NativeDatabaseSetupState::Uncertain);
+                pending.complete(state);
+                Err(failure.into())
+            }
+        }
     }
 }
 
 struct PendingSetup<'a> {
-    state: &'a mut NativeBackendState,
+    state: &'a mut NativeDatabaseSetupState,
     finished: bool,
 }
 
 impl<'a> PendingSetup<'a> {
-    fn new(state: &'a mut NativeBackendState, action: NativeDatabaseAction) -> Self {
-        *state = NativeBackendState::SettingUp(action);
+    fn new(state: &'a mut NativeDatabaseSetupState, action: NativeDatabaseAction) -> Self {
+        *state = NativeDatabaseSetupState::Checking(action);
         Self {
             state,
             finished: false,
         }
     }
 
-    fn complete(mut self, state: NativeBackendState) {
+    fn control(state: &'a mut NativeDatabaseSetupState, control: NativeControl) -> Self {
+        *state = NativeDatabaseSetupState::Controlling(control);
+        Self {
+            state,
+            finished: false,
+        }
+    }
+
+    fn complete(mut self, state: NativeDatabaseSetupState) {
         *self.state = state;
         self.finished = true;
     }
@@ -267,8 +462,49 @@ impl<'a> PendingSetup<'a> {
 impl Drop for PendingSetup<'_> {
     fn drop(&mut self) {
         if !self.finished {
-            *self.state = NativeBackendState::Uncertain;
+            *self.state = NativeDatabaseSetupState::Uncertain;
         }
+    }
+}
+
+/// Confirms local setup-driver termination, retaining the preceding state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
+pub struct NativeDatabaseSetupDisposed {
+    previous_state: NativeDatabaseSetupState,
+}
+
+impl NativeDatabaseSetupDisposed {
+    pub fn previous_state(self) -> NativeDatabaseSetupState {
+        self.previous_state
+    }
+}
+
+#[derive(Debug)]
+pub struct NativeDatabaseSetupDisposeError {
+    previous_state: NativeDatabaseSetupState,
+    source: DisposeSource,
+}
+
+impl NativeDatabaseSetupDisposeError {
+    pub fn previous_state(&self) -> NativeDatabaseSetupState {
+        self.previous_state
+    }
+}
+
+impl fmt::Display for NativeDatabaseSetupDisposeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "native setup driver failed during disposal: {}",
+            self.source.as_error()
+        )
+    }
+}
+
+impl StdError for NativeDatabaseSetupDisposeError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        Some(self.source.as_error())
     }
 }
 
@@ -278,11 +514,11 @@ mod tests {
 
     #[test]
     fn unfinished_setup_has_no_cleanup_receipt() {
-        let mut state = NativeBackendState::Ready(TransactionState::Idle);
+        let mut state = NativeDatabaseSetupState::Ready(TransactionState::Idle);
         drop(PendingSetup::new(
             &mut state,
             NativeDatabaseAction::Initialize,
         ));
-        assert_eq!(state, NativeBackendState::Uncertain);
+        assert_eq!(state, NativeDatabaseSetupState::Uncertain);
     }
 }

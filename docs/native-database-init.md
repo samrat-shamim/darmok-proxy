@@ -19,8 +19,12 @@ that the handler ran.
 `darmok init --database-url-env ENV_NAME` explicitly installs or validates
 both components in one owned transaction. `darmok verify` validates both
 without creation. The library entry points are `initialize_database` and
-`verify_database`. The old schema-only entry points and nested CLI command are
-removed, with no aliases or migration machinery.
+`verify_database` on `NativeDatabaseSetup`. This dedicated owner retains its
+own fresh client and driver, setup state, control errors and disposal receipts.
+`NativeBackend` has no setup methods, setup states or setup operations. The
+setup owner has no query scopes and cannot be converted into a query backend;
+dispose it, then connect a fresh `NativeBackend` for query work. Neither owner
+can adopt an existing client. See [private command history](native-command-history.md).
 
 The physical database must already exist. PostgreSQL 17/18, UTF8, installed
 extension files and an already preloaded `darmok_server` module are prerequisites.
@@ -91,7 +95,8 @@ successful repeated setup and verification.
 
 ## Failure and ownership
 
-Setup has its own in-flight owner state. Dropping a polled operation before a
+Setup has its own `NativeDatabaseSetupState`, independent of the query owner's
+lifecycle. Dropping a polled operation before a
 confirmed completion leaves the owner uncertain; no asynchronous cleanup is
 invented. A pre-submission invalid state leaves existing caller work unchanged.
 
@@ -113,6 +118,9 @@ rules; an uncertain commit is never reported as a rollback or setup success.
 ## Cost and required verification
 
 Setup uses two operation round trips, placing response validation before commit.
+The transition to query work opens a different connection with its own driver
+and one fixed initialization request. This adds connection/startup cost at the
+setup boundary, with no additional request or allocation per query statement.
 SQL/response allocations occur
 once per setup, not per row. The empty native request does not scan relation
 facts. Native mechanism sources and build definitions need no change. The packaged

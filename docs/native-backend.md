@@ -25,6 +25,16 @@ initialization failure is an error; the uncertain owner is dropped and is not
 returned to its caller. Drop requests local driver abortion without awaiting
 termination; construction failure supplies no disposal or server rollback receipt.
 
+Explicit database initialization and verification belong to a separate
+`NativeDatabaseSetup` owner. Query owners cannot submit either manifest, and
+setup owners cannot open a query scope or transfer their connection to a query
+owner. Both use a private connection mechanism for client/driver ownership and
+disposal, without sharing a connection or command history. Starting query work
+after setup requires a fresh connection. This removes setup's procedural
+commands from the query owner's post-startup history; it does not prove the
+connector's complete native startup or callback footprint. Those remaining
+gates are recorded in [private command history](native-command-history.md).
+
 The owner is neither clonable nor shareable as an independent SQL handle.
 Transaction methods require a mutable borrow. Its Debug output contains the
 lifecycle state only. The connector argument is forwarded unchanged; this work
@@ -122,7 +132,7 @@ by itself is not statement admission or output validation.
 
 `dispose` consumes the owner, drops its private client, aborts and awaits its
 local driver, and returns the preceding state. Driver errors retain their
-native or task error source. If the disposal future is stopped, owner Drop
+native or task error source. If the disposal future is stopped, private connection Drop
 still aborts the driver; it cannot detach a running driver task. Ordinary owner
 Drop also aborts the driver without awaiting it or issuing SQL.
 
