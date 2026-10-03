@@ -4775,3 +4775,24 @@ mechanism inputs remain unchanged. Current-revision checks and independent
 review are pending. The native entry/bootstrap/whole-statement, serving and
 release gates, issues46/15 and the overall goal remain open. Concurrent native
 two-phase transactions remain required; all standing exclusions remain in force.
+
+The implementation leaf is `c5fa88ef8d9d8661202c8f6901e918e7c3233436`, tree
+`b3ec4c989e96089478e7e24e4db9cb149086dec8`, parent4d2. Root07 formatting,
+08 workspace Clippy all targets/features with warnings denied,10 offline tests,
+11 required suites and13 repository checks actually exit0. Offline tests report
+1691 passes, zero failures and88 ignored database/other fixtures across41 result
+groups; the database fixtures are required separately. Each PG17.11/18.6 matrix
+runs 77 owner,10 BigDecimal transaction,10 BigDecimal frontend and4 CLI process
+fixtures with zero failures/ignored. The new ordinary fixture proves a fresh
+query session after awaited setup disposal, not native entry admission.
+The eight-suite facts SHA256 is
+`e6b30a0196bee7d1900527c7ce3a4f56d0e6d7b1326f796871a9e720e97e678b`.
+
+Root09/12 read-only profile audits each run48 actual successful readers. Their
+facts SHA256 values are `f5ea9a66c53715724602ff73c853f2c0d7443302626f6c9b34d19913e60a4f05`
+and `16a63652b50cd5667bd0a4b209a82d2f4dbecb0541198a26f8871150ca165329`.
+All eight identities, start times, restart counts, settings and library/header
+bytes agree before/after; no fixture databases remain. The 22 native inputs
+are unchanged. This is current Rust/CLI validation against the existing native
+packages, not a new native build, full startup proof or release acceptance.
+Independent review is pending. All remaining gates and exclusions still apply.

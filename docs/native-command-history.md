@@ -1,6 +1,6 @@
 # Private command history and separate connection owners
 
-Status: owner separation implemented; current-revision validation and
+Status: owner separation implemented and locally verified at c5fa88e;
 independent review pending. Native entry and bootstrap admission remain open.
 
 ## Boundary and rationale
@@ -34,6 +34,25 @@ checking and disposal behavior. No authentication, TLS or credential behavior
 is added. This costs a second connection/startup at the setup-to-query boundary;
 there is no additional per-statement round trip, allocation or cache mechanism.
 No measured latency or memory acceptance is inferred.
+
+Current verification at `c5fa88ef8d9d8661202c8f6901e918e7c3233436` passes
+formatting, workspace Clippy with all targets/features and warnings denied,
+repository checks and offline workspace tests. Offline results include the
+three new public API compile-fail examples. Required local PG17.11/18.6 runs
+each pass 77 native-owner fixtures, ten BigDecimal transaction fixtures, ten
+BigDecimal frontend fixtures and four actual CLI process fixtures, with no
+failures or ignored tests in those required runs. These are suite invocations,
+including feature variants, not 101 distinct behavioral cases per major.
+
+The new ordinary owner fixture initializes and verifies a disposable database,
+creates setup-only temporary/session state through private fixture access,
+awaits setup disposal, connects a fresh query owner and observes that the setup
+state is absent while committed compatibility functions remain available.
+Fixture SQL is not a public query execution API or native admission proof.
+Read-only before/after audits observe identical identities, start times, restart
+counts, settings and native library/header bytes on all eight existing profiles,
+with no residual fixture databases. All 22 native inputs remain unchanged;
+there is no new native package build. Independent acceptance remains required.
 
 ## Targeted native source findings
 
