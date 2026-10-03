@@ -4623,7 +4623,7 @@ implementation/runtime/full statement and release gates OPEN.
 Its root10 investigation binding actually exits0:349 versus348 opaque Git
 entries, one new and two modified unpackaged docs,346 unchanged prior entries,
 22 unchanged native inputs and the unchanged tested Rust fixture. Binding facts
-SHA256 is `e0ec5abba1cb5698d5fd306335845255f96f2ec400cc56416c521536e2709e2`.
+SHA256 is `e0ec5abba1cb5698d5fd306335845255f96f2ecf400cc56416c521536e2709e2`.
 Root11 boundary check actually exits0 for9 packages.
 
 Independent review at `logs/review-native-catalog-bootstrap-0b39063-investigation-v1`
