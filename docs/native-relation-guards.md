@@ -141,7 +141,9 @@ sampler observes ALREADY_HELD/CLEAR by acquiring and releasing one extra native
 increment, without dispatching or marking. It checks multiple modes, parent
 counts surviving child rollback and clear reset after the final count. A warm
 builtin heap descriptor is closed with AccessShareLock before prepared AX;
-both prepared completion outcomes must refresh current shape outside exclusion
+prepared commit must consume target invalidations and refresh current shape;
+prepared abort does not publish that private definition and may consume no
+target messages. Both outcomes must return the expected current shape outside exclusion
 with first-unselected and established repeatable-read flags unchanged. A passive
 test callback records owner/fence observations during acquisition. OIDs/setup
 come from a distinct observer; no reader SELECT selects the unselected view.

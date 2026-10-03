@@ -340,8 +340,12 @@ async fn prepared_completion_refreshes_warm_builtin_cache_without_selecting_data
             waiting.await.unwrap();
             let state = status(&reader).await;
             check_cache_acquisition(&state, established);
-            assert!(state["acquire_invalidations"].as_u64().unwrap() > 0, "{state}");
-            assert!(state["watched_callbacks"].as_u64().unwrap() > 0, "{state}");
+            if ending == "COMMIT" {
+                assert!(state["acquire_invalidations"].as_u64().unwrap() > 0, "{state}");
+                assert!(state["watched_callbacks"].as_u64().unwrap() > 0, "{state}");
+            }
+            // Native prepared abort never publishes the private definition;
+            // target SI need not exist. Unrelated messages may still arrive.
             assert_eq!(clear_results(&reader, &requests).await, vec!["already_clear"; 4]);
             if ending == "COMMIT" { attributes += 1; }
             command(&reader, &format!("relation_warm:{low}/1")).await.unwrap();

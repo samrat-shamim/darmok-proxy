@@ -2614,3 +2614,36 @@ mutate or issue SQL. Native clear is per exact mode and may skip SI processing;
 it is not global freshness, full closure, callback neutrality or preparation.
 Fresh strict product/probe images and affected PG17/18 fixtures remain required.
 All broader gates and standing exclusions remain unchanged; the goal is active.
+
+### Prepared-abort fixture oracle correction
+
+At draft `e6fce687a9955e723bc3eb2eea0c0decd1479375`, four strict native
+product/probe builds and Rust native-package compilation are actual0. Eight
+fresh profiles bind all 16 native inputs; 112 setup actions are actual0.
+The ordinary PG17 six-fixture group is actual101: five passed and the warm
+fixture failed unconditional positive SI/callback assertions after its first
+prepared ROLLBACK case. Its earlier prepared COMMIT case passed. The observed
+rollback had zero acquisition invalidations/callbacks, restored owner, unchanged
+first-unselected flags and the previously committed warmed shape. This is a
+fixture-oracle blocker, not native component acceptance or an established
+production defect. No error was injected, no test was ignored, and the original
+raw receipt remains under `native-cache-clearing-e6fce68-08-relations17`.
+
+Paired native `REL_17_11`/`REL_18_6` `twophase.c:1621..1628` sends saved SI only
+inside `if (isCommit)`. A prepared abort never publishes that private definition.
+Corrected immutable proposal v4 SHA256 is
+`425ea7ce92d700e0844ccbcab72e441f5ee33424deb369a870c13f79b2610cac`.
+The separate finish-source proof has facts SHA256
+`62d602289195a46035739e0598175b707612c48ef949011183f592d4ef1550ac`,
+three-file seal `55101903db5edc84f042fbc36d3cb82cd364636f0e691eafc16502cca928cf8f`
+and actual0 outer `native-cache-clearing-e6fce68-09-finish-primary`.
+The independent source reviewer identified the same fixture blocker against e6.
+
+The corrected Rust oracle requires positive target invalidation/callback
+observations for COMMIT only. Both outcomes still require exact native clear,
+owner/snapshot/no-exclusion wait completion and the expected current shape.
+Rollback need not have zero global SI because unrelated messages can arrive.
+No synthetic callback or product fallback is introduced. Only Rust/docs change;
+all 16 native inputs must rebind exactly before reusing fresh e6 images/profiles.
+Corrected-source runtime and independent closure/evidence acceptance remain
+required. All broader gates and exclusions are unchanged.
