@@ -191,6 +191,11 @@ cache refresh and every descriptor open remain outside raw/S, under the explicit
 continuous builtin callback profile. No catalog snapshot may survive a new
 physical guard wait, and all waits must precede S.
 
+The [metadata bootstrap follow-up](native-catalog-bootstrap.md) compares exact
+guard costs and follows global/local option and native rebuild paths. Its
+preferred complete-options direction remains conditional on registry/provider,
+entered-cache/owner and writer proof; it closes no bootstrap or runtime gate.
+
 The bootstrap gate remains OPEN until paired source proof covers all admitted
 writers, invalidation rebuilds and cold paths, and explains which exact guards
 keep the pre-open facts valid. In particular, supported ordinary in-place hints
