@@ -1,7 +1,7 @@
 # Explicit database initialization
 
-Status: proposed combined setup boundary; implementation and verification are
-pending. This extends the functional [schema contract](native-schema.md) without
+Status: independently reviewed combined setup design; implementation and
+runtime verification are pending. This extends the functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
 ## Problem and selected behavior
@@ -118,7 +118,13 @@ postcreation manifest mismatch and 810-case helper corpus. Actual CLI children
 check both artifacts, selected independent databases, output/exit status and
 local disposal. The existing unpreloaded profile supplies an ordinary unsupported
 installation boundary: placeholder output must fail decoding before commit and
-leave created artifacts uncommitted. Offline sequence/decoder checks cover
+leave created artifacts uncommitted. A second cooperating owner must positively observe the advisory lock after the
+checked SHOW and before the separate COMMIT, then observe both committed
+components. The fresh unpreloaded-database fixture must retain the decoding
+failure and actual rollback receipt and prove both namespaces and the extension
+absent afterward. A public function with an ordinary DEPENDS ON EXTENSION
+dependency must be accepted, while added extension members and extra objects in
+the reserved namespace must be rejected. Offline sequence/decoder checks cover
 malformed replies without introducing a native forced-error experiment.
 
 Record exact source, native-input/profile reuse, commands, original outcomes and
@@ -133,5 +139,14 @@ paired pinned [`pg_extension.h`](https://github.com/postgres/postgres/blob/REL_1
 and [`InsertExtensionTuple`](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/commands/extension.c).
 The paired source/HTML capture is `native-database-init-primary-v2`, manifest
 SHA256 `8bf7fdfae4921c30896a9e693715db979a1ed697effbab74fff50407e11431a5`
-and seal SHA256 `1fad3314e253f7987c39fe245b06d4bfb3155450ab347119559fe8a4e02073d5`.
-This proves saved provenance, not a new native build or binary identity.
+and completed original seal SHA256
+`1fad3314e253f7987c39fe245b06d4bfb3155450ab347119559fe8a4e02073d5`.
+That original seal is invalid because its self entry records an empty file; it
+remains preserved with review finding P1 open at the original design revision.
+The distinct nonrecursive correction `native-database-init-primary-v3` verifies
+the same six sources and seven nonself members. Its 11-member seal SHA256 is
+`1aad1279e0b23ffadbbfe7170747a3ec98e86200b58632b566bf3d12e605028c`,
+with correction facts SHA256
+`6cebe6b5f618eb472b23551f61844b2938ffa9c0f85b6133682e774db3d3d8a9`.
+This proves saved HTTP source provenance, not Git blob identity, a new native
+build or binary identity.

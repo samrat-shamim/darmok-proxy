@@ -3900,3 +3900,43 @@ EXTENSION pages in `logs/native-database-init-primary-v2`. Its manifest/seal
 hashes are recorded in the design. This is functional provenance only. No new
 native profile, native build, forced-error experiment, security work, hosted CI
 poll, account action or release publication occurs here.
+
+### Combined database setup design review and provenance correction
+
+The independent review at clean design head
+`f01e2aaa67fe2f5f251f45e2b8de62b35c078ac2` / tree
+`7b921f589c304c5688e2bb7657eaa446ba669e2e` conditionally recommends
+implementation with no architectural blocker. It does not accept implementation
+or runtime. `logs/review-native-database-init-f01e2aa-design-v1` contains report
+SHA256 `a9b15f8d68233c1b318105937ff4a493d14b14e4188970f292c894d196818a6a`,
+facts `1ae6f8e4731c74af78ec3ec480c33ddadd8db8831a25f3089feda2211fc20db8`,
+commands `6838353d6a72a5394d63aacf10f9f3b79f2e2b2e4c882ae87e6d08f2fb68d052`,
+and 217-member nonrecursive seal
+`5e4b3130ba54971636e6bb65e82526f35fce61d45855aa1962ce38932d332cc1`.
+Actual finalization38 and independent post39 both exit0; their receipt hashes
+are `70cdc0068bc43fe98e48a83fed7137f5c0bc2e79d02c269a4f00aa1ae2d10306`
+and `26b153815a915ac46b7bdba4a30c7beb4870df65139eea5762cf82f42c5f189d`.
+Passive reader20 wrong-path failure, reader31's real primary self-seal failure,
+and finalizer-builder36 quoting failure remain actual1. Corrected readers and
+final/post checks do not relabel them. No runtime command ran.
+
+P1 remains OPEN at the original f01 design: root02's actual0 HTTP capture
+created its seal file before constructing members, so it recorded itself as
+empty. All six sources and seven nonself members are valid. The original
+helper, files, seal and exit remain unchanged. Root03 exits0, rehashing all217
+review members plus separate companions (233 unique paths), and constructs a
+distinct 11-member primary-v3 seal with the manifest evaluated before opening
+the seal. Corrected seal/facts hashes are
+`1aad1279e0b23ffadbbfe7170747a3ec98e86200b58632b566bf3d12e605028c` and
+`6cebe6b5f618eb472b23551f61844b2938ffa9c0f85b6133682e774db3d3d8a9`.
+This corrects saved provenance only, without a new HTTP capture, Git-blob
+identity claim, native build or runtime result. Root04 exits0 and creates this
+separate docs correction worktree; the reviewed f01 worktree remains frozen.
+
+The design explicitly carries all three mandatory ordinary coverage conditions:
+positive advisory-lock observation after checked SHOW before COMMIT, atomic
+rollback of both new components after unpreloaded placeholder decoding failure,
+and acceptance of nonmembership application dependencies while rejecting extra
+extension members and reserved-namespace objects. Bounded independent P1
+readback is pending at this correction leaf. Implementation, runtime acceptance,
+M2/M3, issues46/15 and the overall goal remain OPEN.
