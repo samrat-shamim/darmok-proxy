@@ -4369,3 +4369,55 @@ is required before normal PR merge. Full transitive descriptors/providers/defaul
 dependencies/constraints/effects, neutral admission/reanalysis, immutable IR,
 row execution, MySQL locking, performance, serving and release remain OPEN;
 issues46/15 and the overall goal stay OPEN. Standing exclusions remain in force.
+
+### Variable catalog payload implementation: independent acceptance
+
+Independent implementation review accepted the finite builtin-profile component
+at `82c72068716545da8cb6dc964ee6ea8238b5a4c6`, tree
+`bf81af33018a08b30d0f75621e6e40031d59a502`. That revision differs from tested
+ed847 only in three unpackaged documents; all344 other tracked entries, the
+Rust fixtures and all22 native build inputs are byte-identical. It does not
+relocate runtime results from ed847 or native package results from c434.
+
+C1 closes only for this implementation: fresh B class/attribute/physical-NULL
+facts and exact owned AS references admit selected pinned metadata TOAST before
+its descriptor is opened. The critical descriptors must already be initialized
+within the continuous builtin bootstrap profile. Post-open validation is
+supplementary and does not admit arbitrary catalog/provider histories. Review
+also checked owned-carrier bounds and decoder lengths, all three snapshot
+lifetimes, exact mode/provenance unions, error ownership, independent native
+oracles, paired package/profile bindings and retained failures.
+
+The review is `logs/review-native-variable-payloads-82c7206-implementation-v1`.
+Its report/facts/command-manifest/1993-member nonself seal SHA256 values are:
+
+- `96a95b453b9fcf1c1cbbe4ef7300a3abc0fde856df8d1881583bdee3179f0624`
+- `3878f03471ceccaf643144cf843ae244cc7794a0e94176e22632bf97270f2662`
+- `4980a99cb96750adf53fb63857b721225c2be1cef1044b9c91776cf063eccf72`
+- `826eaa856216599420190f8c69ac520318afed063bc161e2228e31173f185913`
+
+Actual final31/post32 exits are0; receipt hashes are
+`76a7178e06bf41ae68faa73854123f2a1621be68f398963a565b91dff2942640`
+and `5663665aaef22736bf77f0dd220d0d3f1552b5df7a8368cc6049752f937eed42`.
+Review reader20's wrong-path exit1 and audit28's overstrict phase-two TOAST-heap
+assertion exit1 remain preserved; distinct corrected readers21/22 and audit29
+exit0. These are reader/audit failures, not native runtime failures. Phase two
+legitimately selects only one metadata TOAST heap. Root45 exits0 rehashing2010
+unique fixed review/companion paths; its facts SHA256 is
+`9ab247519c01719df12af677d94ec297839558ebda82f8163a92889469442513`.
+
+D1 remained open on the frozen82 documentation: ten catalog scans described
+the prior mechanism, not the current implementation. The later documentation
+leaf labels that count historical and updates these status records. Its exact
+leaf and independent D1 readback are separate merge evidence and do not
+re-certify executable code. The original implementation/evidence files stay
+frozen; the correction changes only three unpackaged documents.
+
+Acceptance does not supply runtime witnesses for malformed carriers, forced
+errors, arbitrary chunk order or shared exact-pointer groups. Those branches
+received source review; ordinary fixtures prove their stated finite cases.
+Full transitive descriptors/providers/default dependencies/constraints/effects,
+neutral statement admission, immutable IR, row execution, MySQL locking, complete
+performance, serving and release remain OPEN. Issues46/15 and the overall goal
+stay OPEN. Concurrent native two-phase transactions remain supported; the
+standing work exclusions remain in force.

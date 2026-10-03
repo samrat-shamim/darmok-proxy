@@ -2,7 +2,8 @@
 
 Status: paired strict product/probe builds and required local PostgreSQL
 17.11/18.6 suites pass for the private C implementation and bounded ordinary
-fixtures. Independent implementation acceptance remains pending. This is the contract for the private
+fixtures. Independent implementation review accepted the finite builtin profile
+at `82c72068716545da8cb6dc964ee6ea8238b5a4c6`. This is the contract for the private
 [heap-storage invocation](native-heap-storage.md). Source bodies have been
 checked for PostgreSQL 17.11/18.6. The [release ledger](release-plan.md) binds the
 tested source, actual packages, failures and finite runtime results; full semantic
@@ -325,7 +326,7 @@ publication. No codec, expression parser or provider is part of normalization.
 ## Cost and implementation gates
 
 Each successful invocation makes three full six-catalog observations: eighteen
-catalog scans instead of the current ten scans over five catalogs. Namespace/class/
+catalog scans compared with the historical ten scans over five catalogs. Namespace/class/
 index maps still scale with catalog size. The pre-open profile copies use those
 same scans and add bounded selected class/attribute/presence records, not a fourth
 observation. Selected attrdef/type payload copying

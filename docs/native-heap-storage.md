@@ -12,9 +12,11 @@ within that finite profile. See
 remain open. Concurrent native PostgreSQL two-phase transactions
 remain supported; disabling them is not a serving requirement.
 
-The current variable-payload implementation passes paired local package/runtime
-verification; independent implementation acceptance is pending. Historical acceptance above does not certify
-this changed native code. Its full source/carrier and pre-open descriptor contract
+The variable-payload implementation passed paired local package/runtime
+verification and independent implementation review at
+`82c72068716545da8cb6dc964ee6ea8238b5a4c6`, within the finite builtin profile.
+The earlier component reviews above do not certify this changed native code.
+Its full source/carrier and pre-open descriptor contract
 is [native-variable-catalog-payloads.md](native-variable-catalog-payloads.md).
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
