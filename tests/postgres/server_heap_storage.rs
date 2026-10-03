@@ -484,10 +484,9 @@ async fn check_graph_modes(
     let references = expected_facts
         .iter()
         .flat_map(|fact| {
-            (1..=3).filter_map(move |mode| {
-                (fact["mode_mask"].as_u64().unwrap() & (1 << mode) != 0)
-                    .then(|| json!([fact["oid"], mode]))
-            })
+            (1..=3)
+                .filter(move |&mode| fact["mode_mask"].as_u64().unwrap() & (1 << mode) != 0)
+                .map(move |mode| json!([fact["oid"], mode]))
         })
         .collect::<Vec<_>>();
     assert_eq!(metadata["references"], json!(references));
@@ -764,10 +763,9 @@ async fn owned_defaults_cover_actual_native_carriers_and_independent_type_presen
                 assert_eq!(empty[1]["present"],true);
                 assert_eq!(empty[1]["carrier_kind"],"s");
                 assert_eq!(empty[1]["image_bytes"],4);
-                for name in ["absent"] {
-                    assert_eq!(type_values(name).len(),2);
-                    assert!(type_values(name).iter().all(|value|value["present"]==false));
-                }
+                let absent = type_values("absent");
+                assert_eq!(absent.len(),2);
+                assert!(absent.iter().all(|value|value["present"]==false));
                 assert!(type_values("inherited").iter().all(|value|value["present"]==true));
                 for name in ["dp","dl"] {
                     assert!(type_values(name).iter().all(|value|value["present"]==true && value["carrier_kind"]=="e"));
