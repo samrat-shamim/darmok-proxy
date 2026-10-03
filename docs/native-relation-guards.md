@@ -1,8 +1,8 @@
 # Private native relation references
 
-Status: the earlier finite private reference-owner was verified on PostgreSQL
-17.11/18.6 at `c0438c7882a197227c147fe4b86e2c67bddbdd5d`.
-The native cache-clearing change described below is under verification.
+Status: finite private reference ownership and native exact-mode cache clearing
+were verified on PostgreSQL 17.11/18.6 at
+`e829f50745ea9eb2de1531444c2e04fb9c2eac81`.
 Complete physical dependency closure and application statement admission remain
 unaccepted; the reference primitive alone does not establish either.
 Issues46/15 remain open. Concurrent native PostgreSQL two-phase transactions
@@ -109,46 +109,61 @@ contention and waits remain. Retain frees the list but repeated retained scopes
 may add native counts until transaction cleanup. No throughput or allocation
 claim follows from the design.
 
-The earlier separate test-only probe may retain a token across bounded SET/SHOW requests
-to observe native queues/cleanup. Product artifacts contain no probe. Four
+The separate test-only probe may retain a token across bounded SET/SHOW requests
+to observe native queues/cleanup. Product artifacts contain no probe. Six
 ordinary fixtures cover exact shared/local tags and modes, borrowed same-owner
 and parent references, copied input, stale tokens, parent/child promotion and
-rollback, scoped ERROR cleanup and native retained commit/rollback/prepare.
-Prepared DDL completion must unblock ordered physical acquisition for both
-outcomes while observers see neither semantic nor raw/publication references.
-Scoped caller ERROR after completed acquisition does not certify the pending
-native-wait ERROR branch. No forced-error experiment is claimed or required for
-its pinned native-source cleanup rule. Native session/transaction overlap
-restrictions at PREPARE remain native errors, not an all-configurations success
-claim. The four fixtures passed on both majors, and all 135 package tests plus
-three private-owner discovery tests passed on each. Current images bind all
-16 native inputs; eight profiles are healthy with no prepared/coordination/mock
-relation references after the fixtures. Missing required dependencies fail.
+rollback, scoped completed-acquisition ERROR cleanup, retained native
+commit/rollback/prepare and ordered prepared-DDL waits. Observers see none of
+the three module tags while physical acquisition waits; normal native prepared
+commit and rollback unblock it.
 
-The earlier bounded cost check sends 32 warmup and 128 measured scopes, with three
-references per scope through one in-container TCP-loopback psql connection.
-PG17 p50/p95/max is 15000/37000/46000 ns; PG18 is 10000/23000/90000 ns, with
-1000 ns psql display quantization. Each scope uses a volatile automatic token
-and releases its native references. Final status has no owned token and false
-snapshot flags; it is not a status observation for every sample. Protocol,
-utility, wrapper and native-owner allocation costs are included. There is no
-baseline comparison, isolated C-call, throughput, contention, descriptor,
-preparation, executor, recovery or full-cache acceptance. See the exact command,
-environment and immutable evidence checkpoint in [release-plan.md](release-plan.md).
-
-Two additional ordinary fixtures are under verification. An exact-owned native
-sampler observes ALREADY_HELD/CLEAR by acquiring and releasing one extra native
-increment, without dispatching or marking. It checks multiple modes, parent
-counts surviving child rollback and clear reset after the final count. A warm
-builtin heap descriptor is closed with AccessShareLock before prepared AX;
-prepared commit must consume target invalidations and refresh current shape;
-prepared abort does not publish that private definition and may consume no
-target messages. Both outcomes must return the expected current shape outside exclusion
-with first-unselected and established repeatable-read flags unchanged. A passive
-test callback records owner/fence observations during acquisition. OIDs/setup
+An exact-owned sampler acquires and releases one extra native increment to
+observe ALREADY_HELD/CLEAR, without dispatching SI or marking clear. It checks
+multiple modes, parent counts surviving child rollback, and clear reset after
+the final count. A warm builtin heap descriptor is closed with AccessShareLock
+before prepared AX. Prepared commit consumes target invalidations and refreshes
+current shape; prepared abort never publishes its private definition and may
+consume no target messages. Both outcomes return the expected current shape
+outside exclusion with first-unselected and established repeatable-read flags
+unchanged. A passive callback records owner/fence observations. Setup and OIDs
 come from a distinct observer; no reader SELECT selects the unselected view.
-These fixtures do not inject native wait errors or certify arbitrary callbacks.
-Earlier results above do not certify these changed native inputs.
+These observations remain conditional on the continuous builtin profile.
+
+All six fixtures, all 137 native package tests and three private-owner discovery
+tests passed on each major at `e829f507`. Four strict product/probe images were
+built at `e6fce687`; the three-file Rust/docs oracle correction changes none of
+the 16 native inputs. Exact input, image, library, LLVM and header bindings were
+rechecked before corrected tests and after all checks. Eight profiles remain
+healthy, with zero prepared transactions, module/mock references and real
+relation-fixture tables. Primary and ordered profiles have native two-phase
+transactions enabled with a maximum of ten; the additional zero case is a
+fixture, not a serving requirement. Formatting, repository boundaries and
+strict workspace/connector Clippy pass.
+
+The first PG17 fixture run failed an incorrect assertion that prepared rollback
+must publish target invalidations. Paired native source proves commit-only saved
+SI publication; the corrected oracle retains both outcomes' shape, exact-mode,
+owner and snapshot checks without requiring zero unrelated messages. A separate
+owner-test invocation failed because its required unpreloaded-profile setting
+was absent, then passed with the corrected command. Both actual101 receipts
+remain failures in the historical ledger. Scoped caller ERROR does not certify
+pending native-wait or callback ERROR; those cleanup rules are source proofs,
+without a forced-error experiment. Native mixed session/transaction PREPARE
+restrictions remain native errors, not guaranteed success in every configuration.
+
+The current bounded cost check sends 32 warmup and 128 measured scopes, with
+three references per scope through one in-container TCP-loopback psql connection.
+PG17 p50/p95/max is 11000/25000/47000 ns; PG18 is 13000/26000/86000 ns, with
+1000 ns display quantization. Each scope uses a volatile automatic token and
+releases its references. One final 16-field status has no owned token, a restored
+caller owner and false snapshot flags; it does not observe every sample.
+Protocol, utility, wrapper, passive callback instrumentation, native SI and owner
+allocation costs are included. There is no baseline, isolated C-call, throughput,
+contention, preparation, executor, recovery or full-cache acceptance. No current
+full workspace test run is claimed. Earlier `c0438c7` ownership results remain
+historical. Exact commands, source reviews, failures and immutable evidence
+are recorded in [release-plan.md](release-plan.md).
 
 Full transitive/catalog/application/index/TOAST/storage/name/negative/overload
 closure, globally fresh facts, neutral descriptor preparation, callback/provider

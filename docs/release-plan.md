@@ -2647,3 +2647,113 @@ No synthetic callback or product fallback is introduced. Only Rust/docs change;
 all 16 native inputs must rebind exactly before reusing fresh e6 images/profiles.
 Corrected-source runtime and independent closure/evidence acceptance remain
 required. All broader gates and exclusions are unchanged.
+
+### Verified native exact-mode cache clearing
+
+Tested corrected source is `e829f50745ea9eb2de1531444c2e04fb9c2eac81`, tree
+`bdf9e5689dcfa1355bd08807c6b6be48aa600990`, on an isolated feature branch from
+merged main `296667c48e3b412e172359047ce8ebf5645761ae`. Native relation acquisition
+delegates each copied ordered declaration to `LockRelationOid` under the recorded
+transaction owner. Native core owns SI recursion and exact per-mode clear state.
+The phase rejects mutating module reentry before any module publication exclusion.
+A native grant or subsequent cache-refresh ERROR is abort-required, without
+decrementing a guessed partial list. Already-clear mode state does not establish
+globally fresh catalog facts or complete statement protection.
+
+| Current check | Observed result |
+| --- | --- |
+| Strict product/probe PG17 and PG18 builds at `e6fce687` | All four actual0, native GCC/shared and LLVM inputs compiled |
+| Corrected relation fixtures at `e829f507` | Six passed, zero failed/ignored on each major |
+| Complete native package at `e829f507` | 137 passed, zero failed/ignored across 18 summaries on each major |
+| Private-owner discovery at `e829f507` | Three passed, zero failed/ignored, 86 filtered on each major |
+| Formatting, nine-package repository boundaries, strict workspace and connector Clippy | Actual0 |
+| Setup, exact-input rebind and final environment | 112/67/67 nested actions, all actual0; eight healthy profiles |
+| Three-reference bounded costs | Actual0, 32 warmups plus 128 measured scopes per major |
+
+The native builds bind the same 16 product/probe inputs at both source revisions;
+only three Rust/docs entries change in the corrected commit. Four fresh images
+have IDs `9e8742ae9731915053fd26ba8697e235ccd8a632f95b93298d658ffc217ba5d5`
+(PG17 product), `82f6d54c545f1c741de70eec339a729452cbc62fa631b80b561a1d12f8951a17`
+(PG17 probe), `f8cd4300fee793f53d4eb758d80cd3cffb256d237aae578a29b19fd8e0db990d`
+(PG18 product), and `d69bf5eb6dc4d51fa8b04774aacf6073466824d0762063e03e7d70a158d57032`
+(PG18 probe). Pinned base digests are
+`b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24`
+and `77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873`.
+Rust/Cargo 1.96.0 runs on macOS 26.0.1 arm64; native servers are Linux arm64/musl
+PostgreSQL 17.11/18.6. All Cargo/helper chains retain the scoped Rustup and
+target paths. Fifteen recorded Cargo/Cargo-spawning intervals do not overlap.
+
+Profiles `darmok-cache-clearing-{17|18}-e6fce68-*-v1` use ports32839..32846,
+with exact unchanged library, LLVM, installed header and image identities.
+Primary/ordered and unpreloaded product profiles use native maximum ten;
+the additional zero profile is not a v0.1 requirement. Product negative profiles
+contain no probe. The final environment facts SHA256 is
+`000c37e97924cb42e90a1ae7c80112cc513c2943b0c2e4f195f509932ea5ce4c`:
+all eight healthy profiles have zero prepared transactions, module/mock relation
+references and real relation-fixture tables. No profile was stopped, restarted
+or signalled; existing fresh native images were reused only after exact rebind.
+
+The six fixtures retain the four ownership cases and add native exact-mode
+clear/borrowed-count behavior plus warm builtin relcache completion. The sampler
+does not dispatch SI or mark clear. The warm descriptor releases its own AS
+increment before prepared AX, observer-only setup avoids selecting an early
+reader data view, and both normal prepared outcomes unblock acquisition without
+any module tag. Only COMMIT requires positive target SI/callback observations;
+both outcomes require current shape, exact clear state, restored owner and
+unchanged first-unselected/established flags. Passive callbacks neither mutate
+nor issue SQL. Continuous builtin caller restrictions still apply.
+
+Original source review preserves F1/P2 OPEN at `e6fce687`, with report SHA256
+`2f009650a2be907be170ff9f10ca1020b3937f74e3c8c9080af23345d195a445`,
+176-file seal `80bb736a3b7664570580671a157cb9aed5a62f796bb3868f23664223c6889f53`,
+separate observed actual0 invocation
+`bc3b77479c5439eb5ad02b6651fd3c6f7a73f0b3fd19f75f9ed855991d9bafa5`.
+Corrected-source closure under
+`.darmok-work/logs/review-native-cache-clearing-e829f50-closure-v1` closes F1
+only at `e829f507`, with report SHA256
+`1b843b1331c23d23002b77159d544bcae5ac4138f906958eebf4f3b364d07297`,
+119-file seal `605e645eb094fd3a3c4f27efc9b81720f7edd0a8490c71a3249dadf96e850b92`,
+separate observed actual0 invocation
+`fcde85b8eef58bd76bad3b8dbbba96467f0dc8f0ef09acebaf1f685a20e6d275`.
+Its 36 passive readers are actual0; shell-glob and pre-child builder failures
+remain separate. The earlier source review's failed filename/builder/recorder
+attempts and all design/primary seals remain unchanged. Neither reviewer ran
+native runtime or Cargo checks.
+
+The first corrected-source owner17 command is also actual101: two passed and
+the third failed because `DARMOK_TEST_UNPRELOADED_DATABASE_URL` was omitted.
+Its failure occurs before that fixture connects. `15-owner17-v2` supplies the
+existing unpreloaded profile and passes all three; owner18 passes likewise.
+The original `08-relations17` actual101 and this `15-owner17` actual101 remain
+raw failures, rather than being recertified. No product fallback or test ignore
+was added. Three passive root inspection/navigation schema errors are documented
+separately and are not counted among zero recorded commands.
+
+Current cost p50/p95/max is 11000/25000/47000 ns on PG17 and
+13000/26000/86000 ns on PG18, with 1000 ns psql quantization. One in-container
+TCP-loopback connection sends three ordered references per scope, including two
+modes on one OID. Protocol, utility, test wrapper, passive callback instrumentation,
+native SI, native lock and owner-allocation costs are included. One final 16-field
+status reports no token, restored caller owner and false snapshot flags; unrelated
+nonnegative SI counters are permitted and no per-sample status claim follows.
+There is no baseline, isolated C timing, throughput or contention comparison.
+
+Root receipts are under `.darmok-work/logs/native-cache-clearing-*`.
+Actual0 `native-cache-clearing-e829f50-24-author-audit` verifies 24 recorded
+results (22 actual0, two preserved actual101), 1689 paths, all 16 native inputs,
+246 nested actual0 actions and all current source/design/proposal seals.
+Its facts SHA256 is
+`bdb9fc46e9c9fd09cb239896e7932a247aeb7981ae8e547fa0110007d3e8c093`,
+31-file seal `d4554ac0af6768631e1b8c1c9fc84da7de1c689ec85ff73e1c5e611b74901036`,
+outer stdout `6ab25046c1d58b900866a80fe008bae2885422136dafba43999330149429d462`.
+Ten author audit readers are actual0. A final two-document leaf must preserve
+all other tracked executable/test/dependency entries and the same 16 native
+inputs, then receive a separate independent full evidence/leaf review before
+normal PR merge.
+
+No current full workspace test run is claimed. Forced native-wait/callback ERROR
+execution, globally fresh SI facts, complete transitive/catalog/application/index/
+TOAST/storage/name/negative/overload closure, neutral preparation, callback/provider
+admission, Describe/materialization, immutable execution, MySQL data/lock behavior,
+serving, driver/cache/throughput/artifact and release gates remain open.
+Issues46/15 and the goal remain active. Standing exclusions are unchanged.
