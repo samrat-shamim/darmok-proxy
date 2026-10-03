@@ -5034,8 +5034,36 @@ and `f9a976c28d5c876f32009ad69703ae5ff11ddb105a4c253996ae21137fbcedc9`.
 These are finite targeted source/provenance findings, not a new native build,
 runtime experiment or recertification of historical review graphs. The same22
 native build inputs remain unchanged. Independent review of this documentation
-checkpoint is pending. Entry/bootstrap/provider/registry/reference/writer/sequence,
+checkpoint is recorded below. Entry/bootstrap/provider/registry/reference/writer/sequence,
 whole-statement/table execution, serving, performance and release gates remain
 OPEN. Concurrent native2PC stays required; security, compiler PR4, hosted CI,
 new stress/recovery or profile lifecycle experiments and release publication
 remain excluded.
+
+At documentation revision `80ec215d0c8f12f153e79ba4401fea70a7eeb842`, tree
+`eb8d6346cf59623d44495506be32634eb9b211d9`, root07 repository checks and root08
+`git diff --check e8b0dde HEAD` actually exit0. Root09's finite evidence binder
+checks exactly four changed docs,354 unchanged base entries and all22 unchanged
+native inputs. Its310-member nonself seal and facts are under
+`logs/native-fixed-history-80ec215-evidence-v1`, with facts SHA256
+`716897722163b5f05e70d8922e323c832eeb8bf1ff0ed61cfb1fa7c1495294ec`.
+These documentation checks introduce no new native runtime result.
+
+The independent review at80ec215 accepts the source investigation only, with no
+required findings. Its exact source/span, paired-difference and finite provenance
+checks retain474 absolute fixed members. Final26/post27/completion28 actually
+exit0. Root10 rehashes496 unique fixed/completion paths and actually exits0;
+facts at `logs/review-native-fixed-history-80ec215-v1-root-rehash-v1/facts.json`
+have SHA256
+`f9a38d2f0c3ca3f3ce026fda6f668aa0800a3ad0c1490f5708ff9fc3bd4951ec`.
+The review report and facts SHA256 values are
+`8ea1c0068ca5c33c6415cda44d835a451911b152823c7e93ef9005045e7bca8b`
+and `0749f283ca1021cde8e73e4805c3c0e466c246b54870b23177b7b7c49f7d8941`.
+Own20's actual1 bookkeeping failure remains preserved: it assumed every root
+seal key was absolute. Its distinct corrected reader binds the sole relative
+`scripts/check_repository.py` key to root09's exact recorded source cwd; there
+is no product finding or evidence mismatch. All live reads release before
+root11 creates this separate review-record leaf. Acceptance of the leaf must
+bind its single changed release-plan file to the other357 unchanged entries
+of accepted80ec215, without reopening the historical review graph. All native
+admission, full-engine and release gates remain OPEN; concurrent2PC is required.
