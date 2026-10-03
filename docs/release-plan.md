@@ -2131,3 +2131,32 @@ required. Concurrent native 2PC remains required and enabled. This does not clos
 read views/locks, table execution, driver/cache/performance/artifact or release
 gates. Security, compiler PR #4, stress/forced interruption, hosted CI/account
 work and release publication remain excluded.
+
+
+The conditional source architecture review is sealed separately in
+`.darmok-work/logs/review-native-dependency-guards-3cc6d52-v1`: report SHA256
+`6fe84023251e70b534f3ebbabd33c8d247fcba17d8ac96a03aee9f3c9c0230a1`,
+334-file seal `23e662a96d90396afdc99e6055d48532c6c52718a7f519229aa3dc8f58fe93ca`,
+outer invocation actual exit 0. It is a source recommendation, not runtime
+acceptance. Draft implementation `957d11950b0860c5af0298b7318371fc4ff030c7` compiled
+and produced four fresh PostgreSQL17/18 product/probe images. Review found named
+Parse statement reuse across outcomes; `4fe5b2e365654a54421ce84ee0b9d499561dd000`
+corrected only those names. All 14 product/probe inputs remained equal.
+
+The first runtime attempt at `4fe5b2e` did not reach the intended publication
+path: first execution of a prepared observer query still built a plan and waited
+for the prepared `pg_class` holder. The local Cargo receipt has actual exit 101,
+with its root-owned test executable ended by SIGINT after source/lock diagnosis.
+A separate normal ROLLBACK PREPARED connection attempt timed out during startup
+(actual exit 2); SQL was never submitted and no rollback is claimed. No native
+PostgreSQL signal, termination, stop or restart was performed. That primary
+profile remains quarantined; this run is failed harness evidence only, with no
+interruption or semantic acceptance claim.
+
+The corrected observer forces generic plans, executes every probe before each
+prepared catalog holder, uses an explicit integer sub-ID result, and bounds each
+critical phase. It retains a separate finishing client across caught assertion
+failure so normal prepared rollback can be attempted before rethrowing; absence,
+native errors and cleanup timeouts are logged and never convert failure to
+success. Corrected checks use six fresh disposable profiles. Their tests and
+independent review remain pending; the module inputs are unchanged.
