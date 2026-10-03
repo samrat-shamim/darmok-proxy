@@ -12,7 +12,9 @@ Component evidence is recorded in the release plan.
 
 The [private native statement interlock](native-statement-guards.md) adds a
 distinct C-only semantic reference and native prepare-coverage marker. It is
-under current verification and does not expose an application execution lane.
+locally verified on PostgreSQL 17.11/18.6 and does not expose an application
+execution lane. Its finite acceptance is separate from complete dependency
+closure and statement admission.
 
 ## Installation and identity
 

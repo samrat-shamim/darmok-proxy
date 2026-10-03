@@ -1,7 +1,7 @@
 # Private native statement interlock
 
-Status: **C component under current verification; no application statement
-entry point**. This extends the [publication fences](server-catalog-lease.md)
+Status: **locally verified private C component on PostgreSQL 17.11/18.6; no
+application statement entry point**. This extends the [publication fences](server-catalog-lease.md)
 with an owned semantic reference. Full physical and name-candidate closure,
 snapshot-neutral native preparation, callback admission, Describe/materialization
 and rollback-capable execution remain [issue46](https://github.com/samrat-shamim/darmok-proxy/issues/46)
@@ -152,7 +152,20 @@ test uncovered dummy representation through the actual native verifier. That
 synthetic case is not pre-install or recovery execution, and never claims the
 once-ready fast path is valid under its intentionally broken hook premise.
 
-Current PG17/18 evidence, full meaningful fixtures and independent code/evidence
-review are required before component acceptance. No security work, stress,
-forced interruption, native-profile restart/stop/signal, hosted CI or release
-publication is included. Full execution and issue46 remain open.
+At tested source `22ce51bc5710de72bc4a14084571d0898f682fb5`, both full native
+packages passed 131 tests, including five guard fixtures; both private-owner
+subsets passed three tests. Independent code/evidence review closes the fixture
+cleanup and documentation findings at this source. Exact builds, profiles,
+commands, failures and immutable receipts are recorded in the
+[release ledger](release-plan.md#private-native-interlock-local-verification).
+
+The bounded sample uses one warmed connection and 128 measured scoped SET
+requests after 32 warmups. PG17 p50/p95/max were 6000/36000/109000 ns; PG18 were
+12000/40000/85000 ns, with 1000 ns psql display quantization. This includes
+in-container TCP-loopback utility/protocol and native lock-owner work; it is
+neither isolated C-call overhead nor application throughput. No current full
+workspace test run or executed recovery fixture is claimed.
+
+No security work, stress, forced interruption, native-profile restart/stop/signal,
+hosted CI or release publication is included. Full execution and issue46 remain
+open.
