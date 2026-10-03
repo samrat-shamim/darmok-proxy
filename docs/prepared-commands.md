@@ -1,8 +1,9 @@
 # Owned local prepared commands
 
-Status: independent review found registry API defect C1 at `8ed1f8b`; the
-correction is implemented and its fresh checks and review are pending. Earlier
-passing results remain bound to `4bffee4` and do not certify this correction.
+Status: registry API defect C1 is corrected and checks pass at
+`43f835b4037b5751a80555dbf1b054e002293b25`; corrective independent review is
+pending. This following documentation revision changes no tested Rust, corpus,
+observer or native input. The rejected `8ed1f8b` review remains historical.
 Table execution, native reusable plans and release certification remain open.
 
 `FrontendConnection` exclusively owns its typed statement registry. PREPARE

@@ -4954,3 +4954,30 @@ The review's packet-summary bookkeeping reader37 actual1 remains preserved;
 corrected position-based reader38 actually exits 0. No second product finding.
 The correction is on a separate branch/worktree; fresh validation and a finite
 C1 review remain pending. Whole-engine and release gates remain OPEN.
+
+### Prepared accounting correction freshly verified
+
+At `43f835b4037b5751a80555dbf1b054e002293b25`, root31–38 all actually exit 0:
+format, workspace all-target/all-feature locked strict Clippy, committed stock
+observer, locked offline suite, profile before/after audits, eight required
+native/CLI suites and repository boundaries. The offline suite reports 1,692
+passed, 0 failed, 93 ignored in 41 groups, including the new plan-mutation
+identity/metadata/accounting regression. Per PostgreSQL 17.11 and 18.6, the
+required suites report 82 owner, 10 decimal transaction, 15 decimal frontend
+and 4 CLI tests, all 0 failed/ignored. CLI child receipts again preserve 15
+actual exit 0 and 17 expected actual exit 1 per major. The stock observer
+reproduces all 15 cases and four condition-count checks.
+
+Raw streams and receipts remain under `logs/prepared-frontend-43f835b-*`.
+Required-suite facts have SHA256
+`dfe8e554f8f5e2392fa72796919db4013fc5a834c66374215e3903fda3de2eed`.
+Profile before/after facts have SHA256
+`cb9295a309f54b162da8fdbcb7cc17550e01e2d86beb11cb7fb66f553b53e7c0`
+and `1e9793d63430521a9f97a90938c7765f828da62a4c0492f8fb0c5d178bd9a54e`:
+all eight profiles keep identical IDs, starts, restart counts, settings,
+libraries and headers with no residual fixture databases. The same 22 native
+build inputs and existing package manifests remain fixed reuse anchors, not
+new native certification. The subsequent two-file documentation revision must
+be bound to these unchanged tested inputs. Corrective independent review still
+decides C1 closure; full native/statement/serving/performance/release gates,
+issues 46/15 and the goal remain OPEN. Concurrent PostgreSQL 2PC is required.
