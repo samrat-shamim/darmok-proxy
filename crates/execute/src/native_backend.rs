@@ -1,19 +1,22 @@
 use std::{error::Error as StdError, fmt};
 
-use tokio::task::{JoinError, JoinHandle};
-use tokio_postgres::{Client, Config, Error, Socket, TransactionState, tls::MakeTlsConnect};
+use tokio_postgres::{Config, Error, Socket, TransactionState, tls::MakeTlsConnect};
 
 use crate::{
-    NativeControl, NativeControlCompletion, NativeControlFailure, NativeControlMismatch,
-    NativeTransactionSpec, check_native_control,
+    NativeControl, NativeControlCompletion, NativeControlFailure, NativeTransactionSpec,
+    check_native_control,
 };
 
 mod native_catalog;
+mod native_connection;
 mod native_database;
 pub use native_catalog::{NativeCatalogError, NativeCatalogFailure, NativeCatalogMismatch};
+use native_connection::{DisposeSource, NativeConnection, confirmed_failure_state};
 pub use native_database::{
     NATIVE_SCHEMA_VERSION, NATIVE_SERVER_EXTENSION_VERSION, NativeDatabaseAction,
-    NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+    NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure, NativeDatabaseSetup,
+    NativeDatabaseSetupDisposeError, NativeDatabaseSetupDisposed, NativeDatabaseSetupError,
+    NativeDatabaseSetupOperation, NativeDatabaseSetupState,
 };
 
 /// Known lifecycle state under this owner's exclusive SQL submission boundary.
@@ -24,15 +27,12 @@ pub enum NativeBackendState {
     Controlling(NativeControl),
     Scoped(NativeScopeBoundary),
     Discovering(NativeScopeBoundary),
-    SettingUp(NativeDatabaseAction),
     /// An unfinished operation or unconfirmed cleanup permits only disposal.
     Uncertain,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeBackendOperation {
-    InitializeDatabase,
-    VerifyDatabase,
     Begin,
     Commit,
     Rollback,
@@ -87,6 +87,14 @@ pub enum NativeRecovery {
 /// It owns fixed controls and catalog observations; admission and the row
 /// executor are pending.
 ///
+/// Database setup cannot be submitted through a query owner:
+/// ```compile_fail
+/// use darmok_execute::NativeBackend;
+/// async fn initialize(backend: &mut NativeBackend) {
+///     let _ = backend.initialize_database().await;
+/// }
+/// ```
+///
 /// A scope excludes interleaved parent commands:
 /// ```compile_fail
 /// use darmok_execute::{
@@ -104,8 +112,7 @@ pub enum NativeRecovery {
 /// ```
 #[must_use]
 pub struct NativeBackend {
-    client: Option<Client>,
-    driver: Option<JoinHandle<Result<(), Error>>>,
+    connection: NativeConnection,
     state: NativeBackendState,
     last_savepoint: u64,
 }
@@ -122,13 +129,11 @@ impl NativeBackend {
         T: MakeTlsConnect<Socket>,
         T::Stream: Send + 'static,
     {
-        let (client, connection) = config
-            .connect(connector)
+        let connection = NativeConnection::connect(config, connector)
             .await
             .map_err(NativeBackendError::Connect)?;
         let mut backend = Self {
-            client: Some(client),
-            driver: Some(tokio::spawn(connection)),
+            connection,
             state: NativeBackendState::Uncertain,
             last_savepoint: 0,
         };
@@ -222,26 +227,17 @@ impl NativeBackend {
 
     /// Stop and await the owned local driver. Disposal does not prove rollback
     /// or resolve an uncertain commit. Dropping this future still aborts the
-    /// driver through the owner's Drop implementation.
+    /// driver through the private connection's Drop implementation.
     pub async fn dispose(mut self) -> Result<NativeBackendDisposed, NativeBackendDisposeError> {
         let previous_state = self.state;
-        self.client.take();
-        let driver = self.driver.as_mut().expect("owner retains its driver");
-        driver.abort();
-        let outcome = driver.await;
-        self.driver.take();
-        match outcome {
-            Ok(Ok(())) => Ok(NativeBackendDisposed { previous_state }),
-            Err(error) if error.is_cancelled() => Ok(NativeBackendDisposed { previous_state }),
-            Ok(Err(error)) => Err(NativeBackendDisposeError {
+        self.connection
+            .dispose()
+            .await
+            .map(|()| NativeBackendDisposed { previous_state })
+            .map_err(|source| NativeBackendDisposeError {
                 previous_state,
-                source: DisposeSource::Backend(error),
-            }),
-            Err(error) => Err(NativeBackendDisposeError {
-                previous_state,
-                source: DisposeSource::Task(error),
-            }),
-        }
+                source,
+            })
     }
 
     fn require(
@@ -268,9 +264,8 @@ impl NativeBackend {
     ) -> Result<NativeControlCompletion, NativeBackendError> {
         let pending = PendingControl::new(&mut self.state, control);
         let events = self
-            .client
-            .as_ref()
-            .expect("live owner retains its client")
+            .connection
+            .client()
             .command_events(sql)
             .map_err(|source| NativeBackendError::Submit { control, source })?;
         match check_native_control(control, events).await {
@@ -282,14 +277,6 @@ impl NativeBackend {
                 pending.complete(failure_state(&failure));
                 Err(failure.into())
             }
-        }
-    }
-}
-
-impl Drop for NativeBackend {
-    fn drop(&mut self) {
-        if let Some(driver) = &self.driver {
-            driver.abort();
         }
     }
 }
@@ -332,36 +319,9 @@ impl Drop for PendingControl<'_> {
 }
 
 fn failure_state(failure: &NativeControlFailure) -> NativeBackendState {
-    use TransactionState::{FailedTransaction, Idle, Transaction};
-
-    if failure.stream_error().is_some() {
-        return NativeBackendState::Uncertain;
-    }
-    // COMMIT-as-ROLLBACK is an observed failed commit with no transaction left.
-    // It is never a successful commit receipt.
-    if failure.control() == NativeControl::Commit
-        && failure.ready_state() == Some(Idle)
-        && failure.backend_error().is_none()
-        && failure.matched_tags() == 0
-        && matches!(failure.mismatch(), Some(NativeControlMismatch::Tag {
-            position: 0, expected: Some("COMMIT"), actual,
-        }) if actual == "ROLLBACK")
-    {
-        return NativeBackendState::Ready(Idle);
-    }
-    if failure.mismatch().is_none() && failure.backend_error().is_some() {
-        match (failure.control(), failure.ready_state()) {
-            (NativeControl::Begin | NativeControl::Commit, Some(Idle)) => {
-                return NativeBackendState::Ready(Idle);
-            }
-            (NativeControl::Savepoint, Some(state @ (Transaction | FailedTransaction))) => {
-                return NativeBackendState::Ready(state);
-            }
-            _ => {}
-        }
-    }
-    // Failed rollback or savepoint cleanup never constitutes a reusable reset.
-    NativeBackendState::Uncertain
+    confirmed_failure_state(failure)
+        .map(NativeBackendState::Ready)
+        .unwrap_or(NativeBackendState::Uncertain)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -491,12 +451,6 @@ impl NativeBackendDisposeError {
     }
 }
 
-#[derive(Debug)]
-enum DisposeSource {
-    Backend(Error),
-    Task(JoinError),
-}
-
 impl fmt::Display for NativeBackendDisposeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -509,10 +463,7 @@ impl fmt::Display for NativeBackendDisposeError {
 
 impl StdError for NativeBackendDisposeError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        Some(match &self.source {
-            DisposeSource::Backend(error) => error,
-            DisposeSource::Task(error) => error,
-        })
+        Some(self.source.as_error())
     }
 }
 
@@ -529,10 +480,10 @@ mod tests {
     use std::{future::Future, pin::Pin, task::Context};
 
     use futures_util::task::noop_waker_ref;
-    use tokio_postgres::{NoTls, error::SqlState};
+    use tokio_postgres::{Client, NoTls, error::SqlState};
 
     use super::*;
-    use crate::{NativeIsolation, NativeTransactionAccess};
+    use crate::{NativeControlMismatch, NativeIsolation, NativeTransactionAccess};
 
     const READ_COMMITTED_WRITE: NativeTransactionSpec = NativeTransactionSpec {
         isolation: NativeIsolation::ReadCommitted,
@@ -550,7 +501,7 @@ mod tests {
     }
 
     fn client(backend: &NativeBackend) -> &Client {
-        backend.client.as_ref().unwrap()
+        backend.connection.client()
     }
 
     async fn setup(backend: &NativeBackend, sql: &str) {

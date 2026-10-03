@@ -8,11 +8,13 @@ use serde_json::Value;
 use super::*;
 use crate::{
     NATIVE_SCHEMA_VERSION, NativeDatabaseAction, NativeDatabaseError, NativeDatabaseFailure,
+    NativeDatabaseSetup, NativeDatabaseSetupError, NativeDatabaseSetupOperation,
+    NativeDatabaseSetupState,
 };
 
 struct Fixture {
     admin: NativeBackend,
-    backend: NativeBackend,
+    backend: NativeDatabaseSetup,
     database: String,
     config: Config,
 }
@@ -29,13 +31,13 @@ impl Fixture {
         let url = std::env::var(variable).expect("required disposable native profile");
         let mut config = url.parse::<Config>().unwrap();
         let admin = NativeBackend::connect(&config, NoTls).await.unwrap();
-        setup(
+        super::setup(
             &admin,
             &format!("CREATE DATABASE {database} TEMPLATE template0 ENCODING 'UTF8'"),
         )
         .await;
         config.dbname(&database);
-        let backend = NativeBackend::connect(&config, NoTls).await.unwrap();
+        let backend = NativeDatabaseSetup::connect(&config, NoTls).await.unwrap();
         Self {
             admin,
             backend,
@@ -46,12 +48,20 @@ impl Fixture {
 
     async fn close(self) {
         let _ = self.backend.dispose().await.unwrap();
-        setup(&self.admin, &format!("DROP DATABASE {}", self.database)).await;
+        super::setup(&self.admin, &format!("DROP DATABASE {}", self.database)).await;
         let _ = self.admin.dispose().await.unwrap();
     }
 }
 
-async fn snapshot(backend: &NativeBackend) -> String {
+fn client(backend: &NativeDatabaseSetup) -> &Client {
+    backend.test_client()
+}
+
+async fn setup(backend: &NativeDatabaseSetup, sql: &str) {
+    client(backend).batch_execute(sql).await.unwrap();
+}
+
+async fn snapshot(backend: &NativeDatabaseSetup) -> String {
     // Includes OIDs and row/catalog xmins: idempotent operations must preserve
     // artifacts, rather than replacing definitions with equivalent objects.
     client(backend).query_one(
@@ -64,16 +74,16 @@ async fn snapshot(backend: &NativeBackend) -> String {
     ).await.unwrap().get(0)
 }
 
-async fn metadata(backend: &NativeBackend) -> String {
+async fn metadata(backend: &NativeDatabaseSetup) -> String {
     client(backend).query_one(
         "SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('row', pg_catalog.to_jsonb(i), 'xmin', i.xmin::pg_catalog.text))::pg_catalog.text FROM darmok.installation i", &[]
     ).await.unwrap().get(0)
 }
 
-fn assert_idle(backend: &NativeBackend) {
+fn assert_idle(backend: &NativeDatabaseSetup) {
     assert_eq!(
         backend.state(),
-        NativeBackendState::Ready(TransactionState::Idle)
+        NativeDatabaseSetupState::Ready(TransactionState::Idle)
     );
 }
 
@@ -108,7 +118,7 @@ async fn native_database_two_ordinary_owners_initialize_and_verify_the_same_data
     let url = std::env::var("DARMOK_TEST_DATABASE_URL").unwrap();
     let mut config = url.parse::<Config>().unwrap();
     config.dbname(&fixture.database);
-    let mut second = NativeBackend::connect(&config, NoTls).await.unwrap();
+    let mut second = NativeDatabaseSetup::connect(&config, NoTls).await.unwrap();
     let (first_receipt, second_receipt) = tokio::join!(
         fixture.backend.initialize_database(),
         second.initialize_database()
@@ -175,6 +185,50 @@ async fn native_database_fresh_repeat_and_readonly_verification_preserve_artifac
         assert_eq!(metadata(&fixture.backend).await, data);
     }
     fixture.close().await;
+}
+
+#[tokio::test]
+#[ignore = "required by PostgreSQL 17/18 native-owner CI"]
+async fn native_database_query_owner_starts_fresh_after_setup_disposal() {
+    let mut fixture = Fixture::new().await;
+    let _ = fixture.backend.initialize_database().await.unwrap();
+    let _ = fixture.backend.verify_database().await.unwrap();
+    setup(
+        &fixture.backend,
+        "CREATE TEMP TABLE setup_history(n pg_catalog.int4); SET application_name = 'darmok-setup-history'",
+    )
+    .await;
+    let Fixture {
+        admin,
+        backend: setup_owner,
+        database,
+        config,
+    } = fixture;
+    let disposed = setup_owner.dispose().await.unwrap();
+    assert_eq!(
+        disposed.previous_state(),
+        NativeDatabaseSetupState::Ready(TransactionState::Idle)
+    );
+    let backend = NativeBackend::connect(&config, NoTls).await.unwrap();
+    assert_eq!(
+        backend.state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
+    let row = super::client(&backend).query_one(
+        "SELECT pg_catalog.to_regclass('pg_temp.setup_history') IS NULL, pg_catalog.current_setting('application_name'), pg_catalog.current_setting('search_path'), darmok.substring_utf8('fresh'::pg_catalog.text, 2::pg_catalog.int8)",
+        &[],
+    ).await.unwrap();
+    assert!(row.get::<_, bool>(0));
+    assert_ne!(row.get::<_, String>(1), "darmok-setup-history");
+    assert_eq!(row.get::<_, String>(2), "pg_catalog");
+    assert_eq!(row.get::<_, String>(3), "resh");
+    let disposed = backend.dispose().await.unwrap();
+    assert_eq!(
+        disposed.previous_state(),
+        NativeBackendState::Ready(TransactionState::Idle)
+    );
+    super::setup(&admin, &format!("DROP DATABASE {database}")).await;
+    let _ = admin.dispose().await.unwrap();
 }
 
 #[tokio::test]
@@ -346,7 +400,11 @@ async fn native_database_definition_and_inventory_mismatches_fail_without_replac
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn native_database_rejects_existing_transaction_without_submitting_or_changing_outer_work() {
     let mut fixture = Fixture::new().await;
-    let _ = fixture.backend.begin(READ_COMMITTED_WRITE).await.unwrap();
+    let _ = fixture
+        .backend
+        .control(NativeControl::Begin, READ_COMMITTED_WRITE.begin_sql())
+        .await
+        .unwrap();
     setup(&fixture.backend, "CREATE TABLE public.application_values(n pg_catalog.int4); INSERT INTO public.application_values VALUES(7)").await;
     let before = snapshot(&fixture.backend).await;
     for initialize in [true, false] {
@@ -358,11 +416,11 @@ async fn native_database_rejects_existing_transaction_without_submitting_or_chan
         .unwrap_err();
         assert!(failure.cleanup().is_none());
         assert!(
-            matches!(failure.original(), NativeDatabaseError::Owner(NativeBackendError::InvalidState { operation, state }) if *operation == if initialize { NativeBackendOperation::InitializeDatabase } else { NativeBackendOperation::VerifyDatabase } && *state == NativeBackendState::Ready(TransactionState::Transaction))
+            matches!(failure.original(), NativeDatabaseError::Owner(NativeDatabaseSetupError::InvalidState { operation, state }) if *operation == if initialize { NativeDatabaseSetupOperation::Initialize } else { NativeDatabaseSetupOperation::Verify } && *state == NativeDatabaseSetupState::Ready(TransactionState::Transaction))
         );
         assert_eq!(
             fixture.backend.state(),
-            NativeBackendState::Ready(TransactionState::Transaction)
+            NativeDatabaseSetupState::Ready(TransactionState::Transaction)
         );
         assert_eq!(snapshot(&fixture.backend).await, before);
         let n: i32 = client(&fixture.backend)
@@ -449,7 +507,7 @@ async fn native_database_manifest_error_after_creation_rolls_back_all_artifacts(
     );
     assert_eq!(
         fixture.backend.state(),
-        NativeBackendState::Ready(TransactionState::FailedTransaction)
+        NativeDatabaseSetupState::Ready(TransactionState::FailedTransaction)
     );
     let _ = fixture.backend.rollback().await.unwrap();
     assert_eq!(snapshot(&fixture.backend).await, before);
@@ -525,7 +583,7 @@ async fn native_database_typed_substrings_match_stock_mysql84_corpus() {
 async fn native_database_advisory_lock_is_held_after_checked_show_until_commit() {
     use super::super::native_database::DATABASE_SQL;
     let mut fixture = Fixture::new().await;
-    let mut second = NativeBackend::connect(&fixture.config, NoTls)
+    let mut second = NativeDatabaseSetup::connect(&fixture.config, NoTls)
         .await
         .unwrap();
     for action in [
@@ -548,9 +606,12 @@ async fn native_database_advisory_lock_is_held_after_checked_show_until_commit()
             .unwrap();
         assert_eq!(
             fixture.backend.state(),
-            NativeBackendState::Ready(TransactionState::Transaction)
+            NativeDatabaseSetupState::Ready(TransactionState::Transaction)
         );
-        let _ = second.begin(READ_COMMITTED_WRITE).await.unwrap();
+        let _ = second
+            .control(NativeControl::Begin, READ_COMMITTED_WRITE.begin_sql())
+            .await
+            .unwrap();
         let locked: bool = client(&second)
             .query_one(
                 "SELECT pg_catalog.pg_try_advisory_xact_lock(4922526098346491905::pg_catalog.int8)",
@@ -597,7 +658,7 @@ async fn native_database_advisory_lock_is_held_after_checked_show_until_commit()
 #[ignore = "required by PostgreSQL 17/18 native-owner CI"]
 async fn native_database_unpreloaded_placeholder_rolls_back_both_components() {
     let mut fixture = Fixture::new_at("DARMOK_TEST_UNPRELOADED_DATABASE_URL").await;
-    let observer = NativeBackend::connect(&fixture.config, NoTls)
+    let observer = NativeDatabaseSetup::connect(&fixture.config, NoTls)
         .await
         .unwrap();
     let before = snapshot(&observer).await;

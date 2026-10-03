@@ -4744,3 +4744,79 @@ The standing exclusions remain in force, including security work, compiler
 PR4, hosted CI, publication and new stress/error/recovery/existing-profile
 lifecycle experiments. No source/helper mutation occurs during a recorded
 root command or a reviewer's live reads.
+
+### Module-footprint merge and private command ownership
+
+[PR63](https://github.com/samrat-shamim/darmok-proxy/pull/63) normally
+squash-merges the corrected source-investigation leaf
+`ee481de178485e62cbb2e52d1dba9bfc40033406` to public main
+`4d2a81b5432474b0ac714cf3ffc4c140773f4f08`, tree
+`e601044b7d81bbe6ca2fe3654ab0a6c015b7ac62`, parent2a18. D1's Linux
+qualification closes only at ee481de; the historical a6e0b29 finding stays
+open. The correction review accepts source investigation only. Root11's finite
+review rehash and root16's merged readback facts SHA256 values are
+`c99322e3db9682eeaf55f2ec06b9ca2a53e7b7807993a05e77f45e0c73fda1e4`
+and `c6f70dc4b804458c98f582f8065691d63009effe779aca56b161e3542ab075c1`.
+All live reads release before subsequent mutation. The readback confirms the
+public personal repository, generic description, empty eligible PR queue and
+issues46/15 open, with PR4 filtered before stdout/evidence.
+
+The [private command-history boundary](native-command-history.md) starts from
+merged4d2 in a new isolated worktree. Root03/04 source capture,05 selected
+functions/spans and06 paired differences actually exit0. The primary v2
+13-member nonself seal and selected-functions 35-member nonself seal SHA256
+values are `ddbf02877f61ddf6a19fdffc40fd9b93e854f82a84f32bd7094c156071031a01`
+and `50fa4db037696cf715bfaccf7cc5daf7cc3370e85be81f2dc004826bc4ccdc0f`.
+These source reads do not certify complete native startup or a new runtime.
+
+The implementation separates setup/verification ownership from the query owner
+through a shared private connection mechanism. Fixed installation SQL and native
+mechanism inputs remain unchanged. Current-revision checks are recorded below.
+The native entry/bootstrap/whole-statement, serving and
+release gates, issues46/15 and the overall goal remain open. Concurrent native
+two-phase transactions remain required; all standing exclusions remain in force.
+
+The implementation leaf is `c5fa88ef8d9d8661202c8f6901e918e7c3233436`, tree
+`b3ec4c989e96089478e7e24e4db9cb149086dec8`, parent4d2. Root07 formatting,
+08 workspace Clippy all targets/features with warnings denied,10 offline tests,
+11 required suites and13 repository checks actually exit0. Offline tests report
+1691 passes, zero failures and88 ignored database/other fixtures across41 result
+groups; the database fixtures are required separately. Each PG17.11/18.6 matrix
+runs 77 owner,10 BigDecimal transaction,10 BigDecimal frontend and4 CLI process
+fixtures with zero failures/ignored. The new ordinary fixture proves a fresh
+query session after awaited setup disposal, not native entry admission.
+The eight-suite facts SHA256 is
+`e6b30a0196bee7d1900527c7ce3a4f56d0e6d7b1326f796871a9e720e97e678b`.
+
+Root09/12 read-only profile audits each run48 actual successful readers. Their
+facts SHA256 values are `f5ea9a66c53715724602ff73c853f2c0d7443302626f6c9b34d19913e60a4f05`
+and `16a63652b50cd5667bd0a4b209a82d2f4dbecb0541198a26f8871150ca165329`.
+All eight identities, start times, restart counts, settings and library/header
+bytes agree before/after; no fixture databases remain. The 22 native inputs
+are unchanged. This is current Rust/CLI validation against the existing native
+packages, not a new native build, full startup proof or release acceptance.
+All remaining gates and exclusions still apply.
+
+The independent review at `1b0fe078063e87670bb0ed0f19d339352836de5e`, tree
+`9d474c09174c221191b1d5bc2429a68be177b5ff`, accepts the finite Rust owner
+implementation carried unchanged from testedc5. D1 remains OPEN historically
+at1b0: the old 6217/20-input package paragraph was labeled current. This separate
+documentation leaf labels the old package/README acceptance historical and
+points to current c5/22-input c434 reuse. It changes no Rust, SQL, native input
+or runtime behavior; independent correction review remains required.
+
+Reviewer audit31 succeeds after preserved own21 actual1 (wrong manifest path),
+22 actual2 (wrong directory) and27 actual1 (wrong ordered preload expectation).
+Those are evidence-reader failures, not product/runtime results. Actual final34,
+post35 and completion36 exit0. Root15 rehashes1170 fixed review members plus16
+completion companions/1192 unique paths and actually exits0; its facts SHA256 is
+`7c2f3e43477abf4d98722a0b67f4b1912c944d9d045fe9d0860ece17d99482fd`.
+Report/facts/completion-map SHA256 values are
+`dffe02e56d244862f84ef7edab19e1e9469aebb99f84efbc5628501d94b40c19`,
+`07188c80bab5ebe3287c39a9d4c5752a82b822bf7aa64ab3abe7c702bdc18f5d`
+and `70956592c8f4d03f7d5762a1f1806af5a7c769c47a3e6e87195267482aa02d21`.
+All live reads release before root16 creates the correction worktree. Prior
+818/1170/1192 graphs stay frozen; correction checks use fixed anchors only.
+No new native build/runtime/hosted-CI or release result follows. Concurrent
+native 2PC and all remaining gates/exclusions, issues46/15 and the goal remain
+open.

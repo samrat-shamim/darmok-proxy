@@ -1,10 +1,10 @@
-//! Explicit physical-database setup commands using the existing native owner.
+//! Explicit physical-database setup commands using a dedicated setup connection owner.
 use std::{fmt, process::ExitCode};
 
 use clap::{Args, Parser, Subcommand};
 use darmok_execute::{
-    NativeBackend, NativeBackendDisposeError, NativeBackendError, NativeDatabaseAction,
-    NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+    NativeDatabaseAction, NativeDatabaseCompletion, NativeDatabaseError, NativeDatabaseFailure,
+    NativeDatabaseSetup, NativeDatabaseSetupDisposeError, NativeDatabaseSetupError,
 };
 use tokio_postgres::{Config, NoTls};
 
@@ -39,16 +39,16 @@ enum CommandFailure {
     NonUnicodeEnvironment(String),
     InvalidSettings(String),
     MissingDatabase(String),
-    Connection(NativeBackendError),
+    Connection(NativeDatabaseSetupError),
     Database {
         action: NativeDatabaseAction,
         original: Box<NativeDatabaseFailure>,
-        disposal: Option<NativeBackendDisposeError>,
+        disposal: Option<NativeDatabaseSetupDisposeError>,
     },
     DisposalAfterSuccess {
         action: NativeDatabaseAction,
         completion: NativeDatabaseCompletion,
-        original: NativeBackendDisposeError,
+        original: NativeDatabaseSetupDisposeError,
     },
 }
 
@@ -69,7 +69,7 @@ impl fmt::Display for CommandFailure {
             ),
             Self::Connection(original) => {
                 f.write_str("could not establish the PostgreSQL connection")?;
-                if let NativeBackendError::Connect(error) = original
+                if let NativeDatabaseSetupError::Connect(error) = original
                     && let Some(code) = error.code()
                 {
                     write!(f, " (SQLSTATE {})", code.code())?;
@@ -89,7 +89,7 @@ impl fmt::Display for CommandFailure {
                 if let Some(cleanup) = original.cleanup() {
                     match cleanup {
                         Ok(_) => f.write_str("; rollback confirmed")?,
-                        Err(error) => write!(f, "; rollback failed: {}", BackendDiagnostic(error))?,
+                        Err(error) => write!(f, "; rollback failed: {}", SetupDiagnostic(error))?,
                     }
                 }
                 if let Some(error) = disposal {
@@ -131,11 +131,11 @@ impl fmt::Display for DatabaseDiagnostic<'_> {
     }
 }
 
-struct BackendDiagnostic<'a>(&'a NativeBackendError);
+struct SetupDiagnostic<'a>(&'a NativeDatabaseSetupError);
 
-impl fmt::Display for BackendDiagnostic<'_> {
+impl fmt::Display for SetupDiagnostic<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let NativeBackendError::Control(control) = self.0
+        if let NativeDatabaseSetupError::Control(control) = self.0
             && let Some(error) = control.backend_error()
             && let Some(database) = error.as_db_error()
         {
@@ -176,14 +176,14 @@ async fn run(command: Command) -> Result<(), CommandFailure> {
         Command::Verify(input) => (NativeDatabaseAction::Verify, input),
     };
     let config = configuration(input)?;
-    let mut backend = NativeBackend::connect(&config, NoTls)
+    let mut setup = NativeDatabaseSetup::connect(&config, NoTls)
         .await
         .map_err(CommandFailure::Connection)?;
     let result = match action {
-        NativeDatabaseAction::Initialize => backend.initialize_database().await,
-        NativeDatabaseAction::Verify => backend.verify_database().await,
+        NativeDatabaseAction::Initialize => setup.initialize_database().await,
+        NativeDatabaseAction::Verify => setup.verify_database().await,
     };
-    let disposal = backend.dispose().await;
+    let disposal = setup.dispose().await;
     match (result, disposal) {
         (Ok(completion), Ok(_)) => {
             println!(
