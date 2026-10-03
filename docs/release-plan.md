@@ -4208,3 +4208,58 @@ result belongs in the PR, without relabeling historical runtime evidence. No
 new native experiment, profile operation, security/compiler4 work, hosted CI,
 account work or release publication is included. Full gates, issues46/15 and
 the overall goal remain OPEN.
+
+### Variable-payload descriptor admission correction
+
+The first design at clean `8884e99932ec172c046a33286a4e7747e51a26a8` / tree
+`08948d9d5064f5c708c2ea7c21c12f5a1e38314e` is not accepted for implementation.
+Its independent review identifies C1: selected TOAST descriptors were opened
+before fresh actual profile validation. Native attribute construction can fetch
+missing/default/constraint metadata before AM initialization; a post-open check
+or later generation mismatch cannot undo provider execution. The original
+reviewed leaf remains frozen. A separate correction uses B's fresh raw capture
+as the pre-open checkpoint, then prepares descriptors outside raw/S with B's
+source snapshot alive and all prerequisite relation tags already owned.
+
+The corrected design names the pinned 2830/4171 bootstrap metadata TOAST heaps,
+their complete three-attribute layout, NULL options and absent descriptor-loading
+branches. It specifies native critical-index initialization/nailed support,
+cold/warm TOAST construction and minimal critical-index reload prerequisites.
+Structural/options/provider mutations of those pinned descriptor prerequisites
+remain outside the continuous builtin profile; ordinary external defaults and
+application DDL stay required. The three observations and concurrent native
+two-phase support remain; no additional full observation or provider fallback
+is introduced. Independent correction acceptance remains pending.
+
+Root03 documentation checks exit0 at888: exactly three unpackaged docs change
+from public41b, 342 tracked entries and all20 native inputs match. The facts
+SHA256 is `b3606cdd91d12c752fe6292e6b07b064142bd2fbbeb1d4fbf09ea05f8fce6f96`.
+Review `logs/review-native-variable-catalog-payloads-8884e99-design-v1` has
+report/facts/330-member structured-seal SHA256 values
+`2eee150240375a356f741ed984181b6fc4c60a7e50c54f6e6a55d7561d3ce23d`,
+`31a088185baa244de9fa749853d358f3d552b4258d27a40b8adb6b70d9020fc0`
+and `f466a75cdb56200da0e96ad3fbd1c7441b6bd0b29828c9a335339a3008aa248f`.
+Actual final25/post26 exit0; their receipt hashes are
+`fdd817a36b56cc18eedacf83315603dfa52ff0a6489c5309cdbf5f771e346fa4`
+and `cd6896a697a41892645446b9891d641bad34c9176202c312aaf741c58da078fd`.
+Reader14's actual1 request for the removed PG18 GetOldestSnapshot is preserved;
+distinct corrected reader17 exits0. Review lifetime/heap/2PC conclusions are
+conditional source conclusions, not runtime results or C1 closure.
+
+Root04 exits0 rehashing330 fixed review members plus companions (344 paths),
+facts `2110142939401edd595b436d486ac21efc15ad24ebf36ca67d02bcffc9f6842d`.
+Root05 exits0 creating the separate correction worktree. Root06 exits0 there at
+still-clean888, rehashing all72 prior source members and adding16 HTTP-200 bodies:
+64 sources (32 permajor), v3 facts
+`c6bf6baf6b4b09c49790f214488b12dd1e2409eebfc7cd29cfe619ce016abc7a`
+and107-member nonself seal
+`89d75367952654a44b252bc39eb8a6fdd7af32826327190a242957afeee0b8f6`.
+Exact root06 receipt SHA256 is
+`1a7298b01e69fead097e910ce4255026192128f24c03cbc04b0865c3f2fe6016`.
+These source/provenance records do not certify native artifacts or execution.
+
+This correction changes only unpackaged design/ledger documentation. Current
+documentation/source checks and independent C1 correction review are required
+before a normal PR merge. Native implementation, builds, ordinary paired suites,
+performance and full closure/executor/serving/release gates, issues46/15 and the
+overall goal remain OPEN. Standing work exclusions remain in force.

@@ -121,13 +121,89 @@ These catalog storage nodes do not become additional application root bindings
 or expand the selected application column/type set. Their physical carrier
 layouts are validated separately.
 
-Before the fresh snapshot, refresh/open each selected TOAST heap under the
-native refresh exclusion with its exact physical reference already owned.
-Its actual routine must be builtin heap and its descriptor must be the native
-three-field `(oid, int4, bytea)` chunk layout, with no dropped/missing/default/
-generation targets or recursive TOAST heap. Cached descriptors and copied class
-facts must agree. Descriptor increments and native lock increments are separate
-owned resources; closing one must not release or fabricate the other.
+## Pre-open descriptor admission
+
+Do not open a selected TOAST descriptor before B has freshly observed and
+validated its actual profile. A declared target and an eventual descriptor
+postcheck are insufficient: `RelationBuildDesc` builds attributes before its
+table-AM routine. Attribute construction can fetch missing arrays, defaults and
+constraints, and a general relation open can initialize a catalog-selected
+handler. A later stamp mismatch cannot undo an unadmitted callback.
+
+This component admits the continuous builtin bootstrap catalog profile, not
+arbitrary catalog descriptor/provider histories. Its selected pointer targets
+are exactly the compiled `pg_attrdef` TOAST heap 2830 and `pg_type` TOAST heap
+4171. In both pinned majors, `IsCatalogRelationOid` classifies these pinned
+OIDs without a catalog lookup. Together with the checked heap AM and native
+kind, that selects the hardwired `F_HEAP_TABLEAM_HANDLER` branch; TOAST kind
+alone has no such shortcut. Native builtin function dispatch and catalog index
+support belong to the existing source-admitted builtin profile; this is not
+general provider or extension-hook admission.
+
+Each A/B/C raw observation copies additional descriptor-profile facts for the
+selected metadata TOAST heaps and the two prerequisite critical indexes.
+They remain metadata storage nodes, not application column bindings. From the
+actual class row and physically present fields, require the compiled target
+identity, `RELKIND_TOASTVALUE`, `HEAP_TABLE_AM_OID`, `PG_TOAST_NAMESPACE`, native
+permanent/local-database storage identity, exactly three positive attributes,
+no recursive TOAST target or rewrite identity, zero `relchecks`, and no rule,
+trigger or other descriptor-loading branch beyond the native bootstrap profile:
+`relhasrules`, `relhastriggers`, `relrowsecurity` and `relispartition` are false.
+Check `pg_class.reloptions` is physically present and NULL before using its
+NULL bit; do not detoast or parse a non-NULL option carrier.
+
+Copy every positive attribute row for the target, not just ordinals 1–3, and
+reject duplicates, extras, dropped slots, missing/default/generated/identity
+declarations or contradictory expression records. The three rows must match
+the native `(chunk_id oid, chunk_seq int4, chunk_data bytea)` types, lengths,
+by-value/alignment, ordinals and names, with plain storage, no compression,
+native typmod/dimension/collation declarations and no missing carrier. This
+profile is established from fixed facts/presence without following an array or
+expression. Native catalog NOT NULL flags do not require a constraint fetch:
+PG17 checks `relchecks`; PG18's catalog classification skips the additional
+noncatalog NOT NULL path. Do not substitute that rule for the other checks.
+
+NULL options are the bootstrap metadata-TOAST profile: `BootstrapToastTable`
+passes a zero options Datum, and `extractRelOptions` returns before any parser
+when the class field is NULL. `validate=false` alone is not callback admission;
+registered string options can still invoke fill callbacks. Altered options or
+structural/provider definitions of these pinned catalog descriptors are an
+unsupported profile for this component. This restriction does not reject large
+or compressed ordinary defaults. Admitting mutable catalog options requires
+their independent carrier/provider closure rather than a permissive postcheck.
+
+The backend must have completed native critical relcache initialization:
+`criticalRelcachesBuilt` is already true, and `ClassOidIndexId` and
+`AttributeRelidNumIndexId` are the native nailed, fully initialized indexes
+with their source-admitted builtin btree support. Check their actual fixed
+class/storage/namespace identity and physically present NULL options in B
+before entering a descriptor path. Do not set the flag, emulate startup, cold
+build replacement critical support or accept arbitrary callback history. Native
+startup initialization is a prerequisite, not work performed under B.
+
+After B's raw/fact scans end and A/B facts agree, open selected TOAST heaps
+under native refresh exclusion with B's snapshot still registered. Use `NoLock`
+for the target because the exact AS reference is already owned. A cold TOAST
+entry uses `RelationBuildDesc`; an invalidated warm entry uses its full rebuild.
+Their admitted paths read only `pg_class` and `pg_attribute` using the two
+initialized critical indexes, or builtin heap scans if native index use is
+disabled. A critical index invalidation uses `RelationReloadIndexInfo`, retaining
+its initialized support and refreshing class/options/physical identity; it does
+not rebuild arbitrary AM/opclass support. NULL options exclude option callbacks
+in that path too. The continuous profile excludes structural/options/provider
+mutations of these descriptors while this path runs; ordinary application DDL
+and global SI refresh are still allowed.
+
+Before B registration, the physical attempt must already own AS for both
+underlying catalog heaps, both exact critical indexes, all six fact graphs and
+every selected TOAST target. Native nested opens may increment those already
+owned tags but may not wait for a new conflicting relation tag while B is
+registered. Descriptor reference increments and native lock increments are
+separate resources; record and close each exact count without disturbing the
+physical attempt. A descriptor postcheck confirms the admitted facts, builtin
+routine and no rewrite target; it is never the admission proof. Unexpected
+prerequisite/profile disagreement fails before a new descriptor path. Buffer
+and IO work outside raw/S retain native waits and ERROR behavior.
 
 ## Observation and fetch ordering
 
@@ -137,18 +213,22 @@ owned resources; closing one must not release or fabricate the other.
    provider execution. Close all A scans, its registered snapshot and descriptor
    increments before building/acquiring the combined physical graph.
 2. **Acquire.** Obtain every exact physical reference outside raw/S. Refresh SI,
-   installation, fact/TOAST descriptors and real mappings under the existing
-   native refresh exclusion. All native relation-lock acquisition or descriptor
-   loading that could block must finish before B's snapshot is registered.
+   installation, fact descriptors and real mappings under the existing native
+   refresh exclusion. Finish every acquisition that could wait for a new
+   conflicting relation tag before registering B. Do not open a selected TOAST
+   descriptor yet; its fresh pre-open validation belongs to B.
 3. **B — own the payload source.** Make a new coherent six-catalog observation
    with its own registered nonhistoric catalog snapshot. Its publication/private/
    backend/database/context identity must agree with A. End B's raw/gate and
    fact scans, keeping only its snapshot and prepared descriptors alive.
-   Build/compare the complete graphs, selected identities, fixed defining facts
-   and raw carriers outside raw/S. A completed stamp/lifecycle change releases
-   this attempt and retries; unexplained same-identity disagreement errors.
-4. **Fetch.** Using only B pointers, scan each selected actual TOAST heap once
-   outside raw/S, with B's registered snapshot still alive. Assemble and
+   Build/compare the complete graphs, selected identities, fixed defining facts,
+   descriptor profiles and raw carriers outside raw/S. A completed stamp/lifecycle
+   change releases this attempt and retries; unexplained same-identity
+   disagreement errors. Validate B's pre-open profile, then prepare its admitted
+   TOAST descriptors outside raw/S while its snapshot remains registered, using
+   only the already-owned native relation tags and initialized prerequisites.
+4. **Fetch.** Using only B pointers and admitted descriptors, scan each selected
+   actual TOAST heap once outside raw/S, with B's registered snapshot still alive. Assemble and
    normalize selected payloads into owned memory. Check context/snapshot state
    throughout. Close TOAST scans, B's registered snapshot and every B descriptor
    increment when fetching ends. No B snapshot survives a subsequent physical
@@ -158,7 +238,8 @@ owned resources; closing one must not release or fabricate the other.
    final descriptors outside S, then acquire S and make the final coherent raw
    six-catalog observation. Release raw/gate before graph construction and
    comparison. C's full stamp, graph, identities, defining fixed facts, NULL
-   presence and exact source carriers must agree with B (and A). Never fetch,
+   presence, descriptor profiles and exact source carriers must agree with B
+   (and A). Never fetch,
    decompress, reload a descriptor or follow a new pointer under S.
 6. **Consume and close.** Invoke the source-admitted pure C consumer exactly once
    with C's validated identities/facts and B's owned normalized images, while S
@@ -238,7 +319,9 @@ publication. No codec, expression parser or provider is part of normalization.
 
 Each successful invocation makes three full six-catalog observations: eighteen
 catalog scans instead of the current ten scans over five catalogs. Namespace/class/
-index maps still scale with catalog size. Selected attrdef/type payload copying
+index maps still scale with catalog size. The pre-open profile copies use those
+same scans and add bounded selected class/attribute/presence records, not a fourth
+observation. Selected attrdef/type payload copying
 scales with selected records/bytes. TOAST scanning costs one full heap scan per
 selected actual metadata TOAST heap, independent of selected value count;
 lookup/assembly costs scanned chunks plus selected stored/decoded bytes and
@@ -288,13 +371,15 @@ outside the current work scope.
 
 ## Primary source evidence
 
-The finite local manifest `logs/native-variable-catalog-payloads-primary-v2`
-records 24 source bodies per major, rehashes 34 cached bodies and captures 14 new
-HTTP-200 bodies across v1/v2. V1 and v2 seals are constructed from member maps
-before their own files are opened. V2 facts SHA256 is
-`f6922882d442cf81751b00d8a57e6868e60903fc2fad657fa9016f7c278dc70c`;
-its 72-member seal SHA256 is
-`9209d7c03637577f8866a8dfb915eb43bb76f3327c5e0b711287a5dc66d40fc0`.
+The finite local manifest `logs/native-variable-catalog-payloads-primary-v3`
+records 32 source bodies per major, rehashes the preceding 72-member source
+record and adds 16 HTTP-200 bodies for descriptor classification/opening,
+bootstrap TOAST construction, AM initialization and options/index machinery.
+Across v1/v2/v3 there are 34 cached and 30 newly captured bodies. Each seal is
+constructed from its member map before its own file is opened. V3 facts SHA256 is
+`c6bf6baf6b4b09c49790f214488b12dd1e2409eebfc7cd29cfe619ce016abc7a`;
+its 107-member seal SHA256 is
+`89d75367952654a44b252bc39eb8a6fdd7af32826327190a242957afeee0b8f6`.
 These are source/provenance records, not Git-blob, installed-binary or runtime
 identity. Exact command/source bindings are in the release ledger.
 
@@ -311,3 +396,13 @@ Snapshot registration, heap scan, accessor, attrdef writer, compression and
 predicate-lock source bodies are also pinned in that manifest. The selected
 mechanism above is Darmok's design derived from those native paths, not a claim
 that PostgreSQL supplies this whole invocation as one API.
+
+The pre-open correction uses paired
+[PG17 descriptor paths](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/cache/relcache.c),
+[PG18 descriptor paths](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/relcache.c),
+[PG17 catalog classification](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/catalog.c),
+[PG18 catalog classification](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/catalog.c),
+[PG17 bootstrap TOAST construction](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/toasting.c)
+and [PG18 bootstrap TOAST construction](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/toasting.c).
+Native table/relation/index opens, heap/btree handler initialization and the
+options parser's NULL return and callback branches are included in v3.
