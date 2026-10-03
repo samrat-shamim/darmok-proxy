@@ -2,15 +2,18 @@
 #include "postgres.h"
 
 #include "access/heapam.h"
+#include "access/htup_details.h"
 #include "access/table.h"
 #include "access/tableam.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_am_d.h"
+#include "catalog/pg_attribute.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_tablespace_d.h"
+#include "catalog/pg_type.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "storage/proc.h"
@@ -28,10 +31,15 @@
 #define STORAGE_ATTEMPTS 16
 #define STORAGE_NAME_BYTES ((Size) 1024 * 1024)
 #define STORAGE_PHASE_BYTES ((Size) 64 * 1024 * 1024)
-#define STORAGE_HEAPS 3
+#define STORAGE_HEAPS 5
+
+StaticAssertDecl(ATTRIBUTE_FIXED_PART_SIZE ==
+				 offsetof(FormData_pg_attribute, attcollation) + sizeof(Oid),
+				 "native attribute fixed prefix must end at attcollation");
 
 static const Oid fact_heap_oids[STORAGE_HEAPS] = {
-	NamespaceRelationId, RelationRelationId, IndexRelationId
+	NamespaceRelationId, RelationRelationId, IndexRelationId,
+	AttributeRelationId, TypeRelationId
 };
 static bool storage_active = false;
 
@@ -95,6 +103,26 @@ typedef struct StorageNode
 	int position;
 } StorageNode;
 
+typedef struct StorageRoot
+{
+	Oid oid;
+	int attribute_offset;
+} StorageRoot;
+
+typedef struct StorageAttribute
+{
+	/* Exact positive ordinal key, with no native struct padding in the hash. */
+	uint64 key;
+	DarmokHeapAttributeFact fact;
+} StorageAttribute;
+
+typedef struct StorageType
+{
+	Oid oid;
+	bool copied;
+	DarmokHeapTypeFact fact;
+} StorageType;
+
 typedef struct StorageObservation
 {
 	MemoryContext context;
@@ -106,8 +134,17 @@ typedef struct StorageObservation
 	HTAB *classes;
 	HTAB *relation_names;
 	HTAB *indexes;
+	HTAB *selected_roots;
+	HTAB *attribute_rows;
+	HTAB *type_rows;
 	DarmokCatalogStamp stamp;
 	DarmokRelationRequest *roots;
+	DarmokHeapStorageRootFact *root_facts;
+	DarmokHeapAttributeFact *attributes;
+	DarmokHeapTypeFact *types;
+	int attribute_count;
+	int type_count;
+	DarmokHeapObservationCost cost;
 	DarmokHeapStorageFact *facts;
 	DarmokRelationRequest *references;
 	HTAB *nodes;
@@ -211,6 +248,12 @@ storage_observation_init(StorageState *state, StorageObservation *observation)
 											 sizeof(StorageNameKey), sizeof(StorageNamedRelation));
 	observation->indexes = storage_hash(observation, "storage index OIDs",
 									  sizeof(Oid), sizeof(StorageIndex));
+	observation->selected_roots = storage_hash(observation, "storage selected roots",
+											 sizeof(Oid), sizeof(StorageRoot));
+	observation->attribute_rows = storage_hash(observation, "storage positive slots",
+											 sizeof(uint64), sizeof(StorageAttribute));
+	observation->type_rows = storage_hash(observation, "storage live type OIDs",
+										 sizeof(Oid), sizeof(StorageType));
 }
 
 static void
@@ -240,8 +283,92 @@ storage_prepare(StorageObservation *observation)
 	PG_END_TRY();
 }
 
+static Oid
+storage_literal_oid(StorageObservation *observation, const StorageInput *input, int position)
+{
+	StorageNamespaceName *schema = hash_search(observation->namespace_names,
+											 &input->schema, HASH_FIND, NULL);
+	StorageNameKey key = {0};
+	StorageNamedRelation *named;
+
+	if (schema == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_TABLE),
+				 errmsg("native storage schema at root %d does not exist", position)));
+	key.schema_oid = schema->oid;
+	key.name = input->name;
+	named = hash_search(observation->relation_names, &key, HASH_FIND, NULL);
+	if (named == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_TABLE),
+				 errmsg("native storage relation at root %d does not exist", position)));
+	return named->oid;
+}
+
 static void
-storage_read_fixed(StorageObservation *observation)
+storage_copy_attribute(DarmokHeapAttributeFact *fact, const FormData_pg_attribute *row)
+{
+	/* Compiled native fixed prefix only: no attcacheoff/CompactAttribute or
+	 * variable field deformation. Normalize names and compare explicit fields. */
+	memset(fact, 0, sizeof(*fact));
+	fact->relation_oid = row->attrelid;
+	fact->number = row->attnum;
+	storage_name_copy(&fact->name, &row->attname);
+	fact->type_oid = row->atttypid;
+	fact->length = row->attlen;
+	fact->typmod = row->atttypmod;
+	fact->dimensions = row->attndims;
+	fact->by_value = row->attbyval;
+	fact->alignment = row->attalign;
+	fact->storage = row->attstorage;
+	fact->compression = row->attcompression;
+	fact->not_null_declared = row->attnotnull;
+	fact->has_default = row->atthasdef;
+	fact->has_missing = row->atthasmissing;
+	fact->identity = row->attidentity;
+	fact->generated = row->attgenerated;
+	fact->dropped = row->attisdropped;
+	fact->local = row->attislocal;
+	fact->inheritance_count = row->attinhcount;
+	fact->collation_oid = row->attcollation;
+}
+
+static void
+storage_copy_type(DarmokHeapTypeFact *fact, const FormData_pg_type *row)
+{
+	memset(fact, 0, sizeof(*fact));
+	fact->oid = row->oid;
+	fact->schema_oid = row->typnamespace;
+	storage_name_copy(&fact->name, &row->typname);
+	fact->length = row->typlen;
+	fact->by_value = row->typbyval;
+	fact->kind = row->typtype;
+	fact->category = row->typcategory;
+	fact->preferred = row->typispreferred;
+	fact->defined = row->typisdefined;
+	fact->delimiter = row->typdelim;
+	fact->relation_oid = row->typrelid;
+	fact->subscript_oid = row->typsubscript;
+	fact->element_oid = row->typelem;
+	fact->array_oid = row->typarray;
+	fact->input_oid = row->typinput;
+	fact->output_oid = row->typoutput;
+	fact->receive_oid = row->typreceive;
+	fact->send_oid = row->typsend;
+	fact->typmod_input_oid = row->typmodin;
+	fact->typmod_output_oid = row->typmodout;
+	fact->analyze_oid = row->typanalyze;
+	fact->alignment = row->typalign;
+	fact->storage = row->typstorage;
+	fact->not_null_declared = row->typnotnull;
+	fact->base_type_oid = row->typbasetype;
+	fact->typmod = row->typtypmod;
+	fact->dimensions = row->typndims;
+	fact->collation_oid = row->typcollation;
+}
+
+static void
+storage_read_fixed(StorageState *state, StorageObservation *observation)
 {
 	HeapTuple tuple;
 	uint64 rows = 0;
@@ -262,6 +389,7 @@ storage_read_fixed(StorageObservation *observation)
 		NameData key;
 		bool found;
 
+		observation->cost.namespace_rows++;
 		storage_name_copy(&key, &row->nspname);
 		fact = hash_search(observation->namespaces, &row->oid, HASH_ENTER, &found);
 		if (found)
@@ -282,6 +410,7 @@ storage_read_fixed(StorageObservation *observation)
 		StorageNameKey key = {0};
 		bool found;
 
+		observation->cost.relation_rows++;
 		key.schema_oid = row->relnamespace;
 		storage_name_copy(&key.name, &row->relname);
 		named = hash_search(observation->relation_names, &key, HASH_ENTER, &found);
@@ -302,6 +431,8 @@ storage_read_fixed(StorageObservation *observation)
 		fact->fact.toast_oid = row->reltoastrelid;
 		fact->fact.tablespace_oid = row->reltablespace;
 		fact->fact.stored_file_number = row->relfilenode;
+		fact->fact.row_type_oid = row->reltype;
+		fact->fact.declared_attribute_count = row->relnatts;
 		fact->fact.shared = row->relisshared;
 		fact->fact.is_partition = row->relispartition;
 		fact->fact.has_indexes = row->relhasindex;
@@ -315,6 +446,7 @@ storage_read_fixed(StorageObservation *observation)
 		StorageIndex *fact;
 		bool found;
 
+		observation->cost.index_rows++;
 		fact = hash_search(observation->indexes, &row->indexrelid, HASH_ENTER, &found);
 		if (found)
 			elog(ERROR, "duplicate index OID in native storage observation");
@@ -323,6 +455,66 @@ storage_read_fixed(StorageObservation *observation)
 		fact->ready = row->indisready;
 		fact->valid = row->indisvalid;
 		fact->check_xmin = row->indcheckxmin;
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	/* Selection is pure fixed-byte/OID hashing within this SAME registered
+	 * snapshot/raw observation. Full graph/type validation follows outside raw. */
+	for (int i = 0; i < state->count; i++)
+	{
+		Oid oid = storage_literal_oid(observation, &state->inputs[i], i);
+		StorageRoot *root;
+		bool found;
+
+		root = hash_search(observation->selected_roots, &oid, HASH_ENTER, &found);
+		if (!found)
+			root->attribute_offset = 0;
+	}
+	while ((tuple = heap_getnext(observation->scans[3], ForwardScanDirection)) != NULL)
+	{
+		Form_pg_attribute row = (Form_pg_attribute) GETSTRUCT(tuple);
+
+		observation->cost.attribute_rows++;
+		if (row->attnum > 0 &&
+			hash_search(observation->selected_roots, &row->attrelid, HASH_FIND, NULL) != NULL)
+		{
+			uint64 key = ((uint64) row->attrelid << 32) | (uint16) row->attnum;
+			StorageAttribute *attribute;
+			bool found;
+
+			attribute = hash_search(observation->attribute_rows, &key, HASH_ENTER, &found);
+			if (found)
+				elog(ERROR, "duplicate positive slot in native storage observation");
+			storage_copy_attribute(&attribute->fact, row);
+			if (!row->attisdropped && OidIsValid(row->atttypid))
+			{
+				StorageType *type = hash_search(observation->type_rows, &row->atttypid,
+											  HASH_ENTER, &found);
+
+				if (!found)
+				{
+					type->copied = false;
+					memset(&type->fact, 0, sizeof(type->fact));
+				}
+			}
+		}
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	while ((tuple = heap_getnext(observation->scans[4], ForwardScanDirection)) != NULL)
+	{
+		Form_pg_type row = (Form_pg_type) GETSTRUCT(tuple);
+		StorageType *type;
+
+		observation->cost.type_rows++;
+		type = hash_search(observation->type_rows, &row->oid, HASH_FIND, NULL);
+		if (type != NULL)
+		{
+			if (type->copied)
+				elog(ERROR, "duplicate live type OID in native storage observation");
+			storage_copy_type(&type->fact, row);
+			type->copied = true;
+		}
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
 	}
@@ -378,7 +570,7 @@ storage_observe_stamp(DarmokCatalogStamp *stamp)
 }
 
 static bool
-storage_capture(StorageObservation *observation, const DarmokCatalogStamp *expected)
+storage_capture(StorageState *state, StorageObservation *observation, const DarmokCatalogStamp *expected)
 {
 	volatile bool captured = false;
 
@@ -388,7 +580,7 @@ storage_capture(StorageObservation *observation, const DarmokCatalogStamp *expec
 		if (darmok_catalog_fence_try_acquire(&observation->stamp) &&
 			storage_stamp_equal(expected, &observation->stamp))
 		{
-			storage_read_fixed(observation);
+			storage_read_fixed(state, observation);
 			captured = true;
 		}
 	}
@@ -559,6 +751,149 @@ storage_oid_order(const void *a, const void *b)
 	return (left > right) - (left < right);
 }
 
+static int
+storage_attribute_order(const void *a, const void *b)
+{
+	const DarmokHeapAttributeFact *left = a;
+	const DarmokHeapAttributeFact *right = b;
+
+	if (left->relation_oid != right->relation_oid)
+		return (left->relation_oid > right->relation_oid) -
+			(left->relation_oid < right->relation_oid);
+	return (left->number > right->number) - (left->number < right->number);
+}
+
+static int
+storage_type_order(const void *a, const void *b)
+{
+	const DarmokHeapTypeFact *left = a;
+	const DarmokHeapTypeFact *right = b;
+
+	return (left->oid > right->oid) - (left->oid < right->oid);
+}
+
+static void
+storage_build_columns(StorageState *state, StorageObservation *observation,
+					  const Oid *oids, int oid_count)
+{
+	long attributes = hash_get_num_entries(observation->attribute_rows);
+	long types = hash_get_num_entries(observation->type_rows);
+	HASH_SEQ_STATUS iter;
+	StorageAttribute *attribute;
+	StorageType *type;
+	int position = 0;
+
+	if (attributes < 0 || types < 0 || types > attributes ||
+		attributes > (long) state->count * MaxHeapAttributeNumber ||
+		(Size) attributes > MaxAllocSize / sizeof(DarmokHeapAttributeFact) ||
+		(Size) types > MaxAllocSize / sizeof(DarmokHeapTypeFact))
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("native storage selected column/type counts exceed native limits")));
+	observation->attribute_count = (int) attributes;
+	observation->type_count = (int) types;
+	if (attributes > 0)
+		observation->attributes = palloc(sizeof(DarmokHeapAttributeFact) * (Size) attributes);
+	storage_budget(observation);
+	if (types > 0)
+		observation->types = palloc(sizeof(DarmokHeapTypeFact) * (Size) types);
+	observation->root_facts = palloc0(sizeof(DarmokHeapStorageRootFact) * state->count);
+	storage_budget(observation);
+	hash_seq_init(&iter, observation->attribute_rows);
+	while ((attribute = hash_seq_search(&iter)) != NULL)
+		observation->attributes[position++] = attribute->fact;
+	if (position != observation->attribute_count)
+		elog(ERROR, "native storage positive slot count changed during copied validation");
+	if (attributes > 1)
+		qsort(observation->attributes, (Size) attributes, sizeof(DarmokHeapAttributeFact), storage_attribute_order);
+	position = 0;
+	hash_seq_init(&iter, observation->type_rows);
+	while ((type = hash_seq_search(&iter)) != NULL)
+	{
+		StorageNamespace *schema = hash_search(observation->namespaces, &type->fact.schema_oid,
+											  HASH_FIND, NULL);
+
+		if (!type->copied || !type->fact.defined || !OidIsValid(type->oid) ||
+			type->fact.oid != type->oid || schema == NULL || !OidIsValid(type->fact.schema_oid))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage live column type is missing, undefined or inconsistent")));
+		type->fact.schema_name = schema->name;
+		observation->types[position++] = type->fact;
+	}
+	if (position != observation->type_count)
+		elog(ERROR, "native storage live type count changed during copied validation");
+	if (types > 1)
+		qsort(observation->types, (Size) types, sizeof(DarmokHeapTypeFact), storage_type_order);
+	position = 0;
+	for (int i = 0; i < oid_count; i++)
+	{
+		StorageClass *heap = storage_class(observation, oids[i]);
+		StorageRoot *root = hash_search(observation->selected_roots, &oids[i], HASH_FIND, NULL);
+		int count = heap->fact.declared_attribute_count;
+
+		if (root == NULL || count < 0 || count > MaxHeapAttributeNumber)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage declared column count is inconsistent")));
+		root->attribute_offset = position;
+		for (int number = 1; number <= count; number++)
+		{
+			DarmokHeapAttributeFact *fact;
+
+			if (position >= observation->attribute_count ||
+				observation->attributes[position].relation_oid != oids[i] ||
+				observation->attributes[position].number != number)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg("native storage positive column ordinals do not match relnatts")));
+			fact = &observation->attributes[position++];
+			if (fact->dropped)
+			{
+				if (OidIsValid(fact->type_oid))
+					ereport(ERROR,
+							(errcode(ERRCODE_DATA_CORRUPTED),
+							 errmsg("native storage dropped column has a live type link")));
+			}
+			else
+			{
+				type = hash_search(observation->type_rows, &fact->type_oid, HASH_FIND, NULL);
+				if (!OidIsValid(fact->type_oid) || type == NULL || !type->copied ||
+					fact->length != type->fact.length ||
+					fact->by_value != type->fact.by_value ||
+					fact->alignment != type->fact.alignment)
+					ereport(ERROR,
+							(errcode(ERRCODE_DATA_CORRUPTED),
+							 errmsg("native storage live column/type physical layout is inconsistent")));
+				/* Storage/compression, typmod, dimensions, collation and NOT NULL
+				 * are independent column declarations, not type-layout redundancy. */
+			}
+		}
+		if (position < observation->attribute_count &&
+			observation->attributes[position].relation_oid == oids[i])
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage has excess positive column ordinals")));
+	}
+	if (position != observation->attribute_count)
+		elog(ERROR, "native storage has an unselected positive column");
+	for (int i = 0; i < state->count; i++)
+	{
+		Oid oid = observation->roots[i].relation_oid;
+		StorageClass *heap = storage_class(observation, oid);
+		StorageRoot *root = hash_search(observation->selected_roots, &oid, HASH_FIND, NULL);
+		DarmokHeapStorageRootFact *fact = &observation->root_facts[i];
+
+		if (root == NULL)
+			elog(ERROR, "native storage lost a selected root binding");
+		fact->oid = oid;
+		fact->row_type_oid = heap->fact.row_type_oid;
+		fact->declared_attribute_count = heap->fact.declared_attribute_count;
+		fact->attribute_offset = root->attribute_offset;
+	}
+	storage_budget(observation);
+}
+
 static void
 storage_build_graph(StorageState *state, StorageObservation *observation)
 {
@@ -584,38 +919,24 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 	for (int i = 0; i < state->count; i++)
 	{
 		StorageInput *input = &state->inputs[i];
-		StorageNamespaceName *schema = hash_search(observation->namespace_names,
-												 &input->schema, HASH_FIND, NULL);
-		StorageNameKey key = {0};
-		StorageNamedRelation *named;
+		Oid oid = storage_literal_oid(observation, input, i);
 		StorageClass *heap;
 		StorageMode *mode;
 		bool found;
 
-		if (schema == NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_TABLE),
-					 errmsg("native storage schema at root %d does not exist", i)));
-		key.schema_oid = schema->oid;
-		key.name = input->name;
-		named = hash_search(observation->relation_names, &key, HASH_FIND, NULL);
-		if (named == NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_TABLE),
-					 errmsg("native storage relation at root %d does not exist", i)));
-		heap = storage_class(observation, named->oid);
+		heap = storage_class(observation, oid);
 		if (heap->fact.kind != RELKIND_RELATION || heap->fact.is_partition ||
 			heap->fact.access_method_oid != HEAP_TABLE_AM_OID)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("native storage admits only ordinary nonpartitioned builtin heaps")));
-		observation->roots[i].relation_oid = named->oid;
+		observation->roots[i].relation_oid = oid;
 		observation->roots[i].lock_mode = input->mode;
-		mode = hash_search(modes, &named->oid, HASH_ENTER, &found);
+		mode = hash_search(modes, &oid, HASH_ENTER, &found);
 		if (!found)
 		{
 			mode->mask = 0;
-			oids[oid_count++] = named->oid;
+			oids[oid_count++] = oid;
 		}
 		mode->mask |= 1 << input->mode;
 	}
@@ -646,6 +967,7 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 			storage_append_indexes(state, observation, toast, mask);
 		}
 	}
+	storage_build_columns(state, observation, oids, oid_count);
 	pfree(oids);
 	storage_budget(observation);
 }
@@ -689,6 +1011,8 @@ storage_definition_equal(const DarmokHeapStorageFact *a, const DarmokHeapStorage
 		a->toast_oid == b->toast_oid && a->parent_oid == b->parent_oid &&
 		a->tablespace_oid == b->tablespace_oid &&
 		a->stored_file_number == b->stored_file_number &&
+		a->row_type_oid == b->row_type_oid &&
+		a->declared_attribute_count == b->declared_attribute_count &&
 		a->file_tablespace_oid == b->file_tablespace_oid &&
 		a->file_database_oid == b->file_database_oid &&
 		a->file_proc_number == b->file_proc_number &&
@@ -702,19 +1026,61 @@ storage_definition_equal(const DarmokHeapStorageFact *a, const DarmokHeapStorage
 	 * Native relfilenumber replacement requires exclusive relation ownership. */
 }
 
+static bool
+storage_attribute_equal(const DarmokHeapAttributeFact *a, const DarmokHeapAttributeFact *b)
+{
+	return a->relation_oid == b->relation_oid && a->number == b->number &&
+		memcmp(&a->name, &b->name, sizeof(NameData)) == 0 &&
+		a->type_oid == b->type_oid && a->length == b->length &&
+		a->typmod == b->typmod && a->dimensions == b->dimensions &&
+		a->by_value == b->by_value && a->alignment == b->alignment &&
+		a->storage == b->storage && a->compression == b->compression &&
+		a->not_null_declared == b->not_null_declared &&
+		a->has_default == b->has_default && a->has_missing == b->has_missing &&
+		a->identity == b->identity && a->generated == b->generated &&
+		a->dropped == b->dropped && a->local == b->local &&
+		a->inheritance_count == b->inheritance_count && a->collation_oid == b->collation_oid;
+}
+
+static bool
+storage_type_equal(const DarmokHeapTypeFact *a, const DarmokHeapTypeFact *b)
+{
+	return a->oid == b->oid && a->schema_oid == b->schema_oid &&
+		memcmp(&a->schema_name, &b->schema_name, sizeof(NameData)) == 0 &&
+		memcmp(&a->name, &b->name, sizeof(NameData)) == 0 &&
+		a->length == b->length && a->by_value == b->by_value &&
+		a->kind == b->kind && a->category == b->category &&
+		a->preferred == b->preferred && a->defined == b->defined &&
+		a->delimiter == b->delimiter && a->relation_oid == b->relation_oid &&
+		a->subscript_oid == b->subscript_oid && a->element_oid == b->element_oid &&
+		a->array_oid == b->array_oid && a->input_oid == b->input_oid &&
+		a->output_oid == b->output_oid && a->receive_oid == b->receive_oid &&
+		a->send_oid == b->send_oid && a->typmod_input_oid == b->typmod_input_oid &&
+		a->typmod_output_oid == b->typmod_output_oid && a->analyze_oid == b->analyze_oid &&
+		a->alignment == b->alignment && a->storage == b->storage &&
+		a->not_null_declared == b->not_null_declared && a->base_type_oid == b->base_type_oid &&
+		a->typmod == b->typmod && a->dimensions == b->dimensions &&
+		a->collation_oid == b->collation_oid;
+}
+
 static void
 storage_compare(StorageState *state)
 {
 	StorageObservation *a = &state->initial;
 	StorageObservation *b = &state->final;
 
-	if (a->fact_count != b->fact_count || a->reference_count != b->reference_count)
+	if (a->fact_count != b->fact_count || a->reference_count != b->reference_count ||
+		a->attribute_count != b->attribute_count || a->type_count != b->type_count)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("native storage graph changed without a publication identity change")));
 	for (int i = 0; i < state->count; i++)
 		if (a->roots[i].relation_oid != b->roots[i].relation_oid ||
-			a->roots[i].lock_mode != b->roots[i].lock_mode)
+			a->roots[i].lock_mode != b->roots[i].lock_mode ||
+			a->root_facts[i].oid != b->root_facts[i].oid ||
+			a->root_facts[i].row_type_oid != b->root_facts[i].row_type_oid ||
+			a->root_facts[i].declared_attribute_count != b->root_facts[i].declared_attribute_count ||
+			a->root_facts[i].attribute_offset != b->root_facts[i].attribute_offset)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage literal binding changed without publication")));
@@ -732,6 +1098,16 @@ storage_compare(StorageState *state)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage exact references changed without publication")));
+	for (int i = 0; i < a->attribute_count; i++)
+		if (!storage_attribute_equal(&a->attributes[i], &b->attributes[i]))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage column definition changed without publication")));
+	for (int i = 0; i < a->type_count; i++)
+		if (!storage_type_equal(&a->types[i], &b->types[i]))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage type definition changed without publication")));
 }
 
 static void
@@ -854,7 +1230,7 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 				storage_observation_init(state, &state->initial);
 				storage_prepare(&state->initial);
 				storage_context_check(state);
-				if (storage_capture(&state->initial, &before))
+				if (storage_capture(state, &state->initial, &before))
 				{
 					storage_close_reader(&state->initial);
 					storage_context_check(state);
@@ -867,7 +1243,7 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 					storage_context_check(state);
 					if (darmok_statement_guard_acquire(&state->semantic))
 					{
-						if (storage_capture(&state->final, &state->initial.stamp))
+						if (storage_capture(state, &state->final, &state->initial.stamp))
 						{
 							DarmokHeapStorageView view;
 
@@ -876,6 +1252,17 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 							storage_context_check(state);
 							view.roots = state->final.roots;
 							view.root_count = state->count;
+							view.root_facts = state->final.root_facts;
+							view.attributes = state->final.attributes;
+							view.attribute_count = state->final.attribute_count;
+							view.types = state->final.types;
+							view.type_count = state->final.type_count;
+							view.attribute_array_bytes = sizeof(DarmokHeapAttributeFact) * (Size) view.attribute_count;
+							view.type_array_bytes = sizeof(DarmokHeapTypeFact) * (Size) view.type_count;
+							state->initial.cost.allocated_bytes = MemoryContextMemAllocated(state->initial.context, true);
+							state->final.cost.allocated_bytes = MemoryContextMemAllocated(state->final.context, true);
+							view.initial_cost = state->initial.cost;
+							view.final_cost = state->final.cost;
 							view.facts = state->final.facts;
 							view.fact_count = state->final.fact_count;
 							view.references = state->final.references;

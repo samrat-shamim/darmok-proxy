@@ -1,15 +1,19 @@
 # Private fixed column and type facts
 
-Status: finite design accepted conditionally at clean `23842c4` on PostgreSQL
-17.11/18.6 primary source evidence. Implementation and exact-source runtime
-verification are pending. This extends the [private heap-storage
+Status: the finite fixed-fact extension is implemented on the feature branch,
+following conditional design review at clean `23842c4` on PostgreSQL 17.11/18.6
+primary source evidence. Exact-source build/runtime and independent
+implementation verification are pending. This extends the [private heap-storage
 invocation](native-heap-storage.md); it does not admit SQL or an executor.
 
 One coherent raw observation copies fixed `pg_namespace`, `pg_class` and
 `pg_index` maps, resolves exact counted literal root names to actual OIDs, then
 fully scans `pg_attribute` and `pg_type` under the same registered nonhistoric
 catalog snapshot. Only positive slots for the selected roots and fixed type
-rows referenced by their live slots are copied. All five descriptors are
+rows referenced by their live slots are copied. Pure literal/hash construction
+rejects missing roots and duplicate identities during copying; native ERROR
+unwinds and requires abort. Full cardinality/layout/schema validation and
+graph construction occur after raw release from the coherent copies. All five descriptors are
 prepared outside raw exclusion and semantic S. No index/syscache/provider lane
 or join across independently stamped observations replaces these scans.
 
