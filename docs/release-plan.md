@@ -2246,3 +2246,67 @@ read-view/lock equivalence, table execution, serving, real-driver/cache/
 performance/artifact, hosted CI and release gates remain open. Security,
 compiler PR #4, stress/forced interruption, remote CI/account actions and
 release publication remain excluded; the goal remains active.
+
+### Private native interlock source selection; current verification pending
+
+PR [#50](https://github.com/samrat-shamim/darmok-proxy/pull/50) was normally
+squash-merged to `b9869aefb31eef5c9753666a0954aec03388818d`, tree
+`6cc4f3628381470ef4295682d5c01087be352f6a`, from reviewed leaf
+`d5f41668464a1463eadee8dc05a750b510720466`. Issue49 is closed; issue46 remains
+open. Historical publication acceptance cannot certify a new semantic tag.
+
+`feat/native-statement-guards` drafts the
+[private C interlock](native-statement-guards.md): semantic reader S, publisher
+RX, compatible prepare-coverage AS, exact owned reference cleanup, short
+shared-drop semantic drain before intent and immediate reader postcheck without
+CV sleep. Native concurrent 2PC remains enabled. There is no SQL lease/frontend
+handle/application statement lane/executable-plan constructor.
+
+Frozen proposals rejected a retained shared-drop writer for two static native
+queue cycles. The refined short drain removes those edges conditionally. Native
+readiness uses each actual prepared dummy under TwoPhase SH then every native
+lock partition SH. Paired native startup finishes lock replay before primary
+admission; this is not executed recovery acceptance. The withdrawn PID/VXID
+classifier was unproven, including fast-path vs native VXID field distinctions;
+it is not an established recovered-alias counterexample.
+
+Root's immutable `.darmok-work/logs/native-statement-guards-field-matrix-v3`
+contains 238 pinned unique sources, 154 exact full-function/startup excerpts and
+152 actual-0 passive readers. Files seal SHA256
+`dc2e5c24ad9ecf574e015db8c4eac03ccd5362effc0b350c5dbaaf55ac17d1d6`;
+recorded outer `native-statement-guards-b9869ae-10-matrix` actual0 stdout
+`940cb3120504b7e4bba2fe6dde04f08bd1910fd755dae734ee4ad6765b664c1c`.
+The authored field matrix SHA256 is
+`b3f2c1ff39fa74808de61815e327f902cc353b92385effc41bec0303a92063c6`,
+ownership proposal
+`1f5714043686f98ea5062ef64e7d31a5d933810f8181da5c9f8ad6ef7bc158f6`.
+An earlier extractor no-match1 omitted the PostPrepare_Inval callee; its helper,
+partial folder and actual1 outer remain frozen, followed by distinct corrected
+and expanded audits. Passive incorrect-path/no-match navigation is not runtime
+or product evidence.
+
+Independent proposal reports retain all prior failures/static findings:
+`review-native-statement-guards-prepared-readiness-b9869ae-v1` report SHA256
+`d44a170e5d1f48bd19e8f39cd4f198ed0c06a560e93aa95b16522b502862da35`,
+201-file seal
+`9cd799ba8b959c8202624c823f5f44f6f578f8540d88d17f204c895e0800e57e`,
+separate actual0 invocation
+`d5e6c6f658c03d503fdd569313c7922e1b59805dc7ccc1fb5be44a918bafe9cf`;
+`review-native-statement-guards-field-b9869ae-v1` report
+`65ad6524aa3cce77d0954632377422db281283dc8eb55b16bf160027dc771562`,
+223-file seal
+`4a3485162faab150c9d04f51bfb3b7ff325ed1caffd2331ac17a7b8dcd3aeb54`,
+separate actual0 invocation
+`c4efcb35c0c94149320de5c77cd46d4b55054ab5babc36b0e8fcf9907e923bb8`.
+These are external proposal/core-source reviews, with early clean and later
+draft-dirty states distinguished; neither accepts implementation/runtime.
+Required owner switching/restoration, parent promotion/TRANS_INPROGRESS reentry,
+segregated test-only lifetime and volatile automatic tokens/unwind counts are
+implementation contracts requiring fresh code/evidence review.
+
+Current compilation, meaningful PG17/18 fixtures, environment cleanup and scoped
+checks remain pending. Physical/negative/overload closure, neutral preparation,
+callback admission, Describe/materialization, MySQL read-view/lock equivalence
+and rollback-capable execution remain open. No recovery/proxy-throughput/cache/
+artifact/hosted-CI/release gate closes. Standing exclusions and the active goal
+remain unchanged.

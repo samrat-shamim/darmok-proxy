@@ -10,6 +10,10 @@ Statement admission, complete dependency guards, result definitions, plan
 caching and a MySQL table executor remain required before exposing table SQL.
 Component evidence is recorded in the release plan.
 
+The [private native statement interlock](native-statement-guards.md) adds a
+distinct C-only semantic reference and native prepare-coverage marker. It is
+under current verification and does not expose an application execution lane.
+
 ## Installation and identity
 
 Build against the selected server's PGXS development files, preload
@@ -88,14 +92,15 @@ The pre-commit callback precedes native ON COMMIT actions. Rebuilding an existin
 indexed temporary table on `ON COMMIT DELETE ROWS` can wait for `pg_class` after
 that callback. Retaining global Exclusive across this wait would prevent a
 prepared holder from finishing and releasing the catalog lock. The publisher
-therefore retains only its transaction-owned gate through late native work:
+therefore retains its transaction-owned publication and semantic RX references
+through late native work, with neither retaining global:
 
-1. Acquire gate RowExclusive outside the global fence.
+1. Acquire semantic RowExclusive, then gate RowExclusive, outside global.
 2. Acquire global Exclusive, drain admitted raw observers, advance generation,
    and immediately release that exact owned reference, including ordinary ERROR.
 3. Run native ON COMMIT work, catalog waits and invalidation delivery under the
-   gate alone. Prepared completion can still acquire global Exclusive.
-4. Let native transaction lock cleanup release the gate after invalidations.
+   retained references. Prepared completion can still acquire global Exclusive.
+4. Let native transaction lock cleanup release both after invalidations.
    Resetting bookkeeping at the COMMIT callback must not release it early.
 
 Late core temporary-object drops use the same ordering through object hooks.
@@ -131,9 +136,12 @@ catalog publication receives the ordinary commit fence.
 PREPARE keeps metadata private. It rejects reentry during discovery or shared-drop
 intent or active completion and releases any tracked publication gate before
 native two-phase lock transfer. Private metadata invalidates the backend's local identity when
-preparation completes. The module adds no marker locks, GID hash gates or native
-completion-tag capture; PostgreSQL retains its normal preparation lifecycle and
-completion tags.
+preparation completes. Neither existing tag transfers. The private interlock's
+distinct semantic tag adds compatible coverage AS to every native prepare, and
+RX when surviving metadata requires publication exclusion. Native PostgreSQL
+owns mode serialization/transfer/recovery/release. There is no GID hash gate or
+native completion-tag capture; PostgreSQL retains its normal preparation
+lifecycle and completion tags.
 
 Every SQL COMMIT PREPARED or ROLLBACK PREPARED that reaches the utility hook takes
 an invocation-owned global Exclusive reference and advances generation before
@@ -181,7 +189,9 @@ drain would prevent that cleanup from finishing; holding it across a storage
 barrier would likewise prevent retirement. Reader exclusion therefore belongs
 to shared-drop intent, rather than a writer lock spanning those native waits.
 
-Intent is registered before draining old leases. New lease requests wait on a
+An invocation-owned semantic RX drains old semantic readers BEFORE intent is
+registered, then is released before native backend/storage waits. Intent is
+registered before draining old raw observation spans. Raw requests wait on a
 condition variable without either lock, and recheck the shared count after
 acquiring gate Share then global Share to close the admission race. If the
 recheck finds intent, release both before waiting again. Sleeping while retaining
@@ -190,10 +200,13 @@ subtransaction, promotes on subcommit and clears on owning subabort or top-level
 commit/abort. Native exit cleanup also clears it. Multiple droppers each own one
 intent; completion of one cannot reopen admission while another remains. A
 backend owning intent cannot acquire its own read lease or transfer it to PREPARE.
+New private semantic S acquisitions immediately postcheck intent and explicitly
+yield without CV sleep; their caller must release physical attempt references
+before waiting. A held semantic reference encountering intent fails loudly.
 
-Native pre-commit acquires the ordinary publication gate and performs a short
+Native pre-commit acquires semantic RX before the ordinary publication gate and performs a short
 global drain, even when shared drop already advanced generation before
-irreversible effects. It retains the gate through invalidation/lock cleanup.
+irreversible effects. It retains both through invalidation/lock cleanup.
 At commit, clearing intent wakes readers, but the gate still prevents observation
 before native invalidations are delivered.
 Aborts may conservatively advance generation. Both ordinary and exit-time

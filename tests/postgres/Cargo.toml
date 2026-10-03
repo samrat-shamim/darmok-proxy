@@ -80,3 +80,7 @@ path = "catalog_discovery.rs"
 [[test]]
 name = "simple_completion"
 path = "simple_completion.rs"
+
+[[test]]
+name = "server_statement_guards"
+path = "server_statement_guards.rs"

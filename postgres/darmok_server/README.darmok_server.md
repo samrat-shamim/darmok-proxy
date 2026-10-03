@@ -26,6 +26,13 @@ errors. PREPARE keeps metadata private and does not retain that global fence.
 Prepared completion can delay catalog readers while native completion runs and
 advances the catalog generation even when no metadata changes.
 
+The private C statement interlock adds semantic reader/publisher modes and a
+compatible coverage marker in native prepared lock records. This mechanism is
+under current verification. It exposes no SQL lease or application statement
+path; full physical/candidate closure and preparation remain separate gates.
+Its installed C header is internal and has no stable public ABI promise. See
+[`docs/native-statement-guards.md`](../../docs/native-statement-guards.md).
+
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
 separate `darmok` namespace contains SQL compatibility functions. Current
 `darmok init` and `schema verify` still cover only the compatibility namespace;
@@ -78,3 +85,10 @@ It does not force interruptions or run resource stress workloads. Missing server
 dependencies fail the required tests. The private-owner catalog fixtures also
 require `DARMOK_TEST_UNPRELOADED_DATABASE_URL` pointing to the third server and
 run explicitly with `native_backend::tests::native_catalog -- --ignored`.
+
+Private interlock fixtures additionally require a fourth disposable test-image
+server with `shared_preload_libraries=darmok_catalog_probe,darmok_server` and
+native 2PC enabled. `DARMOK_TEST_ORDERED_TWO_PHASE_DATABASE_URL` selects that
+server. The ordered callback removes coverage solely in synthetic lock
+representation fixtures; it is not a production configuration or recovery test.
+Run `--test server_statement_guards` with the same primary environment.
