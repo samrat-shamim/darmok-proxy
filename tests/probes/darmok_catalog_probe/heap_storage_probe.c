@@ -1,10 +1,12 @@
 /* Copyright 2026 Darmok contributors. SPDX-License-Identifier: Apache-2.0 */
 /* Test-only source-admitted pure copying consumer. Never in product images. */
 #include "postgres.h"
+#include "access/detoast.h"
 #include "access/heapam.h"
 #include "access/htup_details.h"
 #include "access/table.h"
 #include "access/tableam.h"
+#include "access/toast_compression.h"
 #include "catalog/pg_type.h"
 #include "fmgr.h"
 #include "funcapi.h"
@@ -38,8 +40,68 @@ static char *status_setting = NULL;
 
 extern PGDLLEXPORT Datum darmok_test_missing_array_image(PG_FUNCTION_ARGS);
 extern PGDLLEXPORT Datum darmok_test_heap_natts(PG_FUNCTION_ARGS);
+extern PGDLLEXPORT Datum darmok_test_varlena_image(PG_FUNCTION_ARGS);
+extern PGDLLEXPORT Datum darmok_test_varlena_carrier(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(darmok_test_missing_array_image);
 PG_FUNCTION_INFO_V1(darmok_test_heap_natts);
+PG_FUNCTION_INFO_V1(darmok_test_varlena_image);
+PG_FUNCTION_INFO_V1(darmok_test_varlena_carrier);
+
+/* Independent ordinary SQL oracles use PostgreSQL's own detoaster and stored
+ * compression introspection. They are never called by the private consumer. */
+Datum
+darmok_test_varlena_image(PG_FUNCTION_ARGS)
+{
+	struct varlena *image = PG_GETARG_VARLENA_P(0);
+	Size bytes = VARSIZE(image);
+	bytea *result;
+
+	if (bytes > MaxAllocSize - VARHDRSZ)
+		elog(ERROR, "native varlena image oracle exceeds native allocation limits");
+	result = palloc(bytes + VARHDRSZ);
+	SET_VARSIZE(result, bytes + VARHDRSZ);
+	memcpy(VARDATA(result), image, bytes);
+	PG_FREE_IF_COPY(image, 0);
+	PG_RETURN_BYTEA_P(result);
+}
+
+Datum
+darmok_test_varlena_carrier(PG_FUNCTION_ARGS)
+{
+	struct varlena *value = (struct varlena *) PG_GETARG_POINTER(0);
+	ToastCompressionId compression = toast_get_compression_id(value);
+	Oid toast_oid = InvalidOid;
+	Oid value_oid = InvalidOid;
+	Size stored = VARSIZE_ANY(value);
+	char kind;
+	char method = compression == TOAST_INVALID_COMPRESSION_ID ? 0 :
+		(compression == TOAST_PGLZ_COMPRESSION_ID ? 'p' : 'l');
+	char *json;
+
+	if (VARATT_IS_EXTERNAL_ONDISK(value))
+	{
+		struct varatt_external pointer;
+
+		VARATT_EXTERNAL_GET_POINTER(pointer, value);
+		toast_oid = pointer.va_toastrelid;
+		value_oid = pointer.va_valueid;
+		stored = VARATT_EXTERNAL_GET_EXTSIZE(pointer);
+		kind = 'e';
+	}
+	else if (VARATT_IS_EXTERNAL(value))
+		elog(ERROR, "native fixture oracle encountered a non-disk external carrier");
+	else if (VARATT_IS_SHORT(value))
+		kind = 's';
+	else if (VARATT_IS_COMPRESSED(value))
+		kind = method;
+	else
+		kind = 'u';
+	json = psprintf("{\"present\":true,\"carrier_kind\":\"%c\",\"compression_kind\":%u,"
+		"\"toast_oid\":%u,\"value_oid\":%u,\"carrier_bytes\":" UINT64_FORMAT
+		",\"stored_bytes\":" UINT64_FORMAT "}", kind, (unsigned char) method,
+		toast_oid, value_oid, (uint64) VARSIZE_ANY(value), (uint64) stored);
+	PG_RETURN_TEXT_P(cstring_to_text(json));
+}
 
 /* Ordinary SQL oracles, outside the private invocation. Core normalizes the
  * actual array; this function does not share the product carrier/envelope code.
@@ -177,11 +239,42 @@ copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
 	appendStringInfo(output, "{\"namespace_rows\":" UINT64_FORMAT
 					 ",\"relation_rows\":" UINT64_FORMAT ",\"index_rows\":" UINT64_FORMAT
 					 ",\"attribute_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
+					 ",\"attrdef_rows\":" UINT64_FORMAT
 					 ",\"missing_carrier_bytes\":" UINT64_FORMAT
+					 ",\"payload_carrier_bytes\":" UINT64_FORMAT
+					 ",\"requested_image_bytes\":" UINT64_FORMAT
 					 ",\"allocated_bytes\":" UINT64_FORMAT "}",
 					 cost->namespace_rows, cost->relation_rows, cost->index_rows,
-					 cost->attribute_rows, cost->type_rows,
-					 (uint64) cost->missing_carrier_bytes, (uint64) cost->allocated_bytes);
+					 cost->attribute_rows, cost->type_rows, cost->attrdef_rows,
+					 (uint64) cost->missing_carrier_bytes, (uint64) cost->payload_carrier_bytes,
+					 (uint64) cost->requested_image_bytes, (uint64) cost->allocated_bytes);
+}
+
+static void
+copy_payload_json(StringInfo output, const DarmokHeapCatalogPayloadFact *fact)
+{
+	const DarmokHeapPayloadImage *value = &fact->value;
+	char kind[2] = {value->carrier_kind, 0};
+
+	appendStringInfo(output, "{\"catalog_oid\":%u,\"row_oid\":%u,\"relation_oid\":%u,"
+		"\"number\":%d,\"field_number\":%d,\"value\":{\"present\":%s,\"carrier_kind\":",
+		fact->catalog_oid, fact->row_oid, fact->relation_oid, fact->number, fact->field_number,
+		value->present ? "true" : "false");
+	escape_json(output, kind);
+	appendStringInfo(output, ",\"compression_kind\":%u,\"toast_oid\":%u,\"value_oid\":%u,"
+		"\"carrier_bytes\":" UINT64_FORMAT ",\"stored_bytes\":" UINT64_FORMAT
+		",\"image_bytes\":" UINT64_FORMAT ",\"image\":",
+		(unsigned char) value->compression_kind, value->toast_oid, value->value_oid,
+		(uint64) value->carrier_bytes, (uint64) value->stored_bytes, (uint64) value->image_bytes);
+	if (value->present)
+	{
+		appendStringInfoChar(output, '"');
+		copy_image_hex(output, value->image, value->image_bytes);
+		appendStringInfoChar(output, '"');
+	}
+	else
+		appendStringInfoString(output, "null");
+	appendStringInfoString(output, "}}");
 }
 
 static void
@@ -246,6 +339,18 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 			copy_image_hex(output, fact->image, fact->image_bytes);
 			appendStringInfoString(output, "\"}");
 		}
+		appendStringInfo(output, "],\"payload_count\":%d,\"payloads\":[", view->payload_count);
+		for (int i = 0; i < view->payload_count; i++)
+		{
+			if (i > 0)
+				appendStringInfoChar(output, ',');
+			copy_payload_json(output, &view->payloads[i]);
+		}
+		appendStringInfoString(output, "],\"uses\":[");
+		for (int i = 0; i < view->use_count; i++)
+			appendStringInfo(output, "%s{\"root_oid\":%u,\"relation_oid\":%u,\"mode_mask\":%u,\"catalog\":%s}",
+				i == 0 ? "" : ",", view->uses[i].root_oid, view->uses[i].relation_oid,
+				view->uses[i].mode_mask, view->uses[i].catalog ? "true" : "false");
 		appendStringInfoString(output, "],\"references\":[");
 		for (int i = 0; i < view->reference_count; i++)
 			appendStringInfo(output, "%s[%u,%d]", i == 0 ? "" : ",",
@@ -286,10 +391,20 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 		appendStringInfo(output, "],\"attribute_array_bytes\":" UINT64_FORMAT
 						 ",\"type_array_bytes\":" UINT64_FORMAT
 						 ",\"missing_array_bytes\":" UINT64_FORMAT
-						 ",\"missing_image_bytes\":" UINT64_FORMAT ",\"initial_cost\":",
+						 ",\"missing_image_bytes\":" UINT64_FORMAT
+						 ",\"payload_array_bytes\":" UINT64_FORMAT
+						 ",\"payload_image_bytes\":" UINT64_FORMAT
+						 ",\"payload_stored_bytes\":" UINT64_FORMAT
+						 ",\"toast_heaps\":" UINT64_FORMAT ",\"toast_rows\":" UINT64_FORMAT
+						 ",\"selected_chunks\":" UINT64_FORMAT ",\"initial_cost\":",
 						 (uint64) view->attribute_array_bytes, (uint64) view->type_array_bytes,
-						 (uint64) view->missing_array_bytes, (uint64) view->missing_image_bytes);
+						 (uint64) view->missing_array_bytes, (uint64) view->missing_image_bytes,
+						 (uint64) view->payload_array_bytes, (uint64) view->payload_image_bytes,
+						 (uint64) view->payload_stored_bytes, view->toast_heaps, view->toast_rows,
+						 view->selected_chunks);
 		copy_cost_json(output, &view->initial_cost);
+		appendStringInfoString(output, ",\"source_cost\":");
+		copy_cost_json(output, &view->source_cost);
 		appendStringInfoString(output, ",\"final_cost\":");
 		copy_cost_json(output, &view->final_cost);
 		appendStringInfoChar(output, '}');
