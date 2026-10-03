@@ -5122,3 +5122,61 @@ new stress/recovery result is introduced by this checkpoint. Concurrent native
 sequence, whole statement/table execution, serving, performance and release
 gates, issues46/15 and the goal stay OPEN. Security, compiler PR4, hosted CI and
 release publication remain excluded.
+
+### Startup reference findings merged; native registry construction traced
+
+PR #67 was normally squash-merged from independently accepted
+`941147b3d1261cb6230f01d9381c28b9ce773996` to public main
+`840dd53e2808ee0ca3c666ee4db0cf221b88bcc2`, tree
+`b63e3833ac43ce9a5dfcacb9a1af4e2bf724a0d0`, parent94d8683. Its four-doc
+checkpoint preserves355 other base entries and all22 native build inputs.
+The independent review retains338 absolute fixed members and no required
+findings. Actual final20/post21/completion22 exit0; own reader13 actual1 remains
+preserved separately from corrected14 and audit17 actual0. Root10 rehashes360
+fixed/completion paths and actually exits0. Its facts at
+`logs/review-native-startup-references-941147b-v1-root-rehash-v1/facts.json`
+have SHA256
+`2733242d6f0c7b2e046c64d71319a57f9bf7b6b039d8f15413b1aef3c3be99c2`.
+Root16 verifies the exact merged tree/parent, public personal repository,
+unchanged generic description, no eligible open PRs after filtering PR4 and
+issues46/15 OPEN. Merged readback facts at
+`logs/native-startup-references-941147b-merged-readback-v1/facts.json` have
+SHA256 `8e8289758e0758de3f5c64ddd2022c84d453a922dfb6d13a7f14412530601396`.
+That acceptance covers the source investigation only, not native startup or
+descriptor admission.
+
+The next isolated branch starts from that exact main. Its
+[native registry trace](native-reloptions-registry.md) identifies global table
+construction and mutations, direct kind-mask registration, borrowed enum data
+and string default-validation effects. Registration is not confined by the API
+to newly allocated custom kinds. Global parsing selects unset definitions too;
+native count assertions and name-based fill dispatch do not establish actual
+registry/parse-table correspondence. Local filler/validator lists remain separate.
+The selected public API supplies no actual global-registry census. The concrete
+construction/witness remains OPEN before new descriptor parsing or opens.
+
+At clean840dd53, root03 rehashes four named reloptions/btree bodies and captures
+two actual HTTP-200 public headers across PostgreSQL17.11/18.6. Root04 actually
+exits0 and saves96 selected records:60 complete function bodies,10 builtin arrays,
+two enum-member arrays,20 type declarations and four bounded declaration spans.
+Seven of48 pairs differ;41 have equal selected bytes. The builtin arrays have
+22/16/3 HEAP/TOAST/BTREE definitions on17 and24/18/3 on18. PostgreSQL18 adds
+two heap/TOAST definitions and explicit-set offsets, including
+vacuum_truncate_set; the native option layout and presence cannot be flattened.
+Other-kind rows captured in the full arrays are outside semantic admission.
+
+Commands use `python3 capture-native-registry-profile-primary-v1.py` and
+`python3 capture-native-registry-profile-functions-v1.py` through the fixed root
+recorder, with `.darmok-work/rustup` and `.darmok-work/native-values/target` as
+the recorded RUSTUP_HOME/CARGO_TARGET_DIR. Primary facts at
+`logs/native-registry-profile-primary-v1/facts.json` have SHA256
+`7c30c41a8aa9681eae2117deac6886f0ddbcd9d265b49d3e2959c2e42728c144`.
+Selected facts/seal under `logs/native-registry-profile-functions-v1` have
+SHA256 `a1c0ad77c5ce57d567b3a6859b9ffd09a2c66df4ebfe5c7b882efa0b7ec527df`
+and `da2ea5a827b21679f020bc286d64e635a604078c9450f4a46952e5c6ccb23570`.
+Independent review and current repository/diff checks are required before merge.
+No C/Rust/SQL, native build/runtime or profile lifecycle change is introduced.
+Concurrent native2PC remains required. Entry/bootstrap/provider/registry/reference/
+writer/sequence, full table execution, serving, performance and release gates,
+issues46/15 and the goal stay OPEN. Security, compiler PR4, hosted CI, new
+stress/recovery experiments and release publication remain excluded.
