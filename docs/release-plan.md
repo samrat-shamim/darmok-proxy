@@ -3152,3 +3152,68 @@ all initial reader increments close before physical waits. Full semantic closure
 variable/provider/name/effect/immutable-IR/preparation/data/executor/lock/serving/
 release gates and issues46/15 stay open. Concurrent native two-phase transactions
 remain in scope. No full-goal completion follows from these design reviews.
+
+
+### Fixed column/type facts first implementation verification (not final acceptance)
+
+Implementation `828692023861fdc31a9989658c00f9bb8dab89ad`, tree
+`dec7fba8990ac02028cb54fb014f2321baf43546`, follows specification `fbba702`.
+The private header/C boundary now copies positive root slots and direct fixed
+live-column types under one registered five-heap observation, compares explicit
+defining fields, preserves column overrides/type0 dropped layout and exposes
+separate scan/selected-array/context costs. Pure hash construction rejects
+missing/duplicate identities while observing; complete cardinality/layout/type
+namespace/graph validation stays outside raw. Such copying ERROR follows normal
+abort-required cleanup; it is never a completed false retry. This clarification
+retains the prior raw hash invariants and involves no variable/provider dispatch.
+
+Recorder `record-catalog-discovery-command-v1.py` SHA
+`27fc25286818869bd1e43351627620b59828833cc7e3a2d1bc04f3338de67122`
+records clean exact before/after source, actual argv/scoped RUSTUP_HOME and
+CARGO_TARGET_DIR, raw streams and child exit. Evidence folders use prefix
+`logs/native-attribute-facts-8286920-`: `04-grammar` captures both pinned native
+grammars0; `05-native-compile`0; strict product/probe PG17/18 builds
+`06-product17`,`07-test17`,`08-product18`,`09-test18`0. Both native compilers and
+LLVM bitcode keep warnings as errors. Twenty exact product/probe inputs include
+packaged documentation. `10-profiles`0 binds all20 inputs and four image IDs;
+127 setup commands0. Fresh eight profiles use ports32855..32862. Primary/ordered
+native maximum is10; disabled2PC is only a negative dependency. Installed native
+headers and packaged README match source. Existing native profiles stay running.
+Setup facts SHA `19d1655b39ff43bd8e5d1c4983a26806beb5c9f798ac3b7f98ff93c8f2cf0257`.
+Paired grammar facts SHA
+`20d6cae0ab7781493838502b8d3de46d22b2d5e4ec306cdd07361a8fff8510fb`;
+three-member seal SHA
+`346dee7094d3a27f43aa95310d91bb5575ca842399b5f84174efe1bacfe5d535`.
+REL_18_6 ConstraintElem uses `NOT NULL ColId` and NOT VALID; no parenthesized
+column syntax or guessed effective nullability was used.
+
+At8286920, `11-storage17`/`12-storage18` each pass9 ordinary fixtures,
+`13-package17`/`14-package18` each pass19 native binaries/146 tests with zero
+failed/ignored (including those9), and `15-owner17`/`16-owner18` explicitly select
+and pass3 private-owner checks each, zero failed/ignored and86 filtered out.
+`17-format`0 and `18-boundaries`0 (9 packages). These are exact8286920 results,
+not current/future-leaf acceptance. New ordinary variants cover fixed-field
+SQL oracles, empty/duplicate ranges,63-byte UTF8/quoted/renamed/dropped slots,
+removed custom types, builtin-like names and shared type IDs, valid storage/
+compression/collation/typmod/dimension/declaration overrides, default/missing/
+identity/stored/virtual-generation flags, PG18 invalid NOT NULL with existing
+NULL data, initial/warm invocation, own TEMP and both prepared ALTER/type rename
+outcomes. Native physical waits hold none of the five catalog reader increments
+or module fences. Complete native suites remain the pre-existing ordinary
+regression matrix, not new stress/signal/error-injection experiments.
+
+Strict workspace/all-target/all-feature Clippy `19-clippy` actually exits101;
+raw stderr SHA `88c633697fe779411174468a6e0db5c3e972cebce21daa05eaee6f1f84644879`.
+Rust1.96 Clippy flags the new test's manual `bytes % count == 0` divisibility
+predicate. The nonzero-count branch can express the same invariant through
+`bytes.is_multiple_of(count)`; use that native predicate without suppressing
+warnings or removing the assertion. Native product/probe inputs do not change.
+The original actual101 receipt and streams remain immutable. Fresh current-leaf
+fixture/static/cost/environment and independent implementation review remain
+required. No full workspace test, full descriptor/SQL/admission/executor/MySQL
+lock/serving/release gate or full-goal completion follows.
+
+A passive receipt inventory pattern for an assumed `native17` suffix returned
+no matches1; a broader known-lane inventory identified `package17` and returned0.
+This was filename discovery, not a product/runtime check. No missing path was
+read, source was unchanged, and no native failure was relabeled.

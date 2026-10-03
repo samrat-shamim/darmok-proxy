@@ -207,7 +207,7 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
         if count == 0 {
             assert_eq!(bytes, 0);
         } else {
-            assert!(bytes > count as u64 && bytes % count as u64 == 0);
+            assert!(bytes > count as u64 && bytes.is_multiple_of(count as u64));
         }
     }
 }
