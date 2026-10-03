@@ -807,7 +807,27 @@ async fn explicit_unsupported_boundaries_abort_the_child_and_allow_fresh_admissi
         let parent = oid(&observer,"heap_storage_limits","parent").await;
         let parent_expected = oracle(&observer,parent).await;
         let parent_columns = column_oracle(&observer, &[parent]).await;
+        let child = oid(&observer,"heap_storage_limits","child").await;
+        let child_expected = oracle(&observer,child).await;
+        let child_columns = column_oracle(&observer, &[child]).await;
+        assert_eq!(child_columns.attributes.len(),1);
+        assert_eq!(child_columns.attributes[0]["local"],false);
+        assert!(child_columns.attributes[0]["inheritance_count"].as_i64().unwrap() > 0);
         let all: Vec<u32> = observer.query("SELECT oid FROM pg_catalog.pg_class WHERE relnamespace=(SELECT oid FROM pg_catalog.pg_namespace WHERE nspname='heap_storage_limits')",&[]).await.unwrap().into_iter().map(|row| row.get(0)).collect();
+        // Inheritance is a copied column declaration. An exact child binding
+        // neither expands its parent nor selects a data snapshot during copying.
+        for established in [false,true] {
+            sql(&reader,if established { "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1" } else { "BEGIN" }).await.unwrap();
+            let child_state = capture(&reader,&json!([["heap_storage_limits","child",1]]),false).await;
+            check_scope(&child_state,established,false);
+            check_graph(&child_state,&child_expected,2);
+            check_columns(&child_state,&child_columns);
+            assert_eq!(child_state["metadata"]["roots"],json!([[child,1]]));
+            assert_eq!(fact_oids(&child_state),vec![child]);
+            assert!(probe.modes(&observer,Some(backend),&all).await.is_empty());
+            probe.no_coordination(&observer,backend).await;
+            sql(&reader,"COMMIT").await.unwrap();
+        }
         sql(&reader,"BEGIN").await.unwrap();
         let parent_state = capture(&reader,&json!([["heap_storage_limits","parent",1]]),false).await;
         check_scope(&parent_state,false,false);

@@ -3217,3 +3217,80 @@ A passive receipt inventory pattern for an assumed `native17` suffix returned
 no matches1; a broader known-lane inventory identified `package17` and returned0.
 This was filename discovery, not a product/runtime check. No missing path was
 read, source was unchanged, and no native failure was relabeled.
+
+### Fixed column/type facts reviewed verification and inherited-column finding
+
+Clean tested `32b4e29a0be641541b6b738bdbaba9a1f3b1e2e3`, tree
+`99a30581f292487a5010cd8e5db6578da2e192a0`, corrects only the test divisibility
+predicate and preceding ledger relative to built `8286920`. Exclusive input
+binding proves all20 native product/probe inputs, including packaged README,
+equal the built Git bytes and setup hashes; binding facts SHA
+`1cc1c5ead1de22be37bf069547a586fcfe8cdff69c8aea556d17369652fcda40`.
+No old receipt or failed Clippy result is modified.
+
+Recorder prefix `logs/native-attribute-facts-32b4e29-` records source/scoped
+environment/actual argv and exits: `20-input-bind`0; workspace all-target/
+all-feature strict `21-clippy`0; `22-format`0; `23-boundaries`0 (9 packages);
+strict tokio-postgres library `24-connector-clippy`0. `25-storage17` and
+`26-storage18` each pass9 required fixtures; `27-package17` and `28-package18`
+each pass19 binaries/146 native tests, zero failed/ignored (including the9).
+Explicit `29-owner17` and `30-owner18` each pass3 owner checks, zero failed/
+ignored and86 filtered out. These are32b4e29 results, not later-leaf acceptance.
+
+`31-cost17`/`32-cost18` wrap new exclusive ordinary measurement bodies under
+`logs/native-attribute-facts-32b4e29-cost{17|18}-v1`, actual0:32 warmups and128
+sequential SET calls per major, one TCP-loopback psql connection, five storage
+nodes/thirteen exact references/two selected positive slots/two actual types.
+PG17 p50/p95/max are525500/701000/835000ns; PG18 are499000/747000/1031000ns.
+Timings include both five-catalog observations, graph/SI/descriptor/native
+owner/lock and pure-copy/protocol work. Psql prints1us quantization; the even
+sample median has500ns granularity. Final-view attribute/type arrays are208/
+416 bytes; each observation context is1204320 bytes on17 and1237088 on18.
+Five scanned-row counts remain separate. Only the final view is inspected;
+these are not peak/process/allocation-event/throughput/contention, isolated-C,
+baseline or full-performance measurements.
+
+`33-environment`0 records85 successful commands with eight exact healthy
+running profiles, unchanged image/container IDs and installed native headers/
+libraries/bitcode/probe/packaged README. Checked prepared/module/mock refs and
+old/new fixture tables/schemas/types are zero. Primary/ordered native2PC remains
+10. Final environment facts SHA
+`347e1877b8f3de9d5fb5987bb05dbb4fff0962c6c952a37849c2c34e80ab0d69`.
+Fresh root source inspection covers the entire C/header/probe and976 fixture
+lines. `34-author-audit`0 seals1457 members, facts SHA
+`cd99a3d59f2842fc1443bd8dd35f714a606b04ea42df746417c562019ea4369e`,
+seal SHA `0074c30215d73cfc5103dfecc670b3f5f68d58632fce6be274f8f320c0eae45e`.
+
+Independent frozen implementation review is
+`logs/review-native-attribute-facts-32b4e29-implementation-v1`. Report SHA
+`94879cafac6671ab26d19c79467ff25e72c4c20dcd6d625fb98038bb90d565bb`,
+facts SHA `03a701313d8c77118005534ce4e1ffb12096717a184bd52ed058132149273d82`,
+1762-member seal SHA
+`cf22b08e5c493e5e180c0cc5fc6cc64804ff5b62cf7a6b69735723a36f94bb26`.
+Actually executed `42-final-invocation.json`0 SHA
+`6b33b1538e70b20ebebbed25aa4eb192ad578eef74efb70885b93ea719e214c1`
+and separate `43-post-invocation.json`0 SHA
+`9a73d3d17ffae3e6ae4a05a504b51a43048b5b18803e8ceb0de3927a4323ea76`
+retain three clean Git readers and post facts SHA
+`dcff3e3e90e748406f7de28971cff3c712ff32d78a561b56b326b34e312cc3d8`.
+Own passive reader failures128/128/1 remain preserved; corrected reads pass.
+Root `35-review-rehash`0 verifies1762+companions1777 unique paths, root record
+SHA `2151249066a1400b6e235a868b1092d383edfc480d168668b128683203b03f9d`.
+
+Review identifies no C defect, closes C1's layout/override requirement and
+confirms P1's selected copying, but withholds final component acceptance for
+required C2/P2 inherited-column coverage. The existing fixture creates a child
+yet selects only its parent; selected positive slots all had local=true and
+inheritance_count0. The next correction selects that actual child without
+parent/descendant expansion, asserts nonlocal/positive inherited declarations,
+compares complete native column/type oracles and checks fresh/established data
+views and release ownership. Current corrected-source tests and independent
+C2 closure remain pending. No metadata implementation change follows from
+this coverage finding, and no earlier evidence is relabeled as acceptance.
+
+A root ad-hoc commands-manifest schema peek returned1 because the JSON object
+contains reader arrays rather than being a top-level array. A key-aware reader
+returned0. This is a reader bookkeeping error, not a native/review result;
+source was unchanged and recorded full rehash35 actually returned0.
+Full closure/effects/preparation/execution/MySQL data/lock/serving/release gates,
+issues46/15 and the goal remain open. Standing exclusions are unchanged.
