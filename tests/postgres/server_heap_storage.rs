@@ -179,9 +179,12 @@ async fn create_missing_oracles(client: &Client, schema: &str) {
 async fn missing_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Value> {
     let schema = quoted(schema);
     tokio::time::timeout(DEADLINE, client.query(&format!(
-        "WITH observed AS MATERIALIZED (SELECT attrelid,attnum,atttypid,pg_catalog.pg_column_size(attmissingval) stored_bytes,pg_catalog.pg_column_compression(attmissingval) compression,{schema}.image(attmissingval) image FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atthasmissing) SELECT pg_catalog.json_build_object('relation_oid',attrelid::bigint,'number',attnum,'type_oid',atttypid::bigint,'carrier_kind',CASE WHEN compression='pglz' THEN 'p' WHEN compression='lz4' THEN 'l' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image)-3 THEN 's' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image) THEN 'u' ELSE 'unexpected-native-form' END,'stored_bytes',stored_bytes,'image_bytes',pg_catalog.octet_length(image),'image',pg_catalog.encode(image,'hex'))::text FROM observed ORDER BY attrelid,attnum"
+        "WITH observed AS MATERIALIZED (SELECT attrelid,attnum,atttypid,pg_catalog.pg_column_size(attmissingval) stored_bytes,pg_catalog.pg_column_compression(attmissingval) compression,{schema}.image(attmissingval) image,pg_catalog.array_ndims(attmissingval) ndim,pg_catalog.array_length(attmissingval,1) dim,pg_catalog.array_lower(attmissingval,1) lbound FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atthasmissing) SELECT pg_catalog.json_build_object('relation_oid',attrelid::bigint,'number',attnum,'type_oid',atttypid::bigint,'carrier_kind',CASE WHEN compression='pglz' THEN 'p' WHEN compression='lz4' THEN 'l' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image)-3 THEN 's' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image) THEN 'u' ELSE 'unexpected-native-form' END,'stored_bytes',stored_bytes,'image_bytes',pg_catalog.octet_length(image),'image',pg_catalog.encode(image,'hex'))::text,ndim,dim,lbound FROM observed ORDER BY attrelid,attnum"
     ), &[&roots])).await.expect("bounded independent missing image oracle did not complete").unwrap()
-        .into_iter().map(|row|serde_json::from_str(&row.get::<_,String>(0)).unwrap()).collect()
+        .into_iter().map(|row|{
+            for column in 1..=3 { assert_eq!(row.get::<_,Option<i32>>(column),Some(1)); }
+            serde_json::from_str(&row.get::<_,String>(0)).unwrap()
+        }).collect()
 }
 
 fn check_missing(state: &Value, expected: &[Value]) {
@@ -261,18 +264,32 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
 }
 
 fn check_graph(state: &Value, expected: &[Value], root_mask: u64) {
+    let root = u32::try_from(expected[0]["oid"].as_u64().unwrap()).unwrap();
+    check_graph_modes(state, expected, &BTreeMap::from([(root, root_mask)]));
+}
+
+fn check_graph_modes(state: &Value, expected_facts: &[Value], root_masks: &BTreeMap<u32, u64>) {
     let metadata = &state["metadata"];
     let facts = metadata["facts"].as_array().unwrap();
-    assert_eq!(facts.len(), expected.len());
+    assert_eq!(facts.len(), expected_facts.len());
     let mut references = Vec::new();
-    for (actual, expected) in facts.iter().zip(expected) {
+    for (actual, expected) in facts.iter().zip(expected_facts) {
         for (key, value) in expected.as_object().unwrap() {
             assert_eq!(&actual[key], value, "{key}: {actual}");
         }
         let toast = expected["kind"] == u64::from(b't')
-            || facts.iter().any(|parent| {
+            || expected_facts.iter().any(|parent| {
                 parent["oid"] == expected["parent_oid"] && parent["kind"] == u64::from(b't')
             });
+        let mut ancestor = expected;
+        while ancestor["parent_oid"] != 0 {
+            ancestor = expected_facts
+                .iter()
+                .find(|fact| fact["oid"] == ancestor["parent_oid"])
+                .unwrap();
+        }
+        let root = u32::try_from(ancestor["oid"].as_u64().unwrap()).unwrap();
+        let root_mask = root_masks[&root];
         let mask = if toast {
             2 | (root_mask & 8)
         } else {
@@ -543,6 +560,11 @@ async fn missing_images_preserve_native_storage_forms_and_present_nulls() {
         let parent = oid(&observer,schema,"parent").await;
         let child = oid(&observer,schema,"child").await;
         let oids = [root,parent,child];
+        let mut ordered = oids;
+        ordered.sort_unstable();
+        let mut graph = Vec::new();
+        for oid in ordered { graph.extend(oracle(&observer,oid).await); }
+        let masks = BTreeMap::from([(root,14),(parent,2),(child,2)]);
         let roots = json!([[schema,"t",3],[schema,"child",1],[schema,"parent",1],[schema,"t",1],[schema,"t",2]]);
         let mut previous: Option<Vec<Value>> = None;
         for phase in 0..3 {
@@ -607,6 +629,7 @@ async fn missing_images_preserve_native_storage_forms_and_present_nulls() {
                     check_scope(&state,established,false);
                     check_columns(&state,&columns);
                     check_missing(&state,&images);
+                    check_graph_modes(&state,&graph,&masks);
                     assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][3]);
                     assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][4]);
                     assert!(probe.modes(&observer,Some(backend),&fact_oids(&state)).await.is_empty());

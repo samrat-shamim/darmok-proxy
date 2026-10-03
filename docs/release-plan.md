@@ -3577,3 +3577,28 @@ their unchanged historical inputs. C1 runtime closure, full descriptor/value/
 default/TOAST/provider/effect/preparation/IR/execution/MySQL row/read-lock,
 serving/cache/full performance/artifact/release gates, issues46/15 and the full
 goal remain open. All previously recorded exclusions remain in force.
+
+The native candidate is committed at
+`d0f607ec4861fabe64f362da933199c1590a7f0d`, tree
+`7af99eb2ffabfbf612c2b0789859348f621cfbf0`. Recorder prefix
+`logs/native-missing-images-d0f607e-` records `01-product17`, `02-probe17`,
+`03-product18` and `04-probe18`, all actual0, with GCC `-Werror`, LLVM bitcode
+and pinned official bases. Linux/arm64 image IDs in that order are
+`c0b5e05fac11e81f0ef42ffaea2c2829fbb16329d3091ce825ad406e2cfc2a23`,
+`21db83bcdd544e055e2a548433e52a64012ab5d8d1035294ef3c155da7d24be9`,
+`7748c14b3b9c649503c20cae8f6fcf90d1042c75d8d9661e5256e80214135bcc`,
+`0131b90bab3994cdd9b6e3e91f70586892f3694904a343a80a51625eb4271e5b`.
+`05-profiles`0 creates eight fresh profiles on ports32863–32870 without any
+existing-profile lifecycle action. Primary/ordered native 2PC limits are10;
+zero is only the negative profile. Setup facts SHA
+`854498b2604835c3910a0f607ec23929e95073ec9e24530c042320e413788952`
+records127 actions0, 20 tracked native inputs, exact17.11/18.6 versions,
+available LZ4, installed libraries/bitcode/headers/README, product probe absence
+and healthy profile identity.
+
+Self-review then strengthens only the Rust fixture: independently compare every
+selected root's complete graph and requested mode mask, and verify singleton
+dimension/length/lower-bound with ordinary core SQL array functions. The test
+oracle traces native expected edges rather than product facts. Native build
+inputs remain unchanged; current input binding and runtime checks are pending.
+These build/setup results do not accept the implementation, C1 or full goal.
