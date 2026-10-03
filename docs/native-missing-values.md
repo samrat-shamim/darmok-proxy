@@ -53,6 +53,8 @@ The `pg_attribute` descriptor is opened, refreshed and checked outside raw/S
 using the existing native-refresh exclusion. The target ordinal must have the
 compiled native anyarray/by-reference/varlena layout. A selected tuple claiming
 a missing value must physically contain that ordinal. A NULL target is an error.
+The builtin anyarray carrier declares double alignment, independently of its
+four-byte length header and of the selected user column's alignment.
 This precheck excludes `heap_getattr`'s `getmissingattr` path, which can allocate
 in native global caches. The admitted accessor is only `fastgetattr`/
 `nocachegetattr` over this already prepared builtin descriptor. These routines

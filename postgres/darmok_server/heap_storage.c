@@ -308,7 +308,7 @@ storage_prepare(StorageObservation *observation)
 			if (target->attrelid != AttributeRelationId ||
 				target->attnum != Anum_pg_attribute_attmissingval || target->attisdropped ||
 				target->atttypid != ANYARRAYOID || target->attlen != -1 ||
-				target->attbyval || target->attalign != TYPALIGN_INT)
+				target->attbyval || target->attalign != TYPALIGN_DOUBLE)
 				elog(ERROR, "native storage pg_attribute missing carrier layout is inconsistent");
 		}
 	}

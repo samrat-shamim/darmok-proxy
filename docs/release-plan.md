@@ -3602,3 +3602,30 @@ dimension/length/lower-bound with ordinary core SQL array functions. The test
 oracle traces native expected edges rather than product facts. Native build
 inputs remain unchanged; current input binding and runtime checks are pending.
 These build/setup results do not accept the implementation, C1 or full goal.
+
+Input binding at `f9720c02523eb12facfe53648c35d29454b38f62`, tree
+`006c8ab5e83abaf266601d0b702bb36cff3620be`, records `06-input-bind`0:
+20 native inputs equal built `d0f607e`, with22 Git readers0. Binding facts SHA
+`fc736363e1bc8f8f0de30e510ae39eee5c8b3fed9d5aa616aca84aec6485117a`.
+The first ordinary `07-storage17` run actually exits101: all10 tests fail at
+the same new descriptor check before a capture completes. Raw stdout SHA
+`6d4e596b2778d0f7ba883a0745089492d0980c0ea6dceb4991a24e0a41d5559e`,
+stderr SHA `b67ae81174ad66b3e0230427b1ae21ff4ef42c45d7204564aca4d7fe7bfc8081`.
+This is a product-check defect, not a passed run or an injected error. The failed
+revision and fresh profile artifacts remain unchanged.
+
+Root cause: the new check assumed integer alignment from an array's four-byte
+header. Builtin anyarray declares double alignment. Separate source capture
+`08-alignment-primary`0 verifies two pinned pg_type.dat bodies after exact Git
+tree path inventory, generated schemapg target rows and ordinary actual catalog
+fields on both native majors. Actual target ordinals are26/25, types2277,
+lengths-1, by-reference and alignment'd'. The selected user column's alignment
+is independent. Four read-only native actions also confirm no checked prepared
+or schema fixture residue; no old profile is stopped or restarted. Facts SHA
+`5bd6922ef4b2b7f1992eee20d94f629da8a2dbf14bcbf3c255ddf109f1a1cd6a`,
+17-member seal SHA
+`7cd60058ad47cf538d996709b8bf565b63d4cc20c747d459a2bf3c158369fea1`.
+The two-source alignment inventory stays separate from the62-source design
+bundle. The correction checks TYPALIGN_DOUBLE and retains every descriptor,
+physical-presence, pointer/header/range and envelope check. Changed C input
+requires fresh strict builds/profiles and runtime evidence; none is yet claimed.
