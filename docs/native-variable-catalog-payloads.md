@@ -377,6 +377,10 @@ execution, MySQL read/lock equivalence, serving and release gates remain open.
 Security work, compiler PR4, hosted CI/account work and release publication are
 outside the current work scope.
 
+The [transitive type definition investigation](native-transitive-type-closure.md)
+builds on these owned images. Its structural graph and new-catalog descriptor
+bootstrap gates remain separate from this accepted direct-type implementation.
+
 ## Primary source evidence
 
 The finite local manifest `logs/native-variable-catalog-payloads-primary-v3`
