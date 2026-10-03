@@ -4088,3 +4088,62 @@ pending. Full closure, executor, serving, MySQL locking, performance and release
 gates, issues46/15 and the overall goal remain OPEN. Security, compiler PR4,
 new native stress/error/interruption/recovery/profile experiments and hosted
 CI/account/release publication remain excluded.
+
+### Combined setup accepted implementation and final instructions
+
+The corrected implementation is independently accepted at clean
+`3b9a15e2523a15624efb35e186bb20a4401061c8` / tree
+`1b7f4a1020e2c1d5ccf688469c556d46e8038446`. C1 closes only there; the old6217
+rejection and saved076 checks retain their original scopes. Root14 exits0 with
+all12 sequential affected checks0. Default and explicit sqlparser/bigdecimal
+each pass5 catalog/3 CLI/22 execute, retaining4 CLI and76 execute ignored
+unrelated fixtures. PG17.11/18.6 each pass13 setup/3 catalog-owner/4 CLI process
+groups, with zero failed/ignored required native tests. Every actual CLI child
+has its original receipt and streams:32 permajor (15 actual0/17 expected1) and15
+per offline feature (4 actual0/5 expected1/6 usage2),94 total. Matrix facts SHA256
+`a1e69d1546c9cef4536d5fa136552d01c25b9b3e3e20f807183fe66eded4fe47`.
+
+Root15 exits0, rehashing current check/child records and running28 ordinary
+read-only package/profile observations. Four built6217 package IDs match; all20
+native inputs equal that source, including its current README. Eight running954
+profiles keep their IDs/images/healthy state/settings/native libraries and
+historical packaged README. Prepared and fixture-database counts are zero.
+Primary/ordered max-prepared remains10; the zero profile stays negative.
+Audit facts SHA256
+`20bcb353155f8cea36948236072f20488b2db22100985cb848f3ba6c2783ef3e`.
+No new build, native server or profile lifecycle operation occurred for C1.
+
+Independent folder `logs/review-native-database-init-3b9a15e-correction-v1` has
+report SHA256 `699a5b3cc826889bd93fd9a47849eff68c8f3911b49c486007051a70de4a3264`,
+facts `d4ec2a1ccc11ad153400f4f3fe9895ee6ee1bc2a01bfc705519786459779e1aa`,
+and732-member structured seal
+`e8f20efafb86eb65d4953776e3ced56ae99b59a9954ac1cbf2a19b273980e4d1`.
+Actual final13/post14 exit0; receipt hashes are
+`293e727cfce951dfed4d117ce9864d8e8c99f7754ef7003363206b9bfaa5469f` and
+`9518ef855241cbb1508bc1653249f7623c9e7c80d109becf74909ac44cffef61`.
+Reader07's actual1 wrong-file no-match is preserved; inventory09/full reader10
+correct it. The review independently accounts for25 offline vectors and the
+common row-event branch, preserving first errors/mismatches and actual readiness.
+No new implementation blocker remains within this finite component.
+
+Root16 actually exits1 because its new rehash helper assumes flat anchor JSON;
+the review's observed anchor format is a keyed map. Original helper/raw/partial
+output stay preserved. Distinct helper v2/root17 exits0, verifying732 fixed
+members plus companions/failure witnesses (747 paths); facts SHA256
+`41bcfb9186a0565cbce4dd42d5d0a89b31a34d090fcc7f2d2a28b1341a9ec3ed`.
+Root18 exits0 creating this final documentation worktree. Tested/reviewed3b9
+stays frozen. The reader failure is bookkeeping, not a product/runtime failure.
+
+D1 is historically OPEN in the3b9 review: CLI instructions omit the fourth
+extension-dependency/conflict group and still label076 checks current/package
+checks pending. This leaf corrects the general four-group description, marks076
+historical, records exact current3b9 verification and6217 packaging, and updates
+the database-init status. It changes only three unpackaged documentation files;
+executable/test/dependency and all20 native inputs must remain exactly equal to
+the accepted3b9 source. A bounded independent final-doc readback is required
+before merge, with its result recorded in the PR rather than fabricating a
+runtime execution at this leaf. Full closure/provider/default/missing/constraint/
+effect/preparation/admission/executor/serving/MySQL locking, performance,
+hosted CI/artifact/release gates, issues46/15 and the overall goal remain OPEN.
+The standing security/compiler/native-experiment/CI/account/release exclusions
+continue to apply.

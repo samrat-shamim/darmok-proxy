@@ -1,23 +1,23 @@
 # Explicit database initialization
 
-Status: independently reviewed design with implementation candidate. Ordinary
-runtime checks passed at 07647b5 and current package checks passed at 6217c0e.
-Independent implementation review found C1 at 6217c0e; the corrected checker
-requires its own affected checks and independent review. This extends the
+Status: combined implementation independently accepted and locally verified at
+3b9a15e. Current native packages passed checks at6217c0e; all 20 native inputs
+remain unchanged in the corrected implementation and final documentation leaf.
+Historical C1 remains open at6217 and closes only at3b9. This extends the
 functional [schema contract](native-schema.md) without
 admitting table execution or certifying a serving proxy.
 
 ## Problem and selected behavior
 
-The existing setup command commits the `darmok` compatibility schema alone.
+The former schema-only setup committed the `darmok` compatibility schema alone.
 Native catalog operations separately require the `darmok_server` extension in
 the selected physical database and the preloaded module's utility handler.
 Reporting setup success before checking both leaves an incomplete installation.
 A dotted `SET` acknowledged by PostgreSQL's placeholder mechanism is not proof
 that the handler ran.
 
-`darmok init --database-url-env ENV_NAME` will explicitly install or validate
-both components in one owned transaction. `darmok verify` will validate both
+`darmok init --database-url-env ENV_NAME` explicitly installs or validates
+both components in one owned transaction. `darmok verify` validates both
 without creation. The library entry points are `initialize_database` and
 `verify_database`. The old schema-only entry points and nested CLI command are
 removed, with no aliases or migration machinery.
@@ -112,8 +112,8 @@ rules; an uncertain commit is never reported as a rollback or setup success.
 
 ## Cost and required verification
 
-Setup uses two operation round trips instead of the schema-only batch's one.
-The extra trip places validation before commit. SQL/response allocations occur
+Setup uses two operation round trips, placing response validation before commit.
+SQL/response allocations occur
 once per setup, not per row. The empty native request does not scan relation
 facts. Native mechanism sources and build definitions need no change. The packaged
 module README is updated for the new setup contract, so native artifacts must

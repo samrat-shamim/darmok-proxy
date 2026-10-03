@@ -79,10 +79,11 @@ a confirmed failed setup request uses explicit rollback instead of commit. Runti
 query latency and complete artifact benchmarks remain pending.
 
 Offline tests run actual binaries for help, version, usage and ordinary settings
-errors. Three required process groups use disposable physical databases on each
+errors. Four required process groups use disposable physical databases on each
 PostgreSQL major: fresh/repeated initialization and read-only verification with
 unchanged application state; ordinary partial/version/function mismatches with
-no repair; and independent installations in two explicitly selected databases.
+no repair; independent installations in two explicitly selected databases; and
+extension nonmembership dependencies versus extra members/reserved objects.
 They check actual child exit codes/output, catalog OIDs and row/catalog `xmin`,
 successful URI and keyword/value inputs selecting an explicit nondefault
 database,
@@ -118,9 +119,9 @@ check. The complete local hashes, exact command/environment records, preserved
 bookkeeping failure and pending hosted CI are in the release plan. This historical evidence does not certify the current combined setup or relabel
 runtime executions as a later source revision.
 
-## Combined setup runtime candidate
+## Historical combined setup runtime candidate
 
-Current combined setup checks are bound to implementation
+The earlier combined setup checks are bound to implementation
 `07647b50af46bd215616a154bd332855d630d7c8` / tree
 `9d001170be930f4f09a396d0b5bd9e2ded4ffdef`. Both PostgreSQL majors pass four
 required process groups with 32 children each: 15 exits0 and 17 expected exits1.
@@ -128,6 +129,28 @@ Both URI and keyword settings select the explicit nondefault database. The
 default and BigDecimal offline invocations each run 15 children: four exits0,
 five expected exits1 and six expected usage exits2. Setup-library fixtures pass
 13 groups on each major, and the affected catalog-owner fixtures pass three.
-The release plan records the exact commands, source and evidence. Independent
-implementation review and the current packaged README artifact check remain
-pending. The historical schema-only results above retain their original scope.
+The release plan records the exact commands, source and evidence. The later C1
+checker correction is not present at076; this earlier result does not certify
+that correction. The historical schema-only results above retain their scope.
+
+## Reviewed combined setup implementation
+
+The corrected implementation is independently accepted and locally checked at
+`3b9a15e2523a15624efb35e186bb20a4401061c8` / tree
+`1b7f4a1020e2c1d5ccf688469c556d46e8038446`. Each PostgreSQL 17.11/18.6 suite
+passes 13 setup library, 3 catalog-owner and 4 CLI process groups, with zero
+failed/ignored required native tests. The process groups retain 32 children per
+major: 15 actual0 and 17 expected1. Default and explicit `sqlparser/bigdecimal`
+offline checks each pass 5 catalog, 3 CLI and 22 execute tests, including the
+malformed error tails, and retain 15 command children each (4 actual0,
+5 expected1,6 usage2). Unrelated4 process and76 execute ignores remain explicit.
+
+All 12 recorded checks, including formatting, nine-package boundaries and strict
+workspace/connector Clippy, pass. Four native product/test packages built at
+6217c0e include the current README; all 20 native inputs remain equal at3b9.
+Saved actual native library identity permits use of the eight existing954
+profiles with their historical packaged README. The final documentation leaf
+only changes unpackaged instructions and validation records. Runtime and
+packaging results remain bound to their respective revisions, not relabeled as
+new executions. See the release plan for exact evidence and independent review.
+Full serving, executor, artifacts on other platforms and release gates remain open.
