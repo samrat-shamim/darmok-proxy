@@ -2246,3 +2246,172 @@ read-view/lock equivalence, table execution, serving, real-driver/cache/
 performance/artifact, hosted CI and release gates remain open. Security,
 compiler PR #4, stress/forced interruption, remote CI/account actions and
 release publication remain excluded; the goal remains active.
+
+### Private native interlock source selection; historical draft checkpoint
+
+PR [#50](https://github.com/samrat-shamim/darmok-proxy/pull/50) was normally
+squash-merged to `b9869aefb31eef5c9753666a0954aec03388818d`, tree
+`6cc4f3628381470ef4295682d5c01087be352f6a`, from reviewed leaf
+`d5f41668464a1463eadee8dc05a750b510720466`. Issue49 is closed; issue46 remains
+open. Historical publication acceptance cannot certify a new semantic tag.
+
+`feat/native-statement-guards` drafts the
+[private C interlock](native-statement-guards.md): semantic reader S, publisher
+RX, compatible prepare-coverage AS, exact owned reference cleanup, short
+shared-drop semantic drain before intent and immediate reader postcheck without
+CV sleep. Native concurrent 2PC remains enabled. There is no SQL lease/frontend
+handle/application statement lane/executable-plan constructor.
+
+Frozen proposals rejected a retained shared-drop writer for two static native
+queue cycles. The refined short drain removes those edges conditionally. Native
+readiness uses each actual prepared dummy under TwoPhase SH then every native
+lock partition SH. Paired native startup finishes lock replay before primary
+admission; this is not executed recovery acceptance. The withdrawn PID/VXID
+classifier was unproven, including fast-path vs native VXID field distinctions;
+it is not an established recovered-alias counterexample.
+
+Root's immutable `.darmok-work/logs/native-statement-guards-field-matrix-v3`
+contains 238 pinned unique sources, 154 exact full-function/startup excerpts and
+152 actual-0 passive readers. Files seal SHA256
+`dc2e5c24ad9ecf574e015db8c4eac03ccd5362effc0b350c5dbaaf55ac17d1d6`;
+recorded outer `native-statement-guards-b9869ae-10-matrix` actual0 stdout
+`940cb3120504b7e4bba2fe6dde04f08bd1910fd755dae734ee4ad6765b664c1c`.
+The authored field matrix SHA256 is
+`b3f2c1ff39fa74808de61815e327f902cc353b92385effc41bec0303a92063c6`,
+ownership proposal
+`1f5714043686f98ea5062ef64e7d31a5d933810f8181da5c9f8ad6ef7bc158f6`.
+An earlier extractor no-match1 omitted the PostPrepare_Inval callee; its helper,
+partial folder and actual1 outer remain frozen, followed by distinct corrected
+and expanded audits. Passive incorrect-path/no-match navigation is not runtime
+or product evidence.
+
+Independent proposal reports retain all prior failures/static findings:
+`review-native-statement-guards-prepared-readiness-b9869ae-v1` report SHA256
+`d44a170e5d1f48bd19e8f39cd4f198ed0c06a560e93aa95b16522b502862da35`,
+201-file seal
+`9cd799ba8b959c8202624c823f5f44f6f578f8540d88d17f204c895e0800e57e`,
+separate actual0 invocation
+`d5e6c6f658c03d503fdd569313c7922e1b59805dc7ccc1fb5be44a918bafe9cf`;
+`review-native-statement-guards-field-b9869ae-v1` report
+`65ad6524aa3cce77d0954632377422db281283dc8eb55b16bf160027dc771562`,
+223-file seal
+`4a3485162faab150c9d04f51bfb3b7ff325ed1caffd2331ac17a7b8dcd3aeb54`,
+separate actual0 invocation
+`c4efcb35c0c94149320de5c77cd46d4b55054ab5babc36b0e8fcf9907e923bb8`.
+These are external proposal/core-source reviews, with early clean and later
+draft-dirty states distinguished; neither accepts implementation/runtime.
+Required owner switching/restoration, parent promotion/TRANS_INPROGRESS reentry,
+segregated test-only lifetime and volatile automatic tokens/unwind counts are
+implementation contracts requiring fresh code/evidence review.
+
+At this draft checkpoint, compilation, meaningful PG17/18 fixtures, environment
+cleanup and scoped checks were pending; their current results follow below.
+Physical/negative/overload closure, neutral preparation,
+callback admission, Describe/materialization, MySQL read-view/lock equivalence
+and rollback-capable execution remain open. No recovery/proxy-throughput/cache/
+artifact/hosted-CI/release gate closes. Standing exclusions and the active goal
+remain unchanged.
+
+### Private native interlock local verification
+
+The tested clean source is `22ce51bc5710de72bc4a14084571d0898f682fb5`, tree
+`6366a257ce98c1d62319bc4e5b0bc6f72d787493`. This verifies the private C ownership,
+semantic publication interlock and per-prepared-dummy coverage check under the
+documented builtin-core profile. It does not admit application statements.
+
+| Check | Command and executed result |
+| --- | --- |
+| Full native PostgreSQL package, 17/18 | `cargo test -p darmok-postgres-tests --locked -- --nocapture --test-threads=1`: 131 passed each, 0 failed/ignored, 17 summaries each; includes 18 publication and five guard fixtures |
+| Private-owner discovery subset, 17/18 | `cargo test -p darmok-execute --lib --locked native_backend::tests::native_catalog -- --ignored --nocapture --test-threads=1`: three passed each, 0 failed/ignored, 86 other tests filtered |
+| Formatting | `cargo fmt --all -- --check`: actual 0 |
+| Repository boundaries | `python3 scripts/check_repository.py`: actual 0, nine packages |
+| Strict workspace Clippy | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`: actual 0 |
+| Strict connector Clippy | `cargo clippy -p tokio-postgres --lib --locked -- -D warnings`: actual 0 |
+| Product/probe images | Four corrected `docker build` invocations at `9855a45f972b925c8de1044b80c885da01f1b076`, all actual 0; all 15 native inputs equal tested source |
+| Setup and final environment | 103 initial, 34 fresh-profile and 59 final-environment actions, all actual 0; eight current profiles healthy with zero prepared targets and coordination references |
+
+Rust/Cargo 1.96.0 ran serially on macOS 26.0.1 arm64 using scoped Rustup/target
+directories. Ten recorded Cargo/Cargo-spawning intervals do not overlap. Native
+servers run 17.11/18.6 on Linux arm64/musl with the pinned PostgreSQL base digests
+already recorded above. The PG17 product build reused identical cached inputs;
+its successful build is not a claim that cached C was recompiled.
+
+Each major has preloaded primary and ordered-callback test profiles with native
+`max_prepared_transactions=10`, a preloaded native-default `0` case, and an
+installed but unpreloaded product-image negative case with `10`. The zero case
+is additional coverage, not a requirement. PG17 primary/ordered acceptance uses
+fresh v2 profiles; its earlier failed v1 profiles are retained and not reused.
+All four PG18 acceptance profiles and PG17 negative profiles are v1. The ordered
+profile preloads the test probe before the product module. The two unpreloaded
+product profiles contain no probe; the other six use test images. Final facts
+bind exact image/library/LLVM/installed-header identities to all 15 inputs.
+
+The five new fixtures exercise owned/stale tokens, nested error and
+subtransaction cleanup, first and established snapshot neutrality, one-invocation
+volatile-token cleanup, retained-reader commit/prepare rejection, publisher
+ordering, both native prepared outcomes and pure DML coexistence. A synthetic
+uncovered dummy cannot borrow another prepared target's coverage marker. Two
+shared-drop cases verify old-reader drain and queued-reader yield while ordinary
+temporary-backend close permits native retirement. They use bounded ordinary
+SQL and client close, without forced native interruption. Synthetic coverage
+removal proves representation/direct-verifier behavior only, not pre-install
+or recovery execution or the once-ready path under a deliberately broken hook.
+
+The cost helper sends LOAD, BEGIN, 32 warmup and 128 measured sequential scoped
+SET requests, final status and ROLLBACK through one in-container TCP-loopback
+connection. Each scope releases its volatile C token in PG_FINALLY. Native psql
+timings have 1000 ns display quantization: PG17 p50/p95/max
+6000/36000/109000 ns; PG18 12000/40000/85000 ns. Final status has no owned token
+and false snapshot flags; this is not 160 separate status observations. There
+is no baseline comparison, isolated C-call cost, throughput, contention,
+physical/preparation/executor/cache or recovery acceptance. Native allocation,
+cross-database exclusion and prepared lifetime remain real costs.
+
+Original failures remain intact. The initial PG17 probe build at `4e5c503`
+exited 1 because the native text-output helper required `utils/builtins.h`;
+the corrected include retains strict warnings. The first guard suite at
+`9855a45` exited 101, four pass/one fail: combining ROLLBACK PREPARED and DROP in
+one simple-query request caused native 25001 at final cleanup. Corrected source
+submits separate top-level requests. Both normal cleanup receipts are actual 0
+with zero prepared/coordination counts. The failed-run quarantine note has
+SHA256 `132c4bc600685189756896e9ff4a315d5bc1f338ec0b4f11405ccb93a7aacb0d`.
+No stop, restart, signal or forced native cleanup was performed.
+
+Immutable root receipts are under
+`.darmok-work/logs/native-statement-guards-{4e5c503,9855a45,22ce51b}-*`.
+The actual-0 `native-statement-guards-22ce51b-24-author-audit` binds 23 command
+results and 970 verified paths, including all native inputs and the 196 nested
+setup/environment actions. Its facts SHA256 is
+`6449afab77138f21d700e8e17798d050b6aba9761de258eaeafc1abd5c236faa`;
+67-file seal `f4626c03cd4a55edc4bdc42d70d3118b9afcc9e651f1c1999cb894c67d7e9763`;
+outer stdout `4414a8861768fe613d93cb8659f356dc823aeab0699a83fc17ac87f0485dfe32`.
+
+Independent original code review is frozen under
+`.darmok-work/logs/review-native-statement-guards-9855a45-code-v1`, report SHA256
+`6958da9745ec510686e07316474712cf9c69c6f31b7f20173f76fc8f3d9a77a6`,
+175-file seal `661df7e86c70c69108fe691b1f96c4a8ffeb7aaf0c4ff39656c325587c17a810`,
+separate actual-0 invocation
+`98b1f5f182472f3e02f06ca906aedba13701146ede2a0058575849cca4c58935`.
+F1 cleanup, D1 allocation wording and D2 release-predicate wording close only
+at tested `22ce51b`. Independent closure/evidence review under
+`.darmok-work/logs/review-native-statement-guards-22ce51b-evidence-v1` finds no
+remaining blocker within this finite component. Its report SHA256 is
+`14e2b40efa577cd883975ab861b5c2223ffe7a8f97195c498c8f2b31109a9c96`;
+147-file seal `ddee534e4ffb2a6f7751dcbc38c9f359856b3f66cac63f965664a4382ebf14c7`;
+separate actual-0 invocation
+`39e3a93ef9d620e38327521a0d1a938accb618ecd6b203de2e090e0280fbebec`.
+The reviewer's own first offline reader exited 1 by wrongly expecting probe
+sidecars on unpreloaded product profiles; that failure is preserved. Its
+corrected audit validates their distinct artifact contract and exits 0. All
+author and baseline seals remain unchanged. The reviewer ran no runtime tests.
+
+The final documentation leaf must preserve every tested executable/test/
+dependency entry and all native inputs. Earlier full workspace tests remain
+historical; no current full workspace test run is claimed. Complete physical,
+name/negative/overload candidate closure, snapshot-neutral native preparation,
+callback admission, Describe/materialization, MySQL read-view/lock equivalence,
+rollback-capable execution, serving, driver/cache/performance/artifact, hosted
+CI and release gates remain open. Issues46/15 and the goal remain active.
+Security, compiler PR4/resources, stress/forced interruption, native-profile
+restart/stop/signal, remote CI/account work and release publication remain
+excluded.

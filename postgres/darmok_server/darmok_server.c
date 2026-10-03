@@ -4,6 +4,7 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "access/parallel.h"
+#include "access/twophase.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_database_d.h"
 #include "catalog/pg_extension_d.h"
@@ -16,6 +17,7 @@
 #include "storage/ipc.h"
 #include "storage/lock.h"
 #include "storage/lwlock.h"
+#include "storage/proc.h"
 #include "storage/shmem.h"
 #include "storage/sinval.h"
 #include "tcop/utility.h"
@@ -28,6 +30,7 @@
 #include "utils/wait_event.h"
 
 #include "catalog_read.h"
+#include "statement_guard.h"
 
 #if PG_VERSION_NUM < 170000 || PG_VERSION_NUM >= 190000
 #error "darmok_server requires PostgreSQL 17 or 18"
@@ -41,6 +44,7 @@ PGDLLEXPORT void _PG_init(void);
  * distinct from user advisory locks. Database zero makes this cluster-wide. */
 #define DARMOK_LOCK_SUBID 0x444d
 #define DARMOK_PUBLICATION_SUBID 0x444e
+#define DARMOK_SEMANTIC_SUBID 0x444f
 #define DARMOK_CLUSTER_ID_BYTES 16
 
 typedef struct DarmokShared
@@ -49,6 +53,7 @@ typedef struct DarmokShared
 	pg_atomic_uint64 generation;
 	pg_atomic_uint64 next_backend_id;
 	pg_atomic_uint32 pending_shared_drops;
+	pg_atomic_uint32 statement_guards_ready;
 	ConditionVariable shared_drops_finished;
 } DarmokShared;
 
@@ -61,6 +66,13 @@ static bool reader_active = false;
 static bool reader_gate_held = false;
 static bool reader_fence_held = false;
 static ResourceOwner reader_owner = NULL;
+static uint64 next_statement_guard_id = 0;
+static uint64 statement_guard_id = 0;
+static ResourceOwner statement_guard_owner = NULL;
+static SubTransactionId statement_guard_subid = InvalidSubTransactionId;
+static bool semantic_writer_held = false;
+static ResourceOwner semantic_writer_owner = NULL;
+static SubTransactionId semantic_writer_subid = InvalidSubTransactionId;
 static bool publication_gate_held = false;
 static SubTransactionId publication_subid = InvalidSubTransactionId;
 static ResourceOwner publication_owner = NULL;
@@ -95,6 +107,16 @@ publication_tag(void)
 
 	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
 					   DARMOK_PUBLICATION_SUBID);
+	return tag;
+}
+
+static LOCKTAG
+semantic_tag(void)
+{
+	LOCKTAG tag;
+
+	SET_LOCKTAG_OBJECT(tag, InvalidOid, ExtensionRelationId, InvalidOid,
+					   DARMOK_SEMANTIC_SUBID);
 	return tag;
 }
 
@@ -183,6 +205,152 @@ transaction_unlock(const LOCKTAG *tag, LOCKMODE mode, ResourceOwner owner)
 }
 
 static void
+require_statement_boundary(void)
+{
+	require_ready();
+	/* Subtransaction callbacks promote our recorded owner before native lock
+	 * reassignment. Never reenter a mutating API in TRANS_COMMIT/ABORT cleanup. */
+	if (!IsTransactionState() || CurTransactionResourceOwner == NULL ||
+		statement_guard_id != 0 || semantic_writer_held || reader_active ||
+		writer_depth > 0 || publication_gate_held || completion_fence_held ||
+		preparing_transaction || pre_commit_started || shared_drop_pending ||
+		proc_exit_inprogress || HistoricSnapshotActive() || IsParallelWorker() ||
+		IsInParallelMode() || ParallelContextActive())
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("unsafe native statement guard boundary")));
+}
+
+void
+darmok_statement_guard_check_prepared(void)
+{
+	LOCKTAG tag = semantic_tag();
+	volatile bool two_phase_held = false;
+	volatile int partitions_held = 0;
+	volatile bool uncovered = false;
+
+	require_statement_boundary();
+	/* Actual dummy identity, never PID/VXID aggregation or a second SQL
+	 * snapshot. Native prepare/recovery/Finish use TwoPhase -> partition order.
+	 * RecoveryInProgress is already false, after complete startup lock replay. */
+	PG_TRY();
+	{
+		LWLockAcquire(TwoPhaseStateLock, LW_SHARED);
+		two_phase_held = true;
+		for (int part = 0; part < NUM_LOCK_PARTITIONS; part++)
+		{
+			LWLockAcquire(LockHashPartitionLockByIndex(part), LW_SHARED);
+			partitions_held++;
+		}
+		for (int slot = 0; slot < max_prepared_xacts && !uncovered; slot++)
+		{
+			PGPROC *proc = &PreparedXactProcs[slot];
+			bool granted = false;
+			bool covered = false;
+
+			for (int part = 0; part < NUM_LOCK_PARTITIONS; part++)
+			{
+				dlist_iter iter;
+
+				dlist_foreach(iter, &proc->myProcLocks[part])
+				{
+					PROCLOCK *proclock = dlist_container(PROCLOCK, procLink,
+														   iter.cur);
+
+					Assert(proclock->tag.myProc == proc);
+					if (proclock->holdMask == 0)
+						continue;
+					granted = true;
+					if (memcmp(&proclock->tag.myLock->tag, &tag, sizeof(LOCKTAG)) == 0 &&
+						(proclock->holdMask & LOCKBIT_ON(AccessShareLock)) != 0)
+						covered = true;
+				}
+			}
+			if (granted && !covered)
+				uncovered = true;
+		}
+	}
+	PG_FINALLY();
+	{
+		while (partitions_held > 0)
+			LWLockRelease(LockHashPartitionLockByIndex(--partitions_held));
+		if (two_phase_held)
+			LWLockRelease(TwoPhaseStateLock);
+	}
+	PG_END_TRY();
+	/* Allocate/report only after every LW lock has been released. New partial
+	 * native transfers can conservatively refuse admission until they finish. */
+	if (uncovered)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("uncovered native prepared transaction prevents statement guards")));
+}
+
+bool
+darmok_statement_guard_owned(const volatile DarmokStatementGuard *guard)
+{
+	return guard != NULL && guard->identity != 0 &&
+		guard->identity == statement_guard_id;
+}
+
+bool
+darmok_statement_guard_acquire(volatile DarmokStatementGuard *guard)
+{
+	LOCKTAG tag = semantic_tag();
+	ResourceOwner owner = CurTransactionResourceOwner;
+	SubTransactionId subid;
+	uint64 identity;
+
+	require_statement_boundary();
+	if (guard == NULL)
+		elog(ERROR, "native statement guard requires a C invocation token");
+	guard->identity = 0;
+	if (next_statement_guard_id >= PG_INT64_MAX)
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("native statement guard identity exhausted")));
+	identity = ++next_statement_guard_id;
+	if (pg_atomic_read_u32(&shared->statement_guards_ready) == 0)
+	{
+		darmok_statement_guard_check_prepared();
+		pg_atomic_write_u32(&shared->statement_guards_ready, 1);
+	}
+	subid = GetCurrentSubTransactionId();
+	transaction_lock_acquire(&tag, ShareLock, owner);
+	/* A precheck alone is racy. No discovery, callbacks, output or physical
+	 * cleanup occurs before this postcheck. Never CV-sleep while holding S. */
+	if (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+	{
+		transaction_unlock(&tag, ShareLock, owner);
+		return false;
+	}
+	statement_guard_owner = owner;
+	statement_guard_subid = subid;
+	statement_guard_id = identity;
+	guard->identity = identity;
+	return true;
+}
+
+void
+darmok_statement_guard_release(volatile DarmokStatementGuard *guard)
+{
+	LOCKTAG tag = semantic_tag();
+	ResourceOwner owner = statement_guard_owner;
+
+	if (!IsTransactionState() || !darmok_statement_guard_owned(guard) ||
+		reader_active || reader_gate_held || reader_fence_held ||
+		preparing_transaction || pre_commit_started || proc_exit_inprogress)
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("unsafe or unowned native statement guard release")));
+	statement_guard_id = 0;
+	statement_guard_owner = NULL;
+	statement_guard_subid = InvalidSubTransactionId;
+	guard->identity = 0;
+	transaction_unlock(&tag, ShareLock, owner);
+}
+
+static void
 clear_shared_drop_intent(int code, Datum arg)
 {
 	(void) code;
@@ -194,6 +362,21 @@ clear_shared_drop_intent(int code, Datum arg)
 		Assert(pg_atomic_read_u32(&shared->pending_shared_drops) > 0);
 		pg_atomic_fetch_sub_u32(&shared->pending_shared_drops, 1);
 		ConditionVariableBroadcast(&shared->shared_drops_finished);
+	}
+}
+
+static void
+take_semantic_writer(void)
+{
+	if (!semantic_writer_held)
+	{
+		LOCKTAG tag = semantic_tag();
+
+		transaction_lock_acquire(&tag, RowExclusiveLock,
+								 CurTransactionResourceOwner);
+		semantic_writer_held = true;
+		semantic_writer_subid = GetCurrentSubTransactionId();
+		semantic_writer_owner = CurTransactionResourceOwner;
 	}
 }
 
@@ -240,10 +423,10 @@ static void
 note_metadata_attempt(void)
 {
 	require_ready();
-	if (reader_active)
+	if (reader_active || statement_guard_id != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("metadata cannot change during catalog discovery")));
+				 errmsg("metadata cannot change during an owned catalog read")));
 	last_metadata_subid = GetCurrentSubTransactionId();
 	advance_local();
 	require_ready();
@@ -268,7 +451,7 @@ static void
 publish_catalog_change(void)
 {
 	require_ready();
-	if (reader_active || completion_fence_held)
+	if (reader_active || statement_guard_id != 0 || completion_fence_held)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("unsafe catalog publication boundary")));
@@ -278,6 +461,10 @@ publish_catalog_change(void)
 				 errmsg("nontransactional catalog publication cannot be prepared")));
 	if (!publication_gate_held)
 	{
+		/* Semantic first: never wait for a semantic reader while retaining the
+		 * raw observation fence or publication gate. Actual cleanup releases RX
+		 * after SI publication; native 2PC may transfer this new mode. */
+		take_semantic_writer();
 		take_publication_gate();
 		drain_catalog_readers();
 	}
@@ -286,29 +473,42 @@ publish_catalog_change(void)
 static void
 begin_shared_drop_publication(void)
 {
+	LOCKTAG tag = semantic_tag();
+	ResourceOwner owner = CurTransactionResourceOwner;
+	volatile bool drain_acquired = false;
+
 	require_ready();
-	if (reader_active || preparing_transaction || pre_commit_started ||
+	if (reader_active || statement_guard_id != 0 || semantic_writer_held ||
+		preparing_transaction || pre_commit_started ||
 		proc_exit_inprogress || publication_gate_held || completion_fence_held)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("unsafe shared-drop catalog publication boundary")));
 	if (!shared_drop_pending)
 	{
-		if (!shared_drop_cleanup_registered)
+		PG_TRY();
 		{
-			before_shmem_exit(clear_shared_drop_intent, 0);
-			shared_drop_cleanup_registered = true;
+			/* Drain BEFORE announcing intent. Release BEFORE native retirement
+			 * waits: queued readers must acquire S and yield on the postcheck so
+			 * an exiting TEMP publisher can pass their native lock queue. */
+			transaction_lock_acquire(&tag, RowExclusiveLock, owner);
+			drain_acquired = true;
+			if (!shared_drop_cleanup_registered)
+			{
+				before_shmem_exit(clear_shared_drop_intent, 0);
+				shared_drop_cleanup_registered = true;
+			}
+			shared_drop_subid = GetCurrentSubTransactionId();
+			pg_atomic_fetch_add_u32(&shared->pending_shared_drops, 1);
+			shared_drop_pending = true;
+			drain_catalog_readers();
 		}
-		shared_drop_subid = GetCurrentSubTransactionId();
-		pg_atomic_fetch_add_u32(&shared->pending_shared_drops, 1);
-		shared_drop_pending = true;
-		/* Exclude new readers before draining existing internal fences. Do not retain
-		 * this lock while native DROP waits for backend retirement or storage
-		 * barriers: exiting temp publishers must still acquire it. The intent
-		 * owns reader exclusion until transaction end; pre-commit takes the
-		 * ordinary publication lock independently. One intent per transaction
-		 * preserves its earliest subtransaction owner across nested drops. */
-		drain_catalog_readers();
+		PG_FINALLY();
+		{
+			if (drain_acquired)
+				transaction_unlock(&tag, RowExclusiveLock, owner);
+		}
+		PG_END_TRY();
 	}
 }
 
@@ -328,7 +528,7 @@ start_shared_memory(void)
 	if (previous_shmem_startup)
 		previous_shmem_startup();
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-	shared = ShmemInitStruct("darmok_server catalog state 1", sizeof(DarmokShared),
+	shared = ShmemInitStruct("darmok_server catalog state 2", sizeof(DarmokShared),
 							 &found);
 	if (!found)
 	{
@@ -337,6 +537,7 @@ start_shared_memory(void)
 		pg_atomic_init_u64(&shared->generation, 1);
 		pg_atomic_init_u64(&shared->next_backend_id, 0);
 		pg_atomic_init_u32(&shared->pending_shared_drops, 0);
+		pg_atomic_init_u32(&shared->statement_guards_ready, 0);
 		ConditionVariableInit(&shared->shared_drops_finished);
 	}
 	LWLockRelease(AddinShmemInitLock);
@@ -352,10 +553,10 @@ transaction_event(XactEvent event, void *arg)
 			/* A concurrently built index has several transactions. Fence every
 			 * publication, not the waits between phases: holding a session fence
 			 * there would deadlock readers with WaitForOlderSnapshots(). */
-			if (completion_fence_held)
+			if (completion_fence_held || statement_guard_id != 0)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("native cleanup cannot retain a prepared completion fence")));
+						 errmsg("native cleanup cannot retain a read or prepared completion fence")));
 			pre_commit_started = true;
 			if (shared_drop_pending || has_catalog_publication())
 			{
@@ -369,13 +570,14 @@ transaction_event(XactEvent event, void *arg)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("shared-drop catalog publication cannot be prepared")));
-			if (reader_active || completion_fence_held)
+			if (reader_active || statement_guard_id != 0 || completion_fence_held)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("unsafe catalog coordination boundary for prepare")));
 			preparing_transaction = true;
-			/* Private metadata is not published by PREPARE. Never transfer our
-			 * publication gate into native two-phase lock records. */
+			/* Never transfer either existing tag. The new compatible coverage
+			 * witness goes into every native prepare; semantic RX goes into a
+			 * metadata target. Native core serializes/transfers both modes. */
 			if (publication_gate_held)
 			{
 				LOCKTAG tag = publication_tag();
@@ -385,6 +587,14 @@ transaction_event(XactEvent event, void *arg)
 				publication_owner = NULL;
 				publication_subid = InvalidSubTransactionId;
 			}
+			{
+				LOCKTAG tag = semantic_tag();
+
+				transaction_lock_acquire(&tag, AccessShareLock,
+									 CurTransactionResourceOwner);
+			}
+			if (has_catalog_publication())
+				take_semantic_writer();
 			break;
 		case XACT_EVENT_COMMIT:
 		case XACT_EVENT_ABORT:
@@ -402,6 +612,12 @@ transaction_event(XactEvent event, void *arg)
 			reader_gate_held = false;
 			reader_fence_held = false;
 			reader_owner = NULL;
+			statement_guard_id = 0;
+			statement_guard_owner = NULL;
+			statement_guard_subid = InvalidSubTransactionId;
+			semantic_writer_held = false;
+			semantic_writer_owner = NULL;
+			semantic_writer_subid = InvalidSubTransactionId;
 			/* Native lock cleanup releases the publication gate AFTER catalog
 			 * invalidations. Do not release its actual reference here. */
 			publication_gate_held = false;
@@ -433,6 +649,16 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 			publication_subid = parent;
 			publication_owner = ResourceOwnerGetParent(publication_owner);
 		}
+		if (statement_guard_id != 0 && statement_guard_subid == subid)
+		{
+			statement_guard_subid = parent;
+			statement_guard_owner = ResourceOwnerGetParent(statement_guard_owner);
+		}
+		if (semantic_writer_held && semantic_writer_subid == subid)
+		{
+			semantic_writer_subid = parent;
+			semantic_writer_owner = ResourceOwnerGetParent(semantic_writer_owner);
+		}
 	}
 	else if (event == SUBXACT_EVENT_ABORT_SUB)
 	{
@@ -448,6 +674,18 @@ subtransaction_event(SubXactEvent event, SubTransactionId subid,
 			publication_gate_held = false;
 			publication_owner = NULL;
 			publication_subid = InvalidSubTransactionId;
+		}
+		if (statement_guard_id != 0 && statement_guard_subid == subid)
+		{
+			statement_guard_id = 0;
+			statement_guard_owner = NULL;
+			statement_guard_subid = InvalidSubTransactionId;
+		}
+		if (semantic_writer_held && semantic_writer_subid == subid)
+		{
+			semantic_writer_held = false;
+			semantic_writer_owner = NULL;
+			semantic_writer_subid = InvalidSubTransactionId;
 		}
 	}
 }
@@ -505,7 +743,7 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		return;
 	}
 
-	if (preparing && reader_active)
+	if (preparing && (reader_active || statement_guard_id != 0))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("a transaction cannot prepare during catalog discovery")));
@@ -521,7 +759,8 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		{
 			LOCKTAG tag = catalog_tag();
 
-			if (reader_active || publication_gate_held || completion_fence_held ||
+			if (reader_active || statement_guard_id != 0 || semantic_writer_held ||
+				publication_gate_held || completion_fence_held ||
 				preparing_transaction || pre_commit_started || shared_drop_pending)
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -617,7 +856,7 @@ void
 darmok_catalog_reader_start(void)
 {
 	require_ready();
-	if (reader_active || writer_depth > 0 || publication_gate_held ||
+	if (reader_active || writer_depth > 0 || semantic_writer_held || publication_gate_held ||
 		completion_fence_held ||
 		preparing_transaction || pre_commit_started || shared_drop_pending ||
 		HistoricSnapshotActive() || IsParallelWorker() || IsInParallelMode() ||
@@ -643,6 +882,11 @@ darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp)
 	 * work occurs while waiting or while this raw observation fence is held. */
 	for (;;)
 	{
+		if (statement_guard_id != 0 &&
+			pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
+			ereport(ERROR,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("shared-drop intent cannot coexist with an owned statement guard")));
 		PG_TRY();
 		{
 			while (pg_atomic_read_u32(&shared->pending_shared_drops) != 0)
