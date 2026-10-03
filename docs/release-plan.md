@@ -3081,3 +3081,74 @@ the component worktree frozen at the reviewed leaf. The next isolated branch
 begins from merged main. Full semantic/candidate/physical closure, neutral
 preparation, effect/immutable-plan admission, execution and MySQL data/lock
 gates remain open. Issues46/15 and the goal stay active; exclusions persist.
+
+
+### Fixed column/type facts design checkpoint (implementation pending)
+
+Public base is PR54/main `8361877170c2cdd475e2c7fb136467c059e1d1d5`.
+The isolated `feat/native-semantic-closure` worktree is clean checkpoint
+`23842c4ca8f25f98eb879dca570a2044c4332e7b`, tree
+`2acfe8ebe6c1375fc00fd1e6c0aac076301b56f9`, before this specification append.
+No native input, test or executable change has yet been verified for this lane.
+
+The primary capture command is `record-catalog-discovery-command-v1.py
+native-semantic-closure-23842c4-01-primary <worktree> 23842c4... python3
+capture-native-semantic-closure-primary-v1.py`, actual0. Scoped RUSTUP_HOME
+is `.darmok-work/rustup`, CARGO_TARGET_DIR is `.darmok-work/native-values/target`.
+`logs/native-semantic-closure-primary-v1/verified-sources.json` contains 90
+pinned REL_17_11/REL_18_6 bodies (45 each, 52 cached/38 HTTP200 fetched), SHA
+`be0d555554e377a582e623f5429455f6a4350a6e782ac254685e40715f2ea484`;
+39-member seal SHA
+`79e8c802277b89599f61f4f73c0d2d7e845351eb956659ba91bbaa31a7023f88`.
+Capture is provenance, not full-body semantic or runtime acceptance.
+
+Immutable external proposal v1 (12976 bytes) SHA
+`1b11ef5cd2a9364925537391f321643e9d10930bc3d4b0c0cee3a20291ebdff2`
+received finite conditional design review from `/root/native_values_review`.
+`logs/review-native-attribute-type-facts-23842c4-design-v1/report.md` SHA
+`eee2814716f1f9a6e6421d2f9222c6480b10d1e17cb97a06b46ad2fd64fdeba0`,
+facts SHA `91dd57faf16bd1153679de98ba18e498f087f95dd13197ea2e1f880d35f9da39`,
+263-member seal SHA
+`5de0e494f8448cbcca18db5ddbe587b3e9a17f749f9ae5e7ba7ba599083f82b3`.
+47 passive readers0, no own failures; independent finalization/post check0.
+Live reads released. Required C1 distinguishes true live layout redundancy
+(attlen/attbyval/attalign) from legitimate column overrides. P1 recommends exact
+root→positive-attribute→live-type filtered copies in one coherent snapshot/raw
+span while retaining full scans. Paired fixed headers and complete native
+TupleDescInitEntry/BuildDescForRelation/ATExecSetStorage/RemoveAttributeById and
+RelationBuildTupleDesc/RelationBuildDesc/RelationInitTableAccessMethod paths
+support the finite declarations and expose excluded variable/provider work.
+Root `02-design-rehash` actual0 verified263+companions277 unique files; root
+facts SHA `fc9544398aa4e5c19919e2e5d29333d552652c811e46d5671248536738d06867`.
+
+New exclusive proposal v2 (16367 bytes), SHA
+`fdb494febc10315183e42c12415236c27ea4d1a8e38bc1f7d9063f7ac2b0a29c`,
+closes C1 at design stage and selects P1. It separates scanned rows, selected
+array bytes and context allocation, and adds ordinary override, builtin-like
+custom type, removed dropped type, repeated type and cold/warm cases. V1 and
+all prior evidence remain unchanged. Independent v2 finite delta review found
+no further required design correction. Review folder
+`logs/review-native-attribute-type-facts-23842c4-design-v2`: report SHA
+`c4f2a38b173754b039d34d08e02f44436d0e7a2d482be468c0d1db301a45fc50`,
+facts SHA `b35846a875ffa44869c62df670fec126da97bc9fa4b108b37f72cdef6ef933ae`,
+60-member seal SHA
+`ca69fc34e7da686d7991dc043746961aff4fe8b2d05ef30b865e61bbb45c583a`.
+10 passive readers0, 19 selected anchors rehashed, no own failures; separate
+finalization/post check0 and clean23842c4/tree2acfe8e. Live reads released.
+Root `03-design-rehash-v2` actual0 verified60+companions74 unique files;
+root facts SHA `f946d718e4ddd4693317aee7bbdbe4ca058cf37f553b6d8b290fdda0c8eaa156`.
+Both root chains use the actual-exit/raw-stream recorder; no runtime gate passed.
+
+A root passive inventory included an absent `docker` path and surfaced rg's
+error, although the display pipeline returned0; it is not verification evidence.
+A subsequent repository-wide verified filename inventory returned0. No source
+or native behavior was changed for that inventory mistake. The source capture,
+review and recorded root rehash commands above all actually returned0.
+
+The selected specification is `docs/native-attribute-type-facts.md`. It extends
+the existing private whole-invocation metadata point, with positive slots and
+direct fixed type declarations only. Five descriptors prepare before exclusion;
+all initial reader increments close before physical waits. Full semantic closure,
+variable/provider/name/effect/immutable-IR/preparation/data/executor/lock/serving/
+release gates and issues46/15 stay open. Concurrent native two-phase transactions
+remain in scope. No full-goal completion follows from these design reviews.
