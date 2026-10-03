@@ -4820,3 +4820,50 @@ All live reads release before root16 creates the correction worktree. Prior
 No new native build/runtime/hosted-CI or release result follows. Concurrent
 native 2PC and all remaining gates/exclusions, issues46/15 and the goal remain
 open.
+
+
+### Separate setup/query owners merged; local prepared commands begun
+
+PR #64 was normally squash-merged from independently reviewed c7db9fd to
+`cd0e0fc6936319e8a660517c1f770a7dee1c34ee`, tree
+`a24d9b497c109694fc4c22f9c571b30ac36a2406`, parent4d2a81b. Root23 verifies
+that exact public personal main, unchanged generic description, no eligible
+open PRs after filtering PR4, and issues46/15 OPEN. Readback facts at
+`logs/native-private-history-c7db9fd-merged-readback-v1/facts.json` have SHA256
+`3d2a10566b66fff93c967338ebbd576c6964f2a8e63ef469f29768952da12457`.
+The independent correction accepts final docs only atc7; the original1b0/D1
+remains historically OPEN. Root18 rehashes162 correction fixed members and
+completion records,184 unique paths, with actual final/post/completion0.
+
+The next [local prepared-command component](prepared-commands.md) starts at
+that merged main in an isolated feature worktree. It owns source-admitted
+local templates, dynamic variable reads and direct parameter metadata under the
+TCP connection, with distinct prepare/execute/reset/close response contracts.
+No native C, SQL, catalog admission or existing-profile lifecycle is changed.
+Its current implementation checks and independent review remain pending.
+
+Ordinary stock observations use the existing MySQL8.4.11 container and pinned
+PyMySQL1.1.2. The first observer's mutable mysql:8.4 tag differs from the running
+container and fails actual1 before any SQL case. V2 binds the existing immutable
+image and completes4 cases; V3 adds initial NULL, tiny-integer and unsigned
+transitions and exposes numeric-to-string coercion/warnings. V4 additionally
+observes ROW_COUNT/FOUND_ROWS; the deprecated FOUND_ROWS call's warning is not
+proof of an earlier condition count. V5 adds independent PING counts showing
+prepare/reset clear and known/unknown close preserve. Its facts at
+`logs/prepared-frontend-reference-v5/facts.json` have SHA256
+`8d79e1ed1b946b21669cdff1f54e037f3bfa7788421185310646fc247d58010e`.
+Original failure/earlier observations stay immutable. The checked-in corpus
+retains unsupported stock conversions separately from proxy-supported paths.
+
+The pinned sql_prepare.cc primary capture is HTTP200,123236 bytes,SHA256
+`69fce8b432c0aa8dded49fdb0c10e04f3cbc476335b4682e80ebb102fe7645ea`.
+Selected preparation, precheck, execute, parameter-reset, statement reset and
+close bodies inform the component; the full file is not semantically accepted.
+Source bytes remain outside the Apache distribution. New template/packet
+allocations and unimplemented coercions are explicit in the component contract.
+
+Native entry/bootstrap/provider/registry/reference/writer/sequence, whole
+statement/table execution, native prepared/DDL validity, full MySQL coercions,
+serving, performance and release gates remain OPEN. Concurrent PostgreSQL
+native2PC remains required. Security, compiler PR4, hosted CI, new native stress
+or recovery experiments and release publication remain excluded.

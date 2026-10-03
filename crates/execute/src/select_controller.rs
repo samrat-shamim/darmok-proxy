@@ -22,6 +22,9 @@ use sqlparser::{
 use crate::ServerSetValues;
 use crate::exact_number::ExactNumber;
 
+mod prepared;
+pub(crate) use prepared::{BinarySelect, PreparedSelect};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectSqlError {
     Unsupported,
@@ -113,35 +116,44 @@ pub(crate) fn admit_select(
             expr,
             source.item_source(index)?,
         )?;
-        if let Some(alias) = alias {
-            // MySQL reports warnings for alias trimming. That outcome is not
-            // implemented; it cannot be silently replaced by a clean SELECT.
-            if alias.starts_with(|ch: char| ch.is_ascii_control() || ch == ' ')
-                || alias.len() > 256
-                || alias.chars().any(|ch| ch as u32 > 0xffff)
-            {
-                return Err(SelectSqlError::Unsupported.into());
-            }
-            cell.name = Bytes::copy_from_slice(alias.as_bytes());
-        } else {
-            cell.name = generated_name(cell.name)?;
-        }
-        columns.push(ColumnDefinition {
-            catalog: Bytes::from_static(b"def"),
-            schema: Bytes::new(),
-            table: Bytes::new(),
-            org_table: Bytes::new(),
-            name: cell.name,
-            org_name: Bytes::new(),
-            character_set: cell.charset,
-            column_length: cell.width,
-            column_type: cell.mysql_type,
-            flags: cell.flags,
-            decimals: cell.decimals,
-        });
-        row.push(cell.value);
+        finish_name(&mut cell, alias)?;
+        row.push(cell.value.take());
+        columns.push(column(cell));
     }
     Ok(SelectPlan { columns, row })
+}
+
+fn finish_name(cell: &mut Cell, alias: Option<&str>) -> Result<(), SelectSqlError> {
+    if let Some(alias) = alias {
+        // MySQL reports warnings for alias trimming. That outcome is not
+        // implemented; it cannot be silently replaced by a clean SELECT.
+        if alias.starts_with(|ch: char| ch.is_ascii_control() || ch == ' ')
+            || alias.len() > 256
+            || alias.chars().any(|ch| ch as u32 > 0xffff)
+        {
+            return Err(SelectSqlError::Unsupported);
+        }
+        cell.name = Bytes::copy_from_slice(alias.as_bytes());
+    } else {
+        cell.name = generated_name(std::mem::take(&mut cell.name))?;
+    }
+    Ok(())
+}
+
+fn column(cell: Cell) -> ColumnDefinition {
+    ColumnDefinition {
+        catalog: Bytes::from_static(b"def"),
+        schema: Bytes::new(),
+        table: Bytes::new(),
+        org_table: Bytes::new(),
+        name: cell.name,
+        org_name: Bytes::new(),
+        character_set: cell.charset,
+        column_length: cell.width,
+        column_type: cell.mysql_type,
+        flags: cell.flags,
+        decimals: cell.decimals,
+    }
 }
 
 fn generated_name(bytes: Bytes) -> Result<Bytes, SelectSqlError> {

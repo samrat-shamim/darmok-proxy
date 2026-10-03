@@ -6,14 +6,15 @@ use std::num::NonZeroU32;
 /// A prepared statement registered by the client. Mutation stays in the
 /// registry so callers cannot bypass accounting or parameter validation.
 #[derive(Clone, PartialEq)]
-pub struct PreparedStatement {
+pub struct PreparedStatement<P> {
     id: u32,
     original_sql: String,
     param_count: u16,
     last_param_types: Vec<PreparedStatementParamType>,
+    plan: P,
 }
 
-impl PreparedStatement {
+impl<P> PreparedStatement<P> {
     pub fn id(&self) -> u32 {
         self.id
     }
@@ -26,9 +27,15 @@ impl PreparedStatement {
     pub fn last_param_types(&self) -> &[PreparedStatementParamType] {
         &self.last_param_types
     }
+    pub fn plan(&self) -> &P {
+        &self.plan
+    }
+    pub fn plan_mut(&mut self) -> &mut P {
+        &mut self.plan
+    }
 }
 
-impl fmt::Debug for PreparedStatement {
+impl<P> fmt::Debug for PreparedStatement<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PreparedStatement")
             .field("id", &self.id)
@@ -64,14 +71,14 @@ pub enum PreparedStatementError {
 /// Statement IDs are not reused until the connection is reset. Exhaustion
 /// fails explicitly instead of wrapping and overwriting a live statement.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PreparedStatementRegistry {
-    stmts: HashMap<u32, PreparedStatement>,
+pub struct PreparedStatementRegistry<P> {
+    stmts: HashMap<u32, PreparedStatement<P>>,
     next_id: Option<NonZeroU32>,
     sql_bytes: usize,
     limits: PreparedStatementLimits,
 }
 
-impl PreparedStatementRegistry {
+impl<P> PreparedStatementRegistry<P> {
     pub fn new(limits: PreparedStatementLimits) -> Self {
         Self {
             stmts: HashMap::new(),
@@ -85,6 +92,7 @@ impl PreparedStatementRegistry {
         &mut self,
         sql: String,
         param_count: u16,
+        plan: P,
     ) -> Result<u32, PreparedStatementError> {
         if self.stmts.len() >= self.limits.max_statements {
             return Err(PreparedStatementError::CountLimit {
@@ -110,17 +118,22 @@ impl PreparedStatementRegistry {
                 original_sql: sql,
                 param_count,
                 last_param_types: Vec::new(),
+                plan,
             },
         );
         self.sql_bytes = sql_bytes;
         Ok(id)
     }
 
-    pub fn get(&self, id: u32) -> Option<&PreparedStatement> {
+    pub fn get(&self, id: u32) -> Option<&PreparedStatement<P>> {
         self.stmts.get(&id)
     }
 
-    pub fn remove(&mut self, id: u32) -> Option<PreparedStatement> {
+    pub fn get_mut(&mut self, id: u32) -> Option<&mut PreparedStatement<P>> {
+        self.stmts.get_mut(&id)
+    }
+
+    pub fn remove(&mut self, id: u32) -> Option<PreparedStatement<P>> {
         let statement = self.stmts.remove(&id)?;
         self.sql_bytes -= statement.original_sql.len();
         Some(statement)
@@ -157,7 +170,7 @@ impl PreparedStatementRegistry {
 mod tests {
     use super::*;
 
-    fn registry(count: usize, bytes: usize) -> PreparedStatementRegistry {
+    fn registry(count: usize, bytes: usize) -> PreparedStatementRegistry<()> {
         PreparedStatementRegistry::new(PreparedStatementLimits {
             max_statements: count,
             max_sql_bytes: bytes,
@@ -167,7 +180,7 @@ mod tests {
     #[test]
     fn registration_tracks_metadata_and_removal_releases_capacity() {
         let mut reg = registry(1, 8);
-        let id = reg.register("SELECT ?".into(), 1).unwrap();
+        let id = reg.register("SELECT ?".into(), 1, ()).unwrap();
         let statement = reg.get(id).unwrap();
         assert_eq!(
             (
@@ -179,28 +192,28 @@ mod tests {
         );
         assert!(statement.last_param_types().is_empty());
         assert_eq!(
-            reg.register("SELECT 2".into(), 0),
+            reg.register("SELECT 2".into(), 0, ()),
             Err(PreparedStatementError::CountLimit { limit: 1 })
         );
         assert!(reg.remove(id).is_some());
         assert!(reg.get(id).is_none());
         assert!(reg.remove(id).is_none());
-        assert_eq!(reg.register("SELECT 2".into(), 0).unwrap(), 2);
+        assert_eq!(reg.register("SELECT 2".into(), 0, ()).unwrap(), 2);
     }
 
     #[test]
     fn byte_limit_counts_utf8_and_rejections_preserve_accounting_and_ids() {
         let mut reg = registry(4, 3);
-        let first = reg.register("é".into(), 0).unwrap();
+        let first = reg.register("é".into(), 0, ()).unwrap();
         assert_eq!(
-            reg.register("é".into(), 0),
+            reg.register("é".into(), 0, ()),
             Err(PreparedStatementError::SqlByteLimit { limit: 3 })
         );
-        assert_eq!(reg.register("x".into(), 0).unwrap(), 2);
+        assert_eq!(reg.register("x".into(), 0, ()).unwrap(), 2);
         reg.remove(first).unwrap();
-        assert_eq!(reg.register("é".into(), 0).unwrap(), 3);
+        assert_eq!(reg.register("é".into(), 0, ()).unwrap(), 3);
         assert!(matches!(
-            reg.register("x".into(), 0),
+            reg.register("x".into(), 0, ()),
             Err(PreparedStatementError::SqlByteLimit { .. })
         ));
     }
@@ -208,24 +221,24 @@ mod tests {
     #[test]
     fn exhausted_ids_do_not_wrap_or_overwrite_existing_statements() {
         let mut reg = registry(4, 100);
-        let first = reg.register("SELECT 1".into(), 0).unwrap();
+        let first = reg.register("SELECT 1".into(), 0, ()).unwrap();
         reg.next_id = NonZeroU32::new(u32::MAX);
-        assert_eq!(reg.register("SELECT 2".into(), 0).unwrap(), u32::MAX);
+        assert_eq!(reg.register("SELECT 2".into(), 0, ()).unwrap(), u32::MAX);
         assert_eq!(
-            reg.register("SELECT 3".into(), 0),
+            reg.register("SELECT 3".into(), 0, ()),
             Err(PreparedStatementError::IdsExhausted)
         );
         assert_eq!(reg.get(first).unwrap().original_sql(), "SELECT 1");
         assert!(reg.get(0).is_none());
         reg.clear();
         assert!(reg.get(u32::MAX).is_none());
-        assert_eq!(reg.register("SELECT 4".into(), 0).unwrap(), 1);
+        assert_eq!(reg.register("SELECT 4".into(), 0, ()).unwrap(), 1);
     }
 
     #[test]
     fn invalid_parameter_metadata_does_not_replace_the_previous_types() {
         let mut reg = registry(2, 100);
-        let id = reg.register("SELECT ?".into(), 1).unwrap();
+        let id = reg.register("SELECT ?".into(), 1, ()).unwrap();
         let types = vec![PreparedStatementParamType {
             field_type: 0x03,
             unsigned: true,
@@ -248,15 +261,15 @@ mod tests {
     #[test]
     fn clear_releases_byte_capacity_and_keeps_configured_limits() {
         let mut reg = registry(1, 8);
-        reg.register("SELECT 1".into(), 0).unwrap();
+        reg.register("SELECT 1".into(), 0, ()).unwrap();
         reg.clear();
-        assert_eq!(reg.register("SELECT 2".into(), 0).unwrap(), 1);
+        assert_eq!(reg.register("SELECT 2".into(), 0, ()).unwrap(), 1);
         assert!(matches!(
-            reg.register("SELECT 3".into(), 0),
+            reg.register("SELECT 3".into(), 0, ()),
             Err(PreparedStatementError::CountLimit { .. })
         ));
         assert!(matches!(
-            registry(0, 100).register("SELECT 1".into(), 0),
+            registry(0, 100).register("SELECT 1".into(), 0, ()),
             Err(PreparedStatementError::CountLimit { limit: 0 })
         ));
     }
@@ -264,7 +277,7 @@ mod tests {
     #[test]
     fn debug_output_does_not_reveal_sql_literals() {
         let mut reg = registry(1, 100);
-        reg.register("SELECT 'confidential-value'".into(), 0)
+        reg.register("SELECT 'confidential-value'".into(), 0, ())
             .unwrap();
         assert!(!format!("{reg:?}").contains("confidential-value"));
     }

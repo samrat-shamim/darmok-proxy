@@ -299,7 +299,7 @@ pub(crate) fn session_status_flags(settings: CommandSettingsSnapshot) -> StatusF
     flags
 }
 
-fn append_packet(
+pub(crate) fn append_packet(
     payload: &mut BytesMut,
     sequence: &mut u8,
     encoded: &mut BytesMut,
