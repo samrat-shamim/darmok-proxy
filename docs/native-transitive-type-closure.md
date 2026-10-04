@@ -5,8 +5,9 @@ collector or statement-admission certificate. The existing
 [variable catalog payload component](native-variable-catalog-payloads.md)
 owns images for type defaults and selected columns. The
 [declared type-link stage](native-declared-type-links.md) now implements discovery
-through the already admitted `pg_type` reader, with paired verification and fresh
-implementation review pending, before the
+through the already admitted `pg_type` reader. Paired packages and all 128 required
+ordinary tests pass at `abe6b3411ac20dbce81efb205322049058be7c06`; fresh
+implementation review is required before merge. This stage precedes the
 additional catalog descriptors required by this full collector. The proposed
 extension below must close its new descriptor
 bootstrap gate before native implementation. Issues46/15 and the overall

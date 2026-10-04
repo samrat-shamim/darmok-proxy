@@ -1,7 +1,9 @@
 # Native declared type links
 
-Status: C/header/probe/oracle implementation is present; current paired builds,
-ordinary verification and independent implementation review are pending.
+Status: current strict PostgreSQL 17.11/18.6 product/probe packages and all 128
+required ordinary tests pass at `abe6b3411ac20dbce81efb205322049058be7c06`.
+Independent implementation review is required before merge. The release ledger
+binds the exact source, packages, profiles, actual failure and corrected results.
 Independent source review accepted the existing-reader selection/pass gate at
 `1e4c7581130da8a6a0bffb6d2a218b0cf3425efa`, with no required design findings.
 This component replaces direct live-column selection with root row types and the complete reachable

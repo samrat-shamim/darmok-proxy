@@ -6275,3 +6275,57 @@ The uninvoked `verify-native-type-links-evidence-v1.py` draft remains preserved
 at SHA256 `58de0a36bebc59be4172d359524faa9780e93f10e5e0f53f808dcbfdf67c17ea`;
 it has no execution or acceptance claim. Full collector/bootstrap/provider/
 statement/execution/serving/performance/release and goal gates remain open.
+
+### Declared type-link corrected paired verification
+
+The corrected tested source is
+`abe6b3411ac20dbce81efb205322049058be7c06`, tree
+`04b73cb6be81f29d36f1f75c29f821e4850d38e7`. Root27–30 passed targeted formatting,
+feature diff, repository boundaries and strict Clippy for both changed Rust
+fixtures. Root31 verified all26 native inputs unchanged from39e and only the
+publication fixture/release ledger changed in the correction.
+
+The uninvoked v2 package-helper draft's broad namespace edit also changed its
+fixed corpus leaf to native-build-corpus-primary-v2. Its complete diff exposed
+this before invocation; the draft remains preserved at SHA256
+`ab03c0f88dcb1d9bb96f707ef4eb2a1f442a845eb2ee6662470df01d6e07f27b`,
+with no build/profile namespace or execution claim. Root32 created the distinct
+v3 helper, restoring that fixed v1 leaf. Its SHA256 is
+`30d6acb73c236e5e54823a03994286a8c1eceaf3732010d17bdf24feeea0d36f`;
+the current package/profile/binding namespaces are fresh v2 namespaces. Complete
+helper differences were read before these corrected helpers ran.
+
+Root33 strictly rebuilt/verified four PostgreSQL 17.11/18.6 product/probe packages,
+14 actual0 commands and26 exact native inputs. Package facts SHA256:
+`c56f56a4b61a32a20e2fbb91e2c1966929aef5e78aba3e0a7a979455f9cc1876`.
+Root34 verified eight fresh required profiles with595 actual0 commands; facts
+SHA256 `bcabcdead82bea2670618e779f8ef5dcd775d7610a9abdfc29f650aaa2f50bf8`.
+Both primary profiles have native two-phase transactions enabled. The no2pc
+profile remains an existing boundary variant, not a serving restriction.
+
+Root35–38 passed all 128 required tests:61 integration and3 private catalog tests
+per major, zero failed and zero ignored. Private runs use --ignored and filter
+101 unrelated tests. All four runs have30 actual0 before/after readers with
+unchanged container IDs, images, start times, restart counts and libraries.
+Binding facts SHA256 values:
+
+- PostgreSQL17 integration:
+  `5dd4e663daa826bff8a6a5caca55b1b1c39a872d5ec595e9e11350f7e3ad87d6`.
+- PostgreSQL17 private:
+  `afd673c442c27f26778a8673db92b729a6105b5deba4747e6c73f3a16eb0a847`.
+- PostgreSQL18 integration:
+  `a62d6857d40241cef4108e7a070d4fbc0de3cdcd2526f816cc67b3018cd4b471`.
+- PostgreSQL18 private:
+  `e163d06c438e1caeb60014a4893f139aeea6465fb6eb6b573a5ab695ebcaa0fc`.
+
+Root39 checks the exact current counts and code bindings; its complete stdout
+SHA256 is `2e48355c8ff8cd3ad2717848ec2ca3cddf459a4fa39ea76ce8991dc0d1bb94c0`.
+
+Both new type-link fixtures and the corrected publication fixture pass on both
+majors. These ordinary results cover current selected facts/default images and
+existing native ownership/data-view cases, not a full transitive type definition
+or semantic/performance certificate. Final changes after this tested source are
+confined to these nonpackaged documentation updates. Independent fresh
+implementation review is required before normal exact-head squash merge. The
+full collector/bootstrap/provider/statement/execution/serving/performance/release
+and goal gates remain open.

@@ -10,8 +10,10 @@ it does not admit SQL or an executor.
 The original direct-only behavior below records that component's scope. The
 current [declared type-link stage](native-declared-type-links.md) extends selection
 to root rowtypes and recursive base/element/array-companion nodes through a whole
-fixed map and selected-default pass. Its current verification/review remain
-pending; historical results do not certify the changed implementation.
+fixed map and selected-default pass. Current paired packages and all 128 required
+ordinary tests pass at `abe6b3411ac20dbce81efb205322049058be7c06`; independent
+implementation review is required before merge. Historical results retain their
+original scope.
 
 One coherent raw observation copies fixed `pg_namespace`, `pg_class` and
 `pg_index` maps, resolves exact counted literal root names to actual OIDs, then

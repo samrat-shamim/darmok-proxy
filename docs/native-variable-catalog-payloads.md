@@ -23,9 +23,10 @@ zero ignored. Independent implementation review is required before merge.
 The [declared type-link stage](native-declared-type-links.md) extends selected
 type defaults to actual root rowtypes and reachable base/element/array-companion
 nodes. It uses a whole fixed type map and a selected-default pass in the same
-registered raw observation. Source review passed; current paired runtime and
-implementation acceptance are pending. Earlier results above retain their
-original scope.
+registered raw observation. Source review passed; current paired packages and
+all 128 required PostgreSQL 17.11/18.6 ordinary tests pass at
+`abe6b3411ac20dbce81efb205322049058be7c06`. Independent implementation review
+is required before merge. Earlier results above retain their original scope.
 
 ## Problem and choice
 

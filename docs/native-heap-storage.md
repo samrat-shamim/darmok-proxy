@@ -53,8 +53,9 @@ Independent review accepted the finite change at
 The [declared type-link stage](native-declared-type-links.md) now adds root
 rowtypes and recursive actual base/element/array-companion membership, plus each
 selected node's own default carriers. Its source gate passed; current paired
-builds, ordinary tests and fresh implementation review are pending. Prior
-component results do not certify this changed native code.
+packages and all 128 required PostgreSQL 17.11/18.6 ordinary tests pass at
+`abe6b3411ac20dbce81efb205322049058be7c06`. Fresh implementation review is
+required before merge. Prior component results retain their original scope.
 
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
