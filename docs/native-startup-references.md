@@ -1,10 +1,11 @@
 # Native startup reference provenance
 
-Status: paired PostgreSQL 17.11/18.6 source findings. The concrete startup and
-entered-reference witness remains OPEN before new descriptor admission. This
-adds to the [fixed-command proof](native-fixed-command-history.md), not a native
-execution implementation. Concurrent PostgreSQL two-phase transactions remain
-required.
+Status: paired PostgreSQL 17.11/18.6 source findings, interpreted under the
+[supported stock runtime contract](native-runtime-contract.md). Ordinary native
+startup/cache construction is trusted. Project reference lifetimes and supported
+pre-open paths remain OPEN for new descriptors. This adds source context to the
+[fixed-command proof](native-fixed-command-history.md), not a native executor.
+Concurrent PostgreSQL two-phase transactions remain required.
 
 ## Baseline pins differ from owned reader references
 
@@ -67,16 +68,17 @@ and [PG18 catcache setup](https://github.com/postgres/postgres/blob/REL_18_6/src
 
 ## Required construction and cost
 
-The entry base must account separately for intrinsic pins, owned Relation
-increments, copied TupleDesc storage and exact held locks. It must cover both
-constructor and restored-file histories, including provider work before a load
-fails. Reusing parsed options requires the actual supported provenance; copying
-their bytes or checking file layout does not establish it. Fresh defining facts
-and complete callback/registration history remain necessary before a new open
-or rebuild. No post-open inspection or readiness shortcut is selected here.
+The project must distinguish intrinsic pins from its own Relation increments,
+copied TupleDesc storage and exact held locks. Under the selected contract,
+native constructor/restored-file histories are runtime services. Darmok does
+not need a producer integrity certificate, and must not use parsed options as
+its defining catalog facts. Fresh actual carriers and supported dependent paths
+remain necessary before a new open or rebuild. No post-open inspection or
+readiness shortcut supplies project admission.
 The [registry trace](native-reloptions-registry.md) adds native kind-mask,
 referenced-data and major-specific presence obligations. Binding the consumer
-registry does not retroactively certify an init file's producing backend.
+registry does not retroactively certify an init file's producing backend; that
+certification is no longer a functional entry requirement.
 The [archive-bound mutation census](native-entry-census.md) adds explicit count
 initialization, owned scan/directory references and whole-object rebuild copies.
 Its literal source matches are not an actual owner census or complete program

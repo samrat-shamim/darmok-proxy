@@ -2,13 +2,14 @@
 
 Status: private C observation component. Current paired product/probe builds,
 ordinary fixtures and independent review are required before merging changes.
-It constructs an owned native pathname image. The complete startup/entry,
-provider, registry and reference proof remains OPEN. Concurrent PostgreSQL
-native two-phase transactions remain required.
+It constructs an owned native pathname image. The
+[stock runtime contract](native-runtime-contract.md) trusts native services;
+project lifetimes and functional path/configuration admission remain OPEN for
+new implementation. Concurrent native two-phase transactions remain required.
 
-The entry base needs an actual loaded-module observation alongside its closed
-startup and command history. Configuration strings and matching module names
-cannot supply actual loaded state. The existing public native APIs provide a
+The observation can inform supported-configuration checks and diagnostics.
+Configuration strings and matching module names cannot supply actual loaded
+state. The existing public native APIs provide a
 copying mechanism without opening a relation descriptor; implementing this
 instrumentation does not admit any new collector descriptor or execution path.
 
@@ -64,8 +65,9 @@ This is an observation of published native pathname entries at one instant.
 It is not a module-content hash, source-to-binary certificate, original provider
 binding, registry/callback census, initializer history or descriptor-owner
 witness. An initializer can have effects before its entry is published. The
-[bootstrap construction](native-catalog-bootstrap.md) must still bind those
-separate facts and preserve them through each permitted command and cleanup.
+supported native premise is an API dependency, not a certificate of those
+separate facts. The [bootstrap argument](native-catalog-bootstrap.md) must still
+admit relevant functional paths and project transitions.
 The observer does not compare a caller-supplied allowlist or turn pathname
 equality into an entry certificate. Existing collector admission gates remain.
 

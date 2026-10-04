@@ -5499,3 +5499,63 @@ impossibility theorem about every native API. Current native input bytes remain
 unchanged; no fresh runtime certification follows from these documentation
 changes. All full engine, serving, performance and release gates, issues 46/15
 and the goal remain OPEN. Standing exclusions remain in force.
+
+## Stock PostgreSQL services selected as the native trust boundary
+
+PR #73 is squash-merged at main 959101c43ba746538fd0252f59c84e4e4b05745b,
+parent 3ed9cc3308e7808eda36da631224cc61b48c9bde. Its tree
+01f7dbe6966c752d58f62b581d2d856cb7fa7438 equals accepted feature
+03a7cc038cbe02f2f7a62ce682c41c61c6f9cfb1. Independent documentation/source
+review found no required correction. Root 07 actually exits 0 while rehashing
+280 fixed members and 16 separate completion companions; its facts SHA256 is
+9ef1f3f5b9fb3f2a40938c28d9eae6c86743866c01d5e77a80499c29d06366f9.
+The review report SHA256 is
+8811e82c975dc712b890b1c89cac9a25ca579c8aa0733651e90e74b8df4654a9;
+its final/post/completion records each actually exit 0. Its own10 bookkeeping
+exit 1 remains preserved. Root 08–13 preflight, feature push, PR creation, open
+readback, normal exact-head squash merge and merged readback all actually exit 0.
+Merged readback verifies that exact tree/single parent, public personal repo,
+unchanged description, no eligible open PR after filtering PR 4 and issues
+46/15 OPEN. Its facts at
+logs/native-entry-boundary-03a7cc0-merged-readback-v1/facts.json have SHA256
+48e239183c3cdb19e4c88f63687a4e3c1db050fdb221f3fb9918394606a6fa2c.
+This was a documentation checkpoint, not new native/runtime certification.
+
+The isolated next branch starts at that exact main. A read-only independent
+architecture assessment recommends Alternative A under an explicit supported
+stock-native API contract. The earlier exhaustive native cache/owner/registry,
+compiled-implementation and init-file-producer premises required unavailable
+integrity observations beyond the functional boundary a proxy needs. The
+[selected runtime contract](native-runtime-contract.md) now relies on correctly
+operating stock PostgreSQL services and an admitted extension configuration,
+while retaining every project acquisition/lifetime, neutral-preparation,
+pre-open-path, physical-wait, DDL/2PC, defining-carrier and execution-stability
+obligation. This is a deliberate specification change with rationale; those
+integrity premises are withdrawn, not reported as successfully proved.
+
+Both MySQL applications on initialized databases and MySQL clients on existing
+native schemas remain required. No supplied server build, new data directory,
+init-file deletion or max_prepared_transactions=0 requirement is adopted.
+A relevant legitimate callback or incompatible registry definition still needs
+functional admission before the dependent path; trusting PostgreSQL does not
+make eventual generation equality an excuse for earlier evaluation. Raw catalog
+images remain the defining input, not cached parsed options or compiled facts.
+The current collector's NULL-options checks and all native input bytes stay
+unchanged. New descriptor paths, writer coverage, exact guards and statement
+validity still need implementation proof and current ordinary verification.
+
+Root 01 fetch and 02 worktree creation actually exit 0. Root 03 records two
+previously archive-bound relcache inputs, eight complete selected init-file
+producer/consumer/pre/post-invalidation bodies and four paired differences at
+main 959101c, with actual 0. Primary facts and 17-member nonself seal SHA256 are
+44c3460fb4d99b7ada966cc000dc5b64b9e62aa0cb421fe7111cfe1068fa768c and
+1a278df35c02abc59bb91d16a5d20c74e3d7bc9a40951b52d496107376782b5f
+under logs/native-runtime-contract-primary-v1. These explain the selected native
+service assumption; they are not complete-file/call-graph or runtime acceptance.
+Earlier source observations and failed extraction/bookkeeping/native outcomes
+retain their original scopes. Four documentation edit-context/syntax failures
+are preserved in the tool trace and corrected before review; they are not native
+product failures. No profile operation, native build, new stress/forced-error/
+interruption/recovery experiment, security or compiler work, hosted CI or release
+publication is introduced. Full engine, serving, performance and release gates,
+issues 46/15 and the overall goal remain OPEN.

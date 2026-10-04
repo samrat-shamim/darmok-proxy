@@ -1,10 +1,11 @@
 # Native reloptions registry construction
 
-Status: paired PostgreSQL 17.11/18.6 source findings. Actual registry/provider
-construction remains OPEN before new descriptor admission. This extends the
-[bootstrap obligations](native-catalog-bootstrap.md); it supplies no new C
-reader or runtime acceptance. Concurrent native two-phase transactions remain
-required.
+Status: paired PostgreSQL 17.11/18.6 source findings. Functional registry/path
+admission remains OPEN for new descriptors under the
+[stock runtime contract](native-runtime-contract.md); an exhaustive private
+registry census is not required. This extends the
+[bootstrap obligations](native-catalog-bootstrap.md), not runtime acceptance.
+Concurrent native two-phase transactions remain required.
 
 ## The registration footprint affects builtin parsing
 
@@ -19,9 +20,10 @@ Allocating a new kind is separate from registering an option. The typed global
 registration functions accept a kind mask; `allocate_reloption` stores that
 mask without requiring a newly allocated kind. Neither that allocation nor
 `add_reloption` checks the name against the builtin parse table. Consequently,
-registration is not confined by construction to new custom kinds. The actual
-history must establish which records intersect HEAP, TOAST and BTREE, including
-their names, types, defaults, order and referenced data. See paired
+registration is not confined by construction to new custom kinds. The supported
+extension configuration must preserve compatible HEAP, TOAST and BTREE
+definitions, including names, types, defaults, order and referenced data.
+Correct native operation does not excuse an incompatible registration. See paired
 [PG17 registry construction](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/common/reloptions.c)
 and [PG18 registry construction](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/common/reloptions.c).
 
@@ -30,12 +32,13 @@ pointers rather than copying their data. A supplied string validator runs on
 the default before record publication; registration then copies a global
 non-NULL default into native long-lived memory. Provider identity alone does
 not bind these values or earlier callback effects. A later module-path sample
-cannot substitute for their construction and preservation proof.
+cannot certify their construction or preservation. The selected trust boundary
+uses supported native registration services and functional configuration admission.
 
 The selected public header declares mutation and parsing APIs, not an actual
 global-registry census or generation observation. No private-structure cast,
 probe parse, successful SHOW or observed module count is selected as that
-missing witness. See paired
+missing census; that census is not the selected entry mechanism. See paired
 [PG17 registry API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/access/reloptions.h)
 and [PG18 registry API](https://github.com/postgres/postgres/blob/REL_18_6/src/include/access/reloptions.h).
 
@@ -87,20 +90,21 @@ outside this heap/TOAST/btree admission scope.
 
 Raw catalog NULL, empty and nonempty option images must remain independent of
 the parsed result. Unset global definitions still participate in parsing and
-default filling. The [startup trace](native-startup-references.md) also requires
-provenance for serialized parsed options from their producing backend; a bound
-consumer registry does not retroactively certify that producer.
+default filling. The [startup trace](native-startup-references.md) describes
+serialized parsed options from a producing backend. Native restoration belongs
+to the supported runtime; no independent producer certificate is required.
+Parsed options still cannot replace Darmok's raw defining carriers.
 
 ## Construction and cost still required
 
-The entry construction must bind actual registry contents and referenced data
-at its base, then preserve them through every allowed callback and command.
-Physical catalog locks do not establish backend-private registry state. The
-existing module's utility/callback route must be admitted, rather than requiring
-every hook to be absent. Unknown registry history must fail before parsing or
-opening a descriptor that depends on it. The concrete witness and complete
-startup/reference/provider induction remain OPEN; this selection closes no
-entry, writer, sequence or table-execution gate.
+The selected construction trusts correct native registry storage and parsing
+under a functionally admitted configuration. Physical locks do not freeze that
+private registry, and an incompatible relevant registration cannot be ignored.
+The existing module's utility/callback route must be admitted, rather than
+requiring every hook to be absent. Unsupported dependent paths must fail before
+parsing or opening them. The complete supported path, local lifetime and guard
+arguments remain OPEN for new descriptors; this selection closes no writer,
+sequence or table-execution gate.
 
 Initialization visits the combined registry and allocates its pointer array;
 the retained custom array grows geometrically. Parsing scans the global table,

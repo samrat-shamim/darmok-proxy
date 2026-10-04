@@ -1,9 +1,11 @@
 # Native entry mutation census
 
 Status: paired archive-bound source census and targeted reference findings.
-The startup/provider/registry/reference construction remains OPEN before new
-descriptor admission. This extends the [startup trace](native-startup-references.md)
-and [registry trace](native-reloptions-registry.md). Concurrent PostgreSQL native
+The [stock runtime contract](native-runtime-contract.md) trusts native internal
+construction and bookkeeping; project lifetimes and functional path admission
+remain OPEN for new descriptors. This extends the
+[startup trace](native-startup-references.md) and
+[registry trace](native-reloptions-registry.md). Concurrent PostgreSQL native
 two-phase transactions remain required.
 
 ## Corpus and what the search establishes
@@ -110,13 +112,14 @@ remain part of the admitted footprint. See paired
 [PG17 resource registration](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/resowner/resowner.c)
 and [PG18 resource registration](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/resowner/resowner.c).
 
-The next construction must cover generated/compiled mutation paths and actual
-module initialization, bind the base's owned references and preserve it through
-each permitted command, invalidation/rebuild and release phase. The entered
-data view, exact AS references and physical-wait frontier remain independent
-requirements. This census selects no private-layout reader and admits no new
-descriptor. Registry/provider, writer, sequence and full table execution remain
-OPEN.
+The next project argument must cover Darmok acquisitions and each permitted
+command, invalidation and release phase using supported native services. It
+does not require a generated/compiled integrity proof of all native mutations.
+Relevant module and callback paths must still preserve neutral preparation.
+The entered data view, exact AS references and physical-wait frontier remain
+independent requirements. This source census selects no private-layout reader
+and admits no new descriptor. Functional path admission, writer, sequence and
+full table execution remain OPEN.
 
 The census and selected reads add no runtime cost. Native owner enlargement,
 scan/read-stream allocation, callback storage and rebuild copies retain separate

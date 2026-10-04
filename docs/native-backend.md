@@ -31,9 +31,10 @@ setup owners cannot open a query scope or transfer their connection to a query
 owner. Both use a private connection mechanism for client/driver ownership and
 disposal, without sharing a connection or command history. Starting query work
 after setup requires a fresh connection. This removes setup's procedural
-commands from the query owner's post-startup history; it does not prove the
-connector's complete native startup or callback footprint. Those remaining
-gates are recorded in [private command history](native-command-history.md).
+commands from the query owner's post-startup history. The
+[stock runtime contract](native-runtime-contract.md) trusts ordinary native
+startup services; relevant callback neutrality and project lifetimes still need
+their functional argument in [private command history](native-command-history.md).
 
 The owner is neither clonable nor shareable as an independent SQL handle.
 Transaction methods require a mutable borrow. Its Debug output contains the
