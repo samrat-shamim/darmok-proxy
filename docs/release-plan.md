@@ -6230,3 +6230,48 @@ Current formatting/diff pre-commit checks pass, but current strict paired native
 packages, required ordinary suites and fresh implementation review remain pending.
 No previous runtime result certifies these changes. The full definition/bootstrap/
 provider/statement/execution/serving/performance/release and goal gates stay open.
+
+### Declared type-link paired run and publication-fixture correction
+
+The first implemented source was
+`39e83887b5bfea493baa2a3dde6a621de87c908f`, tree
+`d512dddb73d6e785e6b8b6ea1ba068bde2442ee3`. Root13–16 formatting, diff,
+repository boundaries and strict targeted Clippy passed. Root18 produced four
+strict PostgreSQL17.11/18.6 product/probe packages with26 bound native inputs and
+14 actual0 commands. Package facts SHA256:
+`e44897911110642ad60abeae431d44429df9c2c80e85d3cc631d8eb85754db96`.
+Root19 verified eight fresh required profiles with620 actual0 commands; facts
+SHA256 `7e336a6b68ece0c96f9a7a959f7e856375216034f7c0cc2e61c307695ddea311`.
+
+Root20/21 passed all61 integration and3 private catalog tests on PostgreSQL17,
+including both new type-link fixtures. Each had30 actual0 before/after readers
+and unchanged profile identities/binaries. Their binding facts SHA256 values:
+`061f5c908e96aa74585f4ab20317d9b025c1b3d4c2ac7ccbc7e0e37f765859f9`
+and `6f2d10bccbb10a8ad99698a0a4ac48c6b2a6d6293c4ca972e59ea09afae2896e`.
+
+Root22 is preserved actual101 on PostgreSQL18: catalog discovery11 and builtin
+dispatch2 passed, then catalog publication had17 passed/1 failed/0 ignored. The
+remaining integration targets and private suite did not run. Binding facts
+SHA256 `e7b26a905a29deff24c0b6b6ae9913f242298bd3ddc4b4c730eac513ec5ceba2`
+records30 actual0 readers and unchanged identities/binaries. All eight profiles,
+packages, raw streams and namespaces remain preserved.
+
+The failed publication assertion compared generation128 from an unheld one-shot
+observation with generation131 after acquiring a retained reader Share. The
+one-shot releases its fences before output (`catalog_read.c`762–875); the probe
+only acquires its retained Share at `darmok_catalog_probe.c`772–788. A publication
+between these scopes is allowed. Root23–26 read the exact failed fixture and
+these existing native paths; this is not a new kernel/registry/history census.
+
+The fixture now checks monotonicity across that unheld interval and uses the
+observation made under the first retained Share as its DDL baseline. Its existing
+two-reader coexistence, pending Exclusive, release-one-still-blocked and final
+completion checks stay intact; post-DDL generation must advance from the held
+baseline. It adds no requests, sleeps or timeout changes. Native product/probe
+inputs are unchanged by this correction. Fresh paired packages, profiles, suites
+and implementation review are still required for the corrected source.
+
+The uninvoked `verify-native-type-links-evidence-v1.py` draft remains preserved
+at SHA256 `58de0a36bebc59be4172d359524faa9780e93f10e5e0f53f808dcbfdf67c17ea`;
+it has no execution or acceptance claim. Full collector/bootstrap/provider/
+statement/execution/serving/performance/release and goal gates remain open.
