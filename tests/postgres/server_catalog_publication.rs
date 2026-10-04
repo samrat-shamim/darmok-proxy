@@ -11,6 +11,10 @@ mod native_frames;
 
 static TEST_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+// Database removal can require a durable checkpoint. Its filesystem sync cost
+// is independent of the module's lock/admission and immediate-read deadlines.
+const DATABASE_DROP_COMPLETION: Duration = Duration::from_secs(120);
+
 const FENCE_LOCKS: &str = "SELECT mode, granted FROM pg_catalog.pg_locks
     WHERE locktype = 'object' AND COALESCE(database, 0) = 0
       AND classid = 'pg_catalog.pg_extension'::pg_catalog.regclass
@@ -1738,7 +1742,7 @@ async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
 
         release_probe(&reader).await;
         reader.batch_execute("COMMIT").await.unwrap();
-        tokio::time::timeout(Duration::from_secs(20), &mut dropping)
+        tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut dropping)
             .await
             .unwrap()
             .unwrap();
@@ -1850,7 +1854,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     release_probe(&reader).await;
     reader.batch_execute("COMMIT").await.unwrap();
     wait_shared_drop_barrier(&observer, second_pid).await;
-    tokio::time::timeout(Duration::from_secs(20), &mut first)
+    tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut first)
         .await
         .unwrap()
         .unwrap();
@@ -1862,7 +1866,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     // intent. Its existing busy-database error clears that intent and wakes the
     // reader; their two replies still have no required ordering.
     barrier.batch_execute("ROLLBACK").await.unwrap();
-    let error = tokio::time::timeout(Duration::from_secs(20), &mut second)
+    let error = tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut second)
         .await
         .unwrap()
         .unwrap_err();

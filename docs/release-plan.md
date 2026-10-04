@@ -5731,3 +5731,36 @@ increased. The failed native cohort is preserved; fresh required verification an
 independent review remain pending. A passive search used the helper-root cwd for
 the fixture source and exited2 after displaying the matching log lines; the next
 source read used the correct worktree. Earlier outcomes retain their scope.
+
+At 69a408ef17fffc2a13a33c76c9d5aac250d8d471, root23 diff, root24 targeted rustfmt
+and root25 targeted Clippy actually exit0. Root26 creates eight freshly named
+verification profiles, all451 commands exit0, binding the unchanged26 native
+inputs to the accepted7abbcfd package build. Its facts SHA256 is
+f284792825b9421c6e18f27bfaef3515ec7b172216fe1a2b49efddad0b06b519.
+The fixture v3 wrapper explicitly records separate source and native build heads
+and validates the actual current native inputs before and after runtime checks.
+
+Root27 PostgreSQL17 integration actually exits101: discovery11 and builtin2
+pass; publication17 pass and the concurrent shared-drop fixture fails at its
+first DROP completion deadline, line1855. This is a distinct, located outcome;
+the observation's unconditional timer has already been removed. The remaining
+four binaries, private-owner cases and all18 runtime cases were not started.
+Its failed binding facts SHA256 is
+7c2e9e4601b3ad4c803fc7abcf7aec9e47a979bfacc56473f0b1d3dbf817f46f.
+All30 before/after artifact readers exit0; no whole current runtime acceptance
+is inferred. This failed cohort remains preserved.
+
+Root28 passively captures that profile's native logs with actual0. The first
+DROP's ordinary checkpoint begins06:24:23.728UTC and completes06:24:44.552UTC:
+total20.825seconds, including19.726seconds of filesystem sync. The test's client
+EOF occurs at06:24:43.639UTC after its20-second deadline; the native checkpoint
+then completes normally. The native durability operation is not a metadata
+deadlock. The fixture's20-second durable utility budget was an unstated disk
+latency requirement, not a proxy semantic assertion. A named120-second database
+DROP completion budget now applies to the three existing DROP completion waits;
+lock/admission, immediate observations and released reader completion retain
+their existing20-second deadlines. Native fsync/checkpoint behavior, assertions,
+outcomes and the extension's bytes remain unchanged. This bounded functional
+verification policy is separate from the uncompleted performance gate. Fresh
+required verification and independent review remain pending; no new native fault,
+stress, interruption/recovery or profile lifecycle experiment is introduced.
