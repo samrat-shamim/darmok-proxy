@@ -53,6 +53,13 @@ The [type metadata preparation proposal](native-type-payload-bootstrap.md)
 now gives that candidate a concrete separate-profile and exact AS/RX sequence.
 Independent source review remains required before new collector C changes.
 
+The first proposal's independent review found R1: its initial AS-only opens
+preceded the fresh profile and complete guards. The revised
+[initial-base and preservation argument](native-type-payload-bootstrap.md#initial-admission-base-and-preservation)
+distinguishes inherited native bootstrap admission from fresh dependent checks
+and requires 16 exact AS/RX seed references before project preparation. That
+correction still requires fresh source review; no new native result is claimed.
+
 All physical waits, including waits for locks retained by a prepared transaction,
 must occur before S. No catalog snapshot or reader descriptor increment may
 cross a new physical wait. Stronger catalog locks would add real waits for
@@ -105,11 +112,18 @@ before opening the path that depends on them.
 
 `RelationBuildDesc` loads class and attribute facts, selects table/index access
 information, parses options and conditionally loads other defining state.
-Fresh copied profile facts must establish the admitted native kind, namespace,
-persistence, handler and physical identity, exact positive attribute layout,
+Fresh copied profile facts must establish each new dependent descriptor's
+admitted native kind, namespace, persistence, handler and physical identity,
+exact positive attribute layout,
 default/missing/generated declarations and the flags that select additional
 descriptor paths. Compiled names/types/length/alignment are expectations to
 check against actual rows, not fabricated replacement catalog facts.
+
+The initial six-reader discovery is separately admitted by the named original
+builtin catalog interface and its closed permitted transitions in the new
+proposal. Later fresh checks cannot retrospectively admit those first opens.
+This finite bootstrap exception neither extends to newly selected descriptors
+nor substitutes native cached values for actual defining carriers.
 
 The [fixed descriptor declarations](native-descriptor-declarations.md)
 component now exposes the actual class CHECK count and rule/trigger hints from

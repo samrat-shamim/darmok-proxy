@@ -32,11 +32,125 @@ a descriptor for a selected nonroot composite. Range opclasses/functions, enum
 input and domain CHECK expressions remain separate unresolved execution
 obligations.
 
+## Initial admission base and preservation
+
+Discovery D needs readers before a fresh profile exists. Its admission is an
+explicit inherited native interface precondition, not a conclusion from D.
+The supported configuration provides the original builtin catalog descriptor
+contract for these six relations and the two initialized native lookup indexes:
+
+| Bootstrap object | Native identity | Inherited descriptor path |
+| --- | --- | --- |
+| `pg_namespace` | 2615 | Permanent nonshared builtin catalog heap |
+| `pg_class` | 1259 | Permanent nonshared builtin catalog heap; no declared TOAST for class carriers |
+| `pg_index` | 2610 | Permanent nonshared builtin catalog heap |
+| `pg_attribute` | 1249 | Permanent nonshared builtin catalog heap |
+| `pg_type` | 1247 | Permanent nonshared builtin catalog heap |
+| `pg_attrdef` | 2604 | Permanent nonshared builtin catalog heap |
+| Class-OID lookup index | 2662 | Original initialized builtin-btree service on `pg_class` |
+| Attribute-ordinal lookup index | 2659 | Original initialized builtin-btree service on `pg_attribute` |
+
+The base includes each heap's native per-major positive attribute ABI, builtin
+heap AM, original catalog namespace and kind, and absence of attribute defaults,
+missing values, stored/virtual generation, declared CHECKs, rules and triggers.
+Ordinary catalog NOT NULL declarations remain present. Raw class options have
+the builtin text-array carrier layout; NULL, empty and nonempty values use the
+complete admitted global options path below. The critical indexes retain their
+original native ownership, key/layout/support contracts and initialized builtin
+options path. A bootstrap open enters no application provider, expression
+loader, local options registry or selected payload's TOAST reader.
+
+Successful ordinary native startup establishes the service base before the
+private query owner begins. Paired `RelationCacheInitializePhase3` either
+restores native init-file data or uses `formrdesc` for critical class, attribute,
+procedure and type catalogs; it then initializes critical indexes and finishes
+native cache setup. This does not mean all six readers are hardwired or nailed.
+Namespace, index and attrdef cold opens depend on the explicit original builtin
+catalog contract above. Native startup may perform ordinary provider work; it
+is not part of Darmok's subsequently neutral query preparation.
+
+The [stock runtime contract](native-runtime-contract.md#startup-and-inherited-native-caches)
+supplies correct native construction, restoration, invalidation and reference
+services. The added finite bootstrap prerequisite supplies the selected original
+catalog path. A warm cache, `criticalRelcachesBuilt`, module pathname, caller
+Boolean or later generation comparison cannot create it. D still copies and
+checks actual rows; compiled identities/layouts never replace defining facts.
+
+The admitted operations preserve this base between attempts as well as while
+guards are owned. Ordinary application DDL and its catalog row writes do not
+alter these builtin relations' descriptor declarations. Statistics and
+clearing-only hint maintenance do not enable missing/default/CHECK/rule/trigger
+branches. Supported options changes stay within the admitted global heap/btree
+parser and compatible definition/parse-table contract. Supported native index
+maintenance preserves the original critical service through its native reload
+and restoration contract; locators are always observed afresh. A configuration
+that changes builtin catalog schema, loaders, AM/support identity or registry
+correspondence is outside this functional bootstrap contract. Direct writes or
+extension paths that make such changes cannot be classified as ordinary
+application catalog writers. This is an interface precondition, not a new
+admission policy or an integrity census.
+
+Before any project refresh, invalidation, increment or open in D, acquire exact
+AS and RX for every one of the eight named seed objects: 16 independently owned
+OID/mode references in the existing native order. Acquisition uses their native
+fixed identities and opens no descriptor. There is no AS-only reader window in
+this proposal. The same AS/RX seed is part of every expanded metadata and full
+physical attempt. A missing seed reference errors before preparation.
+
+Native SI delivery inside a lock acquisition uses the already admitted native
+service/configuration base. The acquisition does not itself certify neutrality
+or create that base. No Darmok reader, scan or registered catalog horizon is
+alive while the seed is being assembled; explicit project refresh/invalidation
+and reader preparation begin only after the complete seed ledger is owned.
+
+The following transition argument is separate from a post-open check:
+
+1. Entry inherits the named native descriptor/lookup base and closed functional
+   configuration before any project reader exists.
+2. AS excludes AX layout/default/missing/generation/AM, rename, drop and rewrite
+   work on the seed. RX also excludes SRX trigger work and Share maintenance
+   while the seed is held. The selected ALTER dispatcher supplies these
+   loader-changing modes; `CreateTriggerFiringOn` explicitly takes SRX before
+   changing a relation's trigger state. The older AS-only seed cannot supply
+   this argument.
+3. Compatible SUE options/statistics paths remain admitted. Paired
+   `vac_update_relstats` changes counters/frozen IDs and can only clear the
+   relevant conservative hints; it cannot enable false rule/trigger hints.
+   Ordinary RX catalog row writes remain compatible. Their defining application
+   facts still need coherent observations and publication/private/context rechecks.
+4. A cold/rebuilt heap uses the admitted class/attribute lookup paths.
+   `ScanPgRelation` opens class with AS and uses its initialized class-OID
+   service; `RelationBuildTupleDesc` uses the attribute-ordinal service. Both
+   exact AS references are already owned. The builtin catalog table-AM branch
+   selects the original heap handler rather than a captured application AM.
+   Absent loader declarations prevent additional default/missing/CHECK/rule/
+   trigger reader branches. Native increments have their native matching close
+   paths; they do not transfer seed ownership.
+5. Critical-index reload retains initialized support state, copies the current
+   class row, parses admitted options and refreshes the physical address.
+   Reloading the class-OID index uses a class heap scan to avoid recursion.
+   These system indexes skip the non-system `pg_index` refresh branch. Project
+   cache operations and opens stay outside raw/S; native cache services retain
+   their admitted contracts.
+6. D must agree with the inherited path and discover the complete current
+   physical graph. Disagreement errors; it neither repairs native state nor
+   retrospectively admits the earlier open. Close D completely before seed
+   release. The closed admitted operations preserve the base through that
+   reader-free gap. Reacquire the full graph before P_A opens; P_A/P_B/P_C
+   admit the new dependent descriptors from fresh actual facts.
+
+The finite initial readers use this separately stated inherited source-admitted
+base. Every descriptor beyond it needs a fresh preparation profile before entry.
+This exception does not extend to application descriptors, new catalogs, TOAST
+or arbitrary indexes, and does not turn compiled bootstrap layouts into copied
+defining schema facts.
+
 ## Pre-open profile
 
-For each descriptor the project will open, a fresh coherent preparation
-observation copies its actual class, positive attributes, relevant type rows,
-index membership and selected class option carriers. It owns its copied bytes.
+For each dependent descriptor beyond the finite initial base, a fresh coherent
+preparation observation copies its actual class, positive attributes, relevant
+type rows, index membership and selected class option carriers. It owns its
+copied bytes.
 The profile must establish the supported namespace, permanent nonshared kind,
 builtin heap or already admitted critical-btree path, declared physical identity,
 exact positive ordinals and the fields that select native descriptor loaders.
@@ -147,17 +261,20 @@ Selection between fixed maps and carrier copying uses only owned bytes.
 It performs no new descriptor open, provider dispatch or physical wait there.
 
 1. Observe the publication/private/context boundary with no project reader or
-   preparation snapshot retained. Acquire the existing eight-reference catalog
-   seed: six admitted heaps and the two critical indexes, exact AccessShare.
-2. Open only those admitted readers using NoLock outside raw/Share. Capture
-   discovery profile D and the proposed complete metadata graph. End every
+   preparation snapshot retained. Acquire the fixed bootstrap seed's 16 exact
+   references: AS and RX for each of six initial heaps and two critical indexes.
+   Establish the local seed ledger before any project cache preparation or open.
+2. Under the inherited base, open only those readers using NoLock outside
+   raw/Share. Capture discovery profile D and the proposed complete metadata
+   graph. End every
    scan/snapshot/reader increment, invalidate the ephemeral catalog snapshot and
    release the seed.
 3. Acquire the complete metadata graph's exact AS/RX references with no project
    catalog reader or registered horizon alive. All physical waits precede
    semantic Share, including waits for locks held by prepared transactions.
-4. Using owned exact references, open only the admitted initial readers, capture
-   fresh preparation profile P_A, validate its graph and defining prerequisites,
+4. Using the inherited base and the owned complete AS/RX seed references,
+   open only the initial readers, capture fresh preparation profile P_A,
+   validate its graph and defining prerequisites,
    then close those readers and its snapshot. An expanded/changed dependency
    unwinds the whole metadata attempt before a bounded pre-effect retry.
 5. Prepare all nine admitted definition readers outside raw/Share using NoLock.
@@ -205,6 +322,9 @@ and P_C add 24. The candidate total is 60 direct catalog passes before selected
 TOAST scans and native internal cache work. This is a design count, not a measured
 invocation result or accepted implementation total.
 
+The fixed seed grows from eight AS references to sixteen exact AS/RX references
+before discovery; that acquisition introduces no extra catalog pass. RX adds
+real Share/SRX contention and possible native transaction retention.
 The fixed maps scale with whole-catalog row counts. Selected metadata attributes,
 profile/type sets, graph edges and option images require checked phase and
 cumulative requested-copy bounds before allocation. Actual exact references
@@ -226,7 +346,13 @@ Before C changes, independently challenge the supported options path, loader
 conditions, field/writer exclusions, critical lookup dependencies, profile
 freshness, complete native mode union, reference cleanup and every wait boundary.
 Resolve any missing source argument rather than opening a descriptor as a probe.
-The source gate remains OPEN at this draft.
+The source gate remains OPEN at this revision. Independent review at
+`fec65d959ef1c3c73588ae81e98330a3b074caa1` found high R1: AS-only initial opens
+lacked a noncircular admission/preservation argument. The inherited base and
+sixteen-reference sequence above propose its correction; fresh source review
+is required before C. R1's original report is immutable at
+`logs/review-native-type-payload-bootstrap-fec65d9-source-v1`, report SHA256
+`3b8e7cd8565d9f3986c808c7cbdedb661bc23ce0face1ef138db3a94ac3bf432`.
 
 After acceptance, replace the old preparation mechanism in one greenfield change
 and implement range/enum/domain-constraint collection against the same copied
@@ -241,6 +367,15 @@ facts SHA256 `6817d5b04564327d6e6a67b4316f08315f21e94002bc6579aafb4ee469f380c8`.
 The selected cold builders and paired headers are separately saved in root04's
 source transcript. Counts establish byte provenance, not whole writer or
 functional-path acceptance. Additional named source obligations must stay finite.
+
+The finite initial-base record
+`logs/native-type-payload-bootstrap-initial-base-primary-v1` binds eight of the
+same pinned source files and sixteen complete selected startup, class lookup,
+builtin table-AM, catalog ALTER, trigger-state and reindex entry bodies; facts
+SHA256 `5c6c8d4c841a6a02ba059f9cf6c618e40dd6e5f3f9a40df9d0d6cce8bbeeff07`.
+Paired trigger creation's explicit SRX acquisition is a separate bounded source
+span. These byte records support the named path argument; their body counts
+do not certify all writers, startup effects or the complete native service graph.
 
 Full providers/expressions, negative/name candidates, statement/binding/execution,
 performance and release gates, issues46/15 and the overall goal remain OPEN.

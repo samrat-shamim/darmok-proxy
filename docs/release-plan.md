@@ -6544,3 +6544,22 @@ the full definition collector's 36, before TOAST/cache work. This is a design
 count requiring independent source review and implementation, not a runtime or
 performance acceptance. Current native code and all required tests remain at
 the merged composite component; the new descriptor/source gate is OPEN.
+
+Independent source review at fec65d9 keeps that gate OPEN on high R1: initial
+six-reader opens preceded their fresh admission and complete AS/RX ownership.
+No runtime defect is established. The immutable report SHA256 is
+`3b8e7cd8565d9f3986c808c7cbdedb661bc23ce0face1ef138db3a94ac3bf432`;
+its actual-zero terminal records and 186 fixed members rehash through root08
+to 208 unique bounded paths, facts SHA256
+`939f99680eb0377739537ae61cbbdfb17751f1d1cfb3e4a13f5826864bb141e4`.
+Root09's guessed commands filename caused a reader-only actual1; corrected
+root10 reads the complete report/raw observer/receipt and preserves that failure.
+
+The proposed correction names the inherited native catalog/lookup base,
+separately classifies permitted transitions and requires AS/RX on all eight
+seed objects before any project cache preparation or reader open: 16 references
+instead of eight. The four preparation and three definition observations cost
+the candidate 60 direct passes. Added native contention/retention and all runtime
+results remain unmeasured. Fresh independent correction review is required
+before C; broader collector, provider, statement, execution, performance,
+release and overall goal gates remain OPEN.
