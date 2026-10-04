@@ -7,6 +7,10 @@ builtin function table against their linked C symbols. It does not admit a new
 descriptor, invoke a provider or establish the complete native entry profile.
 Concurrent native PostgreSQL two-phase transactions remain required.
 
+The [stock runtime contract](native-runtime-contract.md) defines the selected
+native API assumptions. This observation can check the selected live table/
+symbol relationship; original-binary attestation is not a functional entry gate.
+
 ## Why a separate observation is needed
 
 The earlier [executable file observations](native-build-observations.md) describe
@@ -53,8 +57,9 @@ build. Equality establishes the relationship between those live inputs at the
 observation, not original executable contents, complete source-to-binary
 derivation or a provider's later execution path. The component does not inspect
 actual FmgrInfo values, selected pg_am rows, AM routine contents, fmgr hooks,
-callback/registry state or entered reference owners. Those separate
-[bootstrap obligations](native-catalog-bootstrap.md) remain open. This is not
+callback/registry state or entered reference owners. Functional supported-path
+and project-lifetime [bootstrap obligations](native-catalog-bootstrap.md) remain
+open; a census of every native owner or registry is not required. This is not
 an allowlist or a certificate derived merely from matching symbol names.
 
 ## Cost and ordinary verification

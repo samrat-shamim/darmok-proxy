@@ -1,11 +1,12 @@
 # Native release, headers and executable observations
 
 Status: paired file observations for the existing PostgreSQL 17.11/18.6 primary
-test profiles. The complete compiled-path, live provider and entered-reference
-construction remains OPEN. This extends the [entry census](native-entry-census.md)
-and [bootstrap investigation](native-catalog-bootstrap.md); it admits no new
-descriptor or execution path. Concurrent native two-phase transactions remain
-required.
+test profiles. The selected [stock runtime contract](native-runtime-contract.md)
+does not require original-binary attestation or a complete native integrity
+census. Functional path and project-lifetime admission remain OPEN for new
+descriptors. This extends the [entry census](native-entry-census.md) and
+[bootstrap investigation](native-catalog-bootstrap.md), not runtime acceptance.
+Concurrent native two-phase transactions remain required.
 
 ## Release corpus and declared source identity
 
@@ -90,8 +91,10 @@ not establish actual runtime relocation/binding, continuous loaded-module and
 registry history, init-file producer provenance or all reference owners.
 Executable hashes and matching declarations also do not prove complete
 source-to-binary derivation or generated/compiled transition coverage. Those
-remain requirements before constructing the entry base and admitting new opens,
-rebuilds, cleanup or statement execution. No private-layout reader is selected.
+integrity certificates are superseded acceptance premises under the selected
+native API boundary. Supported dependent paths, local project acquisitions and
+statement validity still require their functional arguments and verification.
+No private-layout reader is selected.
 
 ## Cost, evidence and remaining work
 

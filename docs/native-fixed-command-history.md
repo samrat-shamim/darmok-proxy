@@ -1,9 +1,10 @@
 # Fixed native commands and catalog entry
 
-Status: paired PostgreSQL 17.11/18.6 source findings and construction obligations.
-The concrete startup, callback/provider/registry and entered-reference witness
-remain OPEN. This document admits no new C reader or execution lease. Concurrent
-native PostgreSQL two-phase transactions remain a v0.1 requirement.
+Status: paired PostgreSQL 17.11/18.6 source findings and project transition
+obligations under the [stock runtime contract](native-runtime-contract.md).
+Native services are trusted; local lifetimes and relevant functional callback
+admission remain OPEN for new paths. This admits no new C reader or execution
+lease. Concurrent native PostgreSQL two-phase transactions remain required.
 
 ## The commands are fixed; their native effects still need a proof
 
@@ -122,21 +123,22 @@ parent locks after successful RELEASE. See paired
 [PG17 transaction lifecycle](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xact.c)
 and [PG18 transaction lifecycle](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/transam/xact.c).
 
-## Construction required before new native descriptor opens
+## Project transitions required before new native descriptor opens
 
-The intended construction is induction over this private history, with three
-distinct obligations. None is implemented by this source checkpoint.
+The intended project argument uses this private history and the selected native
+services, with three obligations. None is implemented by this source checkpoint.
 
-1. Establish a base after actual native startup: bind the executable build,
-   loaded providers, callback/delegate and registration footprint, selected GUC
-   records, baseline native references and snapshot/owner state. A fresh Rust
-   connection or successful lookup SET supplies only part of this base.
+1. Establish fresh exclusive query ownership and confirmed native state after
+   supported native startup. State the admitted extension configuration and
+   relevant analysis/utility/GUC paths. A fresh Rust connection or lookup SET
+   alone does not establish their neutrality or project reference lifetimes.
 2. Prove every allowed transition preserves that base or changes explicitly
    modeled state. Include parse/utility/object hooks, catalog discovery, SI/cache
    callbacks, all release phases, GUC restoration and subtransaction owner
    changes. Bind actual native reference increments/decrements separately from
-   lock acquisition, reassignment and retention. Unknown transitions cannot
-   supply an entry witness merely because their wire outcome matches.
+   lock acquisition, reassignment and retention. Unsupported project transitions
+   cannot supply admission merely because their wire outcome matches. Native
+   internal reference accounting is an API dependency, not an all-owner census.
 3. At each new descriptor entry, require the established history and exact
    pre-open profile/reference facts before the reader increment or rebuild.
    Perform physical waits before S with readers/snapshots closed. End S before
@@ -144,16 +146,15 @@ distinct obligations. None is implemented by this source checkpoint.
    before another acquisition; concurrent prepared transactions remain supported.
 
 The public APIs identified in the [bootstrap investigation](native-catalog-bootstrap.md)
-do not passively enumerate all entered relcache references or opaque owner
-items. The concrete base/witness mechanism and complete transition induction
-still need to be selected and proved. A module-path list, hook pointer, critical
-relcache flag, positive rd_refcnt or readiness receipt cannot replace them.
-The [startup trace](native-startup-references.md) identifies the intrinsic pin
-constructors, restored-file/provider history and incomplete cleanup census that
-the base must account for separately from later owned reader increments.
-Likewise, the native provider/registry and defining-writer proofs must close
-before the proposed transitive descriptors are opened. No fallback collector
-or stronger-lock shortcut is admitted by these findings.
+do not passively enumerate all native cache references or opaque owner items.
+The selected architecture does not require that census. A module-path list,
+hook pointer, critical-cache flag or readiness receipt still cannot replace
+project lifetime and supported-path arguments. The
+[startup trace](native-startup-references.md) explains native intrinsic pins and
+restoration separately from Darmok-owned reader increments. Functional options/
+provider admission and defining-writer coverage must close before transitive
+descriptors are opened. No fallback collector or stronger-lock shortcut is
+admitted by these findings.
 
 ## Major differences, cost and evidence scope
 

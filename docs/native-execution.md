@@ -7,6 +7,11 @@ and [exclusive control owner and borrowed scopes](native-backend.md) are
 implemented components. Admitted statement execution, rollback through output
 validation and a runnable proxy remain pending.
 
+The [stock runtime contract](native-runtime-contract.md) states the native API
+assumptions. Native cache/reference correctness does not freeze captured meanings
+or admit evaluation: the project must establish the complete statement-validity
+and preparation/execution boundary below.
+
 The [native portal component](native-portals.md) separates Bind/Describe from
 Execute and checks actual bound output facts against the prepared handle. This
 is a representation prerequisite; dependency admission and the scoped public

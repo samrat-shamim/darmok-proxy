@@ -4,6 +4,10 @@ Status: owner separation implemented and locally verified at c5fa88e;
 the finite Rust implementation is independently reviewed at1b0fe07.
 Native entry and bootstrap admission remain open.
 
+The selected [stock runtime contract](native-runtime-contract.md) defines the
+native API assumptions. This owner boundary establishes project command and
+resource lifetimes; it does not require an exhaustive native integrity census.
+
 ## Boundary and rationale
 
 Exclusive Rust ownership prevents unrelated callers from submitting SQL. It
@@ -99,13 +103,13 @@ They do not certify complete startup, artifact identity or runtime behavior.
 
 The [fixed-command source trace](native-fixed-command-history.md) adds concrete
 parse/utility/string-object, GUC-restoration and resource-release callback paths.
-Fixed SQL and completed cleanup cannot replace a bound native provider/reference
-history. The existing Darmok utility hook is required, so the construction must
-admit its actual path rather than assume every hook is absent.
+Fixed SQL and completed cleanup cannot excuse an unsupported callback or prove
+project reference lifetimes. The existing Darmok utility hook is required, so
+the construction must admit its actual path rather than assume every hook is absent.
 
 Typed owner separation closes only the setup-to-query connection-transfer path.
-A concrete native entered-cache/reference witness, actual module/callback and
-registry/provider footprint, writer coverage, guard sequence and bootstrap
-admission remain required. Concurrent PostgreSQL native two-phase transactions
-remain a v0.1 requirement. No C admission changes follow from this boundary
+A project acquisition/lifetime argument, functional callback/options/path
+admission, writer coverage, guard sequence and bootstrap admission remain
+required under supported native services. Concurrent native two-phase
+transactions remain a v0.1 requirement. No C admission changes follow from this boundary
 alone. Whole-statement execution, serving and release gates remain open.

@@ -1,16 +1,18 @@
 # Native metadata descriptor bootstrap
 
-Status: paired source investigation and preferred design direction. The new
-descriptor bootstrap gate remains OPEN before descriptor-collector C changes.
-This document does not certify an implementation-ready collector, a backend callback/owner
-witness, new runtime behavior or an execution lease. The accepted six-catalog
-and direct-payload components retain their original source and profile scope.
+Status: supported path investigation under the selected
+[stock runtime contract](native-runtime-contract.md). The new descriptor
+bootstrap implementation gate remains OPEN before collector C changes. Native
+cache/reference services are trusted; Darmok's own acquisitions, pre-open path
+admission and exact guard sequence still require proof. This does not certify
+an implementation-ready collector, new runtime behavior or an execution lease.
+The accepted six-catalog and direct-payload components retain their original scope.
 Concurrent native PostgreSQL two-phase transactions remain required.
 
-The [entry mechanism comparison](native-entry-boundary.md) makes the remaining
-private-state boundary and concrete deployment alternatives explicit. It does
-not select or implement an entry witness; the current stock-server/extension
-direction and all pre-open requirements below remain in force.
+The [entry mechanism comparison](native-entry-boundary.md) records the selected
+stock-server/extension direction. Exhaustive native owner/registry/producer
+censuses are superseded acceptance premises. The functional pre-open
+requirements below remain in force.
 
 The [transitive type investigation](native-transitive-type-closure.md) adds
 `pg_range`, `pg_enum`, `pg_constraint` and constraint TOAST2832 to the intended
@@ -74,17 +76,18 @@ as the global heap/btree path. See paired
 [PG17 registration and parsing](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/common/reloptions.c)
 and [PG18 registration and parsing](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/common/reloptions.c).
 
-This narrows the callback question; it does not accept every registry history,
-provider, allocation or option datum. A concrete profile still needs an
-authoritative registry/provider admission boundary, supported native carrier
-paths and resource accounting before it calls native parsing. Preserve actual
+This narrows the callback question; it does not accept every extension
+configuration, provider, allocation or option datum. A concrete profile still
+needs functional registry/provider admission, supported native carrier paths
+and resource accounting before it calls native parsing. Preserve actual
 NULL/empty/nonempty option images independently from parsed `rd_options`.
 The [registry construction trace](native-reloptions-registry.md) identifies
 direct kind-mask registration, referenced enum data, the missing public census
-and PostgreSQL 18's explicit-set field. The actual registration and parse-table
-correspondence must be established before those paths run.
+and PostgreSQL 18's explicit-set field. The supported configuration must preserve
+registration/parse-table correspondence before those paths run; a private
+registry census is not required by the stock runtime contract.
 Native cache defaults or ignored options are not an alternative source of
-the collector's defining bytes. Unexpected carriers or histories must fail
+the collector's defining bytes. Unexpected carriers or unsupported paths must fail
 before opening the path that depends on them.
 
 ## Cold and invalidated descriptors
@@ -111,18 +114,19 @@ Cache invalidation is an entry concern as well as a recheck concern. In17,
 can reach `RelationBuildDesc`, while inactive pre-existing entries can be
 discarded. Locally created/relocated entries and nailed/index descriptors take
 other paths. `RelationReloadIndexInfo` parses options again. A new guard acquired
-later does not retroactively admit an earlier invalidation callback or an
-unowned active reference. Warm-cache state and `criticalRelcachesBuilt` alone
-cannot supply the missing witness. See paired
+later does not retroactively admit an unsupported functional callback or repair
+an unmatched project reference. Warm-cache state and critical flags do not
+establish fresh defining facts. Native internal entries remain trusted services.
+See paired
 [PG17 relcache paths](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/cache/relcache.c)
 and [PG18 relcache paths](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/relcache.c).
 
-The required entered-cache/owner witness and continuous builtin callback profile
-remain OPEN. They must govern cache clearing, native snapshot acquisition,
-new descriptor opens, invalidation/rebuilds and cleanup. An unsupported active
-descriptor cannot be probed by opening/rebuilding it and checking afterward.
-No assumption of a private owner or absence of outstanding references is
-inferred from a passing direct-type fixture.
+The required project reference lifetimes and supported callback/path admission
+remain OPEN for new descriptors. They must govern project cache operations,
+native snapshot use, opens, invalidation and cleanup. An unsupported dependent
+path cannot be probed by opening/rebuilding it and checking afterward. Ordinary
+native cache entries and intrinsic pins belong to the trusted runtime; neither
+a private Rust owner nor a passing fixture proves Darmok's own acquisitions.
 
 ## Original builtin heap dispatch
 
@@ -139,10 +143,11 @@ native heap handler returns the same static `heapam_methods` object as
 Both pinned bootstrap data rows assign original OID 3 to
 `heap_tableam_handler`. This source finding applies to the original compiled
 identity and admitted catalog branch. A function alias goes through a catalog
-lookup; a matching name alone cannot establish this dispatch. The selected
-server build, catalog-branch prerequisites and complete options/carrier,
-loader, callback and resource profile still need their admission proof. There
-is no new runtime/build result or universal provider certificate here.
+lookup; a matching name alone cannot establish this dispatch. The
+supported native runtime, catalog-branch prerequisites and complete functional
+options/carrier, callback and project-resource path still need to be stated.
+No original-binary attestation or complete native integrity census is required.
+There is no new runtime/build result or universal provider certificate here.
 See paired [PG17 table-AM dispatch](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/table/tableamapi.c),
 [PG18 table-AM dispatch](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/access/table/tableamapi.c),
 [PG17 function lookup](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/fmgr/fmgr.c),
@@ -166,7 +171,8 @@ reference in `CurrentResourceOwner` during normal processing.
 reference. Bulk release removes the owner item before invoking its release
 routine; `ResOwnerReleaseRelation` consequently decrements without forgetting
 the item again. Native relcache references use the BEFORE_LOCKS release phase.
-Actual owner provenance and exact counts must be retained through every phase.
+Darmok-owned increments and matching owner/count semantics must be retained
+through every project phase; native internal owner bookkeeping is trusted.
 
 In the ordinary successful simple-query path, `exec_simple_query` runs its
 unnamed portal to completion and drops it before reporting command completion.
@@ -187,19 +193,20 @@ the C invocation's owner-identity checks supply different observations:
 
 | Observation | Established fact | Additional proof still required |
 | --- | --- | --- |
-| Exclusive Rust owner | Commands cannot interleave through an escaped client | Admitted native startup/command history and callback footprint |
-| Current and transaction ResourceOwner identity | The recorded invocation boundary is unchanged | Provenance of every entered positive descriptor reference |
-| `rd_refcnt` on an obtained descriptor | Native total reference count | Exact owners, baseline nailed references and a safe pre-open observation |
-| `criticalRelcachesBuilt` | Native critical initialization completed | Continuous provider/registry/cache history |
+| Exclusive Rust owner | Commands cannot interleave through an escaped client | Supported native context, fixed transitions and relevant callback admission |
+| Current and transaction ResourceOwner identity | The recorded invocation boundary is unchanged | Each Darmok acquisition and matching cleanup |
+| `rd_refcnt` on an obtained descriptor | Native total reference count | Project increments/lifetimes; an intrinsic pin does not supply an owned lock |
+| `criticalRelcachesBuilt` | Native critical initialization completed | Fresh defining facts and supported dependent paths |
 
 The pinned public relcache header offers lookup and invalidation routines, but
 no passive iterator over the cache's active references. The public owner type
 is opaque. `RelationIdGetRelation` can increment and rebuild an invalid entry
 before returning, so it cannot be used as a pre-open inspection shortcut.
-Neither a caller-supplied flag nor matching owner pointers constructs the
-missing witness. Investigate building it from a closed, source-admitted
-private history and the actual native provider/registry footprint; the concrete
-mechanism and complete induction remain OPEN. See paired
+Neither a caller-supplied flag nor matching owner pointers proves project
+lifetimes. The selected construction relies on ordinary supported native
+services and a closed private project history; it does not enumerate every
+native owner item. Its local lifetime and supported-path argument remains OPEN
+for new descriptors. See paired
 [PG17 cache API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/utils/relcache.h),
 [PG18 cache API](https://github.com/postgres/postgres/blob/REL_18_6/src/include/utils/relcache.h),
 [PG17 owner API](https://github.com/postgres/postgres/blob/REL_17_11/src/include/utils/resowner.h)
@@ -216,14 +223,15 @@ reset, interruption or recovery experiment. See paired
 [PG17 invalidation](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/cache/inval.c)
 and [PG18 invalidation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/inval.c).
 
-Before descriptor-collector C changes, the entry proof must bind the supported
-native build and registered callback/options footprint, establish every entered
-reference's provenance, and preserve that profile across SI, new opens, reloads and cleanup.
+Before collector C changes, establish the supported native paths and extension
+configuration, each project reference lifetime and exact acquisition sequence.
+Preserve neutral preparation across SI, new opens, reloads and cleanup.
 The [startup reference trace](native-startup-references.md) distinguishes
 intrinsic nailed pins from owned reader items and retained locks. It also
 identifies restored init-file options/provider work and the limited assertion
-scope of end-of-transaction cleanup. Those paths belong in the entry base;
-successful startup or a critical-cache flag is insufficient.
+scope of end-of-transaction cleanup. Those findings describe the native services
+trusted at startup. A critical-cache flag cannot replace fresh defining facts
+or project lifetime accounting.
 The [fixed private-command trace](native-fixed-command-history.md) identifies
 parse/utility/string-object hooks, GUC restoration, resource-release callbacks
 and savepoint lifecycle that this preservation proof must cover. Requiring
@@ -253,7 +261,8 @@ file list and accounts for each pathname terminator plus the final terminator.
 The serializer walks that list and copies the pathname strings, ending with an
 additional NUL. Neither selected function loads a module, opens a catalog
 reader or invokes a registered callback. They are concrete passive observation
-primitives for a future private-history proof, not an accepted entry witness.
+primitives for supported-configuration checks or diagnostics, not an accepted
+project lifetime or statement-validity proof.
 
 The estimator and serializer must observe the same unchanged list. The copy
 routine relies on its caller's capacity: its per-entry check is an `Assert`,
@@ -296,7 +305,8 @@ expansion, while leaving nested paths to the expansion routine. Consequently,
 a declaration string, a loaded pathname, a name/version pair and native ABI
 compatibility supply different facts. None alone binds the executable build,
 actual registry contents, callback history or descriptor-reference owners.
-The footprint proof must bind those facts independently.
+The observer cannot establish those separate facts. The selected stock contract
+does not require an exhaustive native integrity or producer certificate.
 The [file observations](native-build-observations.md) add matching release/API
 bytes, installed generated headers and the original heap-handler row in each
 captured executable. Its declared one-argument signature differs from the
@@ -317,12 +327,11 @@ Passive pathname capture is linear in module count and total pathname bytes;
 18's iteration adds one visit per module and any copied metadata bytes. These
 selected observations add no database or protocol round trip. Their buffer,
 resource bound and stable-list construction remain design obligations, with
-no measured latency/peak-memory claim. Next establish the concrete admitted
-startup and fixed-command history, including registration and cleanup, before
-using the footprint as one part of the entry proof. The authoritative entry,
-owner, registry/provider, writer, sequence, implementation/runtime and whole
-statement gates remain OPEN; no new descriptor path is admitted by this
-investigation.
+no measured latency/peak-memory claim. Use a footprint only for its named
+supported-configuration or diagnostic role. Fixed project transitions, relevant
+callback/path admission, writer coverage, guard sequence and whole-statement
+validity remain OPEN for new implementation; no descriptor path is admitted by
+this source investigation.
 
 ## Writer coverage and remaining sequence
 
@@ -343,8 +352,8 @@ actual hint updates from schema/provider changes, without inventing18 fields
 on17 or using a hint as proof of complete live index membership. This source
 read does not exclude all hint writers or certify a publication/cache shortcut.
 
-Before new descriptor collector C implementation, close the entered-cache/owner
-and supported options profile proof; finish writer and defining-field coverage;
+Before new collector C implementation, close the local reference-lifetime and
+supported options/path argument; finish writer and defining-field coverage;
 then select the exact
 bootstrap observations and guard sequence. Discovery must use only admitted
 readers. Close the discovery horizon before acquisition, collect fresh profile

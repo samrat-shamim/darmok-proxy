@@ -9,6 +9,11 @@ bootstrap gate before native implementation. Issues46/15 and the overall
 release gates remain open. Concurrent native PostgreSQL two-phase transactions
 remain required; disabling them is not an alternative.
 
+The [stock runtime contract](native-runtime-contract.md) defines the native API
+assumptions. New collector paths still require functional admission, project
+reference lifetimes and exact guards; an exhaustive native integrity census is
+not a bootstrap prerequisite.
+
 ## Why direct type rows are insufficient
 
 A table column can name a domain over a domain, an array whose element is a
@@ -193,8 +198,9 @@ physical guard wait, and all waits must precede S.
 
 The [metadata bootstrap follow-up](native-catalog-bootstrap.md) compares exact
 guard costs and follows global/local option and native rebuild paths. Its
-preferred complete-options direction remains conditional on registry/provider,
-entered-cache/owner and writer proof; it closes no bootstrap or runtime gate.
+preferred complete-options direction remains conditional on functional
+registry/provider admission, project reference lifetimes and writer coverage;
+it closes no bootstrap or runtime gate.
 
 The bootstrap gate remains OPEN until paired source proof covers all admitted
 writers, invalidation rebuilds and cold paths, and explains which exact guards
