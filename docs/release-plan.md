@@ -5868,3 +5868,66 @@ This completes local ordinary reference-scope verification only. New supported
 options/descriptor paths, writer coverage, transitive type collection, immutable
 binding/planning, table execution, serving, performance and release gates,
 issues46/15 and the overall goal remain OPEN. Standing exclusions remain.
+
+### Raw relation option carriers — candidate implementation
+
+Base: d0f39c521dddbfdb6220199c54c4a9132e4e90b7, the exact reviewed PR75
+merged tree933fb06a150383c3baf4d4707512db87ebdc4cd7. PR75 independent review
+has no required findings; root50 rehash and root59 merged readback actually
+exit0. Its116/0/0 results remain evidence for that earlier native source only.
+Merged-readback facts are logs/native-bootstrap-references-59127f8-merged-readback-v2/facts.json,
+SHA2562b6ba82f60c8f3f596f81b8bde9b2ce529de998642cd6623ac017cd921106e1a,
+with37-member seal7dbce45131c1b3fe72f07018d4244cfe6d94a80e71d5561165ffb8f7b7692c45.
+Readback v1's uninvoked stdout.log assumption was corrected in distinct v2
+before execution; no failed namespace or result was overwritten.
+
+The working branch captures one raw pg_class.reloptions source per distinct
+selected graph node through an extra class scan in the SAME raw observation
+span and registered snapshot. Pure graph selection/source construction now
+also occupy raw; no second fence acquisition or options parser is added.
+Only selected carriers are copied. A/B/C compare source identity, independent
+NULL presence and exact stored bytes; B supplies normalized owned images.
+The existing opened bootstrap descriptors still require NULL options. All
+returned scans detach before cleanup after raw/S. See native-relation-options.md
+for the exact sequence, cardinality, native resource and cost contracts.
+
+Direct catalog scan count becomes21 per successful attempt, plus selected
+metadata TOAST scans. options_rows reports the extra full class pass, while
+payload bytes count only selected carriers. Physical modes/counts and protocol
+round trips are unchanged. Longer raw exclusion, selected carrier/bitmap/image
+allocations and phase budgets need current verification; no performance result
+or complete options/descriptor/writer/table gate is claimed.
+
+Two ordinary fixtures cover actual heap/index/parent-TOAST option changes and
+reset, duplicate roots, NULL sources, unrelated-source filtering, preserved
+historical copies and native borrowed modes. Prepared SUE option changes are
+observed before and after both normal outcomes with first-unselected and
+established real table reads. The independent varlena oracles add text[]
+signatures and exact class source/image/accounting checks. These are required
+ordinary feature fixtures, not stress, injection or recovery experiments.
+
+Passive current source commands01–12 are saved under native-options-path-d0f39c5.
+Own08 actually exits1 because its rg child exits2 on nonexistent statement_guard.c;
+raw/partial streams remain preserved. The corrected09 reads the actual
+utility/prepared/reader code in darmok_server.c. A later direct documentation
+inventory has Python wrapper0 but rg child2 for nonexistent native-catalog-payloads.md;
+the actual native-variable-catalog-payloads.md was then read. Neither error is
+product verification. The earlier design notes remain a distinct draft; the
+implemented same-span sequence is the current spec.
+
+Own12 primary capture actually exits0. logs/native-options-path-primary-v1
+binds six named files to official PG17.11/18.6 archives, four complete selected
+writer/temp-predicate bodies and two complete public class declarations. Facts
+SHA256d195a6778de42d284c93be0d2d172e9e55804845f1d54df6289b0f7510199c39;
+16-member nonself seal4a07aa82dfd362fe024686f30de00c3d51b4a5ce129c6dbdeab575235bd780d7.
+Selected bodies/declarations and actual paired differences were read. This
+is finite interface evidence, not complete writer/kernel/registry acceptance.
+
+Current strict native packages, affected ordinary PG17/18 suites, strict Clippy,
+boundaries and independent implementation review remain PENDING. Both use cases
+and concurrent native two-phase transactions remain required. Wider
+options/descriptors/writers/closure/binding/planning/execution/serving/performance/
+release gates, issues46/15 and the goal remain OPEN. Security work, compilerPR4/
+source/resources, hosted CI/admin/account actions, release publication and new
+stress/interruption/recovery or existing-profile lifecycle experiments remain
+excluded. Existing profiles are preserved.

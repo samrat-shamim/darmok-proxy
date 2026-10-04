@@ -163,7 +163,7 @@ async fn column_oracle(client: &Client, roots: &[u32]) -> ColumnOracle {
             "SELECT pg_catalog.json_build_object('oid',t.oid::bigint,'schema_oid',t.typnamespace::bigint,'schema',n.nspname,'name',t.typname,'length',t.typlen,'by_value',t.typbyval,'kind',pg_catalog.ascii(t.typtype::text),'category',pg_catalog.ascii(t.typcategory::text),'preferred',t.typispreferred,'defined',t.typisdefined,'delimiter',pg_catalog.ascii(t.typdelim::text),'relation_oid',t.typrelid::bigint,'subscript_oid',t.typsubscript::oid::bigint,'element_oid',t.typelem::bigint,'array_oid',t.typarray::bigint,'input_oid',t.typinput::oid::bigint,'output_oid',t.typoutput::oid::bigint,'receive_oid',t.typreceive::oid::bigint,'send_oid',t.typsend::oid::bigint,'typmod_input_oid',t.typmodin::oid::bigint,'typmod_output_oid',t.typmodout::oid::bigint,'analyze_oid',t.typanalyze::oid::bigint,'alignment',pg_catalog.ascii(t.typalign::text),'storage',pg_catalog.ascii(t.typstorage::text),'not_null_declared',t.typnotnull,'base_type_oid',t.typbasetype::bigint,'typmod',t.typtypmod,'dimensions',t.typndims,'collation_oid',t.typcollation::bigint)::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE t.oid IN(SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atttypid<>0) ORDER BY t.oid", &[&oids],
         ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
         let scanned = serde_json::from_str(&client.query_one(
-            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type),'attrdef_rows',(SELECT count(*) FROM pg_catalog.pg_attrdef))::text", &[],
+            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'options_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type),'attrdef_rows',(SELECT count(*) FROM pg_catalog.pg_attrdef))::text", &[],
         ).await.unwrap().get::<_, String>(0)).unwrap();
         ColumnOracle { roots, attributes, types, scanned }
     }).await.expect("bounded independent column/type oracle did not complete")
@@ -195,7 +195,7 @@ fn check_missing(state: &Value, expected: &[Value]) {
 
 async fn create_payload_oracles(client: &Client, schema: &str) {
     let schema = quoted(schema);
-    for argument in ["pg_catalog.pg_node_tree", "text"] {
+    for argument in ["pg_catalog.pg_node_tree", "text", "text[]"] {
         for (name, result, symbol) in [
             ("payload_image", "bytea", "darmok_test_varlena_image"),
             ("payload_carrier", "text", "darmok_test_varlena_carrier"),
@@ -250,9 +250,21 @@ async fn payload_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Val
                 payloads.push(payload_expected(row.get(0),row.get(1),0,0,row.get(2),row.get(3),row.get(4)));
             }
         }
+        for row in client.query(&format!(
+            "WITH roots AS (SELECT unnest($1::oid[]) oid UNION SELECT unnest(ARRAY['pg_catalog.pg_namespace'::regclass::oid,'pg_catalog.pg_class'::regclass::oid,'pg_catalog.pg_index'::regclass::oid,'pg_catalog.pg_attribute'::regclass::oid,'pg_catalog.pg_type'::regclass::oid,'pg_catalog.pg_attrdef'::regclass::oid])), heaps AS (SELECT c.oid FROM pg_catalog.pg_class c JOIN roots r ON r.oid=c.oid UNION SELECT c.reltoastrelid FROM pg_catalog.pg_class c JOIN roots r ON r.oid=c.oid WHERE c.reltoastrelid<>0), nodes AS (SELECT oid FROM heaps UNION SELECT i.indexrelid FROM pg_catalog.pg_index i JOIN heaps h ON h.oid=i.indrelid WHERE i.indislive) SELECT 'pg_catalog.pg_class'::regclass::oid,c.oid,a.attnum,{schema}.payload_carrier(c.reloptions),{schema}.payload_image(c.reloptions) FROM nodes x JOIN pg_catalog.pg_class c ON c.oid=x.oid CROSS JOIN pg_catalog.pg_attribute a WHERE a.attrelid='pg_catalog.pg_class'::regclass AND a.attname='reloptions' ORDER BY c.oid"
+        ), &[&roots]).await.unwrap() {
+            payloads.push(payload_expected(row.get(0),row.get(1),0,0,row.get(2),row.get(3),row.get(4)));
+        }
         payloads.sort_by_key(|fact|(fact["catalog_oid"].as_u64().unwrap(),fact["row_oid"].as_u64().unwrap(),fact["field_number"].as_u64().unwrap()));
         payloads
-    }).await.expect("bounded independent default payload oracle did not complete")
+    }).await.expect("bounded independent catalog payload oracle did not complete")
+}
+
+fn options_payload(payloads: &[Value], relation: u32) -> &Value {
+    payloads
+        .iter()
+        .find(|fact| fact["catalog_oid"] == 1259 && fact["row_oid"] == relation)
+        .expect("selected graph relation must have its own options source")
 }
 
 fn check_payloads(state: &Value, expected: &[Value]) {
@@ -1553,6 +1565,140 @@ async fn all_live_indexes_include_ordinary_not_ready_and_ready_invalid_build_pha
     close(reader, rd).await;
     close(holder, hd).await;
     close(builder, bd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+async fn graph_options_keep_exact_images_across_changes_and_reset() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "storage_reloptions";
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,"CREATE SCHEMA storage_reloptions; CREATE TABLE storage_reloptions.t(id integer,body text) WITH(fillfactor=70,toast.autovacuum_enabled=false); CREATE INDEX t_id ON storage_reloptions.t(id) WITH(fillfactor=80,deduplicate_items=off); CREATE TABLE storage_reloptions.absent(id integer); CREATE TABLE storage_reloptions.unrelated(id integer) WITH(fillfactor=55); INSERT INTO storage_reloptions.t VALUES(1,'value')").await.unwrap();
+        create_payload_oracles(&observer,schema).await;
+        let root = oid(&observer,schema,"t").await;
+        let absent = oid(&observer,schema,"absent").await;
+        let unrelated = oid(&observer,schema,"unrelated").await;
+        let index = oid(&observer,schema,"t_id").await;
+        let toast: u32 = observer.query_one("SELECT reltoastrelid FROM pg_catalog.pg_class WHERE oid=$1",&[&root]).await.unwrap().get(0);
+        assert_ne!(toast,0);
+        let roots = json!([[schema,"t",1],[schema,"t",3],[schema,"absent",1]]);
+        for established in [false,true] {
+            sql(&observer,"ALTER TABLE storage_reloptions.t SET(fillfactor=70,toast.autovacuum_enabled=false); ALTER INDEX storage_reloptions.t_id SET(fillfactor=80,deduplicate_items=off)").await.unwrap();
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { sql(&reader,"SELECT body FROM storage_reloptions.t").await.unwrap(); }
+            let initial_expected = payload_oracle(&observer,schema,&[root,absent]).await;
+            let selected = initial_expected.iter().filter(|fact|fact["catalog_oid"]==1259).map(|fact|u32::try_from(fact["row_oid"].as_u64().unwrap()).unwrap()).collect::<Vec<_>>();
+            let prior_modes = probe.modes(&observer,Some(backend),&selected).await;
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_payloads(&initial,&initial_expected);
+            check_columns(&initial,&column_oracle(&observer,&[root,absent]).await);
+            let options = initial["metadata"]["payloads"].as_array().unwrap().iter().filter(|fact|fact["catalog_oid"]==1259).collect::<Vec<_>>();
+            assert_eq!(options.len(),fact_oids(&initial).len());
+            assert!(!options.iter().any(|fact|fact["row_oid"]==unrelated));
+            for node in [root,index,toast] { assert_eq!(options_payload(&initial_expected,node)["value"]["present"],true); }
+            assert_eq!(options_payload(&initial_expected,absent)["value"]["present"],false);
+            sql(&observer,"ALTER TABLE storage_reloptions.t SET(fillfactor=75,toast.autovacuum_enabled=true); ALTER INDEX storage_reloptions.t_id SET(fillfactor=85,deduplicate_items=on)").await.unwrap();
+            let changed_expected = payload_oracle(&observer,schema,&[root,absent]).await;
+            let changed = capture(&reader,&roots,false).await;
+            check_scope(&changed,established,false);
+            check_payloads(&changed,&changed_expected);
+            for node in [root,index,toast] { assert_ne!(options_payload(&initial_expected,node)["value"]["image"],options_payload(&changed_expected,node)["value"]["image"]); }
+            assert_eq!(initial["metadata"]["payloads"],json!(initial_expected));
+            sql(&observer,"ALTER TABLE storage_reloptions.t RESET(fillfactor,toast.autovacuum_enabled); ALTER INDEX storage_reloptions.t_id RESET(fillfactor,deduplicate_items)").await.unwrap();
+            let reset_expected = payload_oracle(&observer,schema,&[root,absent]).await;
+            let reset = capture(&reader,&roots,false).await;
+            check_scope(&reset,established,false);
+            check_payloads(&reset,&reset_expected);
+            for node in [root,index,toast,absent] { assert_eq!(options_payload(&reset_expected,node)["value"]["present"],false); }
+            assert_eq!(changed["metadata"]["payloads"],json!(changed_expected));
+            assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&reset)).await,prior_modes);
+            probe.no_coordination(&observer,backend).await;
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+    })).catch_unwind().await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        "DROP SCHEMA IF EXISTS storage_reloptions CASCADE",
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+async fn prepared_option_changes_preserve_read_views_through_both_outcomes() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (writer, wd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "storage_options_prepared";
+    let gids = [
+        "storage_options_first_commit",
+        "storage_options_first_abort",
+        "storage_options_rr_commit",
+        "storage_options_rr_abort",
+    ];
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,"CREATE SCHEMA storage_options_prepared; CREATE TABLE storage_options_prepared.t(id integer,body text) WITH(fillfactor=70,toast.autovacuum_enabled=false); CREATE INDEX t_id ON storage_options_prepared.t(id) WITH(fillfactor=80); INSERT INTO storage_options_prepared.t VALUES(1,'value')").await.unwrap();
+        create_payload_oracles(&observer,schema).await;
+        let root = oid(&observer,schema,"t").await;
+        let roots = json!([[schema,"t",1],[schema,"t",1]]);
+        let index = oid(&observer,schema,"t_id").await;
+        for (case,gid) in gids.iter().enumerate() {
+            let established = case>=2;
+            let ending = if case%2==0 { "COMMIT" } else { "ROLLBACK" };
+            sql(&observer,"ALTER TABLE storage_options_prepared.t SET(fillfactor=70,toast.autovacuum_enabled=false); ALTER INDEX storage_options_prepared.t_id SET(fillfactor=80)").await.unwrap();
+            let before = payload_oracle(&observer,schema,&[root]).await;
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { sql(&reader,"SELECT body FROM storage_options_prepared.t").await.unwrap(); }
+            let selected = before.iter().filter(|fact|fact["catalog_oid"]==1259).map(|fact|u32::try_from(fact["row_oid"].as_u64().unwrap()).unwrap()).collect::<Vec<_>>();
+            let prior_modes = probe.modes(&observer,Some(backend),&selected).await;
+            sql(&writer,&format!("BEGIN; ALTER TABLE storage_options_prepared.t SET(fillfactor=75,toast.autovacuum_enabled=true); ALTER INDEX storage_options_prepared.t_id SET(fillfactor=85); PREPARE TRANSACTION '{gid}'")).await.unwrap();
+            let targets = vec![root,index];
+            let prepared_modes = observer.query("SELECT relation FROM pg_catalog.pg_locks WHERE locktype='relation' AND pid IS NULL AND granted AND mode='ShareUpdateExclusiveLock' AND relation=ANY($1) AND database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) ORDER BY relation",&[&targets]).await.unwrap().into_iter().map(|row|row.get::<_,u32>(0)).collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(prepared_modes,targets.into_iter().collect::<std::collections::BTreeSet<_>>());
+            // Native SUE option locks coexist with AS. The prepared version is
+            // still uncommitted; discovery must complete with the old images.
+            let pending = capture(&reader,&roots,false).await;
+            check_scope(&pending,established,false);
+            check_payloads(&pending,&before);
+            assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&pending)).await,prior_modes);
+            probe.no_coordination(&observer,backend).await;
+            sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
+            let after = payload_oracle(&observer,schema,&[root]).await;
+            let completed = capture(&reader,&roots,false).await;
+            check_scope(&completed,established,false);
+            check_payloads(&completed,&after);
+            if ending=="COMMIT" { assert_ne!(options_payload(&before,root)["value"]["image"],options_payload(&after,root)["value"]["image"]); }
+            else { assert_eq!(after,before); }
+            assert_eq!(pending["metadata"]["payloads"],json!(before));
+            assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&completed)).await,prior_modes);
+            probe.no_coordination(&observer,backend).await;
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+    })).catch_unwind().await;
+    finish_targets(&observer, &gids).await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(&writer, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        "DROP SCHEMA IF EXISTS storage_options_prepared CASCADE",
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(writer, wd).await;
     close(observer, od).await;
     finish(outcome);
 }

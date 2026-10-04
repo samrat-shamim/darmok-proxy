@@ -11,6 +11,13 @@ and performance acceptance remain open. This work extends
 [missing-value images](native-missing-values.md). It keeps concurrent native
 PostgreSQL two-phase transactions supported.
 
+The current [relation option extension](native-relation-options.md) adds one
+raw class-option carrier per distinct selected storage node. It uses the same
+generic payload source identity and middle-phase normalization. Its additional
+class pass and pure graph selection stay in the same raw span; previous
+variable-payload verification does not certify this changed implementation.
+Current builds, required ordinary tests and independent review are pending.
+
 ## Problem and choice
 
 A default declaration is insufficient for native row interpretation or later

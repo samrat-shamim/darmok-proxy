@@ -27,8 +27,16 @@ The current [catalog reference scopes](native-bootstrap-references.md)
 implementation separates initial seed acquisition from reader increments.
 Paired packages and required ordinary suites are locally verified at
 62deefe017e947bfb2dba454ea36fb9ea5f2f662 with unchanged native inputs from the
-7abbcfd build. Independent fresh review is a merge gate. This verification
+7abbcfd build. Independent fresh review accepted the finite change at
+59127f8f8d421075836fcac8d1ba9f4ca7ae79a8 and PR75 has that exact merged tree. This verification
 admits no new descriptor/options path or transitive type closure.
+
+The current [raw relation option images](native-relation-options.md) extension
+is implemented in the working branch with verification/review pending. It
+captures every selected graph node's class option carrier, preserves the
+existing opened-descriptor profile and moves copied graph selection into the
+same raw span as its additional class pass. The prior tests above do not
+certify this changed native code.
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
@@ -112,15 +120,18 @@ until native abort releases its resources; normal completion deletes it.
 
 The accepted original component performed two full three-heap observations and
 the fixed column/type extension performed two five-heap observations. The current
-variable-payload implementation requires three six-heap observations and one
-direct scan per selected metadata TOAST heap. It reports all three selected-copy/
+variable-payload implementation required three six-heap observations and one
+direct scan per selected metadata TOAST heap. The current option extension has
+one additional class pass per observation, twenty-one catalog scans in total,
+and retains the selected metadata TOAST scans. It reports all three selected-copy/
 context costs and the additional raw, normalized and heap/chunk costs. Original
 namespace/class/index maps remain O(catalog-size) copying, O(V+E) graph traversal, sorting for deterministic roots/index siblings
 and O(D log D) exact-declaration validation, plus D native increments and SI/
 descriptor/owner costs. Unrelated publications can cause false retries. Root
 and exact reference counts are bounded to 4096, copied names to 1MiB and copied
-observation/graph phases to 64MiB. Raw copying allocates under its short fence;
-graph/serialization work is outside raw. Periodic checks can overshoot before
+observation/graph phases to 64MiB. Raw copying and pure copied graph/source
+construction allocate under the raw fence; normalization and descriptor
+preparation stay outside raw/S. Periodic checks can overshoot before
 error; these are not peak or total process-memory bounds. Retained counts accrue
 until native transaction cleanup. Finite ordinary costs are recorded; allocation,
 throughput, contention and full performance acceptance remain open.

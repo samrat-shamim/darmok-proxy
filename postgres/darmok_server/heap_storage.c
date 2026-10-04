@@ -177,6 +177,7 @@ typedef struct StorageObservation
 	MemoryContext context;
 	Relation heaps[STORAGE_HEAPS];
 	TableScanDesc scans[STORAGE_HEAPS];
+	TableScanDesc options_scan;
 	Snapshot snapshot;
 	Relation toast_heaps[STORAGE_TOAST_HEAPS];
 	Relation critical_indexes[STORAGE_CRITICAL_INDEXES];
@@ -200,6 +201,7 @@ typedef struct StorageObservation
 	DarmokHeapMissingFact *missing;
 	DarmokHeapCatalogPayloadFact *payloads;
 	DarmokCatalogPayloadRequest *payload_requests;
+	DarmokCatalogCarrier *reloptions;
 	int payload_count;
 	DarmokCatalogPayloadCost payload_cost;
 	int attribute_count;
@@ -824,6 +826,13 @@ storage_end_scans(StorageObservation *observation)
 			observation->scans[i] = NULL;
 			heap_endscan(scan);
 		}
+	if (observation->options_scan != NULL)
+	{
+		TableScanDesc scan = observation->options_scan;
+
+		observation->options_scan = NULL;
+		heap_endscan(scan);
+	}
 }
 
 static void
@@ -888,30 +897,6 @@ storage_observe_stamp(DarmokCatalogStamp *stamp)
 	}
 	PG_END_TRY();
 	return acquired;
-}
-
-static bool
-storage_capture(StorageState *state, StorageObservation *observation, const DarmokCatalogStamp *expected)
-{
-	volatile bool captured = false;
-
-	darmok_catalog_reader_start();
-	PG_TRY();
-	{
-		if (darmok_catalog_fence_try_acquire(&observation->stamp) &&
-			storage_stamp_equal(expected, &observation->stamp))
-		{
-			storage_read_fixed(state, observation);
-			captured = true;
-		}
-	}
-	PG_FINALLY();
-	{
-		/* No descriptor cleanup here. The final capture still owns S. */
-		darmok_catalog_reader_finish();
-	}
-	PG_END_TRY();
-	return captured;
 }
 
 static StorageClass *
@@ -1183,9 +1168,11 @@ storage_build_payloads(StorageObservation *observation)
 	Size position = 0;
 
 	if (expressions < 0 || expressions > PG_INT32_MAX || observation->type_count < 0 ||
-		observation->type_count > (PG_INT32_MAX - expressions) / 2)
+		observation->fact_count < 0 || observation->fact_count > PG_INT32_MAX - expressions ||
+		observation->type_count > (PG_INT32_MAX - expressions - observation->fact_count) / 2)
 		elog(ERROR, "native catalog payload source count exceeds native limits");
-	count = (Size) observation->type_count * 2 + (Size) expressions;
+	count = (Size) observation->type_count * 2 + (Size) expressions +
+		(Size) observation->fact_count;
 	if (count > MaxAllocSize / sizeof(StoragePayloadSource) ||
 		count > MaxAllocSize / sizeof(DarmokHeapCatalogPayloadFact) ||
 		count > MaxAllocSize / sizeof(DarmokCatalogPayloadRequest))
@@ -1220,6 +1207,15 @@ storage_build_payloads(StorageObservation *observation)
 		source->number = expression->key & 0xffff;
 		source->field_number = Anum_pg_attrdef_adbin;
 		source->carrier = &expression->carrier;
+	}
+	for (int i = 0; i < observation->fact_count; i++)
+	{
+		StoragePayloadSource *source = &sources[position++];
+
+		source->catalog_oid = RelationRelationId;
+		source->row_oid = observation->facts[i].oid;
+		source->field_number = Anum_pg_class_reloptions;
+		source->carrier = &observation->reloptions[i];
 	}
 	if (position != count)
 		elog(ERROR, "native catalog payload source count changed during copied validation");
@@ -1520,10 +1516,93 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 	qsort(application_oids, application_count, sizeof(Oid), storage_oid_order);
 	storage_build_columns(state, observation, application_oids, application_count);
 	storage_validate_profiles(observation);
-	storage_build_payloads(observation);
 	pfree(application_oids);
 	pfree(oids);
 	storage_budget(observation);
+}
+
+static void
+storage_read_options(StorageObservation *observation)
+{
+	HeapTuple tuple;
+	bool *copied;
+	int count = 0;
+	uint64 rows = 0;
+
+	if (OidIsValid(storage_class(observation, RelationRelationId)->fact.toast_oid))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("native relation options require builtin no-TOAST pg_class")));
+	observation->reloptions = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(DarmokCatalogCarrier) * (Size) observation->fact_count, true);
+	copied = darmok_catalog_image_alloc(&observation->image_budget,
+		sizeof(bool) * (Size) observation->fact_count, true);
+	/* Reuse the admitted descriptor, exact AS and this observation's registered
+	 * snapshot. Selection uses the existing copied graph; no new fence, native
+	 * relation tag, provider or options parser is entered here. */
+	observation->options_scan = heap_beginscan(observation->heaps[1], observation->snapshot,
+		0, NULL, NULL, SO_TYPE_SEQSCAN | SO_ALLOW_PAGEMODE);
+	while ((tuple = heap_getnext(observation->options_scan, ForwardScanDirection)) != NULL)
+	{
+		Form_pg_class row = (Form_pg_class) GETSTRUCT(tuple);
+		StorageNode *node = hash_search(observation->nodes, &row->oid, HASH_FIND, NULL);
+
+		observation->cost.options_rows++;
+		if (node != NULL)
+		{
+			DarmokCatalogCarrier *carrier;
+			StorageClass *source = storage_class(observation, row->oid);
+			int position = node->position;
+
+			if (position < 0 || position >= observation->fact_count ||
+				observation->facts[position].oid != row->oid || copied[position])
+				elog(ERROR, "native relation options have a duplicate or inconsistent graph source");
+			carrier = &observation->reloptions[position];
+			darmok_catalog_carrier_copy(&observation->image_budget, carrier,
+				tuple, RelationGetDescr(observation->heaps[1]), Anum_pg_class_reloptions, false);
+			if (storage_descriptor_profile_oid(row->oid) && source->options_null != !carrier->present)
+				elog(ERROR, "native relation options contradict the captured descriptor profile");
+			copied[position] = true;
+			count++;
+			observation->cost.payload_carrier_bytes += carrier->bytes;
+		}
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	if (count != observation->fact_count)
+		elog(ERROR, "native relation options have a missing graph source");
+	pfree(copied);
+	storage_budget(observation);
+}
+
+static bool
+storage_capture(StorageState *state, StorageObservation *observation, const DarmokCatalogStamp *expected)
+{
+	volatile bool captured = false;
+
+	darmok_catalog_reader_start();
+	PG_TRY();
+	{
+		if (darmok_catalog_fence_try_acquire(&observation->stamp) &&
+			storage_stamp_equal(expected, &observation->stamp))
+		{
+			storage_read_fixed(state, observation);
+			/* Pure copied graph selection stays in the SAME raw span so the
+			 * selected options pass does not reacquire a fence with live readers.
+			 * All normalization and descriptor preparation remain outside it. */
+			storage_build_graph(state, observation);
+			storage_read_options(observation);
+			storage_build_payloads(observation);
+			captured = true;
+		}
+	}
+	PG_FINALLY();
+	{
+		/* No descriptor cleanup here. The final capture still owns S. */
+		darmok_catalog_reader_finish();
+	}
+	PG_END_TRY();
+	return captured;
 }
 
 static void
@@ -1868,7 +1947,6 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	storage_context_check(state);
 	darmok_relation_attempt_release(&state->seed);
 	storage_context_check(state);
-	storage_build_graph(state, a);
 	darmok_relation_attempt_acquire(&state->physical, a->references, a->reference_count);
 	storage_observation_init(state, b);
 	storage_prepare(state, b);
@@ -1877,7 +1955,6 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	if (!storage_capture(state, b, &a->stamp))
 		return false;
 	storage_end_scans(b); /* Retain the registered source snapshot only. */
-	storage_build_graph(state, b);
 	storage_compare(state, a, b);
 	storage_context_check(state);
 	storage_fetch_payloads(state);
@@ -1892,7 +1969,6 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 		return false;
 	/* Raw/gate have ended; only copied C facts are processed under S.
 	 * No descriptor opening, external fetching or decoding occurs here. */
-	storage_build_graph(state, c);
 	storage_compare(state, a, c);
 	storage_compare(state, b, c);
 	storage_context_check(state);
