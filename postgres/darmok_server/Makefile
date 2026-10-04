@@ -1,9 +1,9 @@
 EXTENSION = darmok_server
 MODULE_big = darmok_server
-OBJS = darmok_server.o catalog_read.o heap_storage.o catalog_payload.o module_footprint.o
+OBJS = darmok_server.o catalog_read.o heap_storage.o catalog_payload.o module_footprint.o builtin_dispatch.o
 DATA = darmok_server--1.0.sql
 DOCS = LICENSE.darmok_server README.darmok_server.md
-HEADERS = statement_guard.h relation_guard.h heap_storage.h module_footprint.h
+HEADERS = statement_guard.h relation_guard.h heap_storage.h module_footprint.h builtin_dispatch.h
 PGFILEDESC = "darmok_server - catalog discovery and native coordination"
 PG_CFLAGS = -Werror
 

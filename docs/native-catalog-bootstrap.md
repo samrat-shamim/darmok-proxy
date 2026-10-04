@@ -211,9 +211,9 @@ reset, interruption or recovery experiment. See paired
 [PG17 invalidation](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/cache/inval.c)
 and [PG18 invalidation](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/cache/inval.c).
 
-Before C changes, the entry proof must bind the supported native build and
-registered callback/options footprint, establish every entered reference's
-provenance, and preserve that profile across SI, new opens, reloads and cleanup.
+Before descriptor-collector C changes, the entry proof must bind the supported
+native build and registered callback/options footprint, establish every entered
+reference's provenance, and preserve that profile across SI, new opens, reloads and cleanup.
 The [startup reference trace](native-startup-references.md) distinguishes
 intrinsic nailed pins from owned reader items and retained locks. It also
 identifies restored init-file options/provider work and the limited assertion
@@ -234,6 +234,13 @@ owned pathname capture without a catalog descriptor open. Its instrumentation
 and ordinary component verification can precede the complete entry certificate;
 this does not relax the pre-open proof required for new collector descriptors.
 Its current implementation/review status is recorded separately.
+
+The separate [live builtin dispatch observer](native-builtin-dispatch.md)
+compares the running backend's selected public heap/btree rows with their linked
+symbols without a catalog open or handler invocation. Like pathname capture,
+this passive instrumentation can precede the complete entry certificate. It
+does not admit descriptor construction, provider execution or an original-build
+identity claim, and does not relax the remaining registry/reference obligations.
 
 Both pinned majors expose `EstimateLibraryStateSpace` and
 `SerializeLibraryState` through `fmgr.h`. The estimator walks the native loaded

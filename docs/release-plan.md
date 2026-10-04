@@ -5372,3 +5372,44 @@ and the real failed fixture remain preserved. Corrected current paired builds,
 fresh profiles, actual ordinary fixtures, required existing suites and independent
 review remain required before merge; no original-body runtime result is inferred
 from the failed lookup or earlier package success. All broader gates stay OPEN.
+
+## Private live builtin dispatch component
+
+Starting from merged PR71 main b36993884830f85adee325b9936203be7fbe3185,
+this component adds a private caller-owned C observation of the running backend's
+heap/btree builtin dispatch. It reads only the public fmgr table and mapping,
+checks selected OIDs/signatures/flags/names and linked function-pointer equality,
+and copies inline scalar/name records after both checks succeed. It invokes no
+handler, opens no catalog, selects no data snapshot and performs no heap
+allocation. This addresses the live-table-versus-linked-symbol relation; it is
+not original-provider identity, complete compiled derivation or descriptor
+admission. The contract is [native builtin dispatch](native-builtin-dispatch.md).
+
+Public mapping bounds and the missing sentinel are checked before each selected
+row. Both generated handler OIDs are compile-time checked. An unexpected row
+fails explicitly, with no alternate lookup or handler. The observer uses the
+existing unused-invocation boundary and requires normal processing. No native
+pointer escapes. Table/symbol definitions remain bound-native-build inputs;
+callback/registry/reference history and actual FmgrInfo/AM routine/pg_am provider
+selection remain separate obligations.
+
+Two ordinary probe fixtures are registered in the existing PostgreSQL package.
+They require exact TEXT/SHOW/transaction wire outcomes, the independently
+observed 17.11/18.6 builtin counts, exact selected rows and linked-symbol checks,
+and snapshot/within-invocation owner preservation before, within and after a
+savepoint. No owner identity equality across different subtransactions is
+claimed. They introduce no new forced-error, stress, interruption, recovery or
+profile lifecycle experiment. Current strict product/probe builds, required
+existing suites, affected Clippy/format/boundary checks and independent
+implementation review are mandatory before merge; their actual receipts remain
+external evidence. The product/probe build-context input count grows from24 to26.
+
+    cargo test -p darmok-postgres-tests --test server_builtin_dispatch --locked -- --nocapture
+
+The mechanism uses two indexed reads, bounded name comparisons and a fixed
+stack copy. Caller cadence and measured latency/memory/throughput/contention
+remain unverified. Full entry/startup/provider/registry/reference/writer/sequence,
+new descriptor/table execution, serving, performance, release, issues46/15 and
+the goal stay open. Ordinary profiles keep max_prepared_transactions=10;
+concurrent native PostgreSQL two-phase transactions remain required. Security,
+project compiler PR4, hosted CI and release publication remain excluded.
