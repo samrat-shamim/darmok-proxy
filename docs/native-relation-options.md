@@ -114,15 +114,22 @@ PostgreSQL 18 no longer admits the direct TOAST-kind entry branch; the parent
 TOAST propagation branch remains. Native prepared completion uses the existing
 global completion fence and real two-phase target. AS does not freeze SUE
 option writers, so the observed carrier and publication identity remain
-required facts. This is specific writer coverage, not a complete DDL census.
+required facts. A prepared metadata writer retains semantic RX even when its
+physical SUE modes coexist with AS. The consumer must wait for S outside raw
+and publication exclusion; native prepared completion can then release that
+writer and the attempt rechecks current definitions. This is specific writer
+coverage, not a complete DDL census.
 
 The ordinary fixtures independently obtain stored carrier shape and flat
 images through test-only native varlena oracles with a text-array signature.
 They verify the real graph's class sources, NULL/nonempty carriers, distinct
 heap/index/TOAST changes, reset, duplicate roots, unrelated-source filtering,
-and copy accounting. Prepared option changes are observed before and after
-both normal completion outcomes with first-unselected and established table
-read views. Prior native relation modes must remain unchanged by capture;
+and copy accounting. Prepared option changes retain an earlier owned result,
+then an independent observer verifies the real ungranted S wait, absence of
+raw/publication locks and preservation of the caller's snapshot horizon. The
+observer completes both normal outcomes before capture returns and its current
+images are checked with first-unselected and established table read views.
+Prior native relation modes must remain unchanged by completed capture;
 an established SELECT's locks cannot be mistaken for leaked invocation counts.
 No new stress, corruption, injection, interruption or recovery fixture is added.
 

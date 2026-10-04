@@ -5931,3 +5931,57 @@ release gates, issues46/15 and the goal remain OPEN. Security work, compilerPR4/
 source/resources, hosted CI/admin/account actions, release publication and new
 stress/interruption/recovery or existing-profile lifecycle experiments remain
 excluded. Existing profiles are preserved.
+
+### Raw relation options: first ordinary run and semantic-wait correction
+
+The first implementation is committed at d6571f495920b36c1e1f730f23fb24c530e45db1,
+tree 42880d1e0e60e4f6cdf067fa6689d896807b6412. Recorded source checks 13–16
+(diff check, targeted rustfmt, repository boundaries and strict storage-test
+Clippy) all exited 0. Paired arm64 Linux PostgreSQL 17.11/18.6 packaging
+(root 17) exited 0: four images, 26 source inputs and fourteen successful inner
+commands. Package facts SHA256 is
+792b80fda1eb4688a45f5d5974aab54915094edc42ae285ebf3f52830aa8e249.
+The eight fresh required profiles (root 18) and all 568 setup commands exited
+0; profile facts SHA256 is
+6f4d29d52a53cc27598279d69b94a03f6539d3d0a748008929321bc8a86648e6.
+Normal and ordered profiles have native 2PC enabled with ten slots; zero slots
+are only the explicit unsupported configuration.
+
+Root 19, the first PostgreSQL 17 integration command, exited 101. Three
+completed bins passed 11/2/18 tests; storage passed 12 and failed the new
+prepared-options fixture with a bounded SQL timeout. The remaining three bins
+and private/PG18 runs were not executed. All thirty before/after fixture
+binding readers exited 0; their identities stayed unchanged. Binding facts
+SHA256 is 8f6a9a3b5eee8d8a755eb60c965c5f8f3cb4a61d7c45bf3c57be7d5d4efc1e94.
+This run is failed evidence, not acceptance; preserve its eight profile
+namespaces, receipts, streams and binaries unchanged.
+
+The new fixture incorrectly assumed physically compatible SUE/AS permits the
+full consumer to return while metadata is prepared. The existing
+PRE_PREPARE callback deliberately transfers semantic RX, and the final
+consumer acquires S. That wait is required even when native relation modes
+coexist. The correction verifies this real wait, its lack of raw/publication
+locks, and the independent data horizon; a separate connection completes the
+prepared transaction before the consumer returns. It keeps the earlier owned
+JSON images for copy-independence checks and compares completed current images
+for both commit and rollback. Native C, installed header and probe inputs are
+unchanged; no barrier is bypassed and no timeout is widened. This preserves
+concurrent native 2PC support. Corrected ordinary verification is pending.
+
+Passive failure diagnosis is recorded in the unique root-19 suffixes. The
+first source reader exited 1 on an excessive declared range; its corrected
+EOF reader/log capture exited 0. The first lock-path reader likewise exited 1
+on an excessive range; the corrected EOF/native-writer reader exited 0.
+The semantic-writer-paths reader exited 2 because a guessed observer file did
+not exist (all selected source spans were emitted); the actual observer is in
+the storage test file, read by the corrected observer reader at exit 0. Keep
+all failures as failures. These are passive reads of the failed ordinary run
+and selected source interfaces, not new stress or forced-error experiments.
+
+External evidence verifier v1 is an uninvoked draft. Its guessed root-08
+namespace was corrected in uninvoked v2, which additionally binds producing
+stdout hashes, helper hashes and the real source-reader values. Neither
+certifies the failed runtime. Corrected evidence needs a new namespace and
+must preserve the failed runtime and passive readers. No old kernel, registry
+or proof graph is recertified. Broader descriptor, writer, closure, execution,
+serving, full performance and release gates and issues 46/15 remain open.

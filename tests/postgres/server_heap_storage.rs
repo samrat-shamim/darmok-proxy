@@ -561,6 +561,10 @@ impl Observer {
         let locks = self.modes(client, Some(pid), &catalogs).await;
         assert_eq!(locks.iter().map(|row| row.0).collect::<Vec<_>>(), catalogs);
         assert!(locks.iter().all(|row| row.2 == "AccessShareLock" && row.3));
+        self.check_data_horizon(client, pid, established).await;
+    }
+
+    async fn check_data_horizon(&self, client: &Client, pid: i32, established: bool) {
         let horizon: Option<String> = tokio::time::timeout(
             DEADLINE,
             client.query_one(
@@ -595,6 +599,26 @@ impl Observer {
         })
         .await
         .expect("native storage physical wait was not observed");
+    }
+
+    async fn wait_semantic(&self, client: &Client, pid: i32) {
+        tokio::time::timeout(DEADLINE, async {
+            loop {
+                let rows = client.query(&self.coordination, &[&pid]).await.unwrap();
+                if rows.iter().any(|row| {
+                    row.get::<_, i32>(0) == 17487
+                        && row.get::<_, String>(1) == "ShareLock"
+                        && !row.get::<_, bool>(2)
+                }) {
+                    // C waits for S with neither raw nor publication locks.
+                    assert_eq!(rows.len(), 1);
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("native storage semantic wait was not observed");
     }
 
     async fn wait_index(&self, client: &Client, schema: &str, name: &str, ready: bool) -> u32 {
@@ -1664,25 +1688,36 @@ async fn prepared_option_changes_preserve_read_views_through_both_outcomes() {
             if established { sql(&reader,"SELECT body FROM storage_options_prepared.t").await.unwrap(); }
             let selected = before.iter().filter(|fact|fact["catalog_oid"]==1259).map(|fact|u32::try_from(fact["row_oid"].as_u64().unwrap()).unwrap()).collect::<Vec<_>>();
             let prior_modes = probe.modes(&observer,Some(backend),&selected).await;
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_payloads(&initial,&before);
+            assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&initial)).await,prior_modes);
+            probe.no_coordination(&observer,backend).await;
             sql(&writer,&format!("BEGIN; ALTER TABLE storage_options_prepared.t SET(fillfactor=75,toast.autovacuum_enabled=true); ALTER INDEX storage_options_prepared.t_id SET(fillfactor=85); PREPARE TRANSACTION '{gid}'")).await.unwrap();
             let targets = vec![root,index];
             let prepared_modes = observer.query("SELECT relation FROM pg_catalog.pg_locks WHERE locktype='relation' AND pid IS NULL AND granted AND mode='ShareUpdateExclusiveLock' AND relation=ANY($1) AND database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) ORDER BY relation",&[&targets]).await.unwrap().into_iter().map(|row|row.get::<_,u32>(0)).collect::<std::collections::BTreeSet<_>>();
             assert_eq!(prepared_modes,targets.into_iter().collect::<std::collections::BTreeSet<_>>());
-            // Native SUE option locks coexist with AS. The prepared version is
-            // still uncommitted; discovery must complete with the old images.
-            let pending = capture(&reader,&roots,false).await;
-            check_scope(&pending,established,false);
-            check_payloads(&pending,&before);
-            assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&pending)).await,prior_modes);
-            probe.no_coordination(&observer,backend).await;
+            // Physical SUE coexists with AS, but prepared metadata retains
+            // semantic RX. Capture must wait for S outside raw/publication.
+            let semantic_modes = observer.query("SELECT mode FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid=17487 AND pid IS NULL AND granted ORDER BY mode",&[]).await.unwrap().into_iter().map(|row|row.get::<_,String>(0)).collect::<Vec<_>>();
+            assert_eq!(semantic_modes,vec!["AccessShareLock","RowExclusiveLock"]);
+            let request = storage_command(&roots,false);
+            let waiting = command(&reader,&request);
+            tokio::pin!(waiting);
+            tokio::select! {
+                result = &mut waiting => panic!("prepared options capture completed before native completion: {result:?}"),
+                () = probe.wait_semantic(&observer,backend) => {},
+            }
+            probe.check_data_horizon(&observer,backend,established).await;
             sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
+            waiting.await.unwrap();
             let after = payload_oracle(&observer,schema,&[root]).await;
-            let completed = capture(&reader,&roots,false).await;
+            let completed = status(&reader).await;
             check_scope(&completed,established,false);
             check_payloads(&completed,&after);
             if ending=="COMMIT" { assert_ne!(options_payload(&before,root)["value"]["image"],options_payload(&after,root)["value"]["image"]); }
             else { assert_eq!(after,before); }
-            assert_eq!(pending["metadata"]["payloads"],json!(before));
+            assert_eq!(initial["metadata"]["payloads"],json!(before));
             assert_eq!(probe.modes(&observer,Some(backend),&fact_oids(&completed)).await,prior_modes);
             probe.no_coordination(&observer,backend).await;
             sql(&reader,"COMMIT").await.unwrap();
