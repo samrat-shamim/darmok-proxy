@@ -188,3 +188,59 @@ and stored declarations, nonroot inheritance/default/missing facts, own TEMP,
 historical outputs and prepared composite/root changes. The prepared fixture
 renames a live composite field and adds a root field in one writer transaction;
 it neither invents a physical composite lease nor disables native2PC.
+
+
+## Preserved verification failure and oracle correction
+
+Strict product/probe packages for PG17.11/18.6 completed fourteen commands at
+implementation source `13ca94f1cd69637ae921df6de1788fe354e0ef81`; the package
+facts SHA256 is
+`3bb06ea8594c5cf4c4e4140f528433c6d1df5ee6aa4e435d95ea52df193109ed`.
+All26 native inputs are bound. The first eight-profile setup (root31 actual1)
+expired its separate readiness timer during stock initialization of the seventh
+profile. That unpreloaded PG18 profile is preserved and unaccepted. A distinct
+setup helper follows Docker's configured terminal health state; two fresh PG18
+profiles completed actual0. The exclusive current-profile assembly binds six
+individually completed profiles from the partial setup plus those two fresh
+profiles, preserving the parent's failure. Its facts SHA256 is
+`fdc9cec3df8c0617d63a3c9ccda63cf1d363d7756607a3982c922a46757dc9c3`.
+No existing profile was stopped, restarted, signaled or relabeled.
+
+Root39 PG17 integration actually exited101. Catalog discovery11, builtin2 and
+publication18 cases passed; heap storage8 passed and11 timed out. The new nested
+composite case passed, while the prepared composite case timed out in the
+payload oracle. Later test binaries were not run. Raw stdout SHA256:
+`bfffdc87b72de546474bc92d2aaf661f18862390da1fdb29c2758229e5174400`;
+binding facts `88807c7229371180d6b83a0b8aa9adba6c481433c8b01756318ecb8772f6f12f`.
+This failed namespace and all profiles remain preserved.
+
+The bounded independent implementation/source diagnosis at clean13ca94f found
+no required product-C correction within this copied-composite contract, and
+one required fixture correction R1. Report SHA256:
+`69741d517a75cecc6d1c6bae91d5c0c25c6a81ffd86ba654e8a7858893356b8e`;
+311-member nonself seal
+`9ebbedd8f4e6709bbb3485746255ef35ea74c564dae3db38c39cefe72b51af6d`.
+Final/post/completion/observer each actually exited0, with16 completion companions.
+Root46 independently rehashed333 unique members; root47 read the complete report
+and terminal observer. R1 identifies a duplicate recursive selection and seven
+serial payload-oracle requests inside a20s aggregate bound. It does not establish
+the cause of all eleven timeouts. Current-idle/zero-prepared observations,
+plan-only output and checkpoint durations do not prove past lock state or load.
+Passive root41's wrong psql role (actual2) and root42's dictionary-as-URL error
+(actual1) remain preserved; corrected root43 actually exited0.
+
+The corrected fixture shares one independent SQL type/composite selection among
+column, missing and payload projections for each metadata phase. Each DDL or
+normal prepared completion gets a fresh selection; none is cached across phases.
+The payload projection now makes four requests, and missing images one, without
+another recursive traversal. Six catalog graph projections use one name lookup
+and one batched graph query rather than twelve separate requests. Actual OID
+membership, default sources, NULL/image assertions, graph ordering/modes,
+historical outputs, native wait barriers and both real data-view states remain
+required. The20s operation/60s case bounds stay unchanged. Oracle timing records
+completion, timeout or interruption with elapsed time, including case cancellation.
+
+This addresses the established source-level R1 cost; current ordinary runtime
+acceptance and fresh final implementation review remain OPEN. These fixture
+changes leave the26 packaged native inputs unchanged, permitting exact binary
+and profile rebinding without rebuilding or relabeling the old evidence.

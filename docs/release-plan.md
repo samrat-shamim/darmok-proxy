@@ -6395,3 +6395,29 @@ not certify peak memory, contention or throughput. Paired strict packages, fresh
 required ordinary PG17/18 profiles/suites and independent implementation review
 remain open. Concurrent native2PC remains required. Full collector/bootstrap/
 provider/statement/execution/performance/release and overall goal remain open.
+
+
+### Composite runtime failure preserved; independent oracle consolidated
+
+Four strict paired packages completed at13ca94f. Initial profile setup root31
+failed a readiness deadline during stock initialization; six individually
+complete profiles and two distinct fresh profiles are explicitly assembled,
+while the failed unpreloaded PG18 profile stays preserved and unaccepted.
+PG17 required integration root39 exited101: discovery11, builtin2 and
+publication18 passed, heap8 passed/11 timed out; later binaries did not execute.
+
+Independent source diagnosis found no required C correction within the finite
+copied-composite contract and one medium fixture correction R1 (duplicate type
+selection/seven payload-oracle requests). The
+[component ledger](native-composite-type-fields.md#preserved-verification-failure-and-oracle-correction)
+binds the original failed streams and the311-member review with actual-zero
+terminal observer and333-member root rehash. R1's cost is established; a common
+cause for all timeouts remains unproven.
+
+Fixtures now share independent selection per metadata phase, batch the six
+catalog graphs and record phase outcomes/elapsed time. Original20s/60s bounds,
+phase freshness, NULL/carrier/source/graph assertions, historical outputs, real
+prepared wait barriers and concurrent native2PC stay required. The26 packaged
+native inputs are unchanged by this fixture correction. Current paired ordinary
+runtime verification and final implementation review remain OPEN, as do the
+full collector/provider/execution/performance/release gates and overall goal.
