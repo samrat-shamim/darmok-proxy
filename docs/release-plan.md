@@ -5764,3 +5764,44 @@ outcomes and the extension's bytes remain unchanged. This bounded functional
 verification policy is separate from the uncompleted performance gate. Fresh
 required verification and independent review remain pending; no new native fault,
 stress, interruption/recovery or profile lifecycle experiment is introduced.
+
+At 6db9794ef20dceec0ccc229b4b9a9998a777cbeb, root29 diff, root30 targeted
+rustfmt and root31 targeted Clippy actually exit0. Root32 creates eight fresh
+PostgreSQL17.11/18.6 verification profiles with all441 commands exit0, preserving
+the26 accepted7abbcfd native inputs. Its facts SHA256 is
+070efb6e847f20fdc187646db5710ad2dbac67d1bb28d4fdaefacf37c2a843e2.
+All primary/ordered profiles retain native max10, separate no2pc profiles use0,
+and restart counts remain0. Root33 PostgreSQL17 integration and root34 private
+owner cases actually exit0:55 plus3 passed, zero failed or ignored.
+
+Root35 PostgreSQL18 integration actually exits101: discovery11 and builtin2
+pass; publication17 pass and one concurrent shared-drop assertion fails at
+line1883, because the second writer's advisory reference is still visible.
+The remaining24 integration cases and3 private-owner cases were not started.
+Failed binding facts SHA256 is
+09776adad0697c7d95db64a6bb3cf9c9620ae93f7dc2434b738fc28a00261ff7.
+All30 before/after native readers exit0 and their native facts are unchanged.
+This is an assertion failure after the expected busy-database error, distinct
+from the earlier timing failures; no whole PostgreSQL18 acceptance is inferred.
+
+Root37 captures this failed profile's native logs passively with actual0; the
+stderr SHA256 is
+b096d6bd3e239185047092952cde7ecebe09d317a6b84f64585730dfc9ff8f9e.
+The checkpoint completes normally and the second DROP reports its expected
+busy-database error at06:51:18.000UTC. Selected paired PostgresMain source shows
+EmitErrorReport before AbortCurrentTransaction; the connector's batch_execute
+returns on the ErrorResponse without confirming ReadyForQuery. The probe's
+advisory reference is transaction-owned. Checking its release on receipt of the
+error therefore races native abort cleanup. The three existing staged DROP
+futures now use the existing command-event interface, preserve the exact DROP
+tag or one backend error, and require ReadyForQuery Idle before returning either
+outcome. The OBJECT_IN_USE and zero-advisory assertions remain. No extra query,
+sleep, weakened assertion or new timeout is introduced; native package bytes
+remain unchanged. Fresh required verification and independent review are pending.
+
+Outside-repository evidence binder drafts v1/v2 were created exclusively and
+read but never invoked. V2 distinguishes each of the eight exact per-profile
+fact records from successful command receipts; neither draft supplies a runtime
+result or an acceptance seal. Two passive searches in this turn guessed absent
+native source/probe paths and exited2; later file inventories identified the
+actual paths. These preserved tool errors do not describe native product failure.
