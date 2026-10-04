@@ -1,8 +1,8 @@
 # Type metadata descriptor preparation
 
-Status: proposed supported path and acquisition sequence. Independent source
-review must accept this mechanism before collector C changes. No new descriptor,
-runtime result or release gate is accepted by this proposal.
+Status: finite pre-C source/design mechanism accepted at 1f7c108 under the named
+native interface prerequisites. Collector implementation, runtime verification
+and release gates remain OPEN. No native result is accepted by this document.
 
 The [stock runtime contract](native-runtime-contract.md) remains the construction
 base. PostgreSQL supplies correct cache, descriptor, reference and native lock
@@ -346,11 +346,11 @@ Before C changes, independently challenge the supported options path, loader
 conditions, field/writer exclusions, critical lookup dependencies, profile
 freshness, complete native mode union, reference cleanup and every wait boundary.
 Resolve any missing source argument rather than opening a descriptor as a probe.
-The source gate remains OPEN at this revision. Independent review at
+The first source gate remained OPEN before correction review. Review at
 `fec65d959ef1c3c73588ae81e98330a3b074caa1` found high R1: AS-only initial opens
 lacked a noncircular admission/preservation argument. The inherited base and
-sixteen-reference sequence above propose its correction; fresh source review
-is required before C. R1's original report is immutable at
+sixteen-reference sequence above supplied the correction reviewed at 1f7c108.
+R1's original OPEN report remains immutable at
 `logs/review-native-type-payload-bootstrap-fec65d9-source-v1`, report SHA256
 `3b8e7cd8565d9f3986c808c7cbdedb661bc23ce0face1ef138db3a94ac3bf432`.
 
@@ -376,6 +376,46 @@ SHA256 `5c6c8d4c841a6a02ba059f9cf6c618e40dd6e5f3f9a40df9d0d6cce8bbeeff07`.
 Paired trigger creation's explicit SRX acquisition is a separate bounded source
 span. These byte records support the named path argument; their body counts
 do not certify all writers, startup effects or the complete native service graph.
+
+## Finite source/design mechanism accepted
+
+Independent correction review accepts clean
+`1f7c108624255dc33d1364151ff2b3d3d9b6c555`, tree
+`45a57fbea7674d9eefb3ecccd6927458bd5a0245`, with no required findings within
+the explicit inherited native interface configuration. R1 closes only there;
+fec65d9's historical finding remains OPEN. Startup/native-service prerequisites,
+separate fresh dependent profiles, exact 16-reference seed and reader/horizon
+closure before physical waits are a conditional source/design argument.
+
+Review namespace: `logs/review-native-type-payload-bootstrap-1f7c108-source-v2`.
+The fixed seal has 323 members and the completion map 16 separate companions.
+Audit10/final20/post21/completion22/observer23 actually exited zero; root20
+rehashes 345 unique paths, facts SHA256
+`2c84b35b2ce05cd338cb2d83de0599dd117bb0f2f2059a91f5d3c5e93bd4a549`.
+Root21 reads the complete report, raw observer and actual observer receipt.
+
+| Review artifact | SHA256 |
+| --- | --- |
+| report | `7dae83d22adf243b9bc1e86fda1333accb267e67ff83992a7889c9a500085734` |
+| facts | `daaf3817fb1f0088671732be86e180796995ed669d88bd61e7c6e48c6f50dd3d` |
+| commands | `24a12ee15fc340e8bbcf8b7348186e352f4ab79e6b434602d19da68d345180d3` |
+| seal | `f9079cd7a5df784e952eefc1ed7c27dc8050ee3d17b57e4bf6f77bb9f0e4ac54` |
+| completion map | `ef513b32953dd0b5ad0509f1ea860087ef87a74ee4e12f85c030ce691a131a5c` |
+| observed completion | `aa2c5e744e781cd32c617287be96facf42fad9ac1b24d30f5dcc4feb62764a22` |
+
+Reviewer05's overly strict single-SRX-site assertion failed actual1; its
+distinct corrected read checks both OID/RangeVar branches. Root09/root17
+reader failures and partial artifacts remain preserved. None is a native
+runtime outcome. The 214-member current source proof binds unchanged 28
+native/test inputs and the complete five-doc feature/four-doc correction delta;
+facts SHA256 `f5ff1611ffe4532bc64a9b7592ec23d8e9e33af7d99916ad9fb406276be278ab`.
+
+Implementation must now prove every actual mode union, increment/cleanup,
+abort-owned lifetime, preparation predicate and coherent copied carrier against
+this design, then pass ordinary verification and fresh implementation review.
+Candidate 60 direct passes and extra contention/retention remain unmeasured.
+This acceptance admits no executed range/enum/domain/provider expression,
+complete writer/statement/execution lease or performance/release result.
 
 Full providers/expressions, negative/name candidates, statement/binding/execution,
 performance and release gates, issues46/15 and the overall goal remain OPEN.

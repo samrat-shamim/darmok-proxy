@@ -6563,3 +6563,15 @@ the candidate 60 direct passes. Added native contention/retention and all runtim
 results remain unmeasured. Fresh independent correction review is required
 before C; broader collector, provider, statement, execution, performance,
 release and overall goal gates remain OPEN.
+
+The finite source/design correction is accepted at clean1f7c108, closing R1 only
+there under the explicit inherited native interface configuration. Its
+[acceptance ledger](native-type-payload-bootstrap.md#finite-sourcedesign-mechanism-accepted)
+binds 323 fixed review members, 16 completion companions, actual-zero
+audit/final/post/completion/observer receipts and root20's 345-path rehash.
+Root21 reads the complete report/raw observer/receipt. Required findings are
+empty; fec65d9's original report and reviewer05/root09/root17 failures retain
+their outcomes. Current 28 native/test inputs remain unchanged. Implementation
+and ordinary runtime verification are the next gates; complete writers,
+providers, whole statements/execution, performance, release and the goal remain
+OPEN. Concurrent native PostgreSQL two-phase transactions remain required.

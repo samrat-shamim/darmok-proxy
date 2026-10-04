@@ -51,14 +51,16 @@ establishes the private callback profile by itself.
 
 The [type metadata preparation proposal](native-type-payload-bootstrap.md)
 now gives that candidate a concrete separate-profile and exact AS/RX sequence.
-Independent source review remains required before new collector C changes.
+Its finite source/design correction is independently accepted at 1f7c108;
+collector implementation and runtime verification remain OPEN.
 
 The first proposal's independent review found R1: its initial AS-only opens
 preceded the fresh profile and complete guards. The revised
 [initial-base and preservation argument](native-type-payload-bootstrap.md#initial-admission-base-and-preservation)
 distinguishes inherited native bootstrap admission from fresh dependent checks
 and requires 16 exact AS/RX seed references before project preparation. That
-correction still requires fresh source review; no new native result is claimed.
+correction closes R1 at 1f7c108 within the stated inherited configuration.
+No new native result is claimed.
 
 All physical waits, including waits for locks retained by a prepared transaction,
 must occur before S. No catalog snapshot or reader descriptor increment may
