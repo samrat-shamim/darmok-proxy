@@ -207,6 +207,21 @@ copy_attribute_json(StringInfo output, const DarmokHeapAttributeFact *fact)
 }
 
 static void
+copy_composite_json(StringInfo output, const DarmokHeapCompositeFact *fact)
+{
+	appendStringInfo(output, "{\"type_oid\":%u,\"relation_oid\":%u,\"schema_oid\":%u,\"schema\":",
+					 fact->type_oid, fact->relation_oid, fact->schema_oid);
+	copy_name_json(output, &fact->schema_name);
+	appendStringInfoString(output, ",\"name\":");
+	copy_name_json(output, &fact->name);
+	appendStringInfo(output, ",\"kind\":%u,\"persistence\":%u,\"am\":%u,\"is_partition\":%s,"
+					 "\"declared_attribute_count\":%d,\"attribute_offset\":%d}",
+					 (unsigned char) fact->kind, (unsigned char) fact->persistence,
+					 fact->access_method_oid, fact->is_partition ? "true" : "false",
+					 fact->declared_attribute_count, fact->attribute_offset);
+}
+
+static void
 copy_type_json(StringInfo output, const DarmokHeapTypeFact *fact)
 {
 	appendStringInfo(output, "{\"oid\":%u,\"schema_oid\":%u,\"schema\":",
@@ -238,7 +253,8 @@ copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
 {
 	appendStringInfo(output, "{\"namespace_rows\":" UINT64_FORMAT
 					 ",\"relation_rows\":" UINT64_FORMAT ",\"index_rows\":" UINT64_FORMAT
-					 ",\"attribute_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
+					 ",\"attribute_rows\":" UINT64_FORMAT
+					 ",\"attribute_payload_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
 					 ",\"type_payload_rows\":" UINT64_FORMAT
 					 ",\"attrdef_rows\":" UINT64_FORMAT
 					 ",\"options_rows\":" UINT64_FORMAT
@@ -247,7 +263,8 @@ copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
 					 ",\"requested_copy_bytes\":" UINT64_FORMAT
 					 ",\"allocated_bytes\":" UINT64_FORMAT "}",
 					 cost->namespace_rows, cost->relation_rows, cost->index_rows,
-					 cost->attribute_rows, cost->type_rows, cost->type_payload_rows, cost->attrdef_rows,
+					 cost->attribute_rows, cost->attribute_payload_rows,
+					 cost->type_rows, cost->type_payload_rows, cost->attrdef_rows,
 					 cost->options_rows,
 					 (uint64) cost->missing_carrier_bytes, (uint64) cost->payload_carrier_bytes,
 					 (uint64) cost->requested_copy_bytes, (uint64) cost->allocated_bytes);
@@ -310,6 +327,13 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 "\"declared_attribute_count\":%d,\"attribute_offset\":%d}",
 							 i == 0 ? "" : ",", fact->oid, fact->row_type_oid,
 							 fact->declared_attribute_count, fact->attribute_offset);
+		}
+		appendStringInfoString(output, "],\"composites\":[");
+		for (int i = 0; i < view->composite_count; i++)
+		{
+			if (i > 0)
+				appendStringInfoChar(output, ',');
+			copy_composite_json(output, &view->composites[i]);
 		}
 		appendStringInfoString(output, "],\"attributes\":[");
 		for (int i = 0; i < view->attribute_count; i++)
@@ -395,6 +419,7 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 fact->triggers_hint ? "true" : "false");
 		}
 		appendStringInfo(output, "],\"attribute_array_bytes\":" UINT64_FORMAT
+						 ",\"composite_array_bytes\":" UINT64_FORMAT
 						 ",\"type_array_bytes\":" UINT64_FORMAT
 						 ",\"missing_array_bytes\":" UINT64_FORMAT
 						 ",\"missing_image_bytes\":" UINT64_FORMAT
@@ -403,7 +428,8 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 						 ",\"payload_stored_bytes\":" UINT64_FORMAT
 						 ",\"toast_heaps\":" UINT64_FORMAT ",\"toast_rows\":" UINT64_FORMAT
 						 ",\"selected_chunks\":" UINT64_FORMAT ",\"initial_cost\":",
-						 (uint64) view->attribute_array_bytes, (uint64) view->type_array_bytes,
+						 (uint64) view->attribute_array_bytes, (uint64) view->composite_array_bytes,
+						 (uint64) view->type_array_bytes,
 						 (uint64) view->missing_array_bytes, (uint64) view->missing_image_bytes,
 						 (uint64) view->payload_array_bytes, (uint64) view->payload_image_bytes,
 						 (uint64) view->payload_stored_bytes, view->toast_heaps, view->toast_rows,

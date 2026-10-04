@@ -6329,3 +6329,193 @@ confined to these nonpackaged documentation updates. Independent fresh
 implementation review is required before normal exact-head squash merge. The
 full collector/bootstrap/provider/statement/execution/serving/performance/release
 and goal gates remain open.
+
+### Declared type links merged; composite field source gate proposed
+
+PR78 merged normally at `a5cb93019284ec9f1e77a330fb5012d337981cc5` on
+2026-10-04T16:18:42Z. Its sole parent is
+`0b6aa8667dfb274fff8c5140813ac88a576af3ad`; merged tree
+`1953e986ab779b6b7ae353846aee42c3fb6d9c5c` equals independently reviewed clean
+`ea284b342358e4ecd9d17ea202b0cd0536410b0f`. The fresh finite implementation review
+found no required corrections and verified 128 actual passes. Report SHA256
+`461ab381039dba75a1eb5698e1ddd89ac47b357cdaa90729eeb72519388f4449`,
+2965-member nonself seal
+`6ba345f7dd616ce42ce6ac6ec2bc8ff31ce15a2d4eef17585776267742a9f50e`,
+16 completion companions; final/post/completion/observer each independently 0.
+Root45 rehashed 2987 unique paths and root46 separately verified observer30 and
+its raw streams. The preserved native101 and reviewer bookkeeping1 remain
+failures in their original records.
+
+Root47–53 checked the public personal repository and exact reviewed head,
+pushed only the feature branch, created PR78, normally squash-merged that head
+and fetched the merged object. The filtered noncompiler queue was empty;
+description remains “A MySQL-to-PostgreSQL compatibility proxy”. Root56 actual0
+verifies the unchanged source, exact merged parent/tree and 227 fixed members in
+`logs/native-type-links-ea284b3-merged-readback-v2`: facts SHA256
+`d620535fbded9faa98bf371b210f62f44385a439b04a07ba59d4f73c0b85613c`,
+seal `0fd0337e4fc2032f430f1a4502e66dae01518823724c68251550842f4b6e1631`.
+The fully read uninvoked readback-v1 draft's nonexistent receipt fields were
+corrected in a distinct v2 helper before invocation; neither old evidence nor
+profiles were reused or changed. Named previous leaves were not re-expanded.
+
+The next finite [composite field source contract](native-composite-type-fields.md)
+proposes a whole fixed attribute map, grouped selected composite traversal and
+one selected missing-carrier pass through the same six admitted readers. It
+distinguishes copied standalone/table definitions from physical descriptors,
+preserves root provenance and adds one measurable scan per observation. Its
+independent source gate must close before C changes. No new native execution,
+application descriptor, provider or complete type/statement admission is claimed;
+full collector/bootstrap/execution/performance/release and overall goal stay open.
+
+### Composite field source design accepted; implementation verification open
+
+The finite source-only review at clean `c43464987b02aa743e95cb7a53bc130e73221a58`
+found no required corrections, accepting grouped composite traversal through the
+already admitted readers conditionally. Report SHA256:
+`b0ea70dd1ff346c2c1a1223375002eb8a3f4dfd1adc202aaf0bf2a37faf4c772`;
+518 fixed members,16 completion companions, final/post/completion/observer each
+actual0. Root16 independently rehashed540 unique paths; root18 checked the exact
+observer receipt and streams. Reviewer reader17's range error and root17's wrong
+JSON key remain actual1 in their original namespaces. Root23's wrong probe
+pathname is likewise preserved as actual1; root24 resolved its exact filename
+and distinct root25 read the intended probe/fixture bodies at actual0. These
+reader failures are not native executions or erased successful labels.
+
+The [composite field contract](native-composite-type-fields.md) now has a C/header/
+probe implementation: whole positive fixed map and relation groups, bounded
+selected traversal, separate tracked missing-carrier pass and complete composite
+fact/range comparisons. It removes the obsolete selected-root column map and
+does not extend application physical graphs or open application descriptors.
+Independent recursive SQL and class/attribute/default/missing oracles expand to
+all selected composites. Two additional ordinary fixtures cover nested/shared/
+dropped/inherited/nonroot/default/missing/own-TEMP declarations and prepared
+composite-plus-root changes, both native outcomes and real data-view states.
+Nine direct scans per observation/27 across A/B/C are exposed; phase budgets do
+not certify peak memory, contention or throughput. Paired strict packages, fresh
+required ordinary PG17/18 profiles/suites and independent implementation review
+remain open. Concurrent native2PC remains required. Full collector/bootstrap/
+provider/statement/execution/performance/release and overall goal remain open.
+
+
+### Composite runtime failure preserved; independent oracle consolidated
+
+Four strict paired packages completed at13ca94f. Initial profile setup root31
+failed a readiness deadline during stock initialization; six individually
+complete profiles and two distinct fresh profiles are explicitly assembled,
+while the failed unpreloaded PG18 profile stays preserved and unaccepted.
+PG17 required integration root39 exited101: discovery11, builtin2 and
+publication18 passed, heap8 passed/11 timed out; later binaries did not execute.
+
+Independent source diagnosis found no required C correction within the finite
+copied-composite contract and one medium fixture correction R1 (duplicate type
+selection/seven payload-oracle requests). The
+[component ledger](native-composite-type-fields.md#preserved-verification-failure-and-oracle-correction)
+binds the original failed streams and the311-member review with actual-zero
+terminal observer and333-member root rehash. R1's cost is established; a common
+cause for all timeouts remains unproven.
+
+Fixtures now share independent selection per metadata phase, batch the six
+catalog graphs and record phase outcomes/elapsed time. Original20s/60s bounds,
+phase freshness, NULL/carrier/source/graph assertions, historical outputs, real
+prepared wait barriers and concurrent native2PC stay required. The26 packaged
+native inputs are unchanged by this fixture correction. Current paired ordinary
+runtime verification and final implementation review remain OPEN, as do the
+full collector/provider/execution/performance/release gates and overall goal.
+
+
+The first consolidated fixture head a841adf passed66 required PG17 cases.
+PG18 root55 passed18 heap cases, including both new composite cases, but the
+existing carrier fixture expired its60s case bound after all12 carrier samples.
+The failed receipt and unchanged profiles are preserved. The
+[phase-sharing ledger](native-composite-type-fields.md#graph-expectations-complete-the-per-phase-oracle-sharing)
+records the exact streams and evidence limit: repeated catalog graph queries
+were avoidable; the cause of variable query latency remains unproven. Independent
+graph expectations now join the per-phase shared oracle, while every native
+capture and all assertions/barriers/bounds remain. Current runtime acceptance
+and final review are still OPEN.
+
+At8329634, root59/60 passed all19 heap cases on each major. PG18 root61 then
+exited101 on an exact publication-generation assertion (592 versus591), after
+discovery11, builtin2 and17 other publication cases passed. Later PG18 suites
+and private cases did not run. The
+[publication witness ledger](native-composite-type-fields.md#paired-heap-acceptance-publication-witness-correction-pending)
+preserves the failure and the115-member source review. The review establishes
+unprotected epoch/hold intervals and premature ErrorResponse cleanup checks;
+the producer of the extra increment remains unknown. A separate test-only
+semantic sentinel now precedes raw holds and distinct unheld epoch reads, and
+expected native errors drain through exact Ready states and stream end. All
+four real finish waits, native outcomes, exact+1 assertions and original bounds
+remain. Closed fixture cohort assumptions and failure cleanup are explicit.
+Native package inputs remain unchanged. Corrected publication verification,
+final implementation review and all broader gates remain OPEN.
+
+Corrected dc10350 passed strict Rust and PG17 publication18, but PG18 root74
+exited101 on two other exact generation checks (GID+2 and lock-only view+1).
+The corrected error-cleanup case passed both majors. The
+[successful-Finish ledger](native-composite-type-fields.md#successful-native-finishes-require-separate-sentinel-geometries)
+preserves the failure and171-member source diagnosis. Metadata PREPARE retains
+semantic RX, so GID uses a pending-then-owned Share reservation with the complete
+known prepared lock cohort; the warmed view's lock-only PREPARE permits a granted
+Share. Both retain distinct unheld epochs, actual native waits/outcomes, exact
+counts and20s bounds. Tracked native completion and failure cleanup drain through
+Ready, release raw before finishing targets and settle the sentinel before all
+driver closures. The failed PG18 profile is preserved; fresh ordinary required
+verification is pending. Native module inputs and all broader open gates remain.
+
+### Composite paired ordinary receipt verification passed; final review open
+
+Corrected fixture source6730a8e passed strict Rust. Two fresh primary PG17.11/18.6
+profiles retain native2PC10 and completed195 setup commands; six accepted control
+profiles retain their original770-command setup anchor. Existing failed profiles
+and namespaces are preserved. Current PG17 publication18, PG18 remaining44 and
+PG18 private3 all passed, including every corrected publication witness. Seven
+selected receipts retain original source/profile identities; explicit source
+proof excludes the18 older publication cases and retains only unchanged heap,
+PG17 nonpublication and PG17 private targets. Native26 bytes still match the
+four strict13ca94f packages.
+
+The [paired ordinary ledger](native-composite-type-fields.md#paired-ordinary-receipt-verification-passed-final-review-open)
+records the exact receipt audit: root95 actual0,132 selected passes (66 per major),
+1665 verified members,14 package commands and195 fresh setup commands. Earlier
+runtime and reader failures remain excluded and preserved; no bounds or native
+generation assertions were relaxed. Final independent implementation review,
+full collector/bootstrap/provider/statement/execution/performance/release,
+issues46/15 and the overall goal remain OPEN.
+
+The final cae76be source review withholds finite component acceptance on medium
+C2: a submitted PREPARE can survive a dropped acknowledgement wait and escape
+boolean prepared-state cleanup. Its287-member report and actual-zero terminal
+observer are preserved in the [submitted-PREPARE ledger](native-composite-type-fields.md#submitted-prepare-survives-a-dropped-wait).
+Preparation now retains submission, stream progress, original error and Ready
+outside the catch; only validated complete responses establish prepared/rejected
+state. Cleanup drains preparation, reconciles finite known GIDs normally and
+keeps transport-unknown/unsettled outcomes explicit. Original/reused identities,
+every driver closure, native barriers/counts/deadlines remain. No native package
+input changes or new error/interruption experiment. Current corrected publication
+verification and final review are OPEN; broader gates and the goal remain OPEN.
+
+Corrected6f3dd33 passed strict Rust and both18-case publication suites, with each
+run's30 profile readers actual0. Root106's current finite receipt audit verifies
+132 selected passes (66/major):96 unchanged targets plus36 replacement publication
+cases, excluding their36 superseded predecessors. The328-member v6 audit reuses
+the accepted earlier audit as a named leaf. Its exact hash and failure-path
+limit are in the [C2 ledger](native-composite-type-fields.md#submitted-prepare-survives-a-dropped-wait).
+Fresh independent C2 source review remains OPEN; ordinary passing paths do not
+certify cancellation/transport cleanup. Broader gates and the goal remain OPEN.
+
+### Finite composite component accepted
+
+Independent review accepts clean933cafd with no required findings and closes C2
+only there. The [accepted component ledger](native-composite-type-fields.md#finite-composite-component-accepted-after-c2-review)
+binds the461-member review, actual-zero final/post/completion/observer receipts,
+483-path root rehash and unchanged28-input current-source proof. Cancellation and
+transport cleanup conclusions are source-based; ordinary receipts establish132
+selected passing cases across PG17.11/18.6, not interruption coverage. Historical
+failed audits and runtime profiles remain preserved. Only two unpackaged docs
+changed after the tested source; native26 bytes still match build13ca94f.
+
+Copied composite declarations and their corrected fixtures are accepted. Full
+collector/bootstrap, range/enum/domain constraints, provider/expression,
+negative/name-candidate, statement/binding/execution, performance and release
+gates, issues46/15 and the overall goal remain OPEN. Direct passes remain9/27,
+with12/36 plus bootstrap unresolved. Concurrent native PostgreSQL2PC is required.

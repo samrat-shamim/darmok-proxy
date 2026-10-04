@@ -55,6 +55,23 @@ typedef struct DarmokHeapStorageRootFact
 	int attribute_offset;
 } DarmokHeapStorageRootFact;
 
+/* Named composite declarations ordered by actual relation OID. Their positive
+ * slot ranges are owned facts, not descriptor or physical execution leases. */
+typedef struct DarmokHeapCompositeFact
+{
+	Oid type_oid;
+	Oid relation_oid;
+	Oid schema_oid;
+	NameData schema_name;
+	NameData name;
+	char kind;
+	char persistence;
+	Oid access_method_oid;
+	bool is_partition;
+	int16 declared_attribute_count;
+	int attribute_offset;
+} DarmokHeapCompositeFact;
+
 /* One use per distinct application or metadata root and storage node. Physical
  * facts/references are deduplicated independently. Input bindings keep their
  * duplicates and modes in roots/root_facts. */
@@ -92,9 +109,9 @@ typedef struct DarmokHeapAttributeFact
 	Oid collation_oid;
 } DarmokHeapAttributeFact;
 
-/* Root rowtypes and live-column seeds, closed over declared base/element/array
- * OIDs. Other composite fields, range/enum/constraint definitions and provider
- * admission remain separate obligations; this is not a completed type graph. */
+/* Root rowtypes closed over named composite fields and declared base/element/
+ * array OIDs. Range/enum/constraint definitions and provider admission remain
+ * separate obligations; this is not a completed type graph. */
 typedef struct DarmokHeapTypeFact
 {
 	Oid oid;
@@ -184,6 +201,7 @@ typedef struct DarmokHeapObservationCost
 	uint64 options_rows;
 	uint64 index_rows;
 	uint64 attribute_rows;
+	uint64 attribute_payload_rows;
 	uint64 type_rows;
 	uint64 type_payload_rows;
 	uint64 attrdef_rows;
@@ -201,6 +219,8 @@ typedef struct DarmokHeapStorageView
 	int root_count;
 	/* Root facts follow input order; duplicates share ordered fact ranges. */
 	const DarmokHeapStorageRootFact *root_facts;
+	const DarmokHeapCompositeFact *composites;
+	int composite_count;
 	const DarmokHeapAttributeFact *attributes;
 	int attribute_count;
 	const DarmokHeapTypeFact *types;
@@ -208,6 +228,7 @@ typedef struct DarmokHeapStorageView
 	const DarmokHeapMissingFact *missing;
 	int missing_count;
 	Size attribute_array_bytes;
+	Size composite_array_bytes;
 	Size type_array_bytes;
 	Size missing_array_bytes;
 	Size missing_image_bytes;
