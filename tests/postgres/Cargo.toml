@@ -92,3 +92,7 @@ path = "server_relation_guards.rs"
 [[test]]
 name = "server_heap_storage"
 path = "server_heap_storage.rs"
+
+[[test]]
+name = "server_module_footprint"
+path = "server_module_footprint.rs"

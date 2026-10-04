@@ -5317,3 +5317,40 @@ bootstrap/provider/registry/reference/writer/sequence/table execution, serving,
 performance and release gates, issues46/15 and the goal remain OPEN. Security,
 compiler PR4, hosted CI, new stress/recovery experiments and release publication
 remain excluded.
+
+
+## Private native module observation component
+
+The follow-up to merged PR70 (main8d3ce36fc483520ce1765d2b2d9151deb938a2c0)
+adds an owned pathname-image capture beneath the common unused-invocation
+boundary. Public PG17/18 estimators run before and after allocation; the final
+estimate and serializer are adjacent without allocation, loader or callback
+work. A bounded complete native image preserves raw bytes and order in a child
+AllocSet and supplies explicit lifetime and requested-byte observations. This
+implements observation instrumentation; it admits no new catalog descriptor
+and does not relax the collector's pre-open proof. See
+[native module footprint](native-module-footprint.md).
+
+Current paired product/probe builds, the two ordinary module-image fixtures,
+required existing native suites, repository checks and independent implementation
+review are required before merge. Source-bound commands, actual outcomes,
+package/provisioning identities and immutable evidence live outside the
+distribution. Fresh required verification servers may be provisioned from the
+new packages; existing profiles are preserved without stop, restart or signal.
+The fixtures introduce no stress, forced error, interruption, recovery or
+profile lifecycle experiment. No earlier native package result certifies the
+changed inputs.
+
+Exact new required command on both primary profiles:
+`cargo test -p darmok-postgres-tests --test server_module_footprint --locked -- --nocapture`.
+The mandatory PostgreSQL job selects the whole package, so its test manifest
+includes this target without a new hosted-CI action. The probe projects a copied
+image and within-invocation owner/snapshot observations; none is an all-reference
+owner census or an initializer/callback history.
+
+Startup/entry/provider/registry/reference, writer/sequence, new descriptor/table
+execution, serving, performance, release, issues46/15 and the goal remain OPEN.
+Concurrent native PostgreSQL two-phase transactions remain required.
+Security/authentication/TLS/roles/grants, project compiler work, new native
+stress/recovery experiments, hosted-CI polling or retry, account actions and
+release publication remain excluded.
