@@ -18,6 +18,11 @@ attempt, native refresh, module fences, publication and transaction cleanup.
 Normal processing is required. The capture opens no catalog reader, acquires no
 relation lock, selects no data snapshot and invokes no module initializer or
 registered callback. It does not create a SQL function or frontend command.
+The private header declares its five functions with PGDLLEXPORT, matching the
+existing private native APIs. PGXS builds the shared object with hidden default
+visibility; a successful compilation without these declarations cannot supply
+the separate probe's runtime symbol lookups. The private C API carries no
+stable public ABI promise.
 
 ## Copy window and lifetime
 

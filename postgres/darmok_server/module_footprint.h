@@ -13,12 +13,12 @@ typedef struct DarmokModuleFootprint DarmokModuleFootprint;
  * The image is owned by a child of CurrentMemoryContext. It expires when that
  * context resets or when released, and contains pathname bytes, not identities
  * of executable contents, callbacks, providers or reference owners. */
-extern DarmokModuleFootprint *darmok_module_footprint_capture(void);
-extern const char *darmok_module_footprint_image(const DarmokModuleFootprint *footprint,
+extern PGDLLEXPORT DarmokModuleFootprint *darmok_module_footprint_capture(void);
+extern PGDLLEXPORT const char *darmok_module_footprint_image(const DarmokModuleFootprint *footprint,
 											  Size *bytes);
-extern uint32 darmok_module_footprint_count(const DarmokModuleFootprint *footprint);
+extern PGDLLEXPORT uint32 darmok_module_footprint_count(const DarmokModuleFootprint *footprint);
 /* Requested record+buffer bytes; excludes context/allocator overhead. */
-extern Size darmok_module_footprint_requested_bytes(const DarmokModuleFootprint *footprint);
-extern void darmok_module_footprint_release(DarmokModuleFootprint *footprint);
+extern PGDLLEXPORT Size darmok_module_footprint_requested_bytes(const DarmokModuleFootprint *footprint);
+extern PGDLLEXPORT void darmok_module_footprint_release(DarmokModuleFootprint *footprint);
 
 #endif

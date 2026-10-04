@@ -5354,3 +5354,21 @@ Concurrent native PostgreSQL two-phase transactions remain required.
 Security/authentication/TLS/roles/grants, project compiler work, new native
 stress/recovery experiments, hosted-CI polling or retry, account actions and
 release publication remain excluded.
+
+
+The initial module-observer revision3aa2aaffe988c1e890ee73db1fa16c7ca44a444a
+passes four product/probe builds and42 package checks, with24 native inputs.
+Two fresh primary profiles bind the packages with55 successful provisioning
+commands. The PG17 module fixture actually exits101: both ordinary cases fail
+during the first runtime symbol lookup, before the observer body executes.
+PGXS uses `-fvisibility=hidden`; the new header omitted the explicit PGDLLEXPORT
+declarations used by the existing private C APIs. Compilation alone did not
+verify the exported boundary.
+
+The correction exports only the five private observer functions through their
+header. It preserves default hidden visibility and tests the actual product
+API through the separate probe. Old packages, profiles, helper/command streams
+and the real failed fixture remain preserved. Corrected current paired builds,
+fresh profiles, actual ordinary fixtures, required existing suites and independent
+review remain required before merge; no original-body runtime result is inferred
+from the failed lookup or earlier package success. All broader gates stay OPEN.
