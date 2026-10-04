@@ -240,12 +240,14 @@ copy_cost_json(StringInfo output, const DarmokHeapObservationCost *cost)
 					 ",\"relation_rows\":" UINT64_FORMAT ",\"index_rows\":" UINT64_FORMAT
 					 ",\"attribute_rows\":" UINT64_FORMAT ",\"type_rows\":" UINT64_FORMAT
 					 ",\"attrdef_rows\":" UINT64_FORMAT
+					 ",\"options_rows\":" UINT64_FORMAT
 					 ",\"missing_carrier_bytes\":" UINT64_FORMAT
 					 ",\"payload_carrier_bytes\":" UINT64_FORMAT
 					 ",\"requested_copy_bytes\":" UINT64_FORMAT
 					 ",\"allocated_bytes\":" UINT64_FORMAT "}",
 					 cost->namespace_rows, cost->relation_rows, cost->index_rows,
 					 cost->attribute_rows, cost->type_rows, cost->attrdef_rows,
+					 cost->options_rows,
 					 (uint64) cost->missing_carrier_bytes, (uint64) cost->payload_carrier_bytes,
 					 (uint64) cost->requested_copy_bytes, (uint64) cost->allocated_bytes);
 }

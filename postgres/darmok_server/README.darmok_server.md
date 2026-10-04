@@ -151,7 +151,15 @@ admitted builtin TOAST heaps are scanned directly outside raw/semantic exclusion
 the final observation requires the exact source carriers and defining facts to
 agree. Missing singleton arrays normalize in that same middle phase. Images do
 not evaluate expressions, admit providers/element decoding, replace a physically
-present NULL or establish frontend column flags. The metadata-TOAST descriptor
+present NULL or establish frontend column flags. Every distinct selected
+storage node also contributes its actual raw class-option array, including
+independent NULL presence. The additional class pass follows pure copied graph
+selection in the same raw observation span. These images do not parse options
+or admit a new descriptor path. Successful metadata preparation discards its
+ephemeral catalog snapshot before later waits and preserves caller data
+snapshots. Verification and scope are recorded in
+[`docs/native-relation-options.md`](../../docs/native-relation-options.md).
+The metadata-TOAST descriptor
 path requires the continuous builtin bootstrap profile, freshly checked NULL
 options and initialized native critical catalog indexes before opening targets.
 

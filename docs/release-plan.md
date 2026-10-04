@@ -5868,3 +5868,233 @@ This completes local ordinary reference-scope verification only. New supported
 options/descriptor paths, writer coverage, transitive type collection, immutable
 binding/planning, table execution, serving, performance and release gates,
 issues46/15 and the overall goal remain OPEN. Standing exclusions remain.
+
+### Raw relation option carriers — candidate implementation
+
+Base: d0f39c521dddbfdb6220199c54c4a9132e4e90b7, the exact reviewed PR75
+merged tree933fb06a150383c3baf4d4707512db87ebdc4cd7. PR75 independent review
+has no required findings; root50 rehash and root59 merged readback actually
+exit0. Its116/0/0 results remain evidence for that earlier native source only.
+Merged-readback facts are logs/native-bootstrap-references-59127f8-merged-readback-v2/facts.json,
+SHA2562b6ba82f60c8f3f596f81b8bde9b2ce529de998642cd6623ac017cd921106e1a,
+with37-member seal7dbce45131c1b3fe72f07018d4244cfe6d94a80e71d5561165ffb8f7b7692c45.
+Readback v1's uninvoked stdout.log assumption was corrected in distinct v2
+before execution; no failed namespace or result was overwritten.
+
+The working branch captures one raw pg_class.reloptions source per distinct
+selected graph node through an extra class scan in the SAME raw observation
+span and registered snapshot. Pure graph selection/source construction now
+also occupy raw; no second fence acquisition or options parser is added.
+Only selected carriers are copied. A/B/C compare source identity, independent
+NULL presence and exact stored bytes; B supplies normalized owned images.
+The existing opened bootstrap descriptors still require NULL options. All
+returned scans detach before cleanup after raw/S. See native-relation-options.md
+for the exact sequence, cardinality, native resource and cost contracts.
+
+Direct catalog scan count becomes21 per successful attempt, plus selected
+metadata TOAST scans. options_rows reports the extra full class pass, while
+payload bytes count only selected carriers. Physical modes/counts and protocol
+round trips are unchanged. Longer raw exclusion, selected carrier/bitmap/image
+allocations and phase budgets need current verification; no performance result
+or complete options/descriptor/writer/table gate is claimed.
+
+Two ordinary fixtures cover actual heap/index/parent-TOAST option changes and
+reset, duplicate roots, NULL sources, unrelated-source filtering, preserved
+historical copies and native borrowed modes. Prepared SUE option changes are
+observed before and after both normal outcomes with first-unselected and
+established real table reads. The independent varlena oracles add text[]
+signatures and exact class source/image/accounting checks. These are required
+ordinary feature fixtures, not stress, injection or recovery experiments.
+
+Passive current source commands01–12 are saved under native-options-path-d0f39c5.
+Own08 actually exits1 because its rg child exits2 on nonexistent statement_guard.c;
+raw/partial streams remain preserved. The corrected09 reads the actual
+utility/prepared/reader code in darmok_server.c. A later direct documentation
+inventory has Python wrapper0 but rg child2 for nonexistent native-catalog-payloads.md;
+the actual native-variable-catalog-payloads.md was then read. Neither error is
+product verification. The earlier design notes remain a distinct draft; the
+implemented same-span sequence is the current spec.
+
+Own12 primary capture actually exits0. logs/native-options-path-primary-v1
+binds six named files to official PG17.11/18.6 archives, four complete selected
+writer/temp-predicate bodies and two complete public class declarations. Facts
+SHA256d195a6778de42d284c93be0d2d172e9e55804845f1d54df6289b0f7510199c39;
+16-member nonself seal4a07aa82dfd362fe024686f30de00c3d51b4a5ce129c6dbdeab575235bd780d7.
+Selected bodies/declarations and actual paired differences were read. This
+is finite interface evidence, not complete writer/kernel/registry acceptance.
+
+Current strict native packages, affected ordinary PG17/18 suites, strict Clippy,
+boundaries and independent implementation review remain PENDING. Both use cases
+and concurrent native two-phase transactions remain required. Wider
+options/descriptors/writers/closure/binding/planning/execution/serving/performance/
+release gates, issues46/15 and the goal remain OPEN. Security work, compilerPR4/
+source/resources, hosted CI/admin/account actions, release publication and new
+stress/interruption/recovery or existing-profile lifecycle experiments remain
+excluded. Existing profiles are preserved.
+
+### Raw relation options: first ordinary run and semantic-wait correction
+
+The first implementation is committed at d6571f495920b36c1e1f730f23fb24c530e45db1,
+tree 42880d1e0e60e4f6cdf067fa6689d896807b6412. Recorded source checks 13–16
+(diff check, targeted rustfmt, repository boundaries and strict storage-test
+Clippy) all exited 0. Paired arm64 Linux PostgreSQL 17.11/18.6 packaging
+(root 17) exited 0: four images, 26 source inputs and fourteen successful inner
+commands. Package facts SHA256 is
+792b80fda1eb4688a45f5d5974aab54915094edc42ae285ebf3f52830aa8e249.
+The eight fresh required profiles (root 18) and all 568 setup commands exited
+0; profile facts SHA256 is
+6f4d29d52a53cc27598279d69b94a03f6539d3d0a748008929321bc8a86648e6.
+Normal and ordered profiles have native 2PC enabled with ten slots; zero slots
+are only the explicit unsupported configuration.
+
+Root 19, the first PostgreSQL 17 integration command, exited 101. Three
+completed bins passed 11/2/18 tests; storage passed 12 and failed the new
+prepared-options fixture with a bounded SQL timeout. The remaining three bins
+and private/PG18 runs were not executed. All thirty before/after fixture
+binding readers exited 0; their identities stayed unchanged. Binding facts
+SHA256 is 8f6a9a3b5eee8d8a755eb60c965c5f8f3cb4a61d7c45bf3c57be7d5d4efc1e94.
+This run is failed evidence, not acceptance; preserve its eight profile
+namespaces, receipts, streams and binaries unchanged.
+
+The new fixture incorrectly assumed physically compatible SUE/AS permits the
+full consumer to return while metadata is prepared. The existing
+PRE_PREPARE callback deliberately transfers semantic RX, and the final
+consumer acquires S. That wait is required even when native relation modes
+coexist. The correction verifies this real wait, its lack of raw/publication
+locks, and the independent data horizon; a separate connection completes the
+prepared transaction before the consumer returns. It keeps the earlier owned
+JSON images for copy-independence checks and compares completed current images
+for both commit and rollback. Native C, installed header and probe inputs are
+unchanged; no barrier is bypassed and no timeout is widened. This preserves
+concurrent native 2PC support. Corrected ordinary verification is pending.
+
+Passive failure diagnosis is recorded in the unique root-19 suffixes. The
+first source reader exited 1 on an excessive declared range; its corrected
+EOF reader/log capture exited 0. The first lock-path reader likewise exited 1
+on an excessive range; the corrected EOF/native-writer reader exited 0.
+The semantic-writer-paths reader exited 2 because a guessed observer file did
+not exist (all selected source spans were emitted); the actual observer is in
+the storage test file, read by the corrected observer reader at exit 0. Keep
+all failures as failures. These are passive reads of the failed ordinary run
+and selected source interfaces, not new stress or forced-error experiments.
+
+External evidence verifier v1 is an uninvoked draft. Its guessed root-08
+namespace was corrected in uninvoked v2, which additionally binds producing
+stdout hashes, helper hashes and the real source-reader values. Neither
+certifies the failed runtime. Corrected evidence needs a new namespace and
+must preserve the failed runtime and passive readers. No old kernel, registry
+or proof graph is recertified. Broader descriptor, writer, closure, execution,
+serving, full performance and release gates and issues 46/15 remain open.
+
+### Raw relation options: prepared semantic wait exposed an ephemeral horizon
+
+Corrected fixture source 1388ddd2e43584c24f95c2129e2fa4ec73e926a1, tree
+2a88dc0c82172e3afc017e5bbbaf2bac0e5e7adc, passed source checks 23–26 at exit 0.
+Its eight fresh profiles (root 27) and all 574 setup commands exited 0, using
+unchanged d6571f4 native build inputs. Profile facts SHA256 is
+7fbeab003506f4ea49e38ecb363678b2a5b54cdf7d4c8f2bdee67ede75206221.
+Root 28 PostgreSQL 17 integration exited 101: completed bins passed 11/2/18,
+storage passed 12 and failed one, and later bins/private/PG18 tests were not
+executed. The corrected fixture observed the real semantic S wait but found
+backend_xmin present for the first-unselected view. All thirty before/after
+binding readers exited 0 with unchanged identities. Binding facts SHA256 is
+2402de0a807e0f14cd383297bd1802f4810fcab207d0a6798322e385708bbc80.
+Keep this second failed ordinary run and its eight profile namespaces intact.
+
+The selected caller chain explains the leak. storage_prepare invalidated the
+cached native catalog snapshot at entry, then performed installation and
+native descriptor/cache work that can recreate it. The subsequent semantic
+wait occurs before C registers its own observation snapshot; conditional
+observation cleanup therefore cannot close this cached horizon. PostgreSQL 17
+get_extension_oid directly scans pg_extension through a native catalog
+snapshot; 18 uses EXTENSIONNAME syscache and can need a snapshot on a miss.
+The cached catalog snapshot independently occupies RegisteredSnapshots and
+protects PGPROC xmin. The selected native invalidation removes that cached
+entry and recomputes xmin, preserving active and registered caller snapshots.
+
+The fix makes successful metadata-only preparation end by invalidating that
+ephemeral catalog snapshot, outside raw/S and before any subsequent wait.
+It is a central preparation postcondition for A/B/C, not a special exception
+for this fixture or a barrier bypass. Failed native preparation still needs
+normal abort cleanup. The first-unselected and established-view assertions
+remain unchanged. No timeout is extended, no new descriptor or options parser
+is admitted, and concurrent native 2PC remains required. Native heap_storage.c
+and packaged documentation changed, so fresh paired builds and new required
+verification profiles are pending. Earlier binaries do not certify this fix.
+
+Passive root-28 snapshot ownership and selected caller readers exited 0.
+Snapshot primary capture also exited 0 and binds four named native files to
+the official archives plus ten complete selected function bodies, with an
+18-member nonself seal. Facts SHA256 is
+3fa2d1c3c96bc7c6a412b5851d98e6c75661290f55ff8a7ffcc882886eb47221;
+seal SHA256 is 82d173da48ecb1db73333a5af885d0dbcee7830c236ae2e3c667969403f00872.
+The four snapshot bodies agree by major, while extension lookup differs.
+Verifier v3 remains an uninvoked draft for the now-failed corrected source;
+it is not acceptance. Preserve v1/v2/v3 drafts and every failed receipt.
+No new native stress, forced error, interruption, recovery or existing-profile
+lifecycle experiment occurred. Broader descriptor, writer, closure, execution,
+serving, performance and release gates and issues 46/15 remain open.
+
+### Raw relation options: current paired ordinary verification
+
+Native fix and fixture source 38f2548a9a812b6e7252002fa247788a9addcc4b,
+tree 77132b3f287831a1e008fca74939f21c1a62a21c, passes recorded commands
+32–41 at actual exit 0. Diff hygiene, targeted Rust formatting, repository
+boundaries and strict storage-test Clippy pass. Both native packages are rebuilt;
+historical binaries do not certify the changed C or packaged documentation.
+
+Root 36 packaging passes: four arm64 Linux PostgreSQL 17.11/18.6 images,
+26 exact inputs and fourteen successful build/artifact commands.
+Facts: logs/native-options-path-38f2548-packages-v2/facts.json,
+SHA256 b5e176ada9d5f2d8fb59e58b58cf2b8b6759df8d38178dd789fffe37d7033ada.
+Root 37 passes all eight fresh required profiles and all 564 setup commands.
+Facts: logs/native-options-path-38f2548-profiles-17-18-primary-no2pc-unpreloaded-ordered-v3/facts.json,
+SHA256 dd4b16d2526de39ef6eec410db54dd74d54864b06bde61bc395e0542168a6f2b.
+Supported normal/alternate-preload profiles have ten native 2PC slots; zero
+slots remain solely the explicit unsupported configuration. Existing profiles
+are preserved without stopping, restarting or signaling them.
+
+Roots 38/40 run the seven affected PostgreSQL integration binaries with
+locked/offline Cargo, include-ignored and one test thread. Each major passes
+11/2/18/13/2/6/5 tests, totaling 57, with zero failed or ignored.
+Roots 39/41 run the private native catalog subset, each passing three with
+zero failed or ignored. The total is 120 passed / 0 failed / 0 ignored.
+All four commands have thirty successful before/after binding readers,
+unchanged container/start identities, zero restarts and the exact current
+native inputs. Fixture binding facts are:
+
+- logs/native-options-path-38-pg17-integration-binding-v3/facts.json:
+  SHA256 4e0916b7f9051a1e7bdb9621a18036bb96e7f74b6ca9d8155859ad176b8bfe59.
+- logs/native-options-path-39-pg17-private-binding-v3/facts.json:
+  SHA256 1a5f107ed01df8373d9237a6109871f3378e78a139e46f08b748f418f20451f6.
+- logs/native-options-path-40-pg18-integration-binding-v3/facts.json:
+  SHA256 857f82e2f0b3e9fbf4d1d1ac54a249f73f28d536d9ab9d3362fe2256c9956b65.
+- logs/native-options-path-41-pg18-private-binding-v3/facts.json:
+  SHA256 b30eeaba79b9152c7212a8145e780ccc3830b75eb354e7feba0107186c55bf7d.
+
+Both new option fixtures pass on both majors. Ordinary heap/index/parent-TOAST
+SET/RESET yields exact source identities, carrier presence and owned images.
+Prepared metadata really retains semantic RX while SUE coexists with reader
+AS: the consumer waits for S without raw/publication locks. The first-unselected
+view has no leaked catalog horizon, and an established caller data view retains
+its horizon. The observer completes both native outcomes before the current
+definitions are rechecked. Earlier owned results and native prior modes remain
+unchanged. No timeout or barrier is weakened.
+
+Only repository documentation changes after this tested revision. All 26
+native/package inputs and the changed Rust fixture bytes remain exact.
+Verifier drafts v1/v2/v3 stay uninvoked and unchanged; fresh v4 binds final
+documentation to current packages/profiles/suites and the two finite selected
+primary records. Its producing command is recorded at
+logs/native-options-path-44-final-evidence/receipt.json. Final diff/boundary
+checks and independent review are merge requirements; this ledger does not
+claim those future checks have already passed. Both earlier failed runtime
+namespaces and every failed passive reader remain preserved as failures.
+
+This completes local ordinary option-carrier and preparation-horizon
+verification only. Broader options/descriptor admission, writer coverage,
+transitive type/statement closure, binding/planning/execution, serving,
+full performance and release gates, issues 46/15 and the overall goal remain
+OPEN. Both use cases and concurrent native 2PC remain required. Standing
+security/compiler/hosted-CI/admin/release and new native experiment exclusions
+remain in force.

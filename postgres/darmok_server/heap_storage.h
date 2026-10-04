@@ -157,7 +157,8 @@ typedef struct DarmokHeapPayloadImage
 } DarmokHeapPayloadImage;
 
 /* Source identity is never merged because two images happen to match.
- * Type records include independently absent binary/text fields. An attrdef
+ * Type records include independently absent binary/text fields; each graph
+ * class has an independently absent raw reloptions array image. An attrdef
  * record additionally names its actual relation and positive column ordinal.
  * field_number identifies the native source-catalog field, not a wire column.
  * These opaque bytes do not admit their expression/type dependencies. */
@@ -175,6 +176,7 @@ typedef struct DarmokHeapObservationCost
 {
 	uint64 namespace_rows;
 	uint64 relation_rows;
+	uint64 options_rows;
 	uint64 index_rows;
 	uint64 attribute_rows;
 	uint64 type_rows;
