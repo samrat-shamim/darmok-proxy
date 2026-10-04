@@ -1,8 +1,8 @@
 # Native metadata descriptor bootstrap
 
 Status: paired source investigation and preferred design direction. The new
-descriptor bootstrap gate remains OPEN before C changes. This document does
-not certify an implementation-ready collector, a backend callback/owner
+descriptor bootstrap gate remains OPEN before descriptor-collector C changes.
+This document does not certify an implementation-ready collector, a backend callback/owner
 witness, new runtime behavior or an execution lease. The accepted six-catalog
 and direct-payload components retain their original source and profile scope.
 Concurrent native PostgreSQL two-phase transactions remain required.
@@ -229,6 +229,12 @@ authoritative entry, bootstrap, whole statement or implementation gate.
 
 ## Passive module footprint and its limits
 
+The separate [private module observer](native-module-footprint.md) implements
+owned pathname capture without a catalog descriptor open. Its instrumentation
+and ordinary component verification can precede the complete entry certificate;
+this does not relax the pre-open proof required for new collector descriptors.
+Its current implementation/review status is recorded separately.
+
 Both pinned majors expose `EstimateLibraryStateSpace` and
 `SerializeLibraryState` through `fmgr.h`. The estimator walks the native loaded
 file list and accounts for each pathname terminator plus the final terminator.
@@ -303,7 +309,8 @@ no measured latency/peak-memory claim. Next establish the concrete admitted
 startup and fixed-command history, including registration and cleanup, before
 using the footprint as one part of the entry proof. The authoritative entry,
 owner, registry/provider, writer, sequence, implementation/runtime and whole
-statement gates remain OPEN; no C changes are admitted by this investigation.
+statement gates remain OPEN; no new descriptor path is admitted by this
+investigation.
 
 ## Writer coverage and remaining sequence
 
@@ -324,8 +331,9 @@ actual hint updates from schema/provider changes, without inventing18 fields
 on17 or using a hint as proof of complete live index membership. This source
 read does not exclude all hint writers or certify a publication/cache shortcut.
 
-Before C implementation, close the entered-cache/owner and supported options
-profile proof; finish writer and defining-field coverage; then select the exact
+Before new descriptor collector C implementation, close the entered-cache/owner
+and supported options profile proof; finish writer and defining-field coverage;
+then select the exact
 bootstrap observations and guard sequence. Discovery must use only admitted
 readers. Close the discovery horizon before acquisition, collect fresh profile
 facts after acquisition, and admit each new descriptor before opening it.

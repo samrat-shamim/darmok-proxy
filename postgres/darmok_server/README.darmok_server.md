@@ -33,6 +33,12 @@ path; full physical/candidate closure and preparation remain separate gates.
 Its installed C header is internal and has no stable public ABI promise. See
 [`docs/native-statement-guards.md`](../../docs/native-statement-guards.md).
 
+The private `module_footprint.h` component captures an owned byte image of the
+native loaded-module pathname list using public PG17/18 copying APIs. It opens
+no catalog descriptor and supplies no entry/provider/reference certificate.
+Its current build and verification status, lifetime and cost are recorded in
+[`docs/native-module-footprint.md`](../../docs/native-module-footprint.md).
+
 The private C relation-reference attempt preserves ordered explicit OID/mode
 increments under the native transaction owner. It releases only its own
 increments or retains them for native transaction cleanup, including prepare.

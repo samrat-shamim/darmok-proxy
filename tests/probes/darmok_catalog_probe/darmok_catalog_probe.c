@@ -25,6 +25,7 @@
 #include "statement_guard.h"
 #include "relation_guard.h"
 #include "heap_storage_probe.h"
+#include "module_footprint.h"
 
 PG_MODULE_MAGIC;
 PGDLLEXPORT void _PG_init(void);
@@ -35,6 +36,7 @@ static SubTransactionId subid = InvalidSubTransactionId;
 static char *command = NULL;
 static char *guard_status = NULL;
 static char *relation_status = NULL;
+static char *module_footprint_status = NULL;
 static DarmokRelationAttempt relation_token = {0};
 static DarmokRelationAttempt stale_relation_token = {0};
 static SubTransactionId relation_subid = InvalidSubTransactionId;
@@ -82,6 +84,87 @@ static RelationAcquire relation_acquire = NULL;
 static RelationComplete relation_release = NULL;
 static RelationComplete relation_retain = NULL;
 static RelationOwned relation_owned = NULL;
+
+typedef DarmokModuleFootprint *(*ModuleCapture) (void);
+typedef const char *(*ModuleImage) (const DarmokModuleFootprint *, Size *);
+typedef uint32 (*ModuleCount) (const DarmokModuleFootprint *);
+typedef Size (*ModuleRequested) (const DarmokModuleFootprint *);
+typedef void (*ModuleRelease) (DarmokModuleFootprint *);
+static ModuleCapture module_capture = NULL;
+static ModuleImage module_image = NULL;
+static ModuleCount module_count = NULL;
+static ModuleRequested module_requested = NULL;
+static ModuleRelease module_release = NULL;
+
+static void
+show_modules(DestReceiver *dest, QueryCompletion *completion)
+{
+	static const char hex[] = "0123456789abcdef";
+	StringInfo text = makeStringInfo();
+	DarmokModuleFootprint *footprint;
+	bool snapshot = FirstSnapshotSet;
+	ResourceOwner current_owner = CurrentResourceOwner;
+	ResourceOwner transaction_owner = CurTransactionResourceOwner;
+	TupOutputState *output;
+
+	if (module_capture == NULL)
+	{
+		ModuleCapture capture;
+		ModuleImage image;
+		ModuleCount count;
+		ModuleRequested requested;
+		ModuleRelease release;
+
+		capture = (ModuleCapture) load_external_function("$libdir/darmok_server",
+															 "darmok_module_footprint_capture", true, NULL);
+		image = (ModuleImage) load_external_function("$libdir/darmok_server",
+														 "darmok_module_footprint_image", true, NULL);
+		count = (ModuleCount) load_external_function("$libdir/darmok_server",
+														 "darmok_module_footprint_count", true, NULL);
+		requested = (ModuleRequested) load_external_function("$libdir/darmok_server",
+															 "darmok_module_footprint_requested_bytes", true, NULL);
+		release = (ModuleRelease) load_external_function("$libdir/darmok_server",
+															 "darmok_module_footprint_release", true, NULL);
+		module_image = image;
+		module_count = count;
+		module_requested = requested;
+		module_release = release;
+		module_capture = capture;
+	}
+	footprint = module_capture();
+	PG_TRY();
+	{
+		Size bytes;
+		const unsigned char *image = (const unsigned char *) module_image(footprint, &bytes);
+
+		appendStringInfo(text, "{\"paths\":%u,\"bytes\":%zu,\"requested_bytes\":%zu,\"image_hex\":\"",
+						 module_count(footprint), bytes, module_requested(footprint));
+		for (Size i = 0; i < bytes; i++)
+		{
+			appendStringInfoChar(text, hex[image[i] >> 4]);
+			appendStringInfoChar(text, hex[image[i] & 15]);
+		}
+		appendStringInfo(text, "\",\"before_snapshot\":%s,\"after_snapshot\":%s,\"owners_unchanged\":%s}",
+						 snapshot ? "true" : "false", FirstSnapshotSet ? "true" : "false",
+						 current_owner == CurrentResourceOwner && transaction_owner == CurTransactionResourceOwner
+						 ? "true" : "false");
+	}
+	PG_FINALLY();
+	{
+		module_release(footprint);
+	}
+	PG_END_TRY();
+	output = begin_tup_output_tupdesc(dest,
+									  GetPGVariableResultDesc("darmok_catalog_probe.module_footprint"),
+									  &TTSOpsVirtual);
+	do_text_output_oneline(output, text->data);
+	end_tup_output(output);
+	pfree(text->data);
+	pfree(text);
+	if (FirstSnapshotSet != snapshot)
+		elog(ERROR, "native module probe SHOW changed first data snapshot");
+	SetQueryCompletion(completion, CMDTAG_SHOW, 0);
+}
 
 static void
 resolve_relation(void)
@@ -677,6 +760,13 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		show_relation(dest, completion);
 		return;
 	}
+	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
+		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
+			   "darmok_catalog_probe.module_footprint") == 0)
+	{
+		show_modules(dest, completion);
+		return;
+	}
 	if (owner != NULL && IsA(pstmt->utilityStmt, TransactionStmt) &&
 		((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_PREPARE)
 		elog(ERROR, "native test probe must release Share before PREPARE");
@@ -823,6 +913,9 @@ _PG_init(void)
 							   NULL, NULL, NULL);
 	DefineCustomStringVariable("darmok_catalog_probe.relation_status", "Native test state only.",
 							   NULL, &relation_status, "native test state", PGC_USERSET, GUC_NOT_IN_SAMPLE,
+							   NULL, NULL, NULL);
+	DefineCustomStringVariable("darmok_catalog_probe.module_footprint", "Native test observation only.",
+							   NULL, &module_footprint_status, "native test observation", PGC_INTERNAL, GUC_NOT_IN_SAMPLE,
 							   NULL, NULL, NULL);
 	darmok_heap_storage_probe_define_guc();
 	MarkGUCPrefixReserved("darmok_catalog_probe");
