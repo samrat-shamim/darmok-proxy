@@ -7,6 +7,8 @@
 #include "catalog/pg_am_d.h"
 #include "catalog/pg_extension_d.h"
 #include "catalog/catalog.h"
+#include "catalog/objectaccess.h"
+#include "catalog/pg_database_d.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -32,6 +34,8 @@ PG_MODULE_MAGIC;
 PGDLLEXPORT void _PG_init(void);
 
 static ProcessUtility_hook_type previous_utility = NULL;
+static object_access_hook_type previous_object_access = NULL;
+static bool shared_drop_barrier = false;
 static ResourceOwner owner = NULL;
 static SubTransactionId subid = InvalidSubTransactionId;
 static char *command = NULL;
@@ -100,6 +104,25 @@ static ModuleRelease module_release = NULL;
 
 typedef void (*BuiltinCapture) (DarmokBuiltinDispatch *);
 static BuiltinCapture builtin_capture = NULL;
+
+static void
+object_access(ObjectAccessType access, Oid class_id, Oid object_id,
+			  int sub_id, void *arg)
+{
+	if (previous_object_access)
+		previous_object_access(access, class_id, object_id, sub_id, arg);
+	if (shared_drop_barrier && access == OAT_DROP && class_id == DatabaseRelationId)
+	{
+		LOCKTAG tag;
+
+		/* Test synchronization only. The product registers and drains the real
+		 * shared-drop intent before this delegate returns, in either preload
+		 * order. Keep the second native DROP alive without a module fence until
+		 * the fixture releases its ordinary transaction-level advisory holder. */
+		SET_LOCKTAG_ADVISORY(tag, MyDatabaseId, 17485, 21316, 2);
+		(void) LockAcquire(&tag, ShareLock, false, false);
+	}
+}
 
 static void
 show_builtin_dispatch(DestReceiver *dest, QueryCompletion *completion)
@@ -976,10 +999,15 @@ _PG_init(void)
 	DefineCustomStringVariable("darmok_catalog_probe.builtin_dispatch", "Native test observation only.",
 							   NULL, &builtin_dispatch_status, "native test observation", PGC_INTERNAL, GUC_NOT_IN_SAMPLE,
 							   NULL, NULL, NULL);
+	DefineCustomBoolVariable("darmok_catalog_probe.shared_drop_barrier", "Native test synchronization only.",
+							 NULL, &shared_drop_barrier, false, PGC_USERSET, GUC_NOT_IN_SAMPLE,
+							 NULL, NULL, NULL);
 	darmok_heap_storage_probe_define_guc();
 	MarkGUCPrefixReserved("darmok_catalog_probe");
 	previous_utility = ProcessUtility_hook;
 	ProcessUtility_hook = process_utility;
+	previous_object_access = object_access_hook;
+	object_access_hook = object_access;
 	RegisterXactCallback(transaction_event, NULL);
 	RegisterSubXactCallback(subtransaction_event, NULL);
 	CacheRegisterRelcacheCallback(observe_relcache, (Datum) 0);

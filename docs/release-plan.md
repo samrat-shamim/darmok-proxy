@@ -5413,3 +5413,36 @@ new descriptor/table execution, serving, performance, release, issues46/15 and
 the goal stay open. Ordinary profiles keep max_prepared_transactions=10;
 concurrent native PostgreSQL two-phase transactions remain required. Security,
 project compiler PR4, hosted CI and release publication remain excluded.
+
+Revision76f274f06204b316ce98eb6ae4d603fdc7b17b12 passed four strict native
+package builds and both new builtin and previous module fixtures on each
+primary profile. PostgreSQL17 passed all51 required existing native fixtures
+(55 with the four observer fixtures). PostgreSQL18 passed catalog discovery11
+and publication17, then failed the existing concurrent shared-drop admission
+fixture while waiting for reader admission. Its remaining three required
+test binaries did not run. That revision therefore has32 PostgreSQL18 passes
+and one failure, not a completed paired regression result. The actual101
+receipt and package/profile observations remain preserved at
+`logs/native-builtin-dispatch-76f274f-10-regression18` and its binding facts
+`logs/native-builtin-dispatch-76f274f-10-regression18-binding-v1/facts.json`
+(SHA256 aefd0d1b2ce3b9cfc8777d2a940dc83f44f3f830216f221727489de4a329ee46).
+
+The fixture assumed that awaiting the first DROP reply kept the second DROP's
+intent live. Native backend progress is independent of when the client polls
+an already-submitted request: the second busy-database error can finish and
+clear its intent before the first reply is consumed. The failed receipt does
+not distinguish the fixture's two admission-wait call sites. The source shows
+that the second wait lacked a native ordering barrier; increasing the timeout
+or retrying would not establish the property being asserted.
+
+The correction adds a test-only object-access delegate and an ordinary
+transaction-level advisory holder. In either existing preload order the
+delegate waits only after the real shared-drop intent is registered and its
+module fences released. This keeps the second intent live until the fixture
+observes reader admission after the first commit. Releasing the advisory holder
+then permits the same existing native busy-database error and verifies its
+advisory-lock cleanup. Phase-specific diagnostics identify future admission
+failures. Product publication code and timeout limits are unchanged; no new
+forced-error or profile lifecycle scenario is introduced. Changed probe inputs
+require fresh current packages/profiles and all required paired suites before
+independent review and merge. All broader gates remain open.
