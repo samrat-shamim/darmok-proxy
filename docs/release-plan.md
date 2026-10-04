@@ -6433,3 +6433,18 @@ were avoidable; the cause of variable query latency remains unproven. Independen
 graph expectations now join the per-phase shared oracle, while every native
 capture and all assertions/barriers/bounds remain. Current runtime acceptance
 and final review are still OPEN.
+
+At8329634, root59/60 passed all19 heap cases on each major. PG18 root61 then
+exited101 on an exact publication-generation assertion (592 versus591), after
+discovery11, builtin2 and17 other publication cases passed. Later PG18 suites
+and private cases did not run. The
+[publication witness ledger](native-composite-type-fields.md#paired-heap-acceptance-publication-witness-correction-pending)
+preserves the failure and the115-member source review. The review establishes
+unprotected epoch/hold intervals and premature ErrorResponse cleanup checks;
+the producer of the extra increment remains unknown. A separate test-only
+semantic sentinel now precedes raw holds and distinct unheld epoch reads, and
+expected native errors drain through exact Ready states and stream end. All
+four real finish waits, native outcomes, exact+1 assertions and original bounds
+remain. Closed fixture cohort assumptions and failure cleanup are explicit.
+Native package inputs remain unchanged. Corrected publication verification,
+final implementation review and all broader gates remain OPEN.

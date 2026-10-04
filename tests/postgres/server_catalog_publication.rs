@@ -102,6 +102,124 @@ async fn complete_drop(client: &Client, sql: &str) -> Result<(), tokio_postgres:
     }
 }
 
+// A backend error is not a completion boundary until its ReadyForQuery and
+// stream end have been received. Keep the original native error for callers.
+async fn complete_native_finish_error(
+    client: &Client,
+    sql: &str,
+    expected: TransactionState,
+) -> tokio_postgres::Error {
+    let mut events = client.command_events(sql).unwrap();
+    let mut error = None;
+    let mut ready = false;
+    while let Some(event) = events.next().await {
+        match event.expect("native finish stream failed") {
+            CommandEvent::BackendError(value) => {
+                assert!(!ready && error.is_none());
+                error = Some(value);
+            }
+            CommandEvent::ReadyForQuery(state) => {
+                assert!(!ready && error.is_some());
+                assert_eq!(state, expected);
+                ready = true;
+            }
+            other => panic!("unexpected native finish event: {other:?}"),
+        }
+    }
+    assert!(ready, "native finish readiness was not observed");
+    error.expect("native finish error was not observed")
+}
+
+async fn publication_sentinel_status(client: &Client) -> serde_json::Value {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        let mut events = client
+            .simple_query_events("SHOW darmok_catalog_probe.guard_status")
+            .unwrap();
+        let mut text = None;
+        let mut descriptions = 0;
+        let mut tags = 0;
+        let mut ready = false;
+        while let Some(event) = events.next().await {
+            assert!(!ready, "event after sentinel readiness");
+            match event.unwrap() {
+                SimpleQueryEvent::RowDescription(columns) => {
+                    assert_eq!(columns.len(), 1);
+                    assert_eq!(columns[0].name(), "darmok_catalog_probe.guard_status");
+                    assert_eq!(columns[0].type_oid(), 25);
+                    assert_eq!(columns[0].format(), 0);
+                    descriptions += 1;
+                }
+                SimpleQueryEvent::Row(row) => {
+                    assert!(text.is_none());
+                    assert_eq!(row.len(), 1);
+                    text = Some(row.get(0).unwrap().to_owned());
+                }
+                SimpleQueryEvent::CommandComplete(tag) => {
+                    assert_eq!(tag, "SHOW");
+                    tags += 1;
+                }
+                SimpleQueryEvent::ReadyForQuery(state) => {
+                    assert!(matches!(
+                        state,
+                        TransactionState::Idle | TransactionState::Transaction
+                    ));
+                    ready = true;
+                }
+                other => panic!("unexpected sentinel status event: {other:?}"),
+            }
+        }
+        assert_eq!((descriptions, tags), (1, 1));
+        assert!(ready, "sentinel readiness was not observed");
+        serde_json::from_str(&text.unwrap()).unwrap()
+    })
+    .await
+    .expect("sentinel status did not complete")
+}
+
+async fn publication_sentinel(
+    client: &Client,
+    observer: &Client,
+    locks: &tokio_postgres::Statement,
+    backend: i32,
+    held: bool,
+) {
+    let sql = if held {
+        "BEGIN READ ONLY; SET darmok_catalog_probe.command='guard_hold'"
+    } else {
+        "SET darmok_catalog_probe.command='guard_release'"
+    };
+    tokio::time::timeout(Duration::from_secs(20), client.batch_execute(sql))
+        .await
+        .expect("sentinel command did not complete")
+        .unwrap();
+    let status = publication_sentinel_status(client).await;
+    assert_eq!(status["owned"], held);
+    assert_eq!(
+        status["outcome"],
+        if held { "acquired" } else { "released" }
+    );
+    let actual: Vec<(i32, String, bool)> =
+        tokio::time::timeout(Duration::from_secs(20), observer.query(locks, &[&backend]))
+            .await
+            .expect("sentinel lock check did not complete")
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.get(0), row.get(1), row.get(2)))
+            .collect();
+    let expected = if held {
+        vec![(17487, "ShareLock".to_owned(), true)]
+    } else {
+        vec![]
+    };
+    assert_eq!(actual, expected);
+    if !held {
+        tokio::time::timeout(Duration::from_secs(20), client.batch_execute("COMMIT"))
+            .await
+            .expect("sentinel transaction did not complete")
+            .unwrap();
+    }
+}
+
 // Epochs come from a distinct unheld backend, never combined with probe state.
 // Staged wait fixtures start this receive operation before releasing their
 // native blockers; the caller bounds completion after the release.
@@ -1461,7 +1579,9 @@ async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
     let (writer, writer_driver) = client().await;
     let (other, other_driver) = client().await;
     let (observer, observer_driver) = client().await;
+    let (sentinel, sentinel_driver) = client().await;
     let writer_pid = pid(&writer).await;
+    let sentinel_pid = pid(&sentinel).await;
     writer
         .batch_execute("PREPARE TRANSACTION 'darmok_prepare_cleanup'")
         .await
@@ -1500,71 +1620,133 @@ async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
         .batch_execute("ROLLBACK PREPARED 'darmok_prepare_cleanup'")
         .await
         .unwrap();
-    for outcome in ["COMMIT", "ROLLBACK"] {
-        other.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let before = observe(&epochs).await;
-        hold_probe(&other).await;
-        let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
-        let mut finishing = Box::pin(writer.batch_execute(&sql));
-        tokio::select! {
-            result = &mut finishing => panic!("attempted native finish bypassed its fence: {result:?}"),
-            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
-        }
+    // Warm the closed fixture cohort before retaining any reference. The
+    // sentinel excludes ordinary/late publishers before their gate/raw queue;
+    // unrelated native Finish calls are not excluded and are outside this
+    // fixture's exact-count interval. Epochs remain distinct and unheld.
+    let sentinel_locks = observer.prepare(
+        "SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid=$1 ORDER BY objsubid,mode"
+    ).await.unwrap();
+    assert!(
+        observer
+            .query(&sentinel_locks, &[&sentinel_pid])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(publication_sentinel_status(&sentinel).await["owned"], false);
+    observer.query(FENCE_LOCKS, &[&writer_pid]).await.unwrap();
+    no_fence(&observer, writer_pid).await;
+    observe(&epochs).await;
+    other.batch_execute("BEGIN READ ONLY").await.unwrap();
+    hold_probe(&other).await;
+    release_probe(&other).await;
+    other.batch_execute("COMMIT").await.unwrap();
+    let outcome = std::panic::AssertUnwindSafe(async {
+        for outcome in ["COMMIT", "ROLLBACK"] {
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
+            other.batch_execute("BEGIN READ ONLY").await.unwrap();
+            hold_probe(&other).await;
+            let before = observe(&epochs).await;
+            let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
+            let mut finishing = Box::pin(complete_native_finish_error(&writer, &sql, TransactionState::Idle));
+            tokio::select! {
+                result = &mut finishing => panic!("attempted native finish bypassed its fence: {result:?}"),
+                () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+            }
 
-        release_probe(&other).await;
-        other.batch_execute("COMMIT").await.unwrap();
-        let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
-            .await
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
-        drop(finishing);
-        no_fence(&observer, writer_pid).await;
-        other.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let after = observe(&epochs).await;
-        hold_probe(&other).await;
-        assert_eq!(after.generation(), before.generation() + 1);
-        release_probe(&other).await;
-        other.batch_execute("COMMIT").await.unwrap();
-    }
-    for outcome in ["COMMIT", "ROLLBACK"] {
-        other.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let before = observe(&epochs).await;
-        hold_probe(&other).await;
-        writer
-            .batch_execute("BEGIN; SAVEPOINT child")
-            .await
-            .unwrap();
-        let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
-        let mut finishing = Box::pin(writer.batch_execute(&sql));
-        tokio::select! {
-            result = &mut finishing => panic!("child native finish bypassed its fence: {result:?}"),
-            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+            release_probe(&other).await;
+            other.batch_execute("COMMIT").await.unwrap();
+            let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+                .await
+                .unwrap();
+            assert_eq!(error.code(), Some(&SqlState::UNDEFINED_OBJECT));
+            drop(finishing);
+            no_fence(&observer, writer_pid).await;
+            other.batch_execute("BEGIN READ ONLY").await.unwrap();
+            hold_probe(&other).await;
+            let after = observe(&epochs).await;
+            assert_eq!(after.generation(), before.generation() + 1);
+            release_probe(&other).await;
+            other.batch_execute("COMMIT").await.unwrap();
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
         }
-        release_probe(&other).await;
-        other.batch_execute("COMMIT").await.unwrap();
-        let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
-            .await
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(error.code(), Some(&SqlState::ACTIVE_SQL_TRANSACTION));
-        drop(finishing);
-        no_fence(&observer, writer_pid).await;
-        writer
-            .batch_execute("ROLLBACK TO child; RELEASE child")
-            .await
-            .unwrap();
-        let recovered = observe(&epochs).await;
-        hold_probe(&writer).await;
-        assert_eq!(recovered.generation(), before.generation() + 1);
-        release_probe(&writer).await;
-        writer.batch_execute("COMMIT").await.unwrap();
-        no_fence(&observer, writer_pid).await;
+        for outcome in ["COMMIT", "ROLLBACK"] {
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
+            other.batch_execute("BEGIN READ ONLY").await.unwrap();
+            hold_probe(&other).await;
+            let before = observe(&epochs).await;
+            writer
+                .batch_execute("BEGIN; SAVEPOINT child")
+                .await
+                .unwrap();
+            let sql = format!("{outcome} PREPARED 'darmok_prepare_cleanup'");
+            let mut finishing = Box::pin(complete_native_finish_error(&writer, &sql, TransactionState::FailedTransaction));
+            tokio::select! {
+                result = &mut finishing => panic!("child native finish bypassed its fence: {result:?}"),
+                () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+            }
+            release_probe(&other).await;
+            other.batch_execute("COMMIT").await.unwrap();
+            let error = tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+                .await
+                .unwrap();
+            assert_eq!(error.code(), Some(&SqlState::ACTIVE_SQL_TRANSACTION));
+            drop(finishing);
+            no_fence(&observer, writer_pid).await;
+            writer
+                .batch_execute("ROLLBACK TO child; RELEASE child")
+                .await
+                .unwrap();
+            hold_probe(&writer).await;
+            let recovered = observe(&epochs).await;
+            assert_eq!(recovered.generation(), before.generation() + 1);
+            release_probe(&writer).await;
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
+            writer.batch_execute("COMMIT").await.unwrap();
+            no_fence(&observer, writer_pid).await;
+        }
+    })
+    .catch_unwind()
+    .await;
+    // Release the raw holder and semantic shield before draining any queued
+    // writer command. Keep all cleanup results until every driver is closed.
+    let mut cleanup = Vec::new();
+    if outcome.is_err() {
+        for client in [&other, &sentinel, &writer] {
+            cleanup.push(
+                tokio::time::timeout(Duration::from_secs(20), client.batch_execute("ROLLBACK"))
+                    .await,
+            );
+        }
     }
-    close(writer, writer_driver).await;
-    close(other, other_driver).await;
-    close(epochs, epochs_driver).await;
-    close(observer, observer_driver).await;
+    let mut closed = Vec::new();
+    for (client, driver) in [
+        (writer, writer_driver),
+        (other, other_driver),
+        (sentinel, sentinel_driver),
+        (epochs, epochs_driver),
+        (observer, observer_driver),
+    ] {
+        closed.push(
+            std::panic::AssertUnwindSafe(close(client, driver))
+                .catch_unwind()
+                .await,
+        );
+    }
+    for result in cleanup {
+        result
+            .expect("publication fixture cleanup did not complete")
+            .unwrap();
+    }
+    for result in closed {
+        if let Err(panic) = result {
+            std::panic::resume_unwind(panic);
+        }
+    }
+    if let Err(panic) = outcome {
+        std::panic::resume_unwind(panic);
+    }
 }
 
 #[tokio::test]

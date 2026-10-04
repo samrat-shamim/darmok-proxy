@@ -275,3 +275,56 @@ exact physical/coordination lock checks, carrier samples and20s/60s deadlines
 remain intact. Product/native inputs remain unchanged. Current paired heap
 acceptance and final implementation review remain OPEN; earlier successes and
 the root55 failure are not relabeled as current acceptance.
+
+### Paired heap acceptance; publication witness correction pending
+
+At source `83296344de0ae177a2bd8c17e81d0e0c70720ad2`, root59 PG17 and
+root60 PG18 each actually exited0 with all19 heap cases passing. Both new
+composite fixtures and all12 carrier samples retain their complete assertions.
+The26 packaged native inputs remain identical to built source13ca94f. Root58's
+unchanged-input proof retains root53/54's44 integration and3 private PG17
+passes at their original source; it does not relabel their receipts.
+
+Root61 PG18 remaining integration actually exited101: discovery11 and builtin2
+passed; publication17 passed and one exact-generation assertion failed, with
+recovered592 versus expected591. Later binaries and PG18 private cases had
+not run. Failed stdout SHA256 is
+`4c0dda8fdae0d91462ead853e053ec65b0964035c3f6a421e2a513b11c8c243a`;
+binding facts SHA256
+`830b59ba4ac79bba6233a9ee36f61871cbfdad79477dec35f8c3c3c6b4b9f259`.
+The failed receipt, namespace and native profiles are preserved. This is not
+paired ordinary runtime acceptance.
+
+Bounded independent source review at8329634 records two medium fixture
+corrections: P1 leaves an interval between unheld epoch sampling and a later
+raw hold; P2 treats ErrorResponse as cleanup before ReadyForQuery. It establishes
+neither a product C defect nor the origin of the extra shared increment. The
+successful child recovery commands already supply a later readiness boundary
+before the failed recovered assertion; P2 is not asserted to cause592.
+The115-member review is at
+`logs/review-native-publication-witness-8329634-source-v1`, report SHA256
+`94eee52cc17fb48004ef85ff198ed0f8055fbb1e88671689722f08e1f5c109c4`,
+seal `4a113f9bdd6fe2d6f330b4746098ddfb7ef781b6763d47356181aaa0edcd7db9`.
+Final/post/completion/observer actually exited0; root66 rehash verifies137
+unique paths, facts SHA256
+`e8055d7281993921e412eb848a7d797dd2d13a68aeb590e340a9f120ce838875`.
+Own03/04 source-reader failures remain preserved. Root67's report-read key error
+also remains actual1; corrected root68 reads the full report and raw observer.
+
+The correction uses a fifth, otherwise quiet backend owning only the existing
+test-probe semantic Share. It acquires and verifies that reference before raw
+holds and baseline SHOW, keeping ordinary/late publishers out before their
+publication/raw queue. It neither replaces the real native finish wait nor
+excludes unrelated native Finish calls: this is explicitly a closed fixture
+cohort, not a production boundary. Epochs remain distinct and unheld. Both
+missing-GID errors drain exactly one original UNDEFINED_OBJECT through Ready
+Idle; both child attempts drain ACTIVE_SQL_TRANSACTION through Ready
+FailedTransaction and stream end. Exact+1 assertions, recovery commands and20s
+bounds remain. The sentinel's owned/outcome and actual native lock checks must
+succeed; it is released before parent COMMIT. Failure cleanup releases the raw
+holder and sentinel before draining writer commands and observes all driver
+closures under existing bounds. No native module input changes.
+
+Current corrected publication verification and final implementation review
+remain OPEN. All full collector/provider/execution/performance/release gates,
+issues46/15 and the overall goal remain OPEN; concurrent native2PC stays required.
