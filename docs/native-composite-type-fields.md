@@ -244,3 +244,34 @@ This addresses the established source-level R1 cost; current ordinary runtime
 acceptance and fresh final implementation review remain OPEN. These fixture
 changes leave the26 packaged native inputs unchanged, permitting exact binary
 and profile rebinding without rebuilding or relabeling the old evidence.
+
+
+### Graph expectations complete the per-phase oracle sharing
+
+At fixture source `a841adf51839fb88e35c6e1f8223399530ab9b90`, PG17 root52/53/54
+actually exited0: heap19, remaining integration44 and private3 cases passed;
+all90 before/after binding readers completed0. Root55 PG18 heap actually
+exited101, with18 passed and one case-wide60s expiration in the pre-existing
+owned-default carrier fixture. Both new composite fixtures passed on both majors.
+Root55 raw stdout SHA256 is
+`166343c1c86633e6f69af686b31fed5a54b8e53f925266801fc170d6f8d241da`;
+binding facts
+`25cb1dc300400f92ec148225626beceecb95d218861995743b493938138ced26`.
+Its30 binding readers completed0 and the failed namespace remains preserved.
+
+The complete failure output contains all12 carrier samples: three metadata
+phases, both real data-view states, two captures each. Source and phase timings
+show that each capture redundantly reread the six catalog graphs, despite no
+DDL inside a phase; some batched graph reads took5–6 seconds. This establishes
+avoidable repeated protocol work, while it does not identify the underlying
+reason for variable query latency. The expiration occurred after the final
+sample, without a declaration/carrier assertion failure.
+
+The fixture now reads catalog graph expectations once after each phase's DDL,
+alongside the application graph/column/payload/missing expectations, and compares
+the full graph/mode/reference projection on every capture. It never shares these
+expectations across DDL phases. All12 native captures, real reader snapshots,
+exact physical/coordination lock checks, carrier samples and20s/60s deadlines
+remain intact. Product/native inputs remain unchanged. Current paired heap
+acceptance and final implementation review remain OPEN; earlier successes and
+the root55 failure are not relabeled as current acceptance.

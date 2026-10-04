@@ -6421,3 +6421,15 @@ prepared wait barriers and concurrent native2PC stay required. The26 packaged
 native inputs are unchanged by this fixture correction. Current paired ordinary
 runtime verification and final implementation review remain OPEN, as do the
 full collector/provider/execution/performance/release gates and overall goal.
+
+
+The first consolidated fixture head a841adf passed66 required PG17 cases.
+PG18 root55 passed18 heap cases, including both new composite cases, but the
+existing carrier fixture expired its60s case bound after all12 carrier samples.
+The failed receipt and unchanged profiles are preserved. The
+[phase-sharing ledger](native-composite-type-fields.md#graph-expectations-complete-the-per-phase-oracle-sharing)
+records the exact streams and evidence limit: repeated catalog graph queries
+were avoidable; the cause of variable query latency remains unproven. Independent
+graph expectations now join the per-phase shared oracle, while every native
+capture and all assertions/barriers/bounds remain. Current runtime acceptance
+and final review are still OPEN.

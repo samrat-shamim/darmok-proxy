@@ -540,6 +540,17 @@ async fn check_graph_modes(
     root_masks: &BTreeMap<u32, u64>,
 ) {
     let catalogs = catalog_graphs(client).await;
+    check_graph_projection(state, application_facts, root_masks, &catalogs);
+}
+
+// Reuse independently read declarations only while the fixture's metadata phase
+// is unchanged. Every capture still checks the entire graph and exact modes.
+fn check_graph_projection(
+    state: &Value,
+    application_facts: &[Value],
+    root_masks: &BTreeMap<u32, u64>,
+    catalogs: &BTreeMap<u32, Vec<Value>>,
+) {
     let mut applications = BTreeMap::<u32, Vec<Value>>::new();
     let mut root = 0;
     for fact in application_facts {
@@ -945,6 +956,7 @@ async fn owned_defaults_cover_actual_native_carriers_and_independent_type_presen
             let mut graph = oracle(&observer,root).await;
             graph.extend(oracle(&observer,other).await);
             let masks = BTreeMap::from([(root,14),(other,2)]);
+            let catalogs = catalog_graphs(&observer).await;
             for established in [false,true] {
                 sql(&reader,if established {"BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1"} else {"BEGIN ISOLATION LEVEL REPEATABLE READ"}).await.unwrap();
                 for pass in 0..2 {
@@ -955,7 +967,7 @@ async fn owned_defaults_cover_actual_native_carriers_and_independent_type_presen
                     check_columns(&state,&columns);
                     check_missing(&state,&missing);
                     check_payloads(&state,&payloads);
-                    check_graph_modes(&observer,&state,&graph,&masks).await;
+                    check_graph_projection(&state,&graph,&masks,&catalogs);
                     assert_eq!(state["metadata"]["root_facts"][0],state["metadata"]["root_facts"][2]);
                     assert!(state["metadata"]["toast_rows"].as_u64().unwrap()>state["metadata"]["selected_chunks"].as_u64().unwrap());
                     assert!(probe.modes(&observer,Some(backend),&fact_oids(&state)).await.is_empty());
