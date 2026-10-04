@@ -6034,3 +6034,67 @@ it is not acceptance. Preserve v1/v2/v3 drafts and every failed receipt.
 No new native stress, forced error, interruption, recovery or existing-profile
 lifecycle experiment occurred. Broader descriptor, writer, closure, execution,
 serving, performance and release gates and issues 46/15 remain open.
+
+### Raw relation options: current paired ordinary verification
+
+Native fix and fixture source 38f2548a9a812b6e7252002fa247788a9addcc4b,
+tree 77132b3f287831a1e008fca74939f21c1a62a21c, passes recorded commands
+32–41 at actual exit 0. Diff hygiene, targeted Rust formatting, repository
+boundaries and strict storage-test Clippy pass. Both native packages are rebuilt;
+historical binaries do not certify the changed C or packaged documentation.
+
+Root 36 packaging passes: four arm64 Linux PostgreSQL 17.11/18.6 images,
+26 exact inputs and fourteen successful build/artifact commands.
+Facts: logs/native-options-path-38f2548-packages-v2/facts.json,
+SHA256 b5e176ada9d5f2d8fb59e58b58cf2b8b6759df8d38178dd789fffe37d7033ada.
+Root 37 passes all eight fresh required profiles and all 564 setup commands.
+Facts: logs/native-options-path-38f2548-profiles-17-18-primary-no2pc-unpreloaded-ordered-v3/facts.json,
+SHA256 dd4b16d2526de39ef6eec410db54dd74d54864b06bde61bc395e0542168a6f2b.
+Supported normal/alternate-preload profiles have ten native 2PC slots; zero
+slots remain solely the explicit unsupported configuration. Existing profiles
+are preserved without stopping, restarting or signaling them.
+
+Roots 38/40 run the seven affected PostgreSQL integration binaries with
+locked/offline Cargo, include-ignored and one test thread. Each major passes
+11/2/18/13/2/6/5 tests, totaling 57, with zero failed or ignored.
+Roots 39/41 run the private native catalog subset, each passing three with
+zero failed or ignored. The total is 120 passed / 0 failed / 0 ignored.
+All four commands have thirty successful before/after binding readers,
+unchanged container/start identities, zero restarts and the exact current
+native inputs. Fixture binding facts are:
+
+- logs/native-options-path-38-pg17-integration-binding-v3/facts.json:
+  SHA256 4e0916b7f9051a1e7bdb9621a18036bb96e7f74b6ca9d8155859ad176b8bfe59.
+- logs/native-options-path-39-pg17-private-binding-v3/facts.json:
+  SHA256 1a5f107ed01df8373d9237a6109871f3378e78a139e46f08b748f418f20451f6.
+- logs/native-options-path-40-pg18-integration-binding-v3/facts.json:
+  SHA256 857f82e2f0b3e9fbf4d1d1ac54a249f73f28d536d9ab9d3362fe2256c9956b65.
+- logs/native-options-path-41-pg18-private-binding-v3/facts.json:
+  SHA256 b30eeaba79b9152c7212a8145e780ccc3830b75eb354e7feba0107186c55bf7d.
+
+Both new option fixtures pass on both majors. Ordinary heap/index/parent-TOAST
+SET/RESET yields exact source identities, carrier presence and owned images.
+Prepared metadata really retains semantic RX while SUE coexists with reader
+AS: the consumer waits for S without raw/publication locks. The first-unselected
+view has no leaked catalog horizon, and an established caller data view retains
+its horizon. The observer completes both native outcomes before the current
+definitions are rechecked. Earlier owned results and native prior modes remain
+unchanged. No timeout or barrier is weakened.
+
+Only repository documentation changes after this tested revision. All 26
+native/package inputs and the changed Rust fixture bytes remain exact.
+Verifier drafts v1/v2/v3 stay uninvoked and unchanged; fresh v4 binds final
+documentation to current packages/profiles/suites and the two finite selected
+primary records. Its producing command is recorded at
+logs/native-options-path-44-final-evidence/receipt.json. Final diff/boundary
+checks and independent review are merge requirements; this ledger does not
+claim those future checks have already passed. Both earlier failed runtime
+namespaces and every failed passive reader remain preserved as failures.
+
+This completes local ordinary option-carrier and preparation-horizon
+verification only. Broader options/descriptor admission, writer coverage,
+transitive type/statement closure, binding/planning/execution, serving,
+full performance and release gates, issues 46/15 and the overall goal remain
+OPEN. Both use cases and concurrent native 2PC remain required. Standing
+security/compiler/hosted-CI/admin/release and new native experiment exclusions
+remain in force.

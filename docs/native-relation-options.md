@@ -1,8 +1,9 @@
 # Owned relation option images
 
-Status: implemented in the working branch; current paired native builds,
-required ordinary fixtures and independent implementation review are pending.
-Historical results do not certify this change. This extends the private
+Status: implemented with paired native builds and required ordinary fixtures
+locally verified at 38f2548a9a812b6e7252002fa247788a9addcc4b: 120 passed,
+zero failed and zero ignored. Independent implementation review is required
+before merge. Historical results do not certify this change. This extends the private
 [heap-storage invocation](native-heap-storage.md) with defining raw carriers,
 not an options parser, new descriptor admission or a table executor.
 Concurrent native PostgreSQL two-phase transactions remain required.
@@ -165,7 +166,35 @@ EXTENSIONNAME syscache in 18). Facts SHA256 is
 the 18-member nonself seal is
 `82d173da48ecb1db73333a5af885d0dbcee7830c236ae2e3c667969403f00872`.
 This establishes the selected cached-snapshot cleanup semantics, not a new
-whole-kernel or registry certificate. Rebuild/runtime review of the fix is pending.
+whole-kernel or registry certificate. The current paired packages and ordinary
+fixtures verify this fix within the scope below.
+
+## Current local verification
+
+Recorded commands 32–41 all exit 0 at
+38f2548a9a812b6e7252002fa247788a9addcc4b. Source checks cover diff hygiene,
+targeted Rust formatting, repository boundaries and strict storage-test Clippy.
+Paired arm64 Linux PostgreSQL 17.11/18.6 packaging produces four images from
+26 exact native inputs, with fourteen successful build/artifact commands.
+Eight fresh required verification databases and all 564 setup commands pass.
+Normal and alternate-preload profiles have ten native prepared-transaction
+slots; zero slots belong only to the explicit unsupported configuration.
+
+Each major passes 57 integration and three private catalog tests. All four
+fixture bindings have thirty successful before/after identity and artifact
+readers, unchanged container/start identities and zero restarts. Both new
+option fixtures pass on both majors, including first-unselected and established
+caller data views during real prepared semantic waits and both normal outcomes.
+These results certify the changed native source, not an earlier build.
+
+Package/profile facts and four fixture bindings are preserved under the
+native-options-path-38f2548 package/profile namespaces and recorded commands
+38–41 outside the distribution. Exact paths and hashes are in release-plan.md.
+Final repository status/evidence edits change documentation only; native
+package and Rust fixture inputs remain exactly those tested. A finite verifier
+binds the final documentation revision to these results and the two selected
+primary records, preserving both earlier failed ordinary runs. Independent
+review remains a merge requirement.
 
 Broader descriptor/options admission, writer coverage, transitive type and
 statement closure, binding/planning/execution, serving, full performance and

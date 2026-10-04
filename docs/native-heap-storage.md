@@ -32,7 +32,9 @@ Paired packages and required ordinary suites are locally verified at
 admits no new descriptor/options path or transitive type closure.
 
 The current [raw relation option images](native-relation-options.md) extension
-is implemented in the working branch with verification/review pending. It
+is locally verified at 38f2548a9a812b6e7252002fa247788a9addcc4b with paired
+native packages and 120 required ordinary tests. Independent implementation
+review is required before merge. It
 captures every selected graph node's class option carrier, preserves the
 existing opened-descriptor profile and moves copied graph selection into the
 same raw span as its additional class pass. The prior tests above do not
