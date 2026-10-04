@@ -6481,3 +6481,15 @@ runtime and reader failures remain excluded and preserved; no bounds or native
 generation assertions were relaxed. Final independent implementation review,
 full collector/bootstrap/provider/statement/execution/performance/release,
 issues46/15 and the overall goal remain OPEN.
+
+The final cae76be source review withholds finite component acceptance on medium
+C2: a submitted PREPARE can survive a dropped acknowledgement wait and escape
+boolean prepared-state cleanup. Its287-member report and actual-zero terminal
+observer are preserved in the [submitted-PREPARE ledger](native-composite-type-fields.md#submitted-prepare-survives-a-dropped-wait).
+Preparation now retains submission, stream progress, original error and Ready
+outside the catch; only validated complete responses establish prepared/rejected
+state. Cleanup drains preparation, reconciles finite known GIDs normally and
+keeps transport-unknown/unsettled outcomes explicit. Original/reused identities,
+every driver closure, native barriers/counts/deadlines remain. No native package
+input changes or new error/interruption experiment. Current corrected publication
+verification and final review are OPEN; broader gates and the goal remain OPEN.

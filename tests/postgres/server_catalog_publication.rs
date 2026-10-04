@@ -4,7 +4,7 @@ use darmok_catalog::{NativeCatalogStamp, decode_catalog_observation};
 use futures_util::{FutureExt, StreamExt};
 use std::time::Duration;
 use tokio_postgres::{Client, NoTls, error::SqlState};
-use tokio_postgres::{CommandEvent, SimpleQueryEvent, TransactionState};
+use tokio_postgres::{CommandEvent, CommandEventStream, SimpleQueryEvent, TransactionState};
 
 #[path = "support/native_frames.rs"]
 mod native_frames;
@@ -262,11 +262,27 @@ async fn rollback_or_commit(client: &Client, command: &str) {
     .unwrap();
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PreparationState {
+    NotSubmitted,
+    Submitted,
+    Prepared,
+    Rejected,
+    Unknown,
+    Completed,
+}
+
 struct PreparedCompletion {
     gid: &'static str,
     outcome: &'static str,
-    prepared: bool,
+    state: PreparationState,
     requested: bool,
+    preparation: Option<CommandEventStream>,
+    expected_tags: &'static [&'static str],
+    received_tags: usize,
+    backend_error: Option<tokio_postgres::Error>,
+    ready: Option<TransactionState>,
+    violation: Option<String>,
 }
 
 impl PreparedCompletion {
@@ -274,14 +290,156 @@ impl PreparedCompletion {
         Self {
             gid,
             outcome,
-            prepared: false,
+            state: PreparationState::NotSubmitted,
             requested: false,
+            preparation: None,
+            expected_tags: &[],
+            received_tags: 0,
+            backend_error: None,
+            ready: None,
+            violation: None,
         }
+    }
+
+    fn submit_preparation(
+        &mut self,
+        client: &Client,
+        sql: &str,
+        expected_tags: &'static [&'static str],
+    ) -> Result<(), tokio_postgres::Error> {
+        assert!(matches!(
+            self.state,
+            PreparationState::NotSubmitted
+                | PreparationState::Rejected
+                | PreparationState::Completed
+        ));
+        assert!(self.preparation.is_none());
+        assert_eq!(expected_tags.last().copied(), Some("PREPARE TRANSACTION"));
+        self.state = PreparationState::Submitted;
+        self.requested = false;
+        self.expected_tags = expected_tags;
+        self.received_tags = 0;
+        self.backend_error = None;
+        self.ready = None;
+        self.violation = None;
+        // command_events queues immediately. Record submission before calling it
+        // and keep both the stream and its consumed prefix outside the catch.
+        match client.command_events(sql) {
+            Ok(events) => {
+                self.preparation = Some(events);
+                Ok(())
+            }
+            Err(error) => {
+                self.state = PreparationState::Unknown;
+                Err(error)
+            }
+        }
+    }
+
+    fn preparation_violation(&mut self, reason: String) {
+        if self.violation.is_none() {
+            self.violation = Some(reason);
+        }
+    }
+
+    async fn settle_preparation(&mut self) -> Result<(), tokio_postgres::Error> {
+        assert_eq!(self.state, PreparationState::Submitted);
+        while let Some(event) = self.preparation.as_mut().unwrap().next().await {
+            if self.ready.is_some() {
+                self.preparation_violation("event after preparation readiness".to_owned());
+            }
+            match event {
+                Ok(CommandEvent::CommandComplete(tag)) => {
+                    if self.backend_error.is_some()
+                        || Some(tag.as_str()) != self.expected_tags.get(self.received_tags).copied()
+                    {
+                        self.preparation_violation(format!("unexpected preparation tag: {tag}"));
+                    }
+                    self.received_tags += 1;
+                }
+                Ok(CommandEvent::BackendError(error)) => {
+                    if self.backend_error.is_some() {
+                        self.preparation_violation(format!(
+                            "additional preparation error: {error}"
+                        ));
+                    } else {
+                        self.backend_error = Some(error);
+                    }
+                }
+                Ok(CommandEvent::ReadyForQuery(state)) => {
+                    if self.ready.replace(state).is_some() {
+                        self.preparation_violation("additional preparation readiness".to_owned());
+                    }
+                }
+                Ok(other) => {
+                    self.preparation_violation(format!("unexpected preparation event: {other:?}"))
+                }
+                Err(error) => {
+                    self.state = PreparationState::Unknown;
+                    drop(self.preparation.take());
+                    if let Some(original) = self.backend_error.take() {
+                        eprintln!(
+                            "preparation transport outcome unconfirmed for {}: {error}",
+                            self.gid
+                        );
+                        return Err(original);
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        drop(self.preparation.take());
+        // A tag or a dropped wait is insufficient. Only a complete validated
+        // response can establish Prepared/Rejected; assertion failures stay Unknown.
+        self.state = PreparationState::Unknown;
+        assert!(
+            self.violation.is_none(),
+            "invalid preparation response for {}: {:?}",
+            self.gid,
+            self.violation
+        );
+        let ready = self.ready.expect("preparation readiness was not observed");
+        if self.backend_error.is_some() {
+            assert!(self.received_tags < self.expected_tags.len());
+            // Failure in the final PREPARE aborts TBLOCK_PREPARE to Idle. An
+            // earlier command after BEGIN leaves the transaction failed instead.
+            let expected =
+                if self.received_tags == 0 || self.received_tags + 1 == self.expected_tags.len() {
+                    TransactionState::Idle
+                } else {
+                    TransactionState::FailedTransaction
+                };
+            assert_eq!(ready, expected);
+            self.state = PreparationState::Rejected;
+            return Err(self.backend_error.take().unwrap());
+        }
+        assert_eq!(self.received_tags, self.expected_tags.len());
+        assert_eq!(ready, TransactionState::Idle);
+        self.state = PreparationState::Prepared;
+        Ok(())
+    }
+
+    fn mark_completed(&mut self) {
+        assert_eq!(self.state, PreparationState::Prepared);
+        assert!(self.requested);
+        self.state = PreparationState::Completed;
     }
 }
 
-async fn complete_tracked_prepared(client: &Client, target: &PreparedCompletion) {
-    if !target.prepared {
+async fn settle_tracked_preparation(target: &mut PreparedCompletion) {
+    if target.preparation.is_some() {
+        tokio::time::timeout(Duration::from_secs(20), target.settle_preparation())
+            .await
+            .expect("tracked preparation response did not settle")
+            .unwrap();
+    }
+}
+
+async fn complete_tracked_prepared(client: &Client, target: &mut PreparedCompletion) {
+    if matches!(
+        target.state,
+        PreparationState::NotSubmitted | PreparationState::Rejected | PreparationState::Completed
+    ) {
         return;
     }
     let sql = format!("{} PREPARED '{}'", target.outcome, target.gid);
@@ -293,17 +451,31 @@ async fn complete_tracked_prepared(client: &Client, target: &PreparedCompletion)
     .await
     .expect("tracked native prepared completion did not complete");
     match result {
-        Ok(()) => {}
-        Err(error) if target.requested && error.code() == Some(&SqlState::UNDEFINED_OBJECT) => {
+        Ok(()) => {
+            assert!(
+                target.preparation.is_none(),
+                "native finish completed for {}, but preparation response remains unresolved",
+                target.gid
+            );
+            target.state = PreparationState::Completed;
+        }
+        Err(error)
+            if target.state == PreparationState::Prepared
+                && target.requested
+                && error.code() == Some(&SqlState::UNDEFINED_OBJECT) =>
+        {
             eprintln!(
                 "tracked native completion already finished: {} code={:?}",
                 target.gid,
                 error.code()
             );
+            target.state = PreparationState::Completed;
         }
         Err(error) => panic!(
-            "tracked native completion failed for {}: {error}",
-            target.gid
+            "tracked native completion failed for {} ({:?}, response_pending={}): {error}; unresolved preparation is not assumed absent",
+            target.gid,
+            target.state,
+            target.preparation.is_some()
         ),
     }
 }
@@ -1548,14 +1720,16 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
     let mut acquiring = None;
     let outcome = std::panic::AssertUnwindSafe(async {
         writer.batch_execute("CREATE TABLE publication_gid_catalog(id integer); CREATE TABLE publication_gid_rows(id integer, value integer); INSERT INTO publication_gid_rows VALUES (1, 1)").await.unwrap();
-        writer.batch_execute("BEGIN; ALTER TABLE publication_gid_catalog ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_gid_reused'").await.unwrap();
-        metadata.prepared = true;
-        dml.batch_execute(
+        metadata.submit_preparation(&writer,
+            "BEGIN; ALTER TABLE publication_gid_catalog ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_gid_reused'",
+            &["BEGIN", "ALTER TABLE", "PREPARE TRANSACTION"],
+        ).unwrap();
+        metadata.settle_preparation().await.unwrap();
+        rows.submit_preparation(&dml,
             "BEGIN; UPDATE publication_gid_rows SET value = 10; PREPARE TRANSACTION 'darmok_gid_dml'",
-        )
-        .await
-        .unwrap();
-        rows.prepared = true;
+            &["BEGIN", "UPDATE 1", "PREPARE TRANSACTION"],
+        ).unwrap();
+        rows.settle_preparation().await.unwrap();
         // A granted Share would conflict with the prepared metadata RX. Reserve
         // Share behind precisely the known prepared cohort before taking raw.
         // Closed cohort: no unrelated Finish, active shared drop, lock group or
@@ -1582,14 +1756,12 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
         // Core retains exact GID uniqueness. A second PREPARE fails while the
         // original is still valid; no module gate changes native error behavior.
         // An error during TBLOCK_PREPARE aborts the whole transaction to Idle.
-        let error = complete_native_command(
+        reuse.submit_preparation(
             &replacement,
             "BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'",
             &["BEGIN", "PREPARE TRANSACTION"],
-            TransactionState::Idle,
-        )
-            .await
-            .unwrap_err();
+        ).unwrap();
+        let error = reuse.settle_preparation().await.unwrap_err();
         assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
         rollback_or_commit(&replacement, "ROLLBACK").await;
         no_fence(&observer, replacement_pid).await;
@@ -1606,23 +1778,25 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
             .await
             .unwrap()
             .unwrap();
-        metadata.prepared = false;
+        metadata.mark_completed();
         drop(finishing);
         tokio::time::timeout(Duration::from_secs(20), &mut finishing_dml)
             .await
             .unwrap()
             .unwrap();
-        rows.prepared = false;
+        rows.mark_completed();
         drop(finishing_dml);
         tokio::time::timeout(Duration::from_secs(20), acquiring.as_mut().unwrap()).await.unwrap().unwrap();
         drop(acquiring.take());
         check_publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
         // Reuse is admitted only after the native original has finished.
-        replacement
-            .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
-            .await
-            .unwrap();
-        reuse.prepared = true;
+        assert_eq!(metadata.state, PreparationState::Completed);
+        assert_eq!(reuse.state, PreparationState::Rejected);
+        reuse.submit_preparation(&replacement,
+            "BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'",
+            &["BEGIN", "PREPARE TRANSACTION"],
+        ).unwrap();
+        reuse.settle_preparation().await.unwrap();
         reader.batch_execute("BEGIN READ ONLY").await.unwrap();
         hold_probe(&reader).await;
         let after = observe(&epochs).await;
@@ -1650,7 +1824,7 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
             .await
             .unwrap()
             .unwrap();
-        reuse.prepared = false;
+        reuse.mark_completed();
         drop(finishing_reuse);
         no_fence(&observer, replacement_pid).await;
         publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
@@ -1668,9 +1842,28 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
                 .catch_unwind()
                 .await,
         );
-        for (client, target) in [(&writer, &metadata), (&dml, &rows), (&replacement, &reuse)] {
+        for (client, target) in [
+            (&writer, &mut metadata),
+            (&dml, &mut rows),
+            (&replacement, &mut reuse),
+        ] {
             cleanup.push(
-                std::panic::AssertUnwindSafe(complete_tracked_prepared(client, target))
+                std::panic::AssertUnwindSafe(settle_tracked_preparation(target))
+                    .catch_unwind()
+                    .await,
+            );
+            // A transport-unknown preparation may outlive its original client.
+            // The released reader is a quiet, independent completion backend.
+            let completion_client = if matches!(
+                target.state,
+                PreparationState::Submitted | PreparationState::Unknown
+            ) {
+                &reader
+            } else {
+                client
+            };
+            cleanup.push(
+                std::panic::AssertUnwindSafe(complete_tracked_prepared(completion_client, target))
                     .catch_unwind()
                     .await,
             );
@@ -1696,6 +1889,7 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
         }
     }
     drop(acquiring);
+    drop((metadata, rows, reuse));
     for (client, driver) in [
         (reader, reader_driver),
         (writer, writer_driver),
@@ -2042,17 +2236,17 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
     let outcome = std::panic::AssertUnwindSafe(async {
         for outcome in ["COMMIT", "ROLLBACK"] {
             target.outcome = outcome;
-            target.requested = false;
             // This warmed closed cohort has no active shared drop/unrelated Finish.
             // LOCK is not metadata DDL; its PREPARE transfers compatible AS only.
             publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
             reader.batch_execute("BEGIN READ ONLY").await.unwrap();
             hold_probe(&reader).await;
             let before = observe(&epochs).await;
-            tokio::time::timeout(Duration::from_secs(20), writer.batch_execute(
-                "BEGIN; LOCK TABLE pg_catalog.pg_prepared_xacts IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_prepared_view_lock'"
-            )).await.unwrap().unwrap();
-            target.prepared = true;
+            target.submit_preparation(&writer,
+                "BEGIN; LOCK TABLE pg_catalog.pg_prepared_xacts IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_prepared_view_lock'",
+                &["BEGIN", "LOCK TABLE", "PREPARE TRANSACTION"],
+            ).unwrap();
+            tokio::time::timeout(Duration::from_secs(20), target.settle_preparation()).await.unwrap().unwrap();
             let retained: bool = observer
                 .query_one(&view_lock, &[&view_oid])
                 .await
@@ -2075,7 +2269,7 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
                 .await
                 .unwrap()
                 .unwrap();
-            target.prepared = false;
+            target.mark_completed();
             drop(finishing);
             let retained: bool = observer
                 .query_one(&view_lock, &[&view_oid])
@@ -2110,7 +2304,12 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
                 .await,
         );
         cleanup.push(
-            std::panic::AssertUnwindSafe(complete_tracked_prepared(&finisher, &target))
+            std::panic::AssertUnwindSafe(settle_tracked_preparation(&mut target))
+                .catch_unwind()
+                .await,
+        );
+        cleanup.push(
+            std::panic::AssertUnwindSafe(complete_tracked_prepared(&finisher, &mut target))
                 .catch_unwind()
                 .await,
         );
@@ -2122,6 +2321,7 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
             );
         }
     }
+    drop(target);
     for (client, driver) in [
         (reader, reader_driver),
         (writer, writer_driver),

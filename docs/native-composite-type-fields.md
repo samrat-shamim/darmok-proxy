@@ -1,8 +1,9 @@
 # Native composite field discovery
 
 Status: independently accepted existing-reader source design and implemented
-copied composite declarations. Paired package/runtime receipt verification has
-passed; fresh final implementation review remains open. The merged
+copied composite declarations. Paired packages and the earlier runtime receipt
+audit passed; the submitted-PREPARE cleanup correction's runtime verification
+and fresh final implementation review remain open. The merged
 [declared type-link stage](native-declared-type-links.md) supplies actual root
 rowtypes and base/element/array links. This stage adds the positive slots of
 selected named composites; the [full collector](native-transitive-type-closure.md),
@@ -434,3 +435,41 @@ Final independent implementation review remains OPEN. This is finite copied
 composite declaration verification, not complete collector/bootstrap/provider/
 statement/execution/performance/release acceptance. Issues46/15 and the overall
 goal remain OPEN; concurrent native PostgreSQL2PC remains required.
+
+### Submitted PREPARE survives a dropped wait
+
+Final source review at `cae76be84a75174ae6f59408fcc003b37aac8f62` withholds
+acceptance on medium C2. The client queues a request independently of its wait;
+batch_execute consumes through Ready, and dropping the receiver permits the
+connection to continue draining. The view fixture's20s timeout could therefore
+leave a durable GID while its acknowledgement-only prepared bit remained false.
+The same accounting gap applies to original metadata, DML and reused preparation.
+This is a source-proved test-cleanup defect, not an observed native failure or
+product C defect. Earlier132 passing paths do not establish C2 cleanup correctness.
+
+The287-member review is `logs/review-native-composite-type-fields-cae76be-final-v1`,
+report SHA256 `de1a38ae450d8461479db66c51e7b12c310ddfe2ad992b5d1a1563dab958aa16`,
+seal `7ba8aeec009c096de00173a2f4c077057c72dc2b4eedf431bf3c0412f2dccba9`.
+Final/post/completion/observer actually exited0. Root98 independently verifies309
+paths, facts `7780ce049730f6e4a22420f955d2bfb6409114ba1507ad47ab3d767cad595880`.
+Own06's inventory child actual2 inside a parent actual0 stays preserved. Root100's
+wrong command-stream source locator is actual1; corrected root101 reads the
+actual completion API. Mixed-display truncation is disclosed and relevant source
+spans are separately read. No new runtime error/interruption experiment occurred.
+
+Preparation now records submission before the immediate queue call and retains
+the event stream, consumed tag prefix, original backend error and Ready state
+outside the caught body. Dropping a timed receive preserves that progress. Only
+validated Ready plus stream end marks Prepared or Rejected; transport or invalid
+responses remain Unknown. Original and reused GID state is separate, and reuse
+requires a drained original completion plus the rejected duplicate preparation.
+Cleanup releases raw first, attempts bounded preparation drains, normally finishes
+finite known targets, settles the sentinel, rolls back and attempts every driver
+closure. An unknown preparation uses an independent completion backend where
+needed; an undefined GID does not certify absence for an unresolved request.
+Unsettled or inconsistent cleanup fails loudly while preserving the original
+test failure. Existing native waits/outcomes, exact+1/+2 and20s bounds remain.
+
+The26 native package inputs and heap/shared inputs remain unchanged. Current
+publication verification and final review remain OPEN; all broader gates and the
+overall goal remain OPEN, with concurrent native PostgreSQL2PC still required.
