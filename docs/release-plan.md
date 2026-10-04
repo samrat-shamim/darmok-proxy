@@ -6493,3 +6493,12 @@ keeps transport-unknown/unsettled outcomes explicit. Original/reused identities,
 every driver closure, native barriers/counts/deadlines remain. No native package
 input changes or new error/interruption experiment. Current corrected publication
 verification and final review are OPEN; broader gates and the goal remain OPEN.
+
+Corrected6f3dd33 passed strict Rust and both18-case publication suites, with each
+run's30 profile readers actual0. Root106's current finite receipt audit verifies
+132 selected passes (66/major):96 unchanged targets plus36 replacement publication
+cases, excluding their36 superseded predecessors. The328-member v6 audit reuses
+the accepted earlier audit as a named leaf. Its exact hash and failure-path
+limit are in the [C2 ledger](native-composite-type-fields.md#submitted-prepare-survives-a-dropped-wait).
+Fresh independent C2 source review remains OPEN; ordinary passing paths do not
+certify cancellation/transport cleanup. Broader gates and the goal remain OPEN.

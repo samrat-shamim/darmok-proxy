@@ -1,9 +1,9 @@
 # Native composite field discovery
 
 Status: independently accepted existing-reader source design and implemented
-copied composite declarations. Paired packages and the earlier runtime receipt
-audit passed; the submitted-PREPARE cleanup correction's runtime verification
-and fresh final implementation review remain open. The merged
+copied composite declarations. Paired packages and current ordinary runtime
+receipt verification passed; fresh final implementation review of the
+submitted-PREPARE cleanup correction remains open. The merged
 [declared type-link stage](native-declared-type-links.md) supplies actual root
 rowtypes and base/element/array links. This stage adds the positive slots of
 selected named composites; the [full collector](native-transitive-type-closure.md),
@@ -473,3 +473,17 @@ test failure. Existing native waits/outcomes, exact+1/+2 and20s bounds remain.
 The26 native package inputs and heap/shared inputs remain unchanged. Current
 publication verification and final review remain OPEN; all broader gates and the
 overall goal remain OPEN, with concurrent native PostgreSQL2PC still required.
+
+At clean corrected source `6f3dd334da0e40aa7abe558d187605f67dba35f0`, root102
+passed strict Rust; root103/104 passed all18 publication cases per major and
+all30 before/after profile readers per run. Root106's updated receipt audit
+actually exited0:132 selected passes (66/major),96 unchanged retained targets
+plus36 current publication cases, with all36 superseded publication results
+excluded. It verifies328 finite members against the earlier accepted runtime
+audit as a named anchor rather than reopening its historical graph. Facts:
+`logs/native-composite-type-fields-6f3dd33-ordinary-verification-v6/facts.json`,
+SHA256 `1f2c4a4a7b1655efb1e33acb68876f86367dc795497a6f7b32f7a2c998f1320f`.
+These are ordinary passing-path receipts. C2 cancellation/transport correctness
+still requires fresh independent source-review acceptance; no new forced-error
+or interruption experiment is performed. Every broader gate and the goal remain
+OPEN; native2PC remains required.
