@@ -6461,3 +6461,23 @@ counts and20s bounds. Tracked native completion and failure cleanup drain throug
 Ready, release raw before finishing targets and settle the sentinel before all
 driver closures. The failed PG18 profile is preserved; fresh ordinary required
 verification is pending. Native module inputs and all broader open gates remain.
+
+### Composite paired ordinary receipt verification passed; final review open
+
+Corrected fixture source6730a8e passed strict Rust. Two fresh primary PG17.11/18.6
+profiles retain native2PC10 and completed195 setup commands; six accepted control
+profiles retain their original770-command setup anchor. Existing failed profiles
+and namespaces are preserved. Current PG17 publication18, PG18 remaining44 and
+PG18 private3 all passed, including every corrected publication witness. Seven
+selected receipts retain original source/profile identities; explicit source
+proof excludes the18 older publication cases and retains only unchanged heap,
+PG17 nonpublication and PG17 private targets. Native26 bytes still match the
+four strict13ca94f packages.
+
+The [paired ordinary ledger](native-composite-type-fields.md#paired-ordinary-receipt-verification-passed-final-review-open)
+records the exact receipt audit: root95 actual0,132 selected passes (66 per major),
+1665 verified members,14 package commands and195 fresh setup commands. Earlier
+runtime and reader failures remain excluded and preserved; no bounds or native
+generation assertions were relaxed. Final independent implementation review,
+full collector/bootstrap/provider/statement/execution/performance/release,
+issues46/15 and the overall goal remain OPEN.

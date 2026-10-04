@@ -1,8 +1,8 @@
 # Native composite field discovery
 
-Status: independently accepted existing-reader source design; implementation is
-present but paired package/runtime and fresh implementation review gates remain
-open. The merged
+Status: independently accepted existing-reader source design and implemented
+copied composite declarations. Paired package/runtime receipt verification has
+passed; fresh final implementation review remains open. The merged
 [declared type-link stage](native-declared-type-links.md) supplies actual root
 rowtypes and base/element/array links. This stage adds the positive slots of
 selected named composites; the [full collector](native-transitive-type-closure.md),
@@ -389,3 +389,48 @@ or product C defect is established. Root78's recorder preflight rejected dirty
 source before its helper-read payload ran; that failed namespace is preserved.
 Native26 package inputs remain unchanged. Fresh ordinary verification and final
 implementation review remain OPEN, as do every broader gate and the goal.
+
+### Paired ordinary receipt verification passed; final review open
+
+At clean fixture source `6730a8e3cc05919b39b866fb8bec6b31beba020d`, strict Rust
+root80 actually exited0. Root81 created two fresh ordinary primary profiles for
+PG17.11/18.6, with native2PC enabled (`max_prepared_transactions=10`); all195
+setup commands passed. It uses the unchanged Docker health policy. Every old
+profile, including failed or unaccepted profiles, remains preserved. Root84
+assembles these two profiles with six accepted control profiles, retaining the
+original770-command setup anchor without relabeling its source or expanding its
+historical member graph. Assembly facts SHA256:
+`f747f6faa7ac1a88cbf8f1fd1ffff5b128acf2fc49911b07f57f92a5cc9b7429`.
+
+Current root85 passed all18 PG17 publication cases; root86 passed PG18 discovery11,
+builtin2, publication18, module2, relation6 and statement5; root87 passed all3
+PG18 private catalog cases (101 filtered). Each command actually exited0 and
+completed30 before/after profile and binary readers at actual0. All three
+corrected publication fixtures passed on each major with their exact generation
+counts and original bounds. Root82's paired finite source proof establishes the
+duplicate PREPARE error's Ready Idle expectation; no new native error experiment
+is added.
+
+Root89's current input proof retains root59/60's19 heap cases per major at8329634
+and root53's26 nonpublication plus root54's3 private PG17 cases at a841adf. The
+18 older publication cases from root53 are explicitly excluded. Complete source
+deltas establish that the retained targets and shared inputs are unchanged;
+actual old receipts and profiles keep their original identities. The26 native
+inputs still exactly match the four strict packages built at13ca94f. Rebinding
+facts SHA256: `bb35d8348e89df505d8c66d6fd883a1fde133a31d0a8d80d88a49aca679e962a`.
+
+Root95's ordinary evidence audit actually exited0, verifying1665 unique members
+and132 selected passing cases (66 per major), with no failed/ignored selected
+cases. It checks raw streams, all command source readers, the seven selected run
+bindings, source deltas,14 package commands and195 fresh setup commands. Facts:
+`logs/native-composite-type-fields-6730a8e-ordinary-verification-v5/facts.json`,
+SHA256 `520b7877055a2f1d02b6110b1ef2feeb711467cfd980717a1161c0297b887861`.
+Eleven earlier failures or preflight failures are preserved and excluded from
+acceptance. Root88's mistaken folder pattern and root92's ordered receipt-list
+comparison remain actual1; corrected readers and the new v5 audit compare the
+complete receipt multiset without changing a count, hash or runtime assertion.
+
+Final independent implementation review remains OPEN. This is finite copied
+composite declaration verification, not complete collector/bootstrap/provider/
+statement/execution/performance/release acceptance. Issues46/15 and the overall
+goal remain OPEN; concurrent native PostgreSQL2PC remains required.
