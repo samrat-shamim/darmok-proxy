@@ -279,6 +279,11 @@ a declaration string, a loaded pathname, a name/version pair and native ABI
 compatibility supply different facts. None alone binds the executable build,
 actual registry contents, callback history or descriptor-reference owners.
 The footprint proof must bind those facts independently.
+The [file observations](native-build-observations.md) add matching release/API
+bytes, installed generated headers and the original heap-handler row in each
+captured executable. Its declared one-argument signature differs from the
+zero-argument native invocation traced above. Neither link-image pointer targets
+nor header declarations establish live provider binding or the entry base.
 
 Shared preload processing calls `load_libraries`; session processing calls it
 for both session and local preload lists. The common loader treats NULL/empty

@@ -45,6 +45,10 @@ The corpus excludes generated/non-C source, external modules and compiled
 objects. Literal absence cannot exclude token construction, indirect calls,
 aliased writes or whole-object copies. This is not a complete program mutation
 proof or a certificate for the selected server binary.
+The [release/header/executable observations](native-build-observations.md) bind
+the published release corpus and selected file artifacts. Matching source
+inventories and one compiled builtin row do not close that binary or live-state
+proof.
 
 ## Counts, owned items and whole-object movement
 
