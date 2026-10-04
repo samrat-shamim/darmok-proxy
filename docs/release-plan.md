@@ -5372,3 +5372,77 @@ and the real failed fixture remain preserved. Corrected current paired builds,
 fresh profiles, actual ordinary fixtures, required existing suites and independent
 review remain required before merge; no original-body runtime result is inferred
 from the failed lookup or earlier package success. All broader gates stay OPEN.
+
+## Private live builtin dispatch component
+
+Starting from merged PR71 main b36993884830f85adee325b9936203be7fbe3185,
+this component adds a private caller-owned C observation of the running backend's
+heap/btree builtin dispatch. It reads only the public fmgr table and mapping,
+checks selected OIDs/signatures/flags/names and linked function-pointer equality,
+and copies inline scalar/name records after both checks succeed. It invokes no
+handler, opens no catalog, selects no data snapshot and performs no heap
+allocation. This addresses the live-table-versus-linked-symbol relation; it is
+not original-provider identity, complete compiled derivation or descriptor
+admission. The contract is [native builtin dispatch](native-builtin-dispatch.md).
+
+Public mapping bounds and the missing sentinel are checked before each selected
+row. Both generated handler OIDs are compile-time checked. An unexpected row
+fails explicitly, with no alternate lookup or handler. The observer uses the
+existing unused-invocation boundary and requires normal processing. No native
+pointer escapes. Table/symbol definitions remain bound-native-build inputs;
+callback/registry/reference history and actual FmgrInfo/AM routine/pg_am provider
+selection remain separate obligations.
+
+Two ordinary probe fixtures are registered in the existing PostgreSQL package.
+They require exact TEXT/SHOW/transaction wire outcomes, the independently
+observed 17.11/18.6 builtin counts, exact selected rows and linked-symbol checks,
+and snapshot/within-invocation owner preservation before, within and after a
+savepoint. No owner identity equality across different subtransactions is
+claimed. They introduce no new forced-error, stress, interruption, recovery or
+profile lifecycle experiment. Current strict product/probe builds, required
+existing suites, affected Clippy/format/boundary checks and independent
+implementation review are mandatory before merge; their actual receipts remain
+external evidence. The product/probe build-context input count grows from24 to26.
+
+    cargo test -p darmok-postgres-tests --test server_builtin_dispatch --locked -- --nocapture
+
+The mechanism uses two indexed reads, bounded name comparisons and a fixed
+stack copy. Caller cadence and measured latency/memory/throughput/contention
+remain unverified. Full entry/startup/provider/registry/reference/writer/sequence,
+new descriptor/table execution, serving, performance, release, issues46/15 and
+the goal stay open. Ordinary profiles keep max_prepared_transactions=10;
+concurrent native PostgreSQL two-phase transactions remain required. Security,
+project compiler PR4, hosted CI and release publication remain excluded.
+
+Revision76f274f06204b316ce98eb6ae4d603fdc7b17b12 passed four strict native
+package builds and both new builtin and previous module fixtures on each
+primary profile. PostgreSQL17 passed all51 required existing native fixtures
+(55 with the four observer fixtures). PostgreSQL18 passed catalog discovery11
+and publication17, then failed the existing concurrent shared-drop admission
+fixture while waiting for reader admission. Its remaining three required
+test binaries did not run. That revision therefore has32 PostgreSQL18 passes
+and one failure, not a completed paired regression result. The actual101
+receipt and package/profile observations remain preserved at
+`logs/native-builtin-dispatch-76f274f-10-regression18` and its binding facts
+`logs/native-builtin-dispatch-76f274f-10-regression18-binding-v1/facts.json`
+(SHA256 aefd0d1b2ce3b9cfc8777d2a940dc83f44f3f830216f221727489de4a329ee46).
+
+The fixture assumed that awaiting the first DROP reply kept the second DROP's
+intent live. Native backend progress is independent of when the client polls
+an already-submitted request: the second busy-database error can finish and
+clear its intent before the first reply is consumed. The failed receipt does
+not distinguish the fixture's two admission-wait call sites. The source shows
+that the second wait lacked a native ordering barrier; increasing the timeout
+or retrying would not establish the property being asserted.
+
+The correction adds a test-only object-access delegate and an ordinary
+transaction-level advisory holder. In either existing preload order the
+delegate waits only after the real shared-drop intent is registered and its
+module fences released. This keeps the second intent live until the fixture
+observes reader admission after the first commit. Releasing the advisory holder
+then permits the same existing native busy-database error and verifies its
+advisory-lock cleanup. Phase-specific diagnostics identify future admission
+failures. Product publication code and timeout limits are unchanged; no new
+forced-error or profile lifecycle scenario is introduced. Changed probe inputs
+require fresh current packages/profiles and all required paired suites before
+independent review and merge. All broader gates remain open.

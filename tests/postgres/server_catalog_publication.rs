@@ -160,7 +160,7 @@ async fn no_fence(observer: &Client, pid: i32) {
     );
 }
 
-async fn wait_reader_admission(observer: &Client, backend: i32) {
+async fn wait_reader_admission(observer: &Client, backend: i32, phase: &str) {
     tokio::time::timeout(Duration::from_secs(20), async {
         loop {
             let waiting: bool = observer.query_one(
@@ -169,8 +169,20 @@ async fn wait_reader_admission(observer: &Client, backend: i32) {
             if waiting { return; }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-    }).await.expect("shared-drop reader admission wait was not observed");
+    }).await.unwrap_or_else(|error| panic!("shared-drop reader admission wait {phase} was not observed: {error}"));
     no_fence(observer, backend).await;
+}
+
+async fn wait_shared_drop_barrier(observer: &Client, backend: i32) {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let waiting: bool = observer.query_one(
+                "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype='advisory' AND classid=17485 AND objid=21316 AND objsubid=2 AND pid=$1 AND mode='ShareLock' AND NOT granted)", &[&backend]
+            ).await.unwrap().get(0);
+            if waiting { return; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.expect("second shared drop did not reach its post-intent test barrier");
 }
 
 // Prepare these observation queries before the pg_class holder is prepared.
@@ -1717,7 +1729,7 @@ async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
         let mut late_acquisition = Box::pin(observe(&late_reader));
         tokio::select! {
             result = &mut late_acquisition => panic!("new reader bypassed shared-drop admission: {result:?}"),
-            () = wait_reader_admission(&observer, late_pid) => {}
+            () = wait_reader_admission(&observer, late_pid, "single drop before completion") => {}
         }
 
         release_probe(&reader).await;
@@ -1779,6 +1791,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     let (second_writer, second_driver) = client().await;
     let (observer, observer_driver) = client().await;
     let (late_reader, late_driver) = client().await;
+    let (barrier, barrier_driver) = client().await;
     // Database utilities each require their own native top-level request.
     first_writer
         .batch_execute("CREATE DATABASE darmok_publication_drop_first")
@@ -1797,6 +1810,17 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     let first_pid = pid(&first_writer).await;
     let second_pid = pid(&second_writer).await;
     let late_pid = pid(&late_reader).await;
+    // This ordinary advisory holder blocks the test probe only after the real
+    // second drop has registered its intent and released all module fences.
+    // Future polling controls reply consumption, not native backend progress.
+    barrier
+        .batch_execute("BEGIN; SELECT pg_catalog.pg_advisory_xact_lock(17485,21316)")
+        .await
+        .unwrap();
+    second_writer
+        .batch_execute("SET darmok_catalog_probe.shared_drop_barrier = on")
+        .await
+        .unwrap();
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     late_reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let before = observe(&epochs).await;
@@ -1817,10 +1841,11 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     let mut acquisition = Box::pin(observe(&late_reader));
     tokio::select! {
         result = &mut acquisition => panic!("reader bypassed shared-drop admission: {result:?}"),
-        () = wait_reader_admission(&observer, late_pid) => {}
+        () = wait_reader_admission(&observer, late_pid, "both drop intents pending") => {}
     }
     release_probe(&reader).await;
     reader.batch_execute("COMMIT").await.unwrap();
+    wait_shared_drop_barrier(&observer, second_pid).await;
     tokio::time::timeout(Duration::from_secs(20), &mut first)
         .await
         .unwrap()
@@ -1828,17 +1853,26 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     drop(first);
     no_fence(&observer, second_pid).await;
     // The first native transaction's commit must not clear the second intent.
-    wait_reader_admission(&observer, late_pid).await;
-    // Native abort clears the remaining intent and wakes the reader. The two
-    // clients' responses have no ordering guarantee: both futures may already
-    // be ready when the task next runs. Observe admission while the intent is
-    // live above, then verify the busy error and subsequent reader independently.
+    wait_reader_admission(&observer, late_pid, "second drop after first commit").await;
+    // Release the explicit native barrier after observing the still-live second
+    // intent. Its existing busy-database error clears that intent and wakes the
+    // reader; their two replies still have no required ordering.
+    barrier.batch_execute("ROLLBACK").await.unwrap();
     let error = tokio::time::timeout(Duration::from_secs(20), &mut second)
         .await
         .unwrap()
         .unwrap_err();
     assert_eq!(error.code(), Some(&SqlState::OBJECT_IN_USE));
     drop(second);
+    let advisory_remains: bool = observer
+        .query_one(
+            "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE locktype='advisory' AND pid=$1)",
+            &[&second_pid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert!(!advisory_remains);
     let after = tokio::time::timeout(Duration::from_secs(20), &mut acquisition)
         .await
         .unwrap();
@@ -1853,6 +1887,10 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     late_reader.batch_execute("COMMIT").await.unwrap();
     close(busy, busy_driver).await;
     second_writer
+        .batch_execute("SET darmok_catalog_probe.shared_drop_barrier = off")
+        .await
+        .unwrap();
+    second_writer
         .batch_execute("DROP DATABASE darmok_publication_drop_busy")
         .await
         .unwrap();
@@ -1862,6 +1900,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     close(observer, observer_driver).await;
     close(epochs, epochs_driver).await;
     close(late_reader, late_driver).await;
+    close(barrier, barrier_driver).await;
 }
 
 #[tokio::test]

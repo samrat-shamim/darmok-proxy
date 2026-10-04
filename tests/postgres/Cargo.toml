@@ -96,3 +96,7 @@ path = "server_heap_storage.rs"
 [[test]]
 name = "server_module_footprint"
 path = "server_module_footprint.rs"
+
+[[test]]
+name = "server_builtin_dispatch"
+path = "server_builtin_dispatch.rs"

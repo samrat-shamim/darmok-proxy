@@ -155,3 +155,9 @@ and [`docs/native-variable-catalog-payloads.md`](../../docs/native-variable-cata
 for the finite contracts, separately recorded verification status and remaining
 gates. Changed native code requires current paired PostgreSQL 17/18 product/probe
 builds, required suites and independent implementation review.
+
+The private builtin-dispatch observer copies the running backend's selected
+heap/btree builtin rows after checking their mappings, signatures, names and
+linked function-pointer equality. It opens no catalog, invokes no handler and
+retains no native pointers. It is passive instrumentation, not descriptor or
+provider admission; see [the finite contract](../../docs/native-builtin-dispatch.md).

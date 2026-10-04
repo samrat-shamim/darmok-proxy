@@ -7,6 +7,8 @@
 #include "catalog/pg_am_d.h"
 #include "catalog/pg_extension_d.h"
 #include "catalog/catalog.h"
+#include "catalog/objectaccess.h"
+#include "catalog/pg_database_d.h"
 #include "fmgr.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -26,17 +28,21 @@
 #include "relation_guard.h"
 #include "heap_storage_probe.h"
 #include "module_footprint.h"
+#include "builtin_dispatch.h"
 
 PG_MODULE_MAGIC;
 PGDLLEXPORT void _PG_init(void);
 
 static ProcessUtility_hook_type previous_utility = NULL;
+static object_access_hook_type previous_object_access = NULL;
+static bool shared_drop_barrier = false;
 static ResourceOwner owner = NULL;
 static SubTransactionId subid = InvalidSubTransactionId;
 static char *command = NULL;
 static char *guard_status = NULL;
 static char *relation_status = NULL;
 static char *module_footprint_status = NULL;
+static char *builtin_dispatch_status = NULL;
 static DarmokRelationAttempt relation_token = {0};
 static DarmokRelationAttempt stale_relation_token = {0};
 static SubTransactionId relation_subid = InvalidSubTransactionId;
@@ -95,6 +101,72 @@ static ModuleImage module_image = NULL;
 static ModuleCount module_count = NULL;
 static ModuleRequested module_requested = NULL;
 static ModuleRelease module_release = NULL;
+
+typedef void (*BuiltinCapture) (DarmokBuiltinDispatch *);
+static BuiltinCapture builtin_capture = NULL;
+
+static void
+object_access(ObjectAccessType access, Oid class_id, Oid object_id,
+			  int sub_id, void *arg)
+{
+	if (previous_object_access)
+		previous_object_access(access, class_id, object_id, sub_id, arg);
+	if (shared_drop_barrier && access == OAT_DROP && class_id == DatabaseRelationId)
+	{
+		LOCKTAG tag;
+
+		/* Test synchronization only. The product registers and drains the real
+		 * shared-drop intent before this delegate returns, in either preload
+		 * order. Keep the second native DROP alive without a module fence until
+		 * the fixture releases its ordinary transaction-level advisory holder. */
+		SET_LOCKTAG_ADVISORY(tag, MyDatabaseId, 17485, 21316, 2);
+		(void) LockAcquire(&tag, ShareLock, false, false);
+	}
+}
+
+static void
+show_builtin_dispatch(DestReceiver *dest, QueryCompletion *completion)
+{
+	DarmokBuiltinDispatch observation;
+	bool snapshot = FirstSnapshotSet;
+	ResourceOwner current_owner = CurrentResourceOwner;
+	ResourceOwner transaction_owner = CurTransactionResourceOwner;
+	StringInfo text;
+	TupOutputState *output;
+
+	if (builtin_capture == NULL)
+		builtin_capture = (BuiltinCapture) load_external_function("$libdir/darmok_server",
+																  "darmok_builtin_dispatch_capture", true, NULL);
+	builtin_capture(&observation);
+	text = makeStringInfo();
+	appendStringInfo(text, "{\"builtin_count\":%d,\"last_builtin_oid\":%u,\"rows\":[",
+					 observation.builtin_count, observation.last_builtin_oid);
+	for (int i = 0; i < DARMOK_BUILTIN_DISPATCH_ROWS; i++)
+	{
+		const DarmokBuiltinDispatchRow *row = &observation.rows[i];
+
+		/* Captured names are the two checked ASCII literals, not arbitrary
+		 * catalog text. The product returns no native function/name pointers. */
+		appendStringInfo(text, "%s{\"oid\":%u,\"index\":%u,\"nargs\":%d,\"strict\":%s,\"retset\":%s,\"name\":\"%s\",\"linked_symbol\":%s}",
+						 i == 0 ? "" : ",", row->oid, row->index, row->nargs,
+						 row->strict ? "true" : "false", row->retset ? "true" : "false", row->name,
+						 row->linked_symbol ? "true" : "false");
+	}
+	appendStringInfo(text, "],\"before_snapshot\":%s,\"after_snapshot\":%s,\"owners_unchanged\":%s}",
+					 snapshot ? "true" : "false", FirstSnapshotSet ? "true" : "false",
+					 current_owner == CurrentResourceOwner && transaction_owner == CurTransactionResourceOwner
+					 ? "true" : "false");
+	output = begin_tup_output_tupdesc(dest,
+									  GetPGVariableResultDesc("darmok_catalog_probe.builtin_dispatch"),
+									  &TTSOpsVirtual);
+	do_text_output_oneline(output, text->data);
+	end_tup_output(output);
+	pfree(text->data);
+	pfree(text);
+	if (FirstSnapshotSet != snapshot)
+		elog(ERROR, "native builtin probe SHOW changed first data snapshot");
+	SetQueryCompletion(completion, CMDTAG_SHOW, 0);
+}
 
 static void
 show_modules(DestReceiver *dest, QueryCompletion *completion)
@@ -767,6 +839,13 @@ process_utility(PlannedStmt *pstmt, const char *query, bool read_only_tree,
 		show_modules(dest, completion);
 		return;
 	}
+	if (IsA(pstmt->utilityStmt, VariableShowStmt) &&
+		strcmp(((VariableShowStmt *) pstmt->utilityStmt)->name,
+			   "darmok_catalog_probe.builtin_dispatch") == 0)
+	{
+		show_builtin_dispatch(dest, completion);
+		return;
+	}
 	if (owner != NULL && IsA(pstmt->utilityStmt, TransactionStmt) &&
 		((TransactionStmt *) pstmt->utilityStmt)->kind == TRANS_STMT_PREPARE)
 		elog(ERROR, "native test probe must release Share before PREPARE");
@@ -917,10 +996,18 @@ _PG_init(void)
 	DefineCustomStringVariable("darmok_catalog_probe.module_footprint", "Native test observation only.",
 							   NULL, &module_footprint_status, "native test observation", PGC_INTERNAL, GUC_NOT_IN_SAMPLE,
 							   NULL, NULL, NULL);
+	DefineCustomStringVariable("darmok_catalog_probe.builtin_dispatch", "Native test observation only.",
+							   NULL, &builtin_dispatch_status, "native test observation", PGC_INTERNAL, GUC_NOT_IN_SAMPLE,
+							   NULL, NULL, NULL);
+	DefineCustomBoolVariable("darmok_catalog_probe.shared_drop_barrier", "Native test synchronization only.",
+							 NULL, &shared_drop_barrier, false, PGC_USERSET, GUC_NOT_IN_SAMPLE,
+							 NULL, NULL, NULL);
 	darmok_heap_storage_probe_define_guc();
 	MarkGUCPrefixReserved("darmok_catalog_probe");
 	previous_utility = ProcessUtility_hook;
 	ProcessUtility_hook = process_utility;
+	previous_object_access = object_access_hook;
+	object_access_hook = object_access;
 	RegisterXactCallback(transaction_event, NULL);
 	RegisterSubXactCallback(subtransaction_event, NULL);
 	CacheRegisterRelcacheCallback(observe_relcache, (Datum) 0);
