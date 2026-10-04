@@ -6366,3 +6366,32 @@ preserves root provenance and adds one measurable scan per observation. Its
 independent source gate must close before C changes. No new native execution,
 application descriptor, provider or complete type/statement admission is claimed;
 full collector/bootstrap/execution/performance/release and overall goal stay open.
+
+### Composite field source design accepted; implementation verification open
+
+The finite source-only review at clean `c43464987b02aa743e95cb7a53bc130e73221a58`
+found no required corrections, accepting grouped composite traversal through the
+already admitted readers conditionally. Report SHA256:
+`b0ea70dd1ff346c2c1a1223375002eb8a3f4dfd1adc202aaf0bf2a37faf4c772`;
+518 fixed members,16 completion companions, final/post/completion/observer each
+actual0. Root16 independently rehashed540 unique paths; root18 checked the exact
+observer receipt and streams. Reviewer reader17's range error and root17's wrong
+JSON key remain actual1 in their original namespaces. Root23's wrong probe
+pathname is likewise preserved as actual1; root24 resolved its exact filename
+and distinct root25 read the intended probe/fixture bodies at actual0. These
+reader failures are not native executions or erased successful labels.
+
+The [composite field contract](native-composite-type-fields.md) now has a C/header/
+probe implementation: whole positive fixed map and relation groups, bounded
+selected traversal, separate tracked missing-carrier pass and complete composite
+fact/range comparisons. It removes the obsolete selected-root column map and
+does not extend application physical graphs or open application descriptors.
+Independent recursive SQL and class/attribute/default/missing oracles expand to
+all selected composites. Two additional ordinary fixtures cover nested/shared/
+dropped/inherited/nonroot/default/missing/own-TEMP declarations and prepared
+composite-plus-root changes, both native outcomes and real data-view states.
+Nine direct scans per observation/27 across A/B/C are exposed; phase budgets do
+not certify peak memory, contention or throughput. Paired strict packages, fresh
+required ordinary PG17/18 profiles/suites and independent implementation review
+remain open. Concurrent native2PC remains required. Full collector/bootstrap/
+provider/statement/execution/performance/release and overall goal remain open.

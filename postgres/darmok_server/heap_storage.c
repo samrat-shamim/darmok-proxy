@@ -101,6 +101,8 @@ typedef struct StorageClass
 	Oid rewrite_oid;
 	bool row_security;
 	bool options_null;
+	bool composite_selected;
+	int attribute_offset;
 } StorageClass;
 
 typedef struct StorageInput
@@ -123,19 +125,23 @@ typedef struct StorageNode
 	int position;
 } StorageNode;
 
-typedef struct StorageRoot
-{
-	Oid oid;
-	int attribute_offset;
-} StorageRoot;
-
 typedef struct StorageAttribute
 {
 	/* Exact positive ordinal key, with no native struct padding in the hash. */
 	uint64 key;
+	bool selected;
+	bool missing_copied;
+	struct StorageAttribute *next_in_group;
 	DarmokHeapAttributeFact fact;
 	DarmokCatalogCarrier missing_carrier;
 } StorageAttribute;
+
+typedef struct StorageAttributeGroup
+{
+	Oid relation_oid;
+	StorageAttribute *head;
+	int count;
+} StorageAttributeGroup;
 
 typedef struct StorageType
 {
@@ -178,6 +184,7 @@ typedef struct StorageObservation
 	Relation heaps[STORAGE_HEAPS];
 	TableScanDesc scans[STORAGE_HEAPS];
 	TableScanDesc options_scan;
+	TableScanDesc attribute_payload_scan;
 	TableScanDesc type_payload_scan;
 	Snapshot snapshot;
 	Relation toast_heaps[STORAGE_TOAST_HEAPS];
@@ -187,8 +194,8 @@ typedef struct StorageObservation
 	HTAB *classes;
 	HTAB *relation_names;
 	HTAB *indexes;
-	HTAB *selected_roots;
 	HTAB *attribute_rows;
+	HTAB *attribute_groups;
 	HTAB *type_rows;
 	HTAB *expression_rows;
 	HTAB *expression_ids;
@@ -197,6 +204,7 @@ typedef struct StorageObservation
 	DarmokCatalogStamp stamp;
 	DarmokRelationRequest *roots;
 	DarmokHeapStorageRootFact *root_facts;
+	DarmokHeapCompositeFact *composites;
 	DarmokHeapAttributeFact *attributes;
 	DarmokHeapTypeFact *types;
 	Oid *selected_type_oids;
@@ -207,6 +215,8 @@ typedef struct StorageObservation
 	int payload_count;
 	DarmokCatalogPayloadCost payload_cost;
 	int attribute_count;
+	int selected_attribute_count;
+	int composite_count;
 	int type_count;
 	int selected_type_count;
 	int selected_type_capacity;
@@ -320,10 +330,10 @@ storage_observation_init(StorageState *state, StorageObservation *observation)
 											 sizeof(StorageNameKey), sizeof(StorageNamedRelation));
 	observation->indexes = storage_hash(observation, "storage index OIDs",
 									  sizeof(Oid), sizeof(StorageIndex));
-	observation->selected_roots = storage_hash(observation, "storage selected roots",
-											 sizeof(Oid), sizeof(StorageRoot));
 	observation->attribute_rows = storage_hash(observation, "storage positive slots",
 											 sizeof(uint64), sizeof(StorageAttribute));
+	observation->attribute_groups = storage_hash(observation, "storage positive slot groups",
+											   sizeof(Oid), sizeof(StorageAttributeGroup));
 	observation->type_rows = storage_hash(observation, "storage fixed type OIDs",
 									 sizeof(Oid), sizeof(StorageType));
 	observation->expression_rows = storage_hash(observation, "storage column expressions",
@@ -555,10 +565,58 @@ storage_select_type(StorageObservation *observation, Oid oid)
 }
 
 static void
+storage_select_composite(StorageObservation *observation, const StorageType *type)
+{
+	Oid oid = type->fact.relation_oid;
+	StorageClass *relation = hash_search(observation->classes, &oid, HASH_FIND, NULL);
+	StorageAttributeGroup *group = hash_search(observation->attribute_groups, &oid, HASH_FIND, NULL);
+	int count;
+
+	if (!OidIsValid(oid) || relation == NULL || relation->fact.row_type_oid != type->oid ||
+		!OidIsValid(relation->fact.schema_oid) ||
+		hash_search(observation->namespaces, &relation->fact.schema_oid, HASH_FIND, NULL) == NULL)
+		elog(ERROR, "native storage selected composite has an inconsistent class backlink or namespace");
+	if (relation->fact.kind == RELKIND_RELATION)
+		storage_validate_root(&relation->fact);
+	else if (relation->fact.kind != RELKIND_COMPOSITE_TYPE || relation->fact.is_partition ||
+		OidIsValid(relation->fact.access_method_oid))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("native storage selected composite is outside its ordinary heap or standalone declaration profile")));
+	count = relation->fact.declared_attribute_count;
+	if (relation->composite_selected || count < 0 || count > MaxHeapAttributeNumber ||
+		(group == NULL ? 0 : group->count) != count)
+		elog(ERROR, "native storage selected composite has inconsistent positive slot membership");
+	if (observation->composite_count >= STORAGE_TYPES ||
+		observation->selected_attribute_count > PG_INT32_MAX - count)
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("native storage selected composite/slot counts exceed native limits")));
+	relation->composite_selected = true;
+	observation->composite_count++;
+	observation->selected_attribute_count += count;
+	/* Group links refer to stable invocation-owned hash entries. Visit only this
+	 * composite's fixed slots, never the whole attribute map for each type. */
+	for (StorageAttribute *attribute = group == NULL ? NULL : group->head;
+		 attribute != NULL; attribute = attribute->next_in_group)
+	{
+		if (attribute->selected || attribute->fact.relation_oid != oid ||
+			attribute->fact.number <= 0 || attribute->fact.number > count)
+			elog(ERROR, "native storage selected composite has an invalid positive ordinal");
+		attribute->selected = true;
+		if (attribute->fact.dropped)
+		{
+			if (OidIsValid(attribute->fact.type_oid))
+				elog(ERROR, "native storage dropped composite field has a live type link");
+		}
+		else
+			(void) storage_select_type(observation, attribute->fact.type_oid);
+	}
+}
+
+static void
 storage_select_types(StorageState *state, StorageObservation *observation)
 {
-	HASH_SEQ_STATUS iter;
-	StorageAttribute *attribute;
 	Oid *path;
 
 	for (int i = 0; i < state->count; i++)
@@ -574,12 +632,8 @@ storage_select_types(StorageState *state, StorageObservation *observation)
 		if (type->fact.kind != TYPTYPE_COMPOSITE || type->fact.relation_oid != oid)
 			elog(ERROR, "native storage root rowtype has an inconsistent composite backlink");
 	}
-	hash_seq_init(&iter, observation->attribute_rows);
-	while ((attribute = hash_seq_search(&iter)) != NULL)
-		if (!attribute->fact.dropped)
-			(void) storage_select_type(observation, attribute->fact.type_oid);
 	/* Append only on first membership. Ordinary companion cycles are not domain
-	 * base cycles; all three links are declarations, not provider admission. */
+	 * base cycles; links and composite fields are declarations, not providers. */
 	for (int i = 0; i < observation->selected_type_count; i++)
 	{
 		StorageType *type = hash_search(observation->type_rows,
@@ -589,6 +643,8 @@ storage_select_types(StorageState *state, StorageObservation *observation)
 		for (int edge = 0; edge < 3; edge++)
 			if (OidIsValid(edges[edge]))
 				(void) storage_select_type(observation, edges[edge]);
+		if (type->fact.kind == TYPTYPE_COMPOSITE)
+			storage_select_composite(observation, type);
 		if (i % 1024 == 0)
 			storage_budget(observation);
 	}
@@ -684,6 +740,46 @@ storage_copy_missing(StorageObservation *observation, StorageAttribute *attribut
 			elog(ERROR, "native storage missing value count exceeds native limits");
 		observation->missing_count++;
 	}
+}
+
+static void
+storage_read_attribute_payloads(StorageObservation *observation)
+{
+	HeapTuple tuple;
+	int copied = 0;
+	uint64 rows = 0;
+
+	/* This separately tracked pass shares the admitted descriptor, registered
+	 * snapshot and raw span. Unrelated fixed slots do not expose missing values. */
+	observation->attribute_payload_scan = heap_beginscan(observation->heaps[3], observation->snapshot,
+		0, NULL, NULL, SO_TYPE_SEQSCAN | SO_ALLOW_PAGEMODE);
+	while ((tuple = heap_getnext(observation->attribute_payload_scan, ForwardScanDirection)) != NULL)
+	{
+		Form_pg_attribute row = (Form_pg_attribute) GETSTRUCT(tuple);
+
+		observation->cost.attribute_payload_rows++;
+		if (row->attnum > 0)
+		{
+			uint64 key = ((uint64) row->attrelid << 32) | (uint16) row->attnum;
+			StorageAttribute *attribute = hash_search(observation->attribute_rows, &key, HASH_FIND, NULL);
+
+			if (attribute == NULL)
+				elog(ERROR, "native attribute payload pass has an unknown fixed source");
+			if (attribute->selected)
+			{
+				if (attribute->missing_copied)
+					elog(ERROR, "duplicate selected missing source in native storage observation");
+				storage_copy_missing(observation, attribute, tuple);
+				attribute->missing_copied = true;
+				copied++;
+			}
+		}
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	if (copied != observation->selected_attribute_count)
+		elog(ERROR, "native storage selected slot has a missing payload source");
+	storage_budget(observation);
 }
 
 static void
@@ -878,18 +974,7 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
 	}
-	/* Selection is pure fixed-byte/OID hashing within this SAME registered
-	 * snapshot/raw observation. Full graph/type validation follows outside raw. */
-	for (int i = 0; i < state->count; i++)
-	{
-		Oid oid = storage_literal_oid(observation, &state->inputs[i], i);
-		StorageRoot *root;
-		bool found;
-
-		root = hash_search(observation->selected_roots, &oid, HASH_ENTER, &found);
-		if (!found)
-			root->attribute_offset = 0;
-	}
+	/* Copy the whole positive fixed map before selecting composite fields. */
 	while ((tuple = heap_getnext(observation->scans[3], ForwardScanDirection)) != NULL)
 	{
 		Form_pg_attribute row = (Form_pg_attribute) GETSTRUCT(tuple);
@@ -910,18 +995,30 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 				Anum_pg_attribute_attmissingval, &is_null);
 			profile->missing_null = is_null;
 		}
-		if (row->attnum > 0 &&
-			hash_search(observation->selected_roots, &row->attrelid, HASH_FIND, NULL) != NULL)
+		if (row->attnum > 0)
 		{
 			uint64 key = ((uint64) row->attrelid << 32) | (uint16) row->attnum;
 			StorageAttribute *attribute;
+			StorageAttributeGroup *group;
 			bool found;
 
 			attribute = hash_search(observation->attribute_rows, &key, HASH_ENTER, &found);
 			if (found)
 				elog(ERROR, "duplicate positive slot in native storage observation");
+			memset(attribute, 0, sizeof(*attribute));
+			attribute->key = key;
 			storage_copy_attribute(&attribute->fact, row);
-			storage_copy_missing(observation, attribute, tuple);
+			group = hash_search(observation->attribute_groups, &row->attrelid, HASH_ENTER, &found);
+			if (!found)
+			{
+				group->head = NULL;
+				group->count = 0;
+			}
+			if (group->count == PG_INT32_MAX)
+				elog(ERROR, "native storage positive slot group exceeds native limits");
+			attribute->next_in_group = group->head;
+			group->head = attribute;
+			group->count++;
 		}
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
@@ -943,15 +1040,17 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 			storage_budget(observation);
 	}
 	storage_select_types(state, observation);
+	storage_read_attribute_payloads(observation);
 	storage_read_type_payloads(observation);
 	while ((tuple = heap_getnext(observation->scans[5], ForwardScanDirection)) != NULL)
 	{
 		Form_pg_attrdef row = (Form_pg_attrdef) GETSTRUCT(tuple);
+		StorageClass *relation = hash_search(observation->classes, &row->adrelid, HASH_FIND, NULL);
 
 		observation->cost.attrdef_rows++;
 		if (storage_toast_profile_oid(row->adrelid))
 			elog(ERROR, "native catalog TOAST profile has a contradictory expression row");
-		if (hash_search(observation->selected_roots, &row->adrelid, HASH_FIND, NULL) != NULL)
+		if (relation != NULL && relation->composite_selected)
 		{
 			uint64 key;
 			StorageAttribute *attribute;
@@ -964,7 +1063,8 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 				elog(ERROR, "native column expression has an invalid source identity");
 			key = ((uint64) row->adrelid << 32) | (uint16) row->adnum;
 			attribute = hash_search(observation->attribute_rows, &key, HASH_FIND, NULL);
-			if (attribute == NULL || attribute->fact.dropped || !attribute->fact.has_default)
+			if (attribute == NULL || !attribute->selected ||
+				attribute->fact.dropped || !attribute->fact.has_default)
 				elog(ERROR, "native column expression contradicts its positive column declaration");
 			(void) hash_search(observation->expression_ids, &row->oid, HASH_ENTER, &found);
 			if (found)
@@ -996,6 +1096,13 @@ storage_end_scans(StorageObservation *observation)
 			observation->scans[i] = NULL;
 			heap_endscan(scan);
 		}
+	if (observation->attribute_payload_scan != NULL)
+	{
+		TableScanDesc scan = observation->attribute_payload_scan;
+
+		observation->attribute_payload_scan = NULL;
+		heap_endscan(scan);
+	}
 	if (observation->type_payload_scan != NULL)
 	{
 		TableScanDesc scan = observation->type_payload_scan;
@@ -1249,6 +1356,16 @@ storage_attribute_order(const void *a, const void *b)
 }
 
 static int
+storage_composite_order(const void *a, const void *b)
+{
+	const DarmokHeapCompositeFact *left = a;
+	const DarmokHeapCompositeFact *right = b;
+
+	return (left->relation_oid > right->relation_oid) -
+		(left->relation_oid < right->relation_oid);
+}
+
+static int
 storage_type_order(const void *a, const void *b)
 {
 	const DarmokHeapTypeFact *left = a;
@@ -1430,20 +1547,22 @@ storage_build_payloads(StorageObservation *observation)
 }
 
 static void
-storage_build_columns(StorageState *state, StorageObservation *observation,
-					  const Oid *oids, int oid_count)
+storage_build_columns(StorageState *state, StorageObservation *observation)
 {
-	long attributes = hash_get_num_entries(observation->attribute_rows);
-	long types = observation->selected_type_count;
+	int attributes = observation->selected_attribute_count;
+	int types = observation->selected_type_count;
+	int composites = observation->composite_count;
 	HASH_SEQ_STATUS iter;
 	StorageAttribute *attribute;
 	StorageType *type;
 	int position = 0;
 
 	if (attributes < 0 || types < 0 || types > STORAGE_TYPES ||
+		composites < 0 || composites > types ||
 		observation->missing_count < 0 || observation->missing_count > attributes ||
-		attributes > (long) state->count * MaxHeapAttributeNumber ||
+		attributes > (long) composites * MaxHeapAttributeNumber ||
 		(Size) attributes > MaxAllocSize / sizeof(DarmokHeapAttributeFact) ||
+		(Size) composites > MaxAllocSize / sizeof(DarmokHeapCompositeFact) ||
 		(Size) types > MaxAllocSize / sizeof(DarmokHeapTypeFact))
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
@@ -1454,6 +1573,9 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 		observation->attributes = darmok_catalog_image_alloc(&observation->image_budget,
 			sizeof(DarmokHeapAttributeFact) * (Size) attributes, false);
 	storage_budget(observation);
+	if (composites > 0)
+		observation->composites = darmok_catalog_image_alloc(&observation->image_budget,
+			sizeof(DarmokHeapCompositeFact) * (Size) composites, true);
 	if (types > 0)
 		observation->types = darmok_catalog_image_alloc(&observation->image_budget,
 			sizeof(DarmokHeapTypeFact) * (Size) types, false);
@@ -1462,7 +1584,12 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	storage_budget(observation);
 	hash_seq_init(&iter, observation->attribute_rows);
 	while ((attribute = hash_seq_search(&iter)) != NULL)
-		observation->attributes[position++] = attribute->fact;
+		if (attribute->selected)
+		{
+			if (!attribute->missing_copied || position >= attributes)
+				elog(ERROR, "native storage selected slot payload completion is inconsistent");
+			observation->attributes[position++] = attribute->fact;
+		}
 	if (position != observation->attribute_count)
 		elog(ERROR, "native storage positive slot count changed during copied validation");
 	if (attributes > 1)
@@ -1489,23 +1616,57 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	if (types > 1)
 		qsort(observation->types, (Size) types, sizeof(DarmokHeapTypeFact), storage_type_order);
 	position = 0;
-	for (int i = 0; i < oid_count; i++)
+	for (int i = 0; i < types; i++)
 	{
-		StorageClass *heap = storage_class(observation, oids[i]);
-		StorageRoot *root = hash_search(observation->selected_roots, &oids[i], HASH_FIND, NULL);
-		int count = heap->fact.declared_attribute_count;
+		const DarmokHeapTypeFact *selected = &observation->types[i];
+		StorageClass *relation;
+		StorageNamespace *schema;
+		DarmokHeapCompositeFact *fact;
 
-		if (root == NULL || count < 0 || count > MaxHeapAttributeNumber)
+		if (selected->kind != TYPTYPE_COMPOSITE)
+			continue;
+		relation = storage_class(observation, selected->relation_oid);
+		schema = hash_search(observation->namespaces, &relation->fact.schema_oid, HASH_FIND, NULL);
+		if (!relation->composite_selected || relation->fact.row_type_oid != selected->oid ||
+			schema == NULL || position >= composites)
+			elog(ERROR, "native storage selected composite count or identity is inconsistent");
+		fact = &observation->composites[position++];
+		fact->type_oid = selected->oid;
+		fact->relation_oid = relation->oid;
+		fact->schema_oid = relation->fact.schema_oid;
+		fact->schema_name = schema->name;
+		fact->name = relation->fact.name;
+		fact->kind = relation->fact.kind;
+		fact->persistence = relation->fact.persistence;
+		fact->access_method_oid = relation->fact.access_method_oid;
+		fact->is_partition = relation->fact.is_partition;
+		fact->declared_attribute_count = relation->fact.declared_attribute_count;
+	}
+	if (position != composites)
+		elog(ERROR, "native storage selected composite count changed during copied validation");
+	if (composites > 1)
+		qsort(observation->composites, (Size) composites, sizeof(DarmokHeapCompositeFact), storage_composite_order);
+	position = 0;
+	for (int i = 0; i < composites; i++)
+	{
+		DarmokHeapCompositeFact *composite = &observation->composites[i];
+		Oid oid = composite->relation_oid;
+		StorageClass *relation = storage_class(observation, oid);
+		int count = composite->declared_attribute_count;
+
+		if (count < 0 || count > MaxHeapAttributeNumber ||
+			(i > 0 && observation->composites[i - 1].relation_oid >= oid))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage declared column count is inconsistent")));
-		root->attribute_offset = position;
+		composite->attribute_offset = position;
+		relation->attribute_offset = position;
 		for (int number = 1; number <= count; number++)
 		{
 			DarmokHeapAttributeFact *fact;
 
 			if (position >= observation->attribute_count ||
-				observation->attributes[position].relation_oid != oids[i] ||
+				observation->attributes[position].relation_oid != oid ||
 				observation->attributes[position].number != number)
 				ereport(ERROR,
 						(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1547,7 +1708,7 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 			}
 		}
 		if (position < observation->attribute_count &&
-			observation->attributes[position].relation_oid == oids[i])
+			observation->attributes[position].relation_oid == oid)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage has excess positive column ordinals")));
@@ -1558,15 +1719,14 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	{
 		Oid oid = observation->roots[i].relation_oid;
 		StorageClass *heap = storage_class(observation, oid);
-		StorageRoot *root = hash_search(observation->selected_roots, &oid, HASH_FIND, NULL);
 		DarmokHeapStorageRootFact *fact = &observation->root_facts[i];
 
-		if (root == NULL)
+		if (!heap->composite_selected)
 			elog(ERROR, "native storage lost a selected root binding");
 		fact->oid = oid;
 		fact->row_type_oid = heap->fact.row_type_oid;
 		fact->declared_attribute_count = heap->fact.declared_attribute_count;
-		fact->attribute_offset = root->attribute_offset;
+		fact->attribute_offset = heap->attribute_offset;
 	}
 	storage_budget(observation);
 }
@@ -1606,10 +1766,7 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 	StorageIndex *index;
 	Oid *oids = darmok_catalog_image_alloc(&observation->image_budget,
 		sizeof(Oid) * (state->count + STORAGE_HEAPS), false);
-	Oid *application_oids = darmok_catalog_image_alloc(&observation->image_budget,
-		sizeof(Oid) * state->count, false);
 	int oid_count = 0;
-	int application_count = 0;
 
 	observation->roots = darmok_catalog_image_alloc(&observation->image_budget,
 		sizeof(DarmokRelationRequest) * state->count, true);
@@ -1646,7 +1803,6 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 			mode->mask = 0;
 			mode->catalog = false;
 			oids[oid_count++] = oid;
-			application_oids[application_count++] = oid;
 		}
 		mode->mask |= 1 << input->mode;
 	}
@@ -1693,10 +1849,8 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 				reference->relation_oid = observation->facts[i].oid;
 				reference->lock_mode = mode;
 			}
-	qsort(application_oids, application_count, sizeof(Oid), storage_oid_order);
-	storage_build_columns(state, observation, application_oids, application_count);
+	storage_build_columns(state, observation);
 	storage_validate_profiles(observation);
-	pfree(application_oids);
 	pfree(oids);
 	storage_budget(observation);
 }
@@ -1842,6 +1996,19 @@ storage_definition_equal(const DarmokHeapStorageFact *a, const DarmokHeapStorage
 }
 
 static bool
+storage_composite_equal(const DarmokHeapCompositeFact *a, const DarmokHeapCompositeFact *b)
+{
+	return a->type_oid == b->type_oid && a->relation_oid == b->relation_oid &&
+		a->schema_oid == b->schema_oid &&
+		memcmp(&a->schema_name, &b->schema_name, sizeof(NameData)) == 0 &&
+		memcmp(&a->name, &b->name, sizeof(NameData)) == 0 &&
+		a->kind == b->kind && a->persistence == b->persistence &&
+		a->access_method_oid == b->access_method_oid && a->is_partition == b->is_partition &&
+		a->declared_attribute_count == b->declared_attribute_count &&
+		a->attribute_offset == b->attribute_offset;
+}
+
+static bool
 storage_attribute_equal(const DarmokHeapAttributeFact *a, const DarmokHeapAttributeFact *b)
 {
 	return a->relation_oid == b->relation_oid && a->number == b->number &&
@@ -1890,6 +2057,7 @@ storage_compare(StorageState *state, StorageObservation *a, StorageObservation *
 {
 	if (a->fact_count != b->fact_count || a->reference_count != b->reference_count ||
 		a->attribute_count != b->attribute_count || a->type_count != b->type_count ||
+		a->composite_count != b->composite_count ||
 		a->missing_count != b->missing_count || a->payload_count != b->payload_count ||
 		a->use_count != b->use_count ||
 		a->cost.missing_carrier_bytes != b->cost.missing_carrier_bytes ||
@@ -1922,6 +2090,11 @@ storage_compare(StorageState *state, StorageObservation *a, StorageObservation *
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("native storage exact references changed without publication")));
+	for (int i = 0; i < a->composite_count; i++)
+		if (!storage_composite_equal(&a->composites[i], &b->composites[i]))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("native storage composite declaration changed without publication")));
 	for (int i = 0; i < a->attribute_count; i++)
 	{
 		if (!storage_attribute_equal(&a->attributes[i], &b->attributes[i]))
@@ -2159,6 +2332,8 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	view.roots = c->roots;
 	view.root_count = state->count;
 	view.root_facts = c->root_facts;
+	view.composites = c->composites;
+	view.composite_count = c->composite_count;
 	view.attributes = c->attributes;
 	view.attribute_count = c->attribute_count;
 	view.types = c->types;
@@ -2166,6 +2341,7 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	view.missing = b->missing;
 	view.missing_count = b->missing_count;
 	view.attribute_array_bytes = sizeof(DarmokHeapAttributeFact) * (Size) view.attribute_count;
+	view.composite_array_bytes = sizeof(DarmokHeapCompositeFact) * (Size) view.composite_count;
 	view.type_array_bytes = sizeof(DarmokHeapTypeFact) * (Size) view.type_count;
 	view.missing_array_bytes = sizeof(DarmokHeapMissingFact) * (Size) view.missing_count;
 	view.missing_image_bytes = b->missing_image_bytes;

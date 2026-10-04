@@ -142,6 +142,7 @@ async fn oracle(client: &Client, root: u32) -> Vec<Value> {
 
 struct ColumnOracle {
     roots: BTreeMap<u32, Value>,
+    composites: Vec<Value>,
     attributes: Vec<Value>,
     types: Vec<Value>,
     scanned: Value,
@@ -149,9 +150,26 @@ struct ColumnOracle {
 
 async fn selected_type_oids(client: &Client, roots: &[u32]) -> Vec<u32> {
     tokio::time::timeout(DEADLINE, client.query(
-        "WITH RECURSIVE selected(oid) AS ((SELECT reltype FROM pg_catalog.pg_class WHERE oid=ANY($1) AND reltype<>0 UNION SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atttypid<>0) UNION SELECT edge.oid FROM selected s JOIN pg_catalog.pg_type t ON t.oid=s.oid CROSS JOIN LATERAL (VALUES(t.typbasetype),(t.typelem),(t.typarray)) AS edge(oid) WHERE edge.oid<>0) SELECT oid FROM selected ORDER BY oid", &[&roots],
+        "WITH RECURSIVE selected(oid) AS ((SELECT reltype FROM pg_catalog.pg_class WHERE oid=ANY($1) AND reltype<>0 UNION SELECT atttypid FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atttypid<>0) UNION SELECT edge.oid FROM selected s JOIN pg_catalog.pg_type t ON t.oid=s.oid CROSS JOIN LATERAL (SELECT oid FROM (VALUES(t.typbasetype),(t.typelem),(t.typarray)) AS declared(oid) UNION SELECT a.atttypid FROM pg_catalog.pg_attribute a WHERE t.typtype='c' AND a.attrelid=t.typrelid AND a.attnum>0 AND NOT a.attisdropped) AS edge(oid) WHERE edge.oid<>0) SELECT oid FROM selected ORDER BY oid", &[&roots],
     )).await.expect("bounded independent recursive type oracle did not complete").unwrap()
         .into_iter().map(|row| row.get(0)).collect()
+}
+
+async fn selected_composite_oids(client: &Client, roots: &[u32]) -> Vec<u32> {
+    let types = selected_type_oids(client, roots).await;
+    tokio::time::timeout(
+        DEADLINE,
+        client.query(
+            "SELECT typrelid FROM pg_catalog.pg_type WHERE oid=ANY($1) AND typtype='c' ORDER BY typrelid",
+            &[&types],
+        ),
+    )
+    .await
+    .expect("bounded independent composite oracle did not complete")
+    .unwrap()
+    .into_iter()
+    .map(|row| row.get(0))
+    .collect()
 }
 
 async fn column_oracle(client: &Client, roots: &[u32]) -> ColumnOracle {
@@ -163,17 +181,21 @@ async fn column_oracle(client: &Client, roots: &[u32]) -> ColumnOracle {
             (row.get::<_, u32>(0), serde_json::from_str(&row.get::<_, String>(1)).unwrap())
         }).collect::<BTreeMap<_, Value>>();
         let oids = roots.keys().copied().collect::<Vec<_>>();
-        let attributes = client.query(
-            "SELECT pg_catalog.json_build_object('relation_oid',attrelid::bigint,'number',attnum,'name',attname,'type_oid',atttypid::bigint,'length',attlen,'typmod',atttypmod,'dimensions',attndims,'by_value',attbyval,'alignment',pg_catalog.ascii(attalign::text),'storage',pg_catalog.ascii(attstorage::text),'compression',CASE WHEN attcompression::text='' THEN 0 ELSE pg_catalog.ascii(attcompression::text) END,'not_null_declared',attnotnull,'has_default',atthasdef,'has_missing',atthasmissing,'identity',CASE WHEN attidentity::text='' THEN 0 ELSE pg_catalog.ascii(attidentity::text) END,'generated',CASE WHEN attgenerated::text='' THEN 0 ELSE pg_catalog.ascii(attgenerated::text) END,'dropped',attisdropped,'local',attislocal,'inheritance_count',attinhcount,'collation_oid',attcollation::bigint)::text FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 ORDER BY attrelid,attnum", &[&oids],
-        ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
         let type_oids = selected_type_oids(client,&oids).await;
+        let composites: Vec<Value> = client.query(
+            "SELECT pg_catalog.json_build_object('type_oid',t.oid::bigint,'relation_oid',c.oid::bigint,'schema_oid',c.relnamespace::bigint,'schema',n.nspname,'name',c.relname,'kind',pg_catalog.ascii(c.relkind::text),'persistence',pg_catalog.ascii(c.relpersistence::text),'am',c.relam::bigint,'is_partition',c.relispartition,'declared_attribute_count',c.relnatts,'attribute_offset',COALESCE(sum(c.relnatts) OVER (ORDER BY c.oid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0))::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_class c ON c.oid=t.typrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE t.oid=ANY($1) AND t.typtype='c' ORDER BY c.oid", &[&type_oids],
+        ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
+        let composite_oids = composites.iter().map(|fact|u32::try_from(fact["relation_oid"].as_u64().unwrap()).unwrap()).collect::<Vec<_>>();
+        let attributes = client.query(
+            "SELECT pg_catalog.json_build_object('relation_oid',attrelid::bigint,'number',attnum,'name',attname,'type_oid',atttypid::bigint,'length',attlen,'typmod',atttypmod,'dimensions',attndims,'by_value',attbyval,'alignment',pg_catalog.ascii(attalign::text),'storage',pg_catalog.ascii(attstorage::text),'compression',CASE WHEN attcompression::text='' THEN 0 ELSE pg_catalog.ascii(attcompression::text) END,'not_null_declared',attnotnull,'has_default',atthasdef,'has_missing',atthasmissing,'identity',CASE WHEN attidentity::text='' THEN 0 ELSE pg_catalog.ascii(attidentity::text) END,'generated',CASE WHEN attgenerated::text='' THEN 0 ELSE pg_catalog.ascii(attgenerated::text) END,'dropped',attisdropped,'local',attislocal,'inheritance_count',attinhcount,'collation_oid',attcollation::bigint)::text FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 ORDER BY attrelid,attnum", &[&composite_oids],
+        ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
         let types = client.query(
             "SELECT pg_catalog.json_build_object('oid',t.oid::bigint,'schema_oid',t.typnamespace::bigint,'schema',n.nspname,'name',t.typname,'length',t.typlen,'by_value',t.typbyval,'kind',pg_catalog.ascii(t.typtype::text),'category',pg_catalog.ascii(t.typcategory::text),'preferred',t.typispreferred,'defined',t.typisdefined,'delimiter',pg_catalog.ascii(t.typdelim::text),'relation_oid',t.typrelid::bigint,'subscript_oid',t.typsubscript::oid::bigint,'element_oid',t.typelem::bigint,'array_oid',t.typarray::bigint,'input_oid',t.typinput::oid::bigint,'output_oid',t.typoutput::oid::bigint,'receive_oid',t.typreceive::oid::bigint,'send_oid',t.typsend::oid::bigint,'typmod_input_oid',t.typmodin::oid::bigint,'typmod_output_oid',t.typmodout::oid::bigint,'analyze_oid',t.typanalyze::oid::bigint,'alignment',pg_catalog.ascii(t.typalign::text),'storage',pg_catalog.ascii(t.typstorage::text),'not_null_declared',t.typnotnull,'base_type_oid',t.typbasetype::bigint,'typmod',t.typtypmod,'dimensions',t.typndims,'collation_oid',t.typcollation::bigint)::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE t.oid=ANY($1) ORDER BY t.oid", &[&type_oids],
         ).await.unwrap().into_iter().map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap()).collect();
         let scanned = serde_json::from_str(&client.query_one(
-            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'options_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type),'type_payload_rows',(SELECT count(*) FROM pg_catalog.pg_type),'attrdef_rows',(SELECT count(*) FROM pg_catalog.pg_attrdef))::text", &[],
+            "SELECT pg_catalog.json_build_object('namespace_rows',(SELECT count(*) FROM pg_catalog.pg_namespace),'relation_rows',(SELECT count(*) FROM pg_catalog.pg_class),'options_rows',(SELECT count(*) FROM pg_catalog.pg_class),'index_rows',(SELECT count(*) FROM pg_catalog.pg_index),'attribute_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'attribute_payload_rows',(SELECT count(*) FROM pg_catalog.pg_attribute),'type_rows',(SELECT count(*) FROM pg_catalog.pg_type),'type_payload_rows',(SELECT count(*) FROM pg_catalog.pg_type),'attrdef_rows',(SELECT count(*) FROM pg_catalog.pg_attrdef))::text", &[],
         ).await.unwrap().get::<_, String>(0)).unwrap();
-        ColumnOracle { roots, attributes, types, scanned }
+        ColumnOracle { roots, composites, attributes, types, scanned }
     }).await.expect("bounded independent column/type oracle did not complete")
 }
 
@@ -187,9 +209,10 @@ async fn create_missing_oracles(client: &Client, schema: &str) {
 
 async fn missing_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Value> {
     let schema = quoted(schema);
+    let composite_oids = selected_composite_oids(client, roots).await;
     tokio::time::timeout(DEADLINE, client.query(&format!(
         "WITH observed AS MATERIALIZED (SELECT attrelid,attnum,atttypid,pg_catalog.pg_column_size(attmissingval) stored_bytes,pg_catalog.pg_column_compression(attmissingval) compression,{schema}.image(attmissingval) image,pg_catalog.array_ndims(attmissingval) ndim,pg_catalog.array_length(attmissingval,1) dim,pg_catalog.array_lower(attmissingval,1) lbound FROM pg_catalog.pg_attribute WHERE attrelid=ANY($1) AND attnum>0 AND NOT attisdropped AND atthasmissing) SELECT pg_catalog.json_build_object('relation_oid',attrelid::bigint,'number',attnum,'type_oid',atttypid::bigint,'carrier_kind',CASE WHEN compression='pglz' THEN 'p' WHEN compression='lz4' THEN 'l' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image)-3 THEN 's' WHEN compression IS NULL AND stored_bytes=pg_catalog.octet_length(image) THEN 'u' ELSE 'unexpected-native-form' END,'stored_bytes',stored_bytes,'image_bytes',pg_catalog.octet_length(image),'image',pg_catalog.encode(image,'hex'))::text,ndim,dim,lbound FROM observed ORDER BY attrelid,attnum"
-    ), &[&roots])).await.expect("bounded independent missing image oracle did not complete").unwrap()
+    ), &[&composite_oids])).await.expect("bounded independent missing image oracle did not complete").unwrap()
         .into_iter().map(|row|{
             for column in 1..=3 { assert_eq!(row.get::<_,Option<i32>>(column),Some(1)); }
             serde_json::from_str(&row.get::<_,String>(0)).unwrap()
@@ -247,9 +270,10 @@ async fn payload_oracle(client: &Client, schema: &str, roots: &[u32]) -> Vec<Val
     tokio::time::timeout(DEADLINE, async {
         let mut payloads = Vec::new();
         let type_oids = selected_type_oids(client,roots).await;
+        let composite_oids = selected_composite_oids(client,roots).await;
         for row in client.query(&format!(
             "SELECT 'pg_catalog.pg_attrdef'::regclass::oid,d.oid,d.adrelid,d.adnum,a.attnum,{schema}.payload_carrier(d.adbin),{schema}.payload_image(d.adbin) FROM pg_catalog.pg_attrdef d CROSS JOIN pg_catalog.pg_attribute a WHERE d.adrelid=ANY($1) AND a.attrelid='pg_catalog.pg_attrdef'::regclass AND a.attname='adbin' ORDER BY d.oid"
-        ), &[&roots]).await.unwrap() {
+        ), &[&composite_oids]).await.unwrap() {
             payloads.push(payload_expected(row.get(0),row.get(1),row.get(2),row.get(3),row.get(4),row.get(5),row.get(6)));
         }
         for field in ["typdefaultbin", "typdefault"] {
@@ -342,6 +366,7 @@ fn check_payloads(state: &Value, expected: &[Value]) {
 fn check_columns(state: &Value, expected: &ColumnOracle) {
     let metadata = &state["metadata"];
     assert_eq!(metadata["attributes"], json!(expected.attributes));
+    assert_eq!(metadata["composites"], json!(expected.composites));
     assert_eq!(metadata["types"], json!(expected.types));
     let root_facts = metadata["roots"]
         .as_array()
@@ -350,12 +375,12 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
         .map(|binding| {
             let oid = u32::try_from(binding[0].as_u64().unwrap()).unwrap();
             let mut fact = expected.roots[&oid].clone();
-            let offset: u64 = expected
-                .roots
-                .range(..oid)
-                .map(|(_, root)| root["declared_attribute_count"].as_u64().unwrap())
-                .sum();
-            fact["attribute_offset"] = json!(offset);
+            let composite = expected
+                .composites
+                .iter()
+                .find(|fact| fact["relation_oid"] == oid)
+                .unwrap();
+            fact["attribute_offset"] = composite["attribute_offset"].clone();
             fact
         })
         .collect::<Vec<_>>();
@@ -392,12 +417,14 @@ fn check_columns(state: &Value, expected: &ColumnOracle) {
         }
         let allocated = metadata[phase]["allocated_bytes"].as_u64().unwrap();
         let arrays = metadata["attribute_array_bytes"].as_u64().unwrap()
+            + metadata["composite_array_bytes"].as_u64().unwrap()
             + metadata["type_array_bytes"].as_u64().unwrap();
         assert_eq!(metadata[phase]["missing_carrier_bytes"], stored_bytes);
         assert!(allocated > 0 && allocated >= arrays);
     }
     for (name, count) in [
         ("attribute_array_bytes", expected.attributes.len()),
+        ("composite_array_bytes", expected.composites.len()),
         ("type_array_bytes", expected.types.len()),
         ("missing_array_bytes", missing.len()),
     ] {
@@ -904,29 +931,32 @@ async fn selected_positive_slots_types_and_column_overrides_are_exact_declaratio
         let root = oid(&observer,schema,"t").await;
         let empty = oid(&observer,schema,"empty").await;
         let before_drop = column_oracle(&observer,&[root,empty]).await;
-        let removed_type = u32::try_from(before_drop.attributes[1]["type_oid"].as_u64().unwrap()).unwrap();
+        let before_root = before_drop.attributes.iter().filter(|fact|fact["relation_oid"]==root).collect::<Vec<_>>();
+        let removed_type = u32::try_from(before_root[1]["type_oid"].as_u64().unwrap()).unwrap();
         sql(&observer,&format!("ALTER TABLE {qschema}.t DROP COLUMN removed; DROP TYPE {qschema}.gone; ALTER TABLE {qschema}.t RENAME COLUMN nullable TO {}", quoted(renamed_column))).await.unwrap();
         let removed: i64 = observer.query_one("SELECT count(*) FROM pg_catalog.pg_type WHERE oid=$1",&[&removed_type]).await.unwrap().get(0);
         assert_eq!(removed,0);
         let expected = column_oracle(&observer,&[root,empty]).await;
-        assert_eq!(expected.attributes.len(),14);
-        let dropped = &expected.attributes[1];
+        let root_attributes = expected.attributes.iter().filter(|fact|fact["relation_oid"]==root).collect::<Vec<_>>();
+        assert_eq!(root_attributes.len(),14);
+        assert_eq!(expected.attributes.len(),15);
+        let dropped = &root_attributes[1];
         assert_eq!(dropped["number"],2);
         assert_eq!(dropped["dropped"],true);
         assert_eq!(dropped["type_oid"],0);
         for field in ["length","by_value","alignment"] {
-            assert_eq!(dropped[field],before_drop.attributes[1][field]);
+            assert_eq!(dropped[field],before_root[1][field]);
         }
-        assert_eq!(expected.attributes[0]["name"],long_column);
-        assert_eq!(expected.attributes[9]["name"],renamed_column);
-        let text = &expected.attributes[2];
+        assert_eq!(root_attributes[0]["name"],long_column);
+        assert_eq!(root_attributes[9]["name"],renamed_column);
+        let text = &root_attributes[2];
         let text_type = expected.types.iter().find(|fact| fact["oid"]==text["type_oid"]).unwrap();
         assert_eq!(text["storage"],u64::from(b'e'));
         assert_eq!(text_type["storage"],u64::from(b'x'));
         assert_eq!(text["compression"],u64::from(b'p'));
         assert_ne!(text["collation_oid"],text_type["collation_oid"]);
-        assert_eq!(expected.attributes[3]["typmod"],11);
-        assert_eq!(expected.attributes[5]["dimensions"],2);
+        assert_eq!(root_attributes[3]["typmod"],11);
+        assert_eq!(root_attributes[5]["dimensions"],2);
         let fake = expected.types.iter().find(|fact| fact["name"]=="int4" && fact["schema"]==schema).unwrap();
         assert_ne!(fake["oid"],23);
         assert_eq!(fake["kind"],u64::from(b'e'));
@@ -934,11 +964,11 @@ async fn selected_positive_slots_types_and_column_overrides_are_exact_declaratio
         assert!(expected.types.iter().any(|fact| fact["kind"]==u64::from(b'c') && fact["relation_oid"]!=0));
         assert!(expected.types.iter().any(|fact| fact["element_oid"]==23));
         assert!(expected.types.iter().all(|fact| fact["oid"]!=removed_type));
-        assert_eq!(expected.attributes[11]["identity"],u64::from(b'a'));
-        assert_eq!(expected.attributes[11]["not_null_declared"],true);
-        assert_eq!(expected.attributes[12]["generated"],u64::from(b's'));
-        assert_eq!(expected.attributes[13]["has_default"],true);
-        assert_eq!(expected.attributes[13]["has_missing"],true);
+        assert_eq!(root_attributes[11]["identity"],u64::from(b'a'));
+        assert_eq!(root_attributes[11]["not_null_declared"],true);
+        assert_eq!(root_attributes[12]["generated"],u64::from(b's'));
+        assert_eq!(root_attributes[13]["has_default"],true);
+        assert_eq!(root_attributes[13]["has_missing"],true);
         let roots = json!([[schema,"t",3],[schema,"empty",1],[schema,"t",1],[schema,"t",2],[schema,"empty",2]]);
         for established in [false,true] {
             sql(&reader,if established { "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1" } else { "BEGIN" }).await.unwrap();
@@ -2111,6 +2141,214 @@ async fn prepared_type_link_changes_preserve_both_real_data_view_states() {
             }
             assert_eq!(initial["metadata"]["types"],json!(before_columns.types));
             assert_eq!(initial["metadata"]["payloads"],json!(before_payloads));
+            assert!(probe.modes(&observer,Some(backend),&fact_oids(&completed)).await.is_empty());
+            probe.no_coordination(&observer,backend).await;
+            let observed_data: i32 = reader.query_one(&format!("SELECT id FROM {qschema}.sentinel"),&[]).await.unwrap().get(0);
+            let current_data: i32 = observer.query_one(&format!("SELECT id FROM {qschema}.sentinel"),&[]).await.unwrap().get(0);
+            assert_eq!(current_data,before_data+i32::from(ending=="COMMIT"));
+            assert_eq!(observed_data,if established { before_data } else { current_data });
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+    })).catch_unwind().await;
+    finish_targets(&observer, &gids).await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(&writer, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        &format!("DROP SCHEMA IF EXISTS {qschema} CASCADE"),
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(writer, wd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+#[ignore = "requires the native PostgreSQL primary profile"]
+async fn composite_fields_own_nested_nonroot_declarations_and_images() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "storage_composite_fields";
+    let qschema = quoted(schema);
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,&format!("CREATE SCHEMA {qschema}; CREATE DOMAIN {qschema}.base AS integer DEFAULT 7; CREATE DOMAIN {qschema}.child AS {qschema}.base DEFAULT 11; CREATE TYPE {qschema}.leaf AS (v {qschema}.child,gone text); ALTER TYPE {qschema}.leaf DROP ATTRIBUTE gone; CREATE DOMAIN {qschema}.leaves AS {qschema}.leaf[]; CREATE TABLE {qschema}.parent(id integer); CREATE TABLE {qschema}.stored(own_field {qschema}.child DEFAULT 13) INHERITS({qschema}.parent); INSERT INTO {qschema}.stored(id) VALUES(1); ALTER TABLE {qschema}.parent ADD COLUMN inherited text DEFAULT 'inherited'; ALTER TABLE {qschema}.stored ADD COLUMN missing {qschema}.child DEFAULT 19; CREATE TYPE {qschema}.middle AS (items {qschema}.leaves,shared {qschema}.leaf,stored {qschema}.stored); CREATE TYPE {qschema}.unrelated AS (unused jsonb); CREATE TABLE {qschema}.target(a {qschema}.middle,b {qschema}.leaf[],stored {qschema}.stored); CREATE TABLE {qschema}.empty(); CREATE TABLE {qschema}.sentinel(id integer); INSERT INTO {qschema}.sentinel VALUES(1)")).await.unwrap();
+        create_missing_oracles(&observer,schema).await;
+        let root = oid(&observer,schema,"target").await;
+        let empty = oid(&observer,schema,"empty").await;
+        let leaf = oid(&observer,schema,"leaf").await;
+        let middle = oid(&observer,schema,"middle").await;
+        let stored = oid(&observer,schema,"stored").await;
+        let parent = oid(&observer,schema,"parent").await;
+        let unrelated = oid(&observer,schema,"unrelated").await;
+        let roots = json!([[schema,"target",3],[schema,"empty",1],[schema,"target",1],[schema,"target",2]]);
+        let masks = BTreeMap::from([(root,14),(empty,2)]);
+        let mut graph = oracle(&observer,root).await;
+        graph.extend(oracle(&observer,empty).await);
+        for established in [false,true] {
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { sql(&reader,&format!("SELECT id FROM {qschema}.sentinel")).await.unwrap(); }
+            let columns = column_oracle(&observer,&[root,empty]).await;
+            let missing = missing_oracle(&observer,schema,&[root,empty]).await;
+            let payloads = payload_oracle(&observer,schema,&[root,empty]).await;
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_columns(&initial,&columns);
+            check_missing(&initial,&missing);
+            check_payloads(&initial,&payloads);
+            check_graph_modes(&observer,&initial,&graph,&masks).await;
+            let actual = columns.composites.iter().map(|fact|u32::try_from(fact["relation_oid"].as_u64().unwrap()).unwrap()).collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(actual,std::collections::BTreeSet::from([root,empty,leaf,middle,stored]));
+            assert!(!actual.contains(&parent) && !actual.contains(&unrelated));
+            let leaf_fields = columns.attributes.iter().filter(|fact|fact["relation_oid"]==leaf).collect::<Vec<_>>();
+            assert_eq!(leaf_fields.len(),2);
+            assert_eq!(leaf_fields[1]["dropped"],true);
+            assert_eq!(leaf_fields[1]["type_oid"],0);
+            let stored_fields = columns.attributes.iter().filter(|fact|fact["relation_oid"]==stored).collect::<Vec<_>>();
+            assert_eq!(stored_fields.len(),4);
+            assert!(stored_fields.iter().any(|fact|fact["local"]==false && fact["inheritance_count"].as_i64().unwrap()>0));
+            assert!(stored_fields.iter().any(|fact|fact["local"]==true && fact["has_default"]==true));
+            assert!(missing.len()>=2 && missing.iter().all(|fact|fact["relation_oid"]==stored));
+            assert!(payloads.iter().any(|fact|fact["catalog_oid"]==2604 && fact["relation_oid"]==stored && fact["value"]["present"]==true));
+            assert!(columns.composites.iter().filter(|fact|fact["kind"]==u64::from(b'c')).all(|fact|fact["am"]==0));
+            assert_eq!(initial["metadata"]["root_facts"][0],initial["metadata"]["root_facts"][2]);
+            assert_eq!(initial["metadata"]["root_facts"][0],initial["metadata"]["root_facts"][3]);
+            assert!(!fact_oids(&initial).iter().any(|oid|[leaf,middle,stored,parent,unrelated].contains(oid)));
+            let field = if established { "latest" } else { "renamed" };
+            let previous_field = if established { "renamed" } else { "v" };
+            sql(&observer,&format!("ALTER TYPE {qschema}.leaf RENAME ATTRIBUTE {previous_field} TO {field}; ALTER TABLE {qschema}.stored ALTER COLUMN own_field SET DEFAULT {}; ALTER DOMAIN {qschema}.base SET DEFAULT {}",if established { 31 } else { 29 },if established { 23 } else { 17 })).await.unwrap();
+            let current_columns = column_oracle(&observer,&[root,empty]).await;
+            let current_missing = missing_oracle(&observer,schema,&[root,empty]).await;
+            let current_payloads = payload_oracle(&observer,schema,&[root,empty]).await;
+            let current = capture(&reader,&roots,false).await;
+            check_scope(&current,established,false);
+            check_columns(&current,&current_columns);
+            check_missing(&current,&current_missing);
+            check_payloads(&current,&current_payloads);
+            check_graph_modes(&observer,&current,&graph,&masks).await;
+            assert_ne!(current_columns.attributes,columns.attributes);
+            assert_ne!(current_payloads,payloads);
+            assert_eq!(current_missing,missing);
+            assert_eq!(initial["metadata"]["composites"],json!(columns.composites));
+            assert_eq!(initial["metadata"]["attributes"],json!(columns.attributes));
+            assert_eq!(initial["metadata"]["payloads"],json!(payloads));
+            assert!(probe.modes(&observer,Some(backend),&fact_oids(&current)).await.is_empty());
+            assert!(probe.modes(&observer,Some(backend),&[leaf,middle,stored]).await.is_empty());
+            probe.no_coordination(&observer,backend).await;
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+        // A referenced own-TEMP rowtype is a declaration, while the input root
+        // alone supplies the application physical graph and retained counts.
+        sql(&reader,&format!("CREATE TEMP TABLE own_composite_leaf(v {qschema}.child); CREATE TEMP TABLE own_composite_root(v pg_temp.own_composite_leaf[])")).await.unwrap();
+        let temp_root: u32 = reader.query_one("SELECT 'pg_temp.own_composite_root'::regclass::oid",&[]).await.unwrap().get(0);
+        let temp_leaf: u32 = reader.query_one("SELECT 'pg_temp.own_composite_leaf'::regclass::oid",&[]).await.unwrap().get(0);
+        let temp_schema: String = reader.query_one("SELECT n.nspname::text FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE c.oid=$1",&[&temp_root]).await.unwrap().get(0);
+        sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+        let temp = capture(&reader,&json!([[temp_schema,"own_composite_root",1]]),true).await;
+        check_scope(&temp,false,true);
+        let temp_columns = column_oracle(&reader,&[temp_root]).await;
+        check_columns(&temp,&temp_columns);
+        check_payloads(&temp,&payload_oracle(&reader,schema,&[temp_root]).await);
+        assert_eq!(temp_columns.composites.len(),2);
+        assert!(temp_columns.composites.iter().all(|fact|fact["schema"]==temp_schema && fact["persistence"]==u64::from(b't')));
+        assert!(!fact_oids(&temp).contains(&temp_leaf));
+        assert!(!probe.modes(&observer,Some(backend),&fact_oids(&temp)).await.is_empty());
+        probe.no_coordination(&observer,backend).await;
+        sql(&reader,"COMMIT; DROP TABLE pg_temp.own_composite_root; DROP TABLE pg_temp.own_composite_leaf").await.unwrap();
+    })).catch_unwind().await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        &format!("DROP SCHEMA IF EXISTS {qschema} CASCADE"),
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+#[ignore = "requires the native PostgreSQL primary profile with two-phase transactions"]
+async fn prepared_composite_field_changes_preserve_both_real_data_view_states() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (writer, wd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "storage_composite_prepared";
+    let qschema = quoted(schema);
+    let gids = [
+        "composite_first_commit",
+        "composite_first_abort",
+        "composite_rr_commit",
+        "composite_rr_abort",
+    ];
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,&format!("CREATE SCHEMA {qschema}; CREATE DOMAIN {qschema}.base AS integer DEFAULT 7; CREATE DOMAIN {qschema}.child AS {qschema}.base DEFAULT 11; CREATE TABLE {qschema}.sentinel(id integer); INSERT INTO {qschema}.sentinel VALUES(1)")).await.unwrap();
+        create_payload_oracles(&observer,schema).await;
+        for (case,gid) in gids.iter().enumerate() {
+            let established = case>=2;
+            let ending = if case%2==0 { "COMMIT" } else { "ROLLBACK" };
+            let name = format!("target_{case}");
+            let leaf_name = format!("leaf_{case}");
+            let table = format!("{qschema}.{}",quoted(&name));
+            let leaf_type = format!("{qschema}.{}",quoted(&leaf_name));
+            sql(&observer,&format!("CREATE TYPE {leaf_type} AS (v {qschema}.child,gone text); ALTER TYPE {leaf_type} DROP ATTRIBUTE gone; CREATE TABLE {table}(v {leaf_type}[])")).await.unwrap();
+            let root = oid(&observer,schema,&name).await;
+            let leaf = oid(&observer,schema,&leaf_name).await;
+            let roots = json!([[schema,name,1],[schema,name,1]]);
+            let before_columns = column_oracle(&observer,&[root]).await;
+            let before_payloads = payload_oracle(&observer,schema,&[root]).await;
+            let before_data: i32 = observer.query_one(&format!("SELECT id FROM {qschema}.sentinel"),&[]).await.unwrap().get(0);
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { sql(&reader,&format!("SELECT id FROM {qschema}.sentinel")).await.unwrap(); }
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_columns(&initial,&before_columns);
+            check_payloads(&initial,&before_payloads);
+            let added = format!("{qschema}.{}",quoted(&format!("added_{case}")));
+            let field = format!("live_{case}");
+            sql(&writer,&format!("BEGIN; ALTER TYPE {leaf_type} RENAME ATTRIBUTE v TO {field}; CREATE DOMAIN {added} AS {qschema}.child DEFAULT {}; ALTER TABLE {table} ADD COLUMN extra {added}[]; UPDATE {qschema}.sentinel SET id=id+1; PREPARE TRANSACTION '{gid}'",case+41)).await.unwrap();
+            assert!(probe.modes(&observer,None,&[root]).await.iter().any(|row|row.2=="AccessExclusiveLock" && row.3));
+            let request = storage_command(&roots,false);
+            let waiting = command(&reader,&request);
+            tokio::pin!(waiting);
+            tokio::select! {
+                result = &mut waiting => panic!("prepared composite acquisition completed before native completion: {result:?}"),
+                () = probe.wait_physical(&observer,backend,root) => {},
+            }
+            probe.check_prepared_storage_wait(&observer,backend,established).await;
+            sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
+            waiting.await.unwrap();
+            let completed = status(&reader).await;
+            check_scope(&completed,established,false);
+            let current_columns = column_oracle(&observer,&[root]).await;
+            let current_payloads = payload_oracle(&observer,schema,&[root]).await;
+            check_columns(&completed,&current_columns);
+            check_payloads(&completed,&current_payloads);
+            check_graph(&observer,&completed,&oracle(&observer,root).await,2).await;
+            if ending=="COMMIT" {
+                assert_eq!(current_columns.attributes.len(),before_columns.attributes.len()+1);
+                assert!(current_columns.types.len()>before_columns.types.len());
+                assert!(current_columns.attributes.iter().any(|fact|fact["relation_oid"]==leaf && fact["number"]==1 && fact["name"]==field));
+                assert_ne!(current_columns.composites,before_columns.composites);
+            } else {
+                assert_eq!(current_columns.composites,before_columns.composites);
+                assert_eq!(current_columns.attributes,before_columns.attributes);
+                assert_eq!(current_columns.types,before_columns.types);
+                assert_eq!(current_payloads,before_payloads);
+            }
+            assert_eq!(initial["metadata"]["composites"],json!(before_columns.composites));
+            assert_eq!(initial["metadata"]["attributes"],json!(before_columns.attributes));
+            assert_eq!(initial["metadata"]["types"],json!(before_columns.types));
+            assert_eq!(initial["metadata"]["payloads"],json!(before_payloads));
+            assert!(!fact_oids(&completed).contains(&leaf));
             assert!(probe.modes(&observer,Some(backend),&fact_oids(&completed)).await.is_empty());
             probe.no_coordination(&observer,backend).await;
             let observed_data: i32 = reader.query_one(&format!("SELECT id FROM {qschema}.sentinel"),&[]).await.unwrap().get(0);

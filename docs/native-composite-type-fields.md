@@ -1,7 +1,8 @@
 # Native composite field discovery
 
-Status: proposed existing-reader source gate. No composite-field implementation
-or runtime acceptance follows from this document. The merged
+Status: independently accepted existing-reader source design; implementation is
+present but paired package/runtime and fresh implementation review gates remain
+open. The merged
 [declared type-link stage](native-declared-type-links.md) supplies actual root
 rowtypes and base/element/array links. This stage adds the positive slots of
 selected named composites; the [full collector](native-transitive-type-closure.md),
@@ -159,3 +160,31 @@ opaque inventory keys; that output stays preserved, while record11 filtered only
 the eight exact entries before printing. It is not a source census or acceptance
 claim. No full-body, provider, new descriptor, runtime or release acceptance
 follows from these excerpts or the prior type-link result.
+
+## Source review and current implementation
+
+The independent source-only review at clean
+`c43464987b02aa743e95cb7a53bc130e73221a58` accepted this finite design
+conditionally, with no required corrections. Its report SHA256 is
+`b0ea70dd1ff346c2c1a1223375002eb8a3f4dfd1adc202aaf0bf2a37faf4c772`;
+facts `359d029c5182c8f487cd0d39b0e798b6d0757dedd7190cbffc30c6a804236de9`;
+518-member nonself seal
+`140844d4ff2eb701ab6b3e5468aaad8246f2e5c206e5c9cf8a8c92c86db6625d`.
+Final/post/completion/observer each actually exited0; the separate root rehash
+verified540 unique paths and16 completion companions. This is source/design
+acceptance only. Reviewer reader17's out-of-range excerpt, root17's wrong
+observer-summary key and root23's wrong probe pathname remain actual1 in their
+original evidence. Distinct corrected readers18/18/25 exited0 respectively;
+none is a native runtime failure or a successful retry label.
+
+The implementation uses embedded links to group whole-map positive fixed slots,
+separate selected and payload-complete bits, and a separately tracked missing
+scan. Composite facts and slot ranges are compared in A/B/C; input roots keep
+their original order and physical graphs. Independent SQL follows actual
+composite field OIDs with recursive UNION membership and computes slot offsets
+with an ordered native class query. Existing ordinary fixtures now check every
+selected composite. Two additional ordinary fixtures cover nested standalone
+and stored declarations, nonroot inheritance/default/missing facts, own TEMP,
+historical outputs and prepared composite/root changes. The prepared fixture
+renames a live composite field and adds a root field in one writer transaction;
+it neither invents a physical composite lease nor disables native2PC.

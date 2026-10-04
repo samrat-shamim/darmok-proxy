@@ -175,11 +175,15 @@ descriptor path. Their contract and verification status are recorded in
 
 The type-link set is sorted and bounded at4096 before insertion. Empty roots still
 contribute their real rowtype; inherited effective defaults are never substituted.
-The eight direct passes per observation report separate fixed-type and type-payload
-row counts. Other composites' fields, range/enum/domain-constraint definitions and
-providers remain separate required admission. See
+Selected named composites now expose actual class declarations and owned positive
+slot ranges. Grouped fields extend the same bounded type worklist, including
+standalone declarations without adding physical heaps or application descriptors.
+Nine direct passes per observation report separate fixed/missing attribute and
+fixed/default type row counts. Range/enum/domain-constraint definitions and providers
+remain separate required admission. See
 [`docs/native-declared-type-links.md`](../../docs/native-declared-type-links.md)
-for the finite contract and separately recorded verification status.
+and [`docs/native-composite-type-fields.md`](../../docs/native-composite-type-fields.md)
+for the finite contracts and separately recorded verification status.
 
 All three scan costs, raw/normalized bytes, cumulative requested copy bytes,
 context allocation and TOAST heap/chunk counts are reported to the private

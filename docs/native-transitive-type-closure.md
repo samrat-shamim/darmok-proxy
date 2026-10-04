@@ -6,18 +6,20 @@ collector or statement-admission certificate. The existing
 owns images for type defaults and selected columns. The
 [declared type-link stage](native-declared-type-links.md) now implements discovery
 through the already admitted `pg_type` reader. Paired packages and all 128 required
-ordinary tests pass at `abe6b3411ac20dbce81efb205322049058be7c06`; fresh
-implementation review is required before merge. This stage precedes the
+ordinary tests pass at `abe6b3411ac20dbce81efb205322049058be7c06`. Independently
+reviewed PR78 merged at `a5cb93019284ec9f1e77a330fb5012d337981cc5` with unchanged
+native inputs and fixtures. This stage precedes the
 additional catalog descriptors required by this full collector. The proposed
 extension below must close its new descriptor
 bootstrap gate before native implementation. Issues46/15 and the overall
 release gates remain open. Concurrent native PostgreSQL two-phase transactions
 remain required; disabling them is not an alternative.
 
-The proposed [composite field stage](native-composite-type-fields.md) extends
+The [composite field stage](native-composite-type-fields.md) extends
 copied discovery through the existing attribute/class/type readers. It opens no
-application descriptor and has its own pre-implementation source gate. Its
-acceptance cannot close the new-descriptor or full-definition gates below.
+application descriptor; its independent source/design gate is accepted, while
+paired package/runtime verification and fresh implementation review remain open.
+Its acceptance cannot close the new-descriptor or full-definition gates below.
 
 The [stock runtime contract](native-runtime-contract.md) defines the native API
 assumptions. New collector paths still require functional admission, project
@@ -228,6 +230,8 @@ it. This document authorizes no provider or arbitrary extension callback.
 The full candidate's A/B/C definition collection costs36 catalog passes before
 additional bootstrap observations or TOAST scans, compared with the prior21.
 The separate declared type-link implementation costs24 direct passes.
+The composite field implementation adds three selected missing-carrier passes,
+for27 across A/B/C, without adding metadata roots or physical graph members.
 Do not publish a total scan count until the bootstrap sequence is fixed. Account
 for its retained references, observations and native cache work separately.
 Whole attribute/type fixed maps increase memory; selected graphs and per-seed
