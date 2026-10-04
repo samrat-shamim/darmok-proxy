@@ -40,6 +40,7 @@
 #define STORAGE_HEAPS 6
 #define STORAGE_TOAST_HEAPS 2
 #define STORAGE_CRITICAL_INDEXES 2
+#define STORAGE_TYPES 4096
 #define STORAGE_USES (2 * DARMOK_RELATION_REQUEST_LIMIT)
 
 StaticAssertDecl(ATTRIBUTE_FIXED_PART_SIZE ==
@@ -139,7 +140,9 @@ typedef struct StorageAttribute
 typedef struct StorageType
 {
 	Oid oid;
-	bool copied;
+	bool selected;
+	bool defaults_copied;
+	uint8 base_state;
 	DarmokHeapTypeFact fact;
 	DarmokCatalogCarrier binary_default;
 	DarmokCatalogCarrier text_default;
@@ -175,6 +178,7 @@ typedef struct StorageObservation
 	Relation heaps[STORAGE_HEAPS];
 	TableScanDesc scans[STORAGE_HEAPS];
 	TableScanDesc options_scan;
+	TableScanDesc type_payload_scan;
 	Snapshot snapshot;
 	Relation toast_heaps[STORAGE_TOAST_HEAPS];
 	Relation critical_indexes[STORAGE_CRITICAL_INDEXES];
@@ -195,6 +199,7 @@ typedef struct StorageObservation
 	DarmokHeapStorageRootFact *root_facts;
 	DarmokHeapAttributeFact *attributes;
 	DarmokHeapTypeFact *types;
+	Oid *selected_type_oids;
 	DarmokHeapMissingFact *missing;
 	DarmokHeapCatalogPayloadFact *payloads;
 	DarmokCatalogPayloadRequest *payload_requests;
@@ -203,6 +208,8 @@ typedef struct StorageObservation
 	DarmokCatalogPayloadCost payload_cost;
 	int attribute_count;
 	int type_count;
+	int selected_type_count;
+	int selected_type_capacity;
 	int missing_count;
 	Size missing_image_bytes;
 	DarmokHeapObservationCost cost;
@@ -317,7 +324,7 @@ storage_observation_init(StorageState *state, StorageObservation *observation)
 											 sizeof(Oid), sizeof(StorageRoot));
 	observation->attribute_rows = storage_hash(observation, "storage positive slots",
 											 sizeof(uint64), sizeof(StorageAttribute));
-	observation->type_rows = storage_hash(observation, "storage live type OIDs",
+	observation->type_rows = storage_hash(observation, "storage fixed type OIDs",
 									 sizeof(Oid), sizeof(StorageType));
 	observation->expression_rows = storage_hash(observation, "storage column expressions",
 												 sizeof(uint64), sizeof(StorageExpression));
@@ -478,6 +485,185 @@ storage_copy_type(DarmokHeapTypeFact *fact, const FormData_pg_type *row)
 	fact->typmod = row->typtypmod;
 	fact->dimensions = row->typndims;
 	fact->collation_oid = row->typcollation;
+}
+
+static void
+storage_validate_root(const DarmokHeapStorageFact *fact)
+{
+	if (fact->kind != RELKIND_RELATION || fact->is_partition ||
+		fact->access_method_oid != HEAP_TABLE_AM_OID)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("native storage admits only ordinary nonpartitioned builtin heaps")));
+}
+
+static StorageType *
+storage_select_type(StorageObservation *observation, Oid oid)
+{
+	StorageType *type = hash_search(observation->type_rows, &oid, HASH_FIND, NULL);
+	StorageNamespace *schema;
+
+	if (!OidIsValid(oid) || type == NULL || type->fact.oid != oid || !type->fact.defined)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_CORRUPTED),
+				 errmsg("native storage selected type is missing, undefined or inconsistent")));
+	if (type->selected)
+		return type;
+	schema = hash_search(observation->namespaces, &type->fact.schema_oid, HASH_FIND, NULL);
+	if (!OidIsValid(type->fact.schema_oid) || schema == NULL)
+		elog(ERROR, "native storage selected type has no actual namespace");
+	switch (type->fact.kind)
+	{
+		case TYPTYPE_BASE:
+		case TYPTYPE_COMPOSITE:
+		case TYPTYPE_DOMAIN:
+		case TYPTYPE_ENUM:
+		case TYPTYPE_MULTIRANGE:
+		case TYPTYPE_PSEUDO:
+		case TYPTYPE_RANGE:
+			break;
+		default:
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("native storage selected type has an unsupported native kind")));
+	}
+	if ((type->fact.kind == TYPTYPE_DOMAIN) != OidIsValid(type->fact.base_type_oid))
+		elog(ERROR, "native storage selected domain base declaration is inconsistent");
+	if (observation->selected_type_count >= STORAGE_TYPES)
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("native storage selected type graph exceeds 4096 nodes")));
+	if (observation->selected_type_count == observation->selected_type_capacity)
+	{
+		int capacity = observation->selected_type_capacity == 0 ? 8 :
+			Min(STORAGE_TYPES, observation->selected_type_capacity * 2);
+		Oid *oids = darmok_catalog_image_alloc(&observation->image_budget,
+			(Size) capacity * sizeof(Oid), false);
+
+		if (observation->selected_type_count > 0)
+			memcpy(oids, observation->selected_type_oids,
+				(Size) observation->selected_type_count * sizeof(Oid));
+		if (observation->selected_type_oids != NULL)
+			pfree(observation->selected_type_oids);
+		observation->selected_type_oids = oids;
+		observation->selected_type_capacity = capacity;
+	}
+	type->fact.schema_name = schema->name;
+	type->selected = true;
+	observation->selected_type_oids[observation->selected_type_count++] = oid;
+	return type;
+}
+
+static void
+storage_select_types(StorageState *state, StorageObservation *observation)
+{
+	HASH_SEQ_STATUS iter;
+	StorageAttribute *attribute;
+	Oid *path;
+
+	for (int i = 0; i < state->count; i++)
+	{
+		Oid oid = storage_literal_oid(observation, &state->inputs[i], i);
+		StorageClass *root = hash_search(observation->classes, &oid, HASH_FIND, NULL);
+		StorageType *type;
+
+		if (root == NULL)
+			elog(ERROR, "native storage selected root has no actual class row");
+		storage_validate_root(&root->fact);
+		type = storage_select_type(observation, root->fact.row_type_oid);
+		if (type->fact.kind != TYPTYPE_COMPOSITE || type->fact.relation_oid != oid)
+			elog(ERROR, "native storage root rowtype has an inconsistent composite backlink");
+	}
+	hash_seq_init(&iter, observation->attribute_rows);
+	while ((attribute = hash_seq_search(&iter)) != NULL)
+		if (!attribute->fact.dropped)
+			(void) storage_select_type(observation, attribute->fact.type_oid);
+	/* Append only on first membership. Ordinary companion cycles are not domain
+	 * base cycles; all three links are declarations, not provider admission. */
+	for (int i = 0; i < observation->selected_type_count; i++)
+	{
+		StorageType *type = hash_search(observation->type_rows,
+			&observation->selected_type_oids[i], HASH_FIND, NULL);
+		Oid edges[3] = {type->fact.base_type_oid, type->fact.element_oid, type->fact.array_oid};
+
+		for (int edge = 0; edge < 3; edge++)
+			if (OidIsValid(edges[edge]))
+				(void) storage_select_type(observation, edges[edge]);
+		if (i % 1024 == 0)
+			storage_budget(observation);
+	}
+	/* Independent colors make shared domain bases completed nodes, rather than
+	 * treating general graph membership as a currently visiting ancestor. */
+	path = darmok_catalog_image_alloc(&observation->image_budget,
+		(Size) observation->selected_type_count * sizeof(Oid), false);
+	for (int i = 0; i < observation->selected_type_count; i++)
+	{
+		StorageType *type = hash_search(observation->type_rows,
+			&observation->selected_type_oids[i], HASH_FIND, NULL);
+		int length = 0;
+
+		while (type->fact.kind == TYPTYPE_DOMAIN && type->base_state == 0)
+		{
+			if (length >= STORAGE_TYPES)
+				elog(ERROR, "native storage selected domain chain exceeds its node bound");
+			type->base_state = 1;
+			path[length++] = type->oid;
+			type = hash_search(observation->type_rows, &type->fact.base_type_oid, HASH_FIND, NULL);
+			if (type == NULL || !type->selected)
+				elog(ERROR, "native storage selected domain chain lost a base target");
+		}
+		if (type->base_state == 1)
+			elog(ERROR, "native storage selected domain base chain is cyclic");
+		type->base_state = 2;
+		for (int j = 0; j < length; j++)
+		{
+			type = hash_search(observation->type_rows, &path[j], HASH_FIND, NULL);
+			type->base_state = 2;
+		}
+	}
+	pfree(path);
+	storage_budget(observation);
+}
+
+static void
+storage_read_type_payloads(StorageObservation *observation)
+{
+	HeapTuple tuple;
+	int copied = 0;
+	uint64 rows = 0;
+
+	/* Same admitted descriptor and registered raw observation. No fresh fence,
+	 * cache lookup, provider, default evaluation or unrelated carrier copy. */
+	observation->type_payload_scan = heap_beginscan(observation->heaps[4], observation->snapshot,
+		0, NULL, NULL, SO_TYPE_SEQSCAN | SO_ALLOW_PAGEMODE);
+	while ((tuple = heap_getnext(observation->type_payload_scan, ForwardScanDirection)) != NULL)
+	{
+		Form_pg_type row = (Form_pg_type) GETSTRUCT(tuple);
+		StorageType *type = hash_search(observation->type_rows, &row->oid, HASH_FIND, NULL);
+
+		observation->cost.type_payload_rows++;
+		if (type == NULL)
+			elog(ERROR, "native type payload pass has an unknown fixed source");
+		if (type->selected)
+		{
+			if (type->defaults_copied)
+				elog(ERROR, "duplicate selected type default source in native storage observation");
+			darmok_catalog_carrier_copy(&observation->image_budget, &type->binary_default,
+				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefaultbin, true);
+			darmok_catalog_carrier_copy(&observation->image_budget, &type->text_default,
+				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefault, true);
+			if (type->binary_default.present && !type->text_default.present)
+				elog(ERROR, "native type binary default has no own text default");
+			observation->cost.payload_carrier_bytes += type->binary_default.bytes + type->text_default.bytes;
+			type->defaults_copied = true;
+			copied++;
+		}
+		if (++rows % 1024 == 0)
+			storage_budget(observation);
+	}
+	if (copied != observation->selected_type_count)
+		elog(ERROR, "native storage selected type has a missing default source");
+	storage_budget(observation);
 }
 
 static void
@@ -736,19 +922,6 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 				elog(ERROR, "duplicate positive slot in native storage observation");
 			storage_copy_attribute(&attribute->fact, row);
 			storage_copy_missing(observation, attribute, tuple);
-			if (!row->attisdropped && OidIsValid(row->atttypid))
-			{
-				StorageType *type = hash_search(observation->type_rows, &row->atttypid,
-											  HASH_ENTER, &found);
-
-				if (!found)
-				{
-					type->copied = false;
-					memset(&type->fact, 0, sizeof(type->fact));
-					memset(&type->binary_default, 0, sizeof(type->binary_default));
-					memset(&type->text_default, 0, sizeof(type->text_default));
-				}
-			}
 		}
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
@@ -757,26 +930,20 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 	{
 		Form_pg_type row = (Form_pg_type) GETSTRUCT(tuple);
 		StorageType *type;
+		bool found;
 
 		observation->cost.type_rows++;
-		type = hash_search(observation->type_rows, &row->oid, HASH_FIND, NULL);
-		if (type != NULL)
-		{
-			if (type->copied)
-				elog(ERROR, "duplicate live type OID in native storage observation");
-			storage_copy_type(&type->fact, row);
-			darmok_catalog_carrier_copy(&observation->image_budget, &type->binary_default,
-				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefaultbin, true);
-			darmok_catalog_carrier_copy(&observation->image_budget, &type->text_default,
-				tuple, RelationGetDescr(observation->heaps[4]), Anum_pg_type_typdefault, true);
-			if (type->binary_default.present && !type->text_default.present)
-				elog(ERROR, "native type binary default has no text default");
-			observation->cost.payload_carrier_bytes += type->binary_default.bytes + type->text_default.bytes;
-			type->copied = true;
-		}
+		type = hash_search(observation->type_rows, &row->oid, HASH_ENTER, &found);
+		if (found)
+			elog(ERROR, "duplicate fixed type OID in native storage observation");
+		memset(type, 0, sizeof(*type));
+		type->oid = row->oid;
+		storage_copy_type(&type->fact, row);
 		if (++rows % 1024 == 0)
 			storage_budget(observation);
 	}
+	storage_select_types(state, observation);
+	storage_read_type_payloads(observation);
 	while ((tuple = heap_getnext(observation->scans[5], ForwardScanDirection)) != NULL)
 	{
 		Form_pg_attrdef row = (Form_pg_attrdef) GETSTRUCT(tuple);
@@ -829,6 +996,13 @@ storage_end_scans(StorageObservation *observation)
 			observation->scans[i] = NULL;
 			heap_endscan(scan);
 		}
+	if (observation->type_payload_scan != NULL)
+	{
+		TableScanDesc scan = observation->type_payload_scan;
+
+		observation->type_payload_scan = NULL;
+		heap_endscan(scan);
+	}
 	if (observation->options_scan != NULL)
 	{
 		TableScanDesc scan = observation->options_scan;
@@ -1260,13 +1434,13 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 					  const Oid *oids, int oid_count)
 {
 	long attributes = hash_get_num_entries(observation->attribute_rows);
-	long types = hash_get_num_entries(observation->type_rows);
+	long types = observation->selected_type_count;
 	HASH_SEQ_STATUS iter;
 	StorageAttribute *attribute;
 	StorageType *type;
 	int position = 0;
 
-	if (attributes < 0 || types < 0 || types > attributes ||
+	if (attributes < 0 || types < 0 || types > STORAGE_TYPES ||
 		observation->missing_count < 0 || observation->missing_count > attributes ||
 		attributes > (long) state->count * MaxHeapAttributeNumber ||
 		(Size) attributes > MaxAllocSize / sizeof(DarmokHeapAttributeFact) ||
@@ -1297,10 +1471,12 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 	hash_seq_init(&iter, observation->type_rows);
 	while ((type = hash_seq_search(&iter)) != NULL)
 	{
-		StorageNamespace *schema = hash_search(observation->namespaces, &type->fact.schema_oid,
-											  HASH_FIND, NULL);
+		StorageNamespace *schema;
 
-		if (!type->copied || !type->fact.defined || !OidIsValid(type->oid) ||
+		if (!type->selected)
+			continue;
+		schema = hash_search(observation->namespaces, &type->fact.schema_oid, HASH_FIND, NULL);
+		if (!type->defaults_copied || !type->fact.defined || !OidIsValid(type->oid) ||
 			type->fact.oid != type->oid || schema == NULL || !OidIsValid(type->fact.schema_oid))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1359,7 +1535,7 @@ storage_build_columns(StorageState *state, StorageObservation *observation,
 			else
 			{
 				type = hash_search(observation->type_rows, &fact->type_oid, HASH_FIND, NULL);
-				if (!OidIsValid(fact->type_oid) || type == NULL || !type->copied ||
+				if (!OidIsValid(fact->type_oid) || type == NULL || !type->selected || !type->defaults_copied ||
 					fact->length != type->fact.length ||
 					fact->by_value != type->fact.by_value ||
 					fact->alignment != type->fact.alignment)
@@ -1461,11 +1637,7 @@ storage_build_graph(StorageState *state, StorageObservation *observation)
 		StorageMode *mode;
 		bool found;
 
-		if (heap->fact.kind != RELKIND_RELATION || heap->fact.is_partition ||
-			heap->fact.access_method_oid != HEAP_TABLE_AM_OID)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("native storage admits only ordinary nonpartitioned builtin heaps")));
+		storage_validate_root(&heap->fact);
 		observation->roots[i].relation_oid = oid;
 		observation->roots[i].lock_mode = input->mode;
 		mode = hash_search(modes, &oid, HASH_ENTER, &found);

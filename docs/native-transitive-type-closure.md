@@ -3,9 +3,10 @@
 Status: source investigation and design gates, not an implementation-ready
 collector or statement-admission certificate. The existing
 [variable catalog payload component](native-variable-catalog-payloads.md)
-owns images for directly referenced types and selected columns. It does not
-follow type edges. The next [declared type-link stage](native-declared-type-links.md)
-specifies discovery through the already admitted `pg_type` reader, before the
+owns images for type defaults and selected columns. The
+[declared type-link stage](native-declared-type-links.md) now implements discovery
+through the already admitted `pg_type` reader, with paired verification and fresh
+implementation review pending, before the
 additional catalog descriptors required by this full collector. The proposed
 extension below must close its new descriptor
 bootstrap gate before native implementation. Issues46/15 and the overall
@@ -219,8 +220,8 @@ it. This document authorizes no provider or arbitrary extension callback.
 ## Cost and verification gates
 
 The full candidate's A/B/C definition collection costs36 catalog passes before
-additional bootstrap observations or TOAST scans, compared with the current21.
-The separately proposed declared type-link stage would cost24 direct passes.
+additional bootstrap observations or TOAST scans, compared with the prior21.
+The separate declared type-link implementation costs24 direct passes.
 Do not publish a total scan count until the bootstrap sequence is fixed. Account
 for its retained references, observations and native cache work separately.
 Whole attribute/type fixed maps increase memory; selected graphs and per-seed

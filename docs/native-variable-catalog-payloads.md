@@ -20,6 +20,13 @@ Current paired builds and required ordinary tests are locally verified at
 38f2548a9a812b6e7252002fa247788a9addcc4b, with 120 passed, zero failed and
 zero ignored. Independent implementation review is required before merge.
 
+The [declared type-link stage](native-declared-type-links.md) extends selected
+type defaults to actual root rowtypes and reachable base/element/array-companion
+nodes. It uses a whole fixed type map and a selected-default pass in the same
+registered raw observation. Source review passed; current paired runtime and
+implementation acceptance are pending. Earlier results above retain their
+original scope.
+
 ## Problem and choice
 
 A default declaration is insufficient for native row interpretation or later
@@ -68,13 +75,13 @@ Require the generation declaration to be one of the pinned major's native
 values, and a nonempty generation declaration to have `atthasdef` and its
 expression record. It must not coexist with an identity declaration.
 
-For every directly referenced live type, copy the independent presence and
+For every selected type in the declared type-link set, copy the independent presence and
 source carrier of both `typdefaultbin` and `typdefault`. A present binary
 expression requires present text, as declared by the native catalog; text-only
 defaults are valid and stay text-only. Absence and an empty present value remain
 distinct. No domain base, element, composite or inherited effective default is
-substituted for these directly observed facts. Transitive types remain a
-separate required closure.
+substituted for these directly observed facts. Full composite-field/range/enum/
+domain-constraint/provider definitions remain a separate required closure.
 
 Column-expression records carry attrdef OID, actual root OID and ordinal.
 Type-default records carry actual type OID and which of the two fields they
@@ -228,7 +235,9 @@ and IO work outside raw/S retain native waits and ERROR behavior.
    make one gate-first/raw try-fenced coherent six-catalog observation. Copy
    defining fixed facts and selected raw carriers without external fetch or
    provider execution. Close all A scans, its registered snapshot and descriptor
-   increments before building/acquiring the combined physical graph.
+   increments before acquiring the combined physical graph. Pure copied graph
+   selection and the selected type/default/class-option passes occur in the same
+   raw observation; no second fence is acquired with live readers.
 2. **Acquire.** Obtain every exact physical reference outside raw/S. Refresh SI,
    installation, fact descriptors and real mappings under the existing native
    refresh exclusion. Finish every acquisition that could wait for a new
@@ -238,7 +247,7 @@ and IO work outside raw/S retain native waits and ERROR behavior.
    with its own registered nonhistoric catalog snapshot. Its publication/private/
    backend/database/context identity must agree with A. End B's raw/gate and
    fact scans, keeping only its snapshot and prepared descriptors alive.
-   Build/compare the complete graphs, selected identities, fixed defining facts,
+   Compare the independently copied graphs, selected identities, fixed defining facts,
    descriptor profiles and raw carriers outside raw/S. A completed stamp/lifecycle
    change releases this attempt and retries; unexplained same-identity
    disagreement errors. Validate B's pre-open profile, then prepare its admitted
@@ -253,8 +262,9 @@ and IO work outside raw/S retain native waits and ERROR behavior.
    snapshot during this completed reader cleanup; do not alter caller snapshots.
 5. **C — validate at the metadata point.** Refresh current SI/installation and
    final descriptors outside S, then acquire S and make the final coherent raw
-   six-catalog observation. Release raw/gate before graph construction and
-   comparison. C's full stamp, graph, identities, defining fixed facts, NULL
+   six-catalog observation, including its own selected graph and type/default/
+   class-option passes in that raw span. Release raw/gate before comparison.
+   C's full stamp, graph, identities, defining fixed facts, NULL
    presence, descriptor profiles and exact source carriers must agree with B
    (and A). Never fetch,
    decompress, reload a descriptor or follow a new pointer under S.
@@ -334,9 +344,10 @@ publication. No codec, expression parser or provider is part of normalization.
 
 ## Cost and implementation gates
 
-Each successful invocation makes three full six-catalog observations: eighteen
-catalog scans compared with the historical ten scans over five catalogs. Namespace/class/
-index maps still scale with catalog size. The pre-open profile copies use those
+Each successful invocation makes three full six-catalog observations, including
+the selected type-default and class-option passes: twenty-four direct catalog
+scans compared with the original eighteen. Namespace/class/index and whole fixed
+type maps still scale with catalog size. The pre-open profile copies use those
 same scans and add bounded selected class/attribute/presence records, not a fourth
 observation. Selected attrdef/type payload copying
 scales with selected records/bytes. TOAST scanning costs one full heap scan per
@@ -387,8 +398,8 @@ Security work, compiler PR4, hosted CI/account work and release publication are
 outside the current work scope.
 
 The [transitive type definition investigation](native-transitive-type-closure.md)
-builds on these owned images. Its structural graph and new-catalog descriptor
-bootstrap gates remain separate from this accepted direct-type implementation.
+builds on these owned images and the declared type-link discovery stage. Its full
+structural graph and new-catalog descriptor bootstrap gates remain separate.
 
 ## Primary source evidence
 

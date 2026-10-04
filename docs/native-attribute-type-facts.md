@@ -7,6 +7,12 @@ continuous builtin private-owner and source-admitted pure C copying contract.
 This extends the [private heap-storage invocation](native-heap-storage.md);
 it does not admit SQL or an executor.
 
+The original direct-only behavior below records that component's scope. The
+current [declared type-link stage](native-declared-type-links.md) extends selection
+to root rowtypes and recursive base/element/array-companion nodes through a whole
+fixed map and selected-default pass. Its current verification/review remain
+pending; historical results do not certify the changed implementation.
+
 One coherent raw observation copies fixed `pg_namespace`, `pg_class` and
 `pg_index` maps, resolves exact counted literal root names to actual OIDs, then
 fully scans `pg_attribute` and `pg_type` under the same registered nonhistoric

@@ -6200,3 +6200,33 @@ Independent source acceptance is required before the proposed C changes; current
 paired packages/ordinary suites and fresh implementation review remain required
 afterward. Full composite/range/enum/domain-constraint/provider/statement,
 execution, serving, performance, release and overall goal gates remain open.
+
+
+### Declared type-link implementation checkpoint
+
+The existing-reader source gate was independently accepted at
+`1e4c7581130da8a6a0bffb6d2a218b0cf3425efa`, tree
+`d2ff0ffd1b21e36882b533427e97a9e5727b54ec`. Root11 rehash facts SHA256
+`a33467334ebcb93e263e3162dd8b575148a647fd99526b0d4ae1e7c45e5683c5`
+binds565 fixed members plus16 completion companions; root12 separately checks
+observer21 actual0/empty stderr. Acceptance applies only to this selection/pass.
+
+C now separates whole fixed type-map membership, selected-node count and own
+binary/text default completion. Root rowtypes and live slot types seed actual
+base/element/array companions. Membership terminates ordinary cycles; independent
+iterative domain colors detect base cycles. The queue starts small and grows
+geometrically under cumulative requested-copy accounting, with4096 checked before
+insertion; domain scratch uses actual selected count. The tracked second type
+scan stays under the same registered raw snapshot and closes with the other scans.
+Sorted selected facts and each actual default carrier keep existing A/B/C equality,
+B normalization and caller data-snapshot/ownership/abort boundaries.
+
+The probe reports type_payload_rows separately; the ordinary SQL oracle computes
+its own recursive UNION node set and observes both default fields. Existing
+zero-column and default expectations are updated. Two ordinary fixtures add
+ancestor defaults/companion/shared/duplicate/empty/own-TEMP cases and prepared
+link/default changes through both commit/rollback and real data-view states.
+Current formatting/diff pre-commit checks pass, but current strict paired native
+packages, required ordinary suites and fresh implementation review remain pending.
+No previous runtime result certifies these changes. The full definition/bootstrap/
+provider/statement/execution/serving/performance/release and goal gates stay open.

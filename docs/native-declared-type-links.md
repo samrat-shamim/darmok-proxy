@@ -1,8 +1,10 @@
 # Native declared type links
 
-Status: proposed implementation contract; independent source review is the next
-gate. The current collector still returns direct live-column type rows. This
-component replaces that selection with root row types and the complete reachable
+Status: C/header/probe/oracle implementation is present; current paired builds,
+ordinary verification and independent implementation review are pending.
+Independent source review accepted the existing-reader selection/pass gate at
+`1e4c7581130da8a6a0bffb6d2a218b0cf3425efa`, with no required design findings.
+This component replaces direct live-column selection with root row types and the complete reachable
 set of the three type OID links already stored in `pg_type`. It is a discovery
 stage of the [full type definition collector](native-transitive-type-closure.md),
 whose composite-field, range, enum, domain-constraint and provider gates remain
@@ -115,3 +117,16 @@ new catalog, TOAST or application descriptor and invokes no type provider. This
 source gate therefore concerns that local selection, scan lifetime and existing
 payload path; it cannot accept the separate new-descriptor bootstrap gate or
 the full dependent definition, execution, performance and release gates.
+
+The frozen source review is `logs/review-native-type-links-source-1e4c758-v1`:
+report SHA256 `149439c60333ed6e6d4040d4e9d296f6801a1c76436963bd8b566645f012f38c`,
+facts SHA256 `e2b18078a663e923c671b53b3865bc41b0f1a80babe4f6759a2724920b6d5bc8`,
+and565-member nonself seal SHA256
+`5243954027e5d30399e70ef55f2da45a6cd326df32e81b732ef8208849208681`.
+Its16 completion companions and actual final/post/completion/observer outcomes
+were independently executed0. Root11 rehashed587 unique paths and root12 separately
+verified observer21 actual0 with empty stderr. The root rehash facts SHA256 is
+`a33467334ebcb93e263e3162dd8b575148a647fd99526b0d4ae1e7c45e5683c5`.
+The two failed passive reviewer readers and uninvoked draft remain preserved;
+they are not runtime results. Source acceptance is limited to the proposed local
+change and does not certify this implementation.
