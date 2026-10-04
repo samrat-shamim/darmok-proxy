@@ -6170,3 +6170,162 @@ It is not a native test failure. Final hygiene/boundary/evidence checks and
 independent fresh implementation review remain merge requirements. Broader
 descriptor/constraint/type/provider/statement/execution/performance/release
 gates, issues 46/15 and the overall goal remain OPEN. Standing exclusions hold.
+
+
+### Declared type-link discovery source gate
+
+Base: PR77 merged at `0b6aa8667dfb274fff8c5140813ac88a576af3ad`, tree
+`d88a1d2383b679140079175c3ae7112ead05f30e`; frozen component readback is
+`logs/native-descriptor-fields-17a646c-merged-readback-v3/facts.json`, SHA256
+`d2fbe59f0f1f7fe254f30e98f22e93cda0cfa35dd3c9505a98bfd077e2446a8c`.
+That component's124/0/0 tests and accepted review certify its original scope.
+
+The next contract is `docs/native-declared-type-links.md`: root rowtype and live
+column seeds, recursive actual base/element/array-companion links, iterative
+selected membership and independent domain-chain validation, selected default
+carriers through a second tracked scan of the existing admitted type reader.
+It adds one direct scan per A/B/C observation (24 total), while leaving the
+metadata roots/physical modes unchanged. Whole fixed maps and selected queues
+use existing cumulative budgets, with an explicit4096 selected-type limit.
+The full type collector cost/sequence has been corrected for the existing class
+options pass and the required single raw span; its new descriptor gates stay open.
+
+Current passive readers07/08 at this clean base actually exited0. The primary
+record `logs/native-type-links-primary-v1` owns selected pinned17/18 type headers,
+facts SHA256 `14344de93dc3f19f6d54b0c061cfa574d4228f424d497d19dc55be21200762fa`
+and four-member nonself seal SHA256
+`cafbd4cc43aa510fbb8a495f56d87fcdf0d5bb5dc48d4d1a76ed01c54b2c2866`.
+No new C, Rust, packages or runtime results exist at this source checkpoint.
+Independent source acceptance is required before the proposed C changes; current
+paired packages/ordinary suites and fresh implementation review remain required
+afterward. Full composite/range/enum/domain-constraint/provider/statement,
+execution, serving, performance, release and overall goal gates remain open.
+
+
+### Declared type-link implementation checkpoint
+
+The existing-reader source gate was independently accepted at
+`1e4c7581130da8a6a0bffb6d2a218b0cf3425efa`, tree
+`d2ff0ffd1b21e36882b533427e97a9e5727b54ec`. Root11 rehash facts SHA256
+`a33467334ebcb93e263e3162dd8b575148a647fd99526b0d4ae1e7c45e5683c5`
+binds565 fixed members plus16 completion companions; root12 separately checks
+observer21 actual0/empty stderr. Acceptance applies only to this selection/pass.
+
+C now separates whole fixed type-map membership, selected-node count and own
+binary/text default completion. Root rowtypes and live slot types seed actual
+base/element/array companions. Membership terminates ordinary cycles; independent
+iterative domain colors detect base cycles. The queue starts small and grows
+geometrically under cumulative requested-copy accounting, with4096 checked before
+insertion; domain scratch uses actual selected count. The tracked second type
+scan stays under the same registered raw snapshot and closes with the other scans.
+Sorted selected facts and each actual default carrier keep existing A/B/C equality,
+B normalization and caller data-snapshot/ownership/abort boundaries.
+
+The probe reports type_payload_rows separately; the ordinary SQL oracle computes
+its own recursive UNION node set and observes both default fields. Existing
+zero-column and default expectations are updated. Two ordinary fixtures add
+ancestor defaults/companion/shared/duplicate/empty/own-TEMP cases and prepared
+link/default changes through both commit/rollback and real data-view states.
+Current formatting/diff pre-commit checks pass, but current strict paired native
+packages, required ordinary suites and fresh implementation review remain pending.
+No previous runtime result certifies these changes. The full definition/bootstrap/
+provider/statement/execution/serving/performance/release and goal gates stay open.
+
+### Declared type-link paired run and publication-fixture correction
+
+The first implemented source was
+`39e83887b5bfea493baa2a3dde6a621de87c908f`, tree
+`d512dddb73d6e785e6b8b6ea1ba068bde2442ee3`. Root13–16 formatting, diff,
+repository boundaries and strict targeted Clippy passed. Root18 produced four
+strict PostgreSQL17.11/18.6 product/probe packages with26 bound native inputs and
+14 actual0 commands. Package facts SHA256:
+`e44897911110642ad60abeae431d44429df9c2c80e85d3cc631d8eb85754db96`.
+Root19 verified eight fresh required profiles with620 actual0 commands; facts
+SHA256 `7e336a6b68ece0c96f9a7a959f7e856375216034f7c0cc2e61c307695ddea311`.
+
+Root20/21 passed all61 integration and3 private catalog tests on PostgreSQL17,
+including both new type-link fixtures. Each had30 actual0 before/after readers
+and unchanged profile identities/binaries. Their binding facts SHA256 values:
+`061f5c908e96aa74585f4ab20317d9b025c1b3d4c2ac7ccbc7e0e37f765859f9`
+and `6f2d10bccbb10a8ad99698a0a4ac48c6b2a6d6293c4ca972e59ea09afae2896e`.
+
+Root22 is preserved actual101 on PostgreSQL18: catalog discovery11 and builtin
+dispatch2 passed, then catalog publication had17 passed/1 failed/0 ignored. The
+remaining integration targets and private suite did not run. Binding facts
+SHA256 `e7b26a905a29deff24c0b6b6ae9913f242298bd3ddc4b4c730eac513ec5ceba2`
+records30 actual0 readers and unchanged identities/binaries. All eight profiles,
+packages, raw streams and namespaces remain preserved.
+
+The failed publication assertion compared generation128 from an unheld one-shot
+observation with generation131 after acquiring a retained reader Share. The
+one-shot releases its fences before output (`catalog_read.c`762–875); the probe
+only acquires its retained Share at `darmok_catalog_probe.c`772–788. A publication
+between these scopes is allowed. Root23–26 read the exact failed fixture and
+these existing native paths; this is not a new kernel/registry/history census.
+
+The fixture now checks monotonicity across that unheld interval and uses the
+observation made under the first retained Share as its DDL baseline. Its existing
+two-reader coexistence, pending Exclusive, release-one-still-blocked and final
+completion checks stay intact; post-DDL generation must advance from the held
+baseline. It adds no requests, sleeps or timeout changes. Native product/probe
+inputs are unchanged by this correction. Fresh paired packages, profiles, suites
+and implementation review are still required for the corrected source.
+
+The uninvoked `verify-native-type-links-evidence-v1.py` draft remains preserved
+at SHA256 `58de0a36bebc59be4172d359524faa9780e93f10e5e0f53f808dcbfdf67c17ea`;
+it has no execution or acceptance claim. Full collector/bootstrap/provider/
+statement/execution/serving/performance/release and goal gates remain open.
+
+### Declared type-link corrected paired verification
+
+The corrected tested source is
+`abe6b3411ac20dbce81efb205322049058be7c06`, tree
+`04b73cb6be81f29d36f1f75c29f821e4850d38e7`. Root27–30 passed targeted formatting,
+feature diff, repository boundaries and strict Clippy for both changed Rust
+fixtures. Root31 verified all26 native inputs unchanged from39e and only the
+publication fixture/release ledger changed in the correction.
+
+The uninvoked v2 package-helper draft's broad namespace edit also changed its
+fixed corpus leaf to native-build-corpus-primary-v2. Its complete diff exposed
+this before invocation; the draft remains preserved at SHA256
+`ab03c0f88dcb1d9bb96f707ef4eb2a1f442a845eb2ee6662470df01d6e07f27b`,
+with no build/profile namespace or execution claim. Root32 created the distinct
+v3 helper, restoring that fixed v1 leaf. Its SHA256 is
+`30d6acb73c236e5e54823a03994286a8c1eceaf3732010d17bdf24feeea0d36f`;
+the current package/profile/binding namespaces are fresh v2 namespaces. Complete
+helper differences were read before these corrected helpers ran.
+
+Root33 strictly rebuilt/verified four PostgreSQL 17.11/18.6 product/probe packages,
+14 actual0 commands and26 exact native inputs. Package facts SHA256:
+`c56f56a4b61a32a20e2fbb91e2c1966929aef5e78aba3e0a7a979455f9cc1876`.
+Root34 verified eight fresh required profiles with595 actual0 commands; facts
+SHA256 `bcabcdead82bea2670618e779f8ef5dcd775d7610a9abdfc29f650aaa2f50bf8`.
+Both primary profiles have native two-phase transactions enabled. The no2pc
+profile remains an existing boundary variant, not a serving restriction.
+
+Root35–38 passed all 128 required tests:61 integration and3 private catalog tests
+per major, zero failed and zero ignored. Private runs use --ignored and filter
+101 unrelated tests. All four runs have30 actual0 before/after readers with
+unchanged container IDs, images, start times, restart counts and libraries.
+Binding facts SHA256 values:
+
+- PostgreSQL17 integration:
+  `5dd4e663daa826bff8a6a5caca55b1b1c39a872d5ec595e9e11350f7e3ad87d6`.
+- PostgreSQL17 private:
+  `afd673c442c27f26778a8673db92b729a6105b5deba4747e6c73f3a16eb0a847`.
+- PostgreSQL18 integration:
+  `a62d6857d40241cef4108e7a070d4fbc0de3cdcd2526f816cc67b3018cd4b471`.
+- PostgreSQL18 private:
+  `e163d06c438e1caeb60014a4893f139aeea6465fb6eb6b573a5ab695ebcaa0fc`.
+
+Root39 checks the exact current counts and code bindings; its complete stdout
+SHA256 is `2e48355c8ff8cd3ad2717848ec2ca3cddf459a4fa39ea76ce8991dc0d1bb94c0`.
+
+Both new type-link fixtures and the corrected publication fixture pass on both
+majors. These ordinary results cover current selected facts/default images and
+existing native ownership/data-view cases, not a full transitive type definition
+or semantic/performance certificate. Final changes after this tested source are
+confined to these nonpackaged documentation updates. Independent fresh
+implementation review is required before normal exact-head squash merge. The
+full collector/bootstrap/provider/statement/execution/serving/performance/release
+and goal gates remain open.

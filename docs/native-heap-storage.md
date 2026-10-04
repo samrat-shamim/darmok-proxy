@@ -46,7 +46,16 @@ The [descriptor branch declarations](native-descriptor-declarations.md)
 addition returns actual rule/trigger hints and the declared CHECK count through
 the existing class observation. Paired PostgreSQL 17.11/18.6 packages and all
 124 required native tests pass at 06ce5b026cba6a9c9dc35fb1957f9f3bec14bfcd.
-Independent review is required before merge; it admits no new descriptor path.
+Independent review accepted the finite change at
+`17a646cf2fd079526b4e88e31025d67b9d4e2a0f`; PR77 merged its exact tree at
+`0b6aa8667dfb274fff8c5140813ac88a576af3ad`. It admits no new descriptor path.
+
+The [declared type-link stage](native-declared-type-links.md) now adds root
+rowtypes and recursive actual base/element/array-companion membership, plus each
+selected node's own default carriers. Its source gate passed; current paired
+packages and all 128 required PostgreSQL 17.11/18.6 ordinary tests pass at
+`abe6b3411ac20dbce81efb205322049058be7c06`. Fresh implementation review is
+required before merge. Prior component results retain their original scope.
 
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
@@ -57,7 +66,7 @@ Traditional inheritance hints are visible but do not imply child expansion.
 
 The storage component copies fixed fields and selected raw carriers from six
 preopened builtin heaps: pg_namespace, pg_class, pg_index, pg_attribute, pg_type
-and pg_attrdef. Exact-root/live-type filtering does not expand the application
+and pg_attrdef. Exact-root column filtering does not expand the application
 column set to include metadata storage nodes. It includes every live index, even invalid/not-ready ones,
 and the declared TOAST heap and all its live indexes. Conservative relhasindex
 does not suppress edges. Roots, then their index siblings in OID order, then
@@ -131,8 +140,10 @@ The accepted original component performed two full three-heap observations and
 the fixed column/type extension performed two five-heap observations. The current
 variable-payload implementation required three six-heap observations and one
 direct scan per selected metadata TOAST heap. The current option extension has
-one additional class pass per observation, twenty-one catalog scans in total,
-and retains the selected metadata TOAST scans. It reports all three selected-copy/
+one additional class pass per observation. The type-link stage adds a selected
+default pass over the same admitted type descriptor, for twenty-four direct
+catalog scans across A/B/C, and retains the selected metadata TOAST scans.
+Separate fixed-type and type-payload row counts expose both passes. It reports all three selected-copy/
 context costs and the additional raw, normalized and heap/chunk costs. Original
 namespace/class/index maps remain O(catalog-size) copying, O(V+E) graph traversal, sorting for deterministic roots/index siblings
 and O(D log D) exact-declaration validation, plus D native increments and SI/

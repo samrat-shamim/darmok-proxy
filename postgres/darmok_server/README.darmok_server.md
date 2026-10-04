@@ -134,8 +134,11 @@ pure consumer contract are required. See
 [`docs/native-heap-storage.md`](../../docs/native-heap-storage.md) for its
 contract and the separately recorded implementation verification status.
 
-The same private invocation adds positive column slots and directly referenced
-fixed type declarations, filtered by exact root and live-type OIDs. A successful
+The same private invocation adds positive column slots, actual root rowtypes and
+the reachable base/element/array-companion type declarations. A whole fixed type
+map supplies iterative discovery; a second tracked type scan copies only selected
+default carriers under the same snapshot/raw span. Companion cycles terminate
+through membership, and domain-base cycles fail separately. A successful
 attempt makes three coherent observations of six builtin catalogs. Dropped
 slots retain layout/type0; only live length/by-value/alignment redundancy is
 cross-checked. Column storage/compression, typmods, dimensions, collation and
@@ -144,7 +147,7 @@ flags are descriptive. The combined physical attempt also owns catalog heaps,
 live indexes and declared TOAST storage, deduplicating each exact OID/mode while
 retaining application/catalog use provenance.
 
-Selected column default/generation expressions and direct type defaults become
+Selected column default/generation expressions and each selected type's own defaults become
 opaque owned native varlena images. Absence and present empty values are distinct.
 The middle observation keeps its registered catalog snapshot alive while
 admitted builtin TOAST heaps are scanned directly outside raw/semantic exclusion;
@@ -169,6 +172,14 @@ conservative hints remain actual observations and do not imply complete object
 absence or presence. These fixed fields add no scan or lock and admit no new
 descriptor path. Their contract and verification status are recorded in
 [`docs/native-descriptor-declarations.md`](../../docs/native-descriptor-declarations.md).
+
+The type-link set is sorted and bounded at4096 before insertion. Empty roots still
+contribute their real rowtype; inherited effective defaults are never substituted.
+The eight direct passes per observation report separate fixed-type and type-payload
+row counts. Other composites' fields, range/enum/domain-constraint definitions and
+providers remain separate required admission. See
+[`docs/native-declared-type-links.md`](../../docs/native-declared-type-links.md)
+for the finite contract and separately recorded verification status.
 
 All three scan costs, raw/normalized bytes, cumulative requested copy bytes,
 context allocation and TOAST heap/chunk counts are reported to the private

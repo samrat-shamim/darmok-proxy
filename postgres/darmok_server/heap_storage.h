@@ -92,8 +92,9 @@ typedef struct DarmokHeapAttributeFact
 	Oid collation_oid;
 } DarmokHeapAttributeFact;
 
-/* Direct live-column types only. OID edges are declarations, not completed
- * transitive dependencies or permission to invoke the named providers. */
+/* Root rowtypes and live-column seeds, closed over declared base/element/array
+ * OIDs. Other composite fields, range/enum/constraint definitions and provider
+ * admission remain separate obligations; this is not a completed type graph. */
 typedef struct DarmokHeapTypeFact
 {
 	Oid oid;
@@ -184,6 +185,7 @@ typedef struct DarmokHeapObservationCost
 	uint64 index_rows;
 	uint64 attribute_rows;
 	uint64 type_rows;
+	uint64 type_payload_rows;
 	uint64 attrdef_rows;
 	Size missing_carrier_bytes;
 	Size payload_carrier_bytes;

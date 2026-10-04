@@ -690,11 +690,14 @@ async fn readers_coexist_with_dml_and_fence_external_metadata_variants() {
         }
         reader.batch_execute("BEGIN READ ONLY").await.unwrap();
         observer.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let before = observe(&epochs).await;
+        let unheld = observe(&epochs).await;
         hold_probe(&reader).await;
-        let second = observe(&epochs).await;
+        // The one-shot observation releases its fence before returning. A
+        // publication may precede the first retained Share, so use the held
+        // observation as the DDL baseline rather than equating the two scopes.
+        let before = observe(&epochs).await;
         hold_probe(&observer).await;
-        assert_eq!(before.generation(), second.generation());
+        assert!(before.generation() >= unheld.generation());
         let ddl = writer.batch_execute(sql);
         tokio::pin!(ddl);
         tokio::select! {
