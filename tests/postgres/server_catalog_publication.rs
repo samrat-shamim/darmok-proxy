@@ -104,30 +104,51 @@ async fn complete_drop(client: &Client, sql: &str) -> Result<(), tokio_postgres:
 
 // A backend error is not a completion boundary until its ReadyForQuery and
 // stream end have been received. Keep the original native error for callers.
+async fn complete_native_command(
+    client: &Client,
+    sql: &str,
+    expected_tags: &[&str],
+    expected: TransactionState,
+) -> Result<(), tokio_postgres::Error> {
+    let mut events = client.command_events(sql).unwrap();
+    let mut error = None;
+    let mut tags = 0;
+    let mut ready = false;
+    while let Some(event) = events.next().await {
+        assert!(!ready, "event after native command readiness");
+        match event.expect("native command stream failed") {
+            CommandEvent::CommandComplete(tag) => {
+                assert!(error.is_none());
+                assert_eq!(Some(tag.as_str()), expected_tags.get(tags).copied());
+                tags += 1;
+            }
+            CommandEvent::BackendError(value) => {
+                assert!(error.is_none());
+                error = Some(value);
+            }
+            CommandEvent::ReadyForQuery(state) => {
+                assert!(error.is_some() || tags == expected_tags.len());
+                assert_eq!(state, expected);
+                ready = true;
+            }
+            other => panic!("unexpected native command event: {other:?}"),
+        }
+    }
+    assert!(ready, "native command readiness was not observed");
+    match error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
 async fn complete_native_finish_error(
     client: &Client,
     sql: &str,
     expected: TransactionState,
 ) -> tokio_postgres::Error {
-    let mut events = client.command_events(sql).unwrap();
-    let mut error = None;
-    let mut ready = false;
-    while let Some(event) = events.next().await {
-        match event.expect("native finish stream failed") {
-            CommandEvent::BackendError(value) => {
-                assert!(!ready && error.is_none());
-                error = Some(value);
-            }
-            CommandEvent::ReadyForQuery(state) => {
-                assert!(!ready && error.is_some());
-                assert_eq!(state, expected);
-                ready = true;
-            }
-            other => panic!("unexpected native finish event: {other:?}"),
-        }
-    }
-    assert!(ready, "native finish readiness was not observed");
-    error.expect("native finish error was not observed")
+    complete_native_command(client, sql, &[], expected)
+        .await
+        .expect_err("native finish error was not observed")
 }
 
 async fn publication_sentinel_status(client: &Client) -> serde_json::Value {
@@ -188,10 +209,27 @@ async fn publication_sentinel(
     } else {
         "SET darmok_catalog_probe.command='guard_release'"
     };
-    tokio::time::timeout(Duration::from_secs(20), client.batch_execute(sql))
-        .await
-        .expect("sentinel command did not complete")
-        .unwrap();
+    let tags: &[&str] = if held { &["BEGIN", "SET"] } else { &["SET"] };
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        complete_native_command(client, sql, tags, TransactionState::Transaction),
+    )
+    .await
+    .expect("sentinel command did not complete")
+    .unwrap();
+    check_publication_sentinel(client, observer, locks, backend, held).await;
+    if !held {
+        rollback_or_commit(client, "COMMIT").await;
+    }
+}
+
+async fn check_publication_sentinel(
+    client: &Client,
+    observer: &Client,
+    locks: &tokio_postgres::Statement,
+    backend: i32,
+    held: bool,
+) {
     let status = publication_sentinel_status(client).await;
     assert_eq!(status["owned"], held);
     assert_eq!(
@@ -212,11 +250,114 @@ async fn publication_sentinel(
         vec![]
     };
     assert_eq!(actual, expected);
-    if !held {
-        tokio::time::timeout(Duration::from_secs(20), client.batch_execute("COMMIT"))
-            .await
-            .expect("sentinel transaction did not complete")
-            .unwrap();
+}
+
+async fn rollback_or_commit(client: &Client, command: &str) {
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        complete_native_command(client, command, &[command], TransactionState::Idle),
+    )
+    .await
+    .expect("native transaction completion did not complete")
+    .unwrap();
+}
+
+struct PreparedCompletion {
+    gid: &'static str,
+    outcome: &'static str,
+    prepared: bool,
+    requested: bool,
+}
+
+impl PreparedCompletion {
+    fn new(gid: &'static str, outcome: &'static str) -> Self {
+        Self {
+            gid,
+            outcome,
+            prepared: false,
+            requested: false,
+        }
+    }
+}
+
+async fn complete_tracked_prepared(client: &Client, target: &PreparedCompletion) {
+    if !target.prepared {
+        return;
+    }
+    let sql = format!("{} PREPARED '{}'", target.outcome, target.gid);
+    let tag = format!("{} PREPARED", target.outcome);
+    let result = tokio::time::timeout(
+        Duration::from_secs(20),
+        complete_native_command(client, &sql, &[&tag], TransactionState::Idle),
+    )
+    .await
+    .expect("tracked native prepared completion did not complete");
+    match result {
+        Ok(()) => {}
+        Err(error) if target.requested && error.code() == Some(&SqlState::UNDEFINED_OBJECT) => {
+            eprintln!(
+                "tracked native completion already finished: {} code={:?}",
+                target.gid,
+                error.code()
+            );
+        }
+        Err(error) => panic!(
+            "tracked native completion failed for {}: {error}",
+            target.gid
+        ),
+    }
+}
+
+async fn wait_pending_publication_sentinel(
+    observer: &Client,
+    locks: &tokio_postgres::Statement,
+    backend: i32,
+) {
+    let mut expected = vec![
+        (None, "AccessShareLock".to_owned(), true),
+        (None, "AccessShareLock".to_owned(), true),
+        (None, "RowExclusiveLock".to_owned(), true),
+        (Some(backend), "ShareLock".to_owned(), false),
+    ];
+    expected.sort();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let mut actual: Vec<(Option<i32>, String, bool)> = observer
+                .query(locks, &[])
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|row| (row.get(0), row.get(1), row.get(2)))
+                .collect();
+            actual.sort();
+            if actual == expected {
+                return;
+            }
+            // No raw reference is held here: already granted publishers can
+            // drain. Sorting compares a multiset, never native queue order.
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("exact pending sentinel/prepared cohort was not observed");
+}
+
+fn finish_publication_case(
+    outcome: Result<(), Box<dyn std::any::Any + Send>>,
+    cleanup: Vec<Result<(), Box<dyn std::any::Any + Send>>>,
+) {
+    if let Err(panic) = outcome {
+        for result in &cleanup {
+            if result.is_err() {
+                eprintln!("publication fixture cleanup failed; original failure retained");
+            }
+        }
+        std::panic::resume_unwind(panic);
+    }
+    for result in cleanup {
+        if let Err(panic) = result {
+            std::panic::resume_unwind(panic);
+        }
     }
 }
 
@@ -1368,95 +1509,209 @@ async fn concurrent_prepared_transactions_and_gid_reuse_keep_native_identity() {
     let (dml, dml_driver) = client().await;
     let (replacement, replacement_driver) = client().await;
     let (observer, observer_driver) = client().await;
-    writer.batch_execute("CREATE TABLE publication_gid_catalog(id integer); CREATE TABLE publication_gid_rows(id integer, value integer); INSERT INTO publication_gid_rows VALUES (1, 1)").await.unwrap();
-    writer.batch_execute("BEGIN; ALTER TABLE publication_gid_catalog ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_gid_reused'").await.unwrap();
-    dml.batch_execute(
-        "BEGIN; UPDATE publication_gid_rows SET value = 10; PREPARE TRANSACTION 'darmok_gid_dml'",
-    )
-    .await
-    .unwrap();
-    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-    let before = observe(&epochs).await;
-    hold_probe(&reader).await;
+    let (sentinel, sentinel_driver) = client().await;
     let writer_pid = pid(&writer).await;
     let dml_pid = pid(&dml).await;
     let replacement_pid = pid(&replacement).await;
-    let mut finishing = Box::pin(writer.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"));
-    tokio::select! {
-        result = &mut finishing => panic!("prepared metadata escaped the held test probe: {result:?}"),
-        () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+    let sentinel_pid = pid(&sentinel).await;
+    observer
+        .batch_execute("SET plan_cache_mode=force_generic_plan")
+        .await
+        .unwrap();
+    let sentinel_locks = observer.prepare(
+        "SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid=$1 ORDER BY objsubid,mode"
+    ).await.unwrap();
+    let semantic_cohort = observer.prepare(
+        "SELECT pid, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid=17487"
+    ).await.unwrap();
+    for _ in 0..4 {
+        observer
+            .query(&sentinel_locks, &[&sentinel_pid])
+            .await
+            .unwrap();
+        observer.query(&semantic_cohort, &[]).await.unwrap();
     }
-    // Core retains exact GID uniqueness. A second PREPARE fails while the
-    // original is still valid; no module gate changes native error behavior.
-    let error = replacement
-        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
-        .await
-        .unwrap_err();
-    assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
-    replacement.batch_execute("ROLLBACK").await.unwrap();
-    no_fence(&observer, replacement_pid).await;
-    let mut finishing_dml = Box::pin(dml.batch_execute("COMMIT PREPARED 'darmok_gid_dml'"));
-    tokio::select! {
-        result = &mut finishing_dml => panic!("prepared DML escaped the held test probe: {result:?}"),
-        () = wait_fence(&observer, dml_pid, "ExclusiveLock", false) => {}
+    for backend in [writer_pid, dml_pid, replacement_pid] {
+        observer.query(FENCE_LOCKS, &[&backend]).await.unwrap();
+        no_fence(&observer, backend).await;
     }
-
-    release_probe(&reader).await;
-    reader.batch_execute("COMMIT").await.unwrap();
-    tokio::time::timeout(Duration::from_secs(20), &mut finishing)
-        .await
-        .unwrap()
-        .unwrap();
-    drop(finishing);
-    tokio::time::timeout(Duration::from_secs(20), &mut finishing_dml)
-        .await
-        .unwrap()
-        .unwrap();
-    drop(finishing_dml);
-    // Reuse is admitted only after the native original has finished.
-    replacement
-        .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
-        .await
-        .unwrap();
+    publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
+    publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
+    observe(&epochs).await;
     reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-    let after = observe(&epochs).await;
     hold_probe(&reader).await;
-    assert_eq!(after.generation(), before.generation() + 2);
-    let value: i32 = reader
-        .query_one("SELECT value FROM publication_gid_rows", &[])
-        .await
-        .unwrap()
-        .get(0);
-    assert_eq!(value, 10);
-    let changed: bool = reader.query_one(
-        "SELECT EXISTS (SELECT FROM pg_catalog.pg_attribute WHERE attrelid = 'publication_gid_catalog'::pg_catalog.regclass AND attname = 'changed' AND NOT attisdropped)", &[]
-    ).await.unwrap().get(0);
-    assert!(changed);
-    let mut finishing_reuse =
-        Box::pin(replacement.batch_execute("COMMIT PREPARED 'darmok_gid_reused'"));
-    tokio::select! {
-        result = &mut finishing_reuse => panic!("reused GID completion escaped the held test probe: {result:?}"),
-        () = wait_fence(&observer, replacement_pid, "ExclusiveLock", false) => {}
-    }
-
     release_probe(&reader).await;
-    reader.batch_execute("COMMIT").await.unwrap();
-    tokio::time::timeout(Duration::from_secs(20), &mut finishing_reuse)
+    rollback_or_commit(&reader, "COMMIT").await;
+    let mut metadata = PreparedCompletion::new("darmok_gid_reused", "COMMIT");
+    let mut rows = PreparedCompletion::new("darmok_gid_dml", "COMMIT");
+    let mut reuse = PreparedCompletion::new("darmok_gid_reused", "COMMIT");
+    let mut acquiring = None;
+    let outcome = std::panic::AssertUnwindSafe(async {
+        writer.batch_execute("CREATE TABLE publication_gid_catalog(id integer); CREATE TABLE publication_gid_rows(id integer, value integer); INSERT INTO publication_gid_rows VALUES (1, 1)").await.unwrap();
+        writer.batch_execute("BEGIN; ALTER TABLE publication_gid_catalog ADD COLUMN changed integer; PREPARE TRANSACTION 'darmok_gid_reused'").await.unwrap();
+        metadata.prepared = true;
+        dml.batch_execute(
+            "BEGIN; UPDATE publication_gid_rows SET value = 10; PREPARE TRANSACTION 'darmok_gid_dml'",
+        )
         .await
-        .unwrap()
         .unwrap();
-    drop(finishing_reuse);
-    no_fence(&observer, replacement_pid).await;
-    writer
-        .batch_execute("DROP TABLE publication_gid_catalog, publication_gid_rows")
-        .await
-        .unwrap();
-    close(reader, reader_driver).await;
-    close(writer, writer_driver).await;
-    close(dml, dml_driver).await;
-    close(replacement, replacement_driver).await;
-    close(epochs, epochs_driver).await;
-    close(observer, observer_driver).await;
+        rows.prepared = true;
+        // A granted Share would conflict with the prepared metadata RX. Reserve
+        // Share behind precisely the known prepared cohort before taking raw.
+        // Closed cohort: no unrelated Finish, active shared drop, lock group or
+        // unsupported prior semantic mode. pg_locks cannot certify drop intent.
+        acquiring = Some(Box::pin(complete_native_command(
+            &sentinel,
+            "BEGIN READ ONLY; SET darmok_catalog_probe.command='guard_hold'",
+            &["BEGIN", "SET"],
+            TransactionState::Transaction,
+        )));
+        tokio::select! {
+            result = acquiring.as_mut().unwrap() => panic!("sentinel did not reserve behind prepared metadata: {result:?}"),
+            () = wait_pending_publication_sentinel(&observer, &semantic_cohort, sentinel_pid) => {}
+        }
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        hold_probe(&reader).await;
+        let before = observe(&epochs).await;
+        metadata.requested = true;
+        let mut finishing = Box::pin(complete_native_command(&writer, "COMMIT PREPARED 'darmok_gid_reused'", &["COMMIT PREPARED"], TransactionState::Idle));
+        tokio::select! {
+            result = &mut finishing => panic!("prepared metadata escaped the held test probe: {result:?}"),
+            () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
+        }
+        // Core retains exact GID uniqueness. A second PREPARE fails while the
+        // original is still valid; no module gate changes native error behavior.
+        // An error during TBLOCK_PREPARE aborts the whole transaction to Idle.
+        let error = complete_native_command(
+            &replacement,
+            "BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'",
+            &["BEGIN", "PREPARE TRANSACTION"],
+            TransactionState::Idle,
+        )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), Some(&SqlState::DUPLICATE_OBJECT));
+        rollback_or_commit(&replacement, "ROLLBACK").await;
+        no_fence(&observer, replacement_pid).await;
+        rows.requested = true;
+        let mut finishing_dml = Box::pin(complete_native_command(&dml, "COMMIT PREPARED 'darmok_gid_dml'", &["COMMIT PREPARED"], TransactionState::Idle));
+        tokio::select! {
+            result = &mut finishing_dml => panic!("prepared DML escaped the held test probe: {result:?}"),
+            () = wait_fence(&observer, dml_pid, "ExclusiveLock", false) => {}
+        }
+
+        release_probe(&reader).await;
+        rollback_or_commit(&reader, "COMMIT").await;
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+            .await
+            .unwrap()
+            .unwrap();
+        metadata.prepared = false;
+        drop(finishing);
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing_dml)
+            .await
+            .unwrap()
+            .unwrap();
+        rows.prepared = false;
+        drop(finishing_dml);
+        tokio::time::timeout(Duration::from_secs(20), acquiring.as_mut().unwrap()).await.unwrap().unwrap();
+        drop(acquiring.take());
+        check_publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
+        // Reuse is admitted only after the native original has finished.
+        replacement
+            .batch_execute("BEGIN; PREPARE TRANSACTION 'darmok_gid_reused'")
+            .await
+            .unwrap();
+        reuse.prepared = true;
+        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+        hold_probe(&reader).await;
+        let after = observe(&epochs).await;
+        assert_eq!(after.generation(), before.generation() + 2);
+        let value: i32 = reader
+            .query_one("SELECT value FROM publication_gid_rows", &[])
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(value, 10);
+        let changed: bool = reader.query_one(
+            "SELECT EXISTS (SELECT FROM pg_catalog.pg_attribute WHERE attrelid = 'publication_gid_catalog'::pg_catalog.regclass AND attname = 'changed' AND NOT attisdropped)", &[]
+        ).await.unwrap().get(0);
+        assert!(changed);
+        reuse.requested = true;
+        let mut finishing_reuse = Box::pin(complete_native_command(&replacement, "COMMIT PREPARED 'darmok_gid_reused'", &["COMMIT PREPARED"], TransactionState::Idle));
+        tokio::select! {
+            result = &mut finishing_reuse => panic!("reused GID completion escaped the held test probe: {result:?}"),
+            () = wait_fence(&observer, replacement_pid, "ExclusiveLock", false) => {}
+        }
+
+        release_probe(&reader).await;
+        rollback_or_commit(&reader, "COMMIT").await;
+        tokio::time::timeout(Duration::from_secs(20), &mut finishing_reuse)
+            .await
+            .unwrap()
+            .unwrap();
+        reuse.prepared = false;
+        drop(finishing_reuse);
+        no_fence(&observer, replacement_pid).await;
+        publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
+        writer
+            .batch_execute("DROP TABLE publication_gid_catalog, publication_gid_rows")
+            .await
+            .unwrap();
+    })
+    .catch_unwind()
+    .await;
+    let mut cleanup = Vec::new();
+    if outcome.is_err() {
+        cleanup.push(
+            std::panic::AssertUnwindSafe(rollback_or_commit(&reader, "ROLLBACK"))
+                .catch_unwind()
+                .await,
+        );
+        for (client, target) in [(&writer, &metadata), (&dml, &rows), (&replacement, &reuse)] {
+            cleanup.push(
+                std::panic::AssertUnwindSafe(complete_tracked_prepared(client, target))
+                    .catch_unwind()
+                    .await,
+            );
+        }
+        if let Some(future) = acquiring.as_mut() {
+            cleanup.push(
+                std::panic::AssertUnwindSafe(async {
+                    tokio::time::timeout(Duration::from_secs(20), future)
+                        .await
+                        .expect("queued sentinel cleanup did not complete")
+                        .unwrap();
+                })
+                .catch_unwind()
+                .await,
+            );
+        }
+        for client in [&sentinel, &writer, &dml, &replacement] {
+            cleanup.push(
+                std::panic::AssertUnwindSafe(rollback_or_commit(client, "ROLLBACK"))
+                    .catch_unwind()
+                    .await,
+            );
+        }
+    }
+    drop(acquiring);
+    for (client, driver) in [
+        (reader, reader_driver),
+        (writer, writer_driver),
+        (dml, dml_driver),
+        (replacement, replacement_driver),
+        (sentinel, sentinel_driver),
+        (epochs, epochs_driver),
+        (observer, observer_driver),
+    ] {
+        cleanup.push(
+            std::panic::AssertUnwindSafe(close(client, driver))
+                .catch_unwind()
+                .await,
+        );
+    }
+    finish_publication_case(outcome, cleanup);
 }
 
 #[tokio::test]
@@ -1715,12 +1970,12 @@ async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
     if outcome.is_err() {
         for client in [&other, &sentinel, &writer] {
             cleanup.push(
-                tokio::time::timeout(Duration::from_secs(20), client.batch_execute("ROLLBACK"))
+                std::panic::AssertUnwindSafe(rollback_or_commit(client, "ROLLBACK"))
+                    .catch_unwind()
                     .await,
             );
         }
     }
-    let mut closed = Vec::new();
     for (client, driver) in [
         (writer, writer_driver),
         (other, other_driver),
@@ -1728,25 +1983,13 @@ async fn preparation_noop_abort_and_native_errors_release_publication_fences() {
         (epochs, epochs_driver),
         (observer, observer_driver),
     ] {
-        closed.push(
+        cleanup.push(
             std::panic::AssertUnwindSafe(close(client, driver))
                 .catch_unwind()
                 .await,
         );
     }
-    for result in cleanup {
-        result
-            .expect("publication fixture cleanup did not complete")
-            .unwrap();
-    }
-    for result in closed {
-        if let Err(panic) = result {
-            std::panic::resume_unwind(panic);
-        }
-    }
-    if let Err(panic) = outcome {
-        std::panic::resume_unwind(panic);
-    }
+    finish_publication_case(outcome, cleanup);
 }
 
 #[tokio::test]
@@ -1759,7 +2002,9 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
     let (writer, writer_driver) = client().await;
     let (finisher, finisher_driver) = client().await;
     let (observer, observer_driver) = client().await;
+    let (sentinel, sentinel_driver) = client().await;
     let finisher_pid = pid(&finisher).await;
+    let sentinel_pid = pid(&sentinel).await;
     let view_oid: u32 = observer
         .query_one(
             "SELECT 'pg_catalog.pg_prepared_xacts'::pg_catalog.regclass::oid",
@@ -1768,63 +2013,130 @@ async fn prepared_catalog_view_locks_do_not_block_their_own_completion() {
         .await
         .unwrap()
         .get(0);
+    observer
+        .batch_execute("SET plan_cache_mode=force_generic_plan")
+        .await
+        .unwrap();
     let view_lock = observer.prepare(
         "SELECT EXISTS (SELECT FROM pg_catalog.pg_locks WHERE relation = $1 AND mode = 'AccessExclusiveLock' AND granted AND pid IS NULL)"
     ).await.unwrap();
-    observer.query(FENCE_LOCKS, &[&finisher_pid]).await.unwrap();
-    for outcome in ["COMMIT", "ROLLBACK"] {
-        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let before = observe(&epochs).await;
-        hold_probe(&reader).await;
-        tokio::time::timeout(Duration::from_secs(20), writer.batch_execute(
-            "BEGIN; LOCK TABLE pg_catalog.pg_prepared_xacts IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_prepared_view_lock'"
-        )).await.unwrap().unwrap();
-        let retained: bool = observer
-            .query_one(&view_lock, &[&view_oid])
+    let sentinel_locks = observer.prepare(
+        "SELECT objsubid::integer, mode, granted FROM pg_catalog.pg_locks WHERE locktype='object' AND COALESCE(database,0)=0 AND classid=3079 AND objid=0 AND objsubid IN (17485,17486,17487) AND pid=$1 ORDER BY objsubid,mode"
+    ).await.unwrap();
+    for _ in 0..4 {
+        observer.query(&view_lock, &[&view_oid]).await.unwrap();
+        observer
+            .query(&sentinel_locks, &[&sentinel_pid])
             .await
-            .unwrap()
-            .get(0);
-        assert!(retained, "native view lock was not transferred to PREPARE");
-        let sql = format!("{outcome} PREPARED 'darmok_prepared_view_lock'");
-        let mut finishing = Box::pin(finisher.batch_execute(&sql));
-        tokio::select! {
-            result = &mut finishing => panic!("prepared view-lock finish bypassed the reader fence: {result:?}"),
-            () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
-        }
-
-        release_probe(&reader).await;
-        reader.batch_execute("COMMIT").await.unwrap();
-        tokio::time::timeout(Duration::from_secs(20), &mut finishing)
-            .await
-            .unwrap()
             .unwrap();
-        drop(finishing);
-        let retained: bool = observer
-            .query_one(&view_lock, &[&view_oid])
-            .await
-            .unwrap()
-            .get(0);
-        assert!(
-            !retained,
-            "native completion retained its catalog view lock"
-        );
-        let remaining: i64 = observer.query_one(
-            "SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid = 'darmok_prepared_view_lock'", &[]
-        ).await.unwrap().get(0);
-        assert_eq!(remaining, 0);
-        no_fence(&observer, finisher_pid).await;
-        reader.batch_execute("BEGIN READ ONLY").await.unwrap();
-        let after = observe(&epochs).await;
-        hold_probe(&reader).await;
-        assert_eq!(after.generation(), before.generation() + 1);
-        release_probe(&reader).await;
-        reader.batch_execute("COMMIT").await.unwrap();
     }
-    close(reader, reader_driver).await;
-    close(writer, writer_driver).await;
-    close(finisher, finisher_driver).await;
-    close(epochs, epochs_driver).await;
-    close(observer, observer_driver).await;
+    observer.query(FENCE_LOCKS, &[&finisher_pid]).await.unwrap();
+    no_fence(&observer, finisher_pid).await;
+    assert_eq!(publication_sentinel_status(&sentinel).await["owned"], false);
+    observe(&epochs).await;
+    reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+    hold_probe(&reader).await;
+    release_probe(&reader).await;
+    rollback_or_commit(&reader, "COMMIT").await;
+    let mut target = PreparedCompletion::new("darmok_prepared_view_lock", "COMMIT");
+    let outcome = std::panic::AssertUnwindSafe(async {
+        for outcome in ["COMMIT", "ROLLBACK"] {
+            target.outcome = outcome;
+            target.requested = false;
+            // This warmed closed cohort has no active shared drop/unrelated Finish.
+            // LOCK is not metadata DDL; its PREPARE transfers compatible AS only.
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, true).await;
+            reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+            hold_probe(&reader).await;
+            let before = observe(&epochs).await;
+            tokio::time::timeout(Duration::from_secs(20), writer.batch_execute(
+                "BEGIN; LOCK TABLE pg_catalog.pg_prepared_xacts IN ACCESS EXCLUSIVE MODE; PREPARE TRANSACTION 'darmok_prepared_view_lock'"
+            )).await.unwrap().unwrap();
+            target.prepared = true;
+            let retained: bool = observer
+                .query_one(&view_lock, &[&view_oid])
+                .await
+                .unwrap()
+                .get(0);
+            assert!(retained, "native view lock was not transferred to PREPARE");
+            let sql = format!("{outcome} PREPARED 'darmok_prepared_view_lock'");
+            let tag = format!("{outcome} PREPARED");
+            let tags = [tag.as_str()];
+            target.requested = true;
+            let mut finishing = Box::pin(complete_native_command(&finisher, &sql, &tags, TransactionState::Idle));
+            tokio::select! {
+                result = &mut finishing => panic!("prepared view-lock finish bypassed the reader fence: {result:?}"),
+                () = wait_fence(&observer, finisher_pid, "ExclusiveLock", false) => {}
+            }
+
+            release_probe(&reader).await;
+            rollback_or_commit(&reader, "COMMIT").await;
+            tokio::time::timeout(Duration::from_secs(20), &mut finishing)
+                .await
+                .unwrap()
+                .unwrap();
+            target.prepared = false;
+            drop(finishing);
+            let retained: bool = observer
+                .query_one(&view_lock, &[&view_oid])
+                .await
+                .unwrap()
+                .get(0);
+            assert!(
+                !retained,
+                "native completion retained its catalog view lock"
+            );
+            let remaining: i64 = observer.query_one(
+                "SELECT count(*) FROM pg_catalog.pg_prepared_xacts WHERE gid = 'darmok_prepared_view_lock'", &[]
+            ).await.unwrap().get(0);
+            assert_eq!(remaining, 0);
+            no_fence(&observer, finisher_pid).await;
+            reader.batch_execute("BEGIN READ ONLY").await.unwrap();
+            hold_probe(&reader).await;
+            let after = observe(&epochs).await;
+            assert_eq!(after.generation(), before.generation() + 1);
+            release_probe(&reader).await;
+            rollback_or_commit(&reader, "COMMIT").await;
+            publication_sentinel(&sentinel, &observer, &sentinel_locks, sentinel_pid, false).await;
+        }
+    })
+    .catch_unwind()
+    .await;
+    let mut cleanup = Vec::new();
+    if outcome.is_err() {
+        cleanup.push(
+            std::panic::AssertUnwindSafe(rollback_or_commit(&reader, "ROLLBACK"))
+                .catch_unwind()
+                .await,
+        );
+        cleanup.push(
+            std::panic::AssertUnwindSafe(complete_tracked_prepared(&finisher, &target))
+                .catch_unwind()
+                .await,
+        );
+        for client in [&sentinel, &writer, &finisher] {
+            cleanup.push(
+                std::panic::AssertUnwindSafe(rollback_or_commit(client, "ROLLBACK"))
+                    .catch_unwind()
+                    .await,
+            );
+        }
+    }
+    for (client, driver) in [
+        (reader, reader_driver),
+        (writer, writer_driver),
+        (finisher, finisher_driver),
+        (sentinel, sentinel_driver),
+        (epochs, epochs_driver),
+        (observer, observer_driver),
+    ] {
+        cleanup.push(
+            std::panic::AssertUnwindSafe(close(client, driver))
+                .catch_unwind()
+                .await,
+        );
+    }
+    finish_publication_case(outcome, cleanup);
 }
 
 #[tokio::test]

@@ -328,3 +328,64 @@ closures under existing bounds. No native module input changes.
 Current corrected publication verification and final implementation review
 remain OPEN. All full collector/provider/execution/performance/release gates,
 issues46/15 and the overall goal remain OPEN; concurrent native2PC stays required.
+
+### Successful native finishes require separate sentinel geometries
+
+At corrected source `dc103508bf84e9ec896099f47ebe0fb73d6bd206`, strict Rust
+root72 and PG17 publication root73 actually exited0; all18 publication cases
+passed. PG18 root74 actually exited101: discovery11/builtin2 passed, publication
+16 passed/two failed. The corrected error-cleanup fixture passed on both majors.
+The GID fixture's exact+2 returned671 versus670; the lock-only catalog-view
+fixture's exact+1 returned727 versus726. Later PG18 binaries did not run. Failed
+stdout SHA256 is
+`367c64c0fc575ac9a81610e3169826480e9a54db4b9dbe68eff0e4a4c4473375`,
+binding facts `b5ae47e41b3cc83a851e7c96eede16f6af9069d18a73b393d90fa15112abbcd4`.
+The failed profile is preserved, including the GID fixture's unreached ordinary
+cleanup and replacement prepared transaction; it is not manually recovered.
+
+Independent bounded source review atdc10350 records G1/V1. The complete known
+semantic cohort must be verified before any raw reference. A granted Share
+cannot span the GID fixture's prepared metadata RX; a pending Share reservation
+can exclude later conflicting ordinary RX under the paired native queue rules.
+Its pre-baseline multiset is exactly two prepared coverage AS rows, one prepared
+metadata RX, and the sentinel's ungranted Share, with no other holders/waiters.
+After both native finishes, acquisition must complete and prove owned/acquired
+plus actual granted Share before reuse PREPARE/after SHOW. All three finishes,
+duplicate PREPARE/native error, value/column oracles and exact+2 remain.
+
+The view fixture warms guard/observer/empty SHOW dependencies before prepared
+AX locks, then grants Share before LOCK/PREPARE. Its admitted lock-only path
+transfers compatible AS without metadata RX. Both native outcomes, AX transfer
+and release, GID absence, actual raw waits and exact+1 remain. Every epoch is
+distinct and unheld; raw holds precede those SHOWs. Both geometries explicitly
+assume a closed cohort without unrelated Finish, active shared-drop intent,
+lock groups or unsupported semantic histories. pg_locks does not certify the
+shared-drop intent counter or map a dummy lock row to its GID.
+
+Native command consumers now preserve the original backend error and validate
+command tags, exact Ready state and stream end. Tracked preparation/request/
+completion state distinguishes the original and reused GID incarnations. On
+failure, release raw first, normally finish only tracked prepared targets using
+the intended outcomes, drain the queued sentinel, then rollback remaining
+transactions and attempt every driver closure. Cleanup errors remain recorded
+while the original failure is rethrown. No signal, restart or native error
+experiment is added; all20s bounds remain.
+
+The duplicate PREPARE error expects Ready Idle. The paired pinned xact.c
+AbortCurrentTransactionInternal TBLOCK_PREPARE branches abort/clean the whole
+transaction and reset TBLOCK_DEFAULT; TransactionBlockStatusCode maps that to
+Idle. It differs from the child Finish attempts' failed-transaction state. The
+finite source read corrects this expectation before ordinary execution; it does
+not add a new native error experiment.
+
+The171-member review is
+`logs/review-native-publication-finishes-dc10350-source-v1`, report SHA256
+`92e162dc2a5286b25f9d98cddb86a9740211cae5d3f00b8a5ec3e18d30101a51`,
+seal `53522f9762827d9bf0dce1b6dbc05928216ecfd26d2aaa869e25132132db2ed9`.
+Final/post/completion/observer actually exited0; root76 verifies193 paths, facts
+`b658c3b0dc53a8458668aa3bcab8924dd1bd639c09abda96f0b9deffd3f173df`;
+root77 reads the full report/raw observer. No producer of the extra increments
+or product C defect is established. Root78's recorder preflight rejected dirty
+source before its helper-read payload ran; that failed namespace is preserved.
+Native26 package inputs remain unchanged. Fresh ordinary verification and final
+implementation review remain OPEN, as do every broader gate and the goal.

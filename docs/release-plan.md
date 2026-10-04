@@ -6448,3 +6448,16 @@ four real finish waits, native outcomes, exact+1 assertions and original bounds
 remain. Closed fixture cohort assumptions and failure cleanup are explicit.
 Native package inputs remain unchanged. Corrected publication verification,
 final implementation review and all broader gates remain OPEN.
+
+Corrected dc10350 passed strict Rust and PG17 publication18, but PG18 root74
+exited101 on two other exact generation checks (GID+2 and lock-only view+1).
+The corrected error-cleanup case passed both majors. The
+[successful-Finish ledger](native-composite-type-fields.md#successful-native-finishes-require-separate-sentinel-geometries)
+preserves the failure and171-member source diagnosis. Metadata PREPARE retains
+semantic RX, so GID uses a pending-then-owned Share reservation with the complete
+known prepared lock cohort; the warmed view's lock-only PREPARE permits a granted
+Share. Both retain distinct unheld epochs, actual native waits/outcomes, exact
+counts and20s bounds. Tracked native completion and failure cleanup drain through
+Ready, release raw before finishing targets and settle the sentinel before all
+driver closures. The failed PG18 profile is preserved; fresh ordinary required
+verification is pending. Native module inputs and all broader open gates remain.
