@@ -7,6 +7,11 @@ witness, new runtime behavior or an execution lease. The accepted six-catalog
 and direct-payload components retain their original source and profile scope.
 Concurrent native PostgreSQL two-phase transactions remain required.
 
+The [entry mechanism comparison](native-entry-boundary.md) makes the remaining
+private-state boundary and concrete deployment alternatives explicit. It does
+not select or implement an entry witness; the current stock-server/extension
+direction and all pre-open requirements below remain in force.
+
 The [transitive type investigation](native-transitive-type-closure.md) adds
 `pg_range`, `pg_enum`, `pg_constraint` and constraint TOAST2832 to the intended
 metadata graph. Each new native descriptor must have a pre-open admission
