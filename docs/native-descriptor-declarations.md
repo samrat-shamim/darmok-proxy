@@ -1,9 +1,11 @@
 # Native descriptor branch declarations
 
-Status: implementation and ordinary fixtures are present; current paired
-PostgreSQL 17/18 builds, required suites and independent implementation review
-are pending. Historical native binaries do not certify this change. This is a
-finite addition to the private storage observation, not new descriptor admission.
+Status: locally verified at `06ce5b026cba6a9c9dc35fb1957f9f3bec14bfcd`
+with paired PostgreSQL 17.11/18.6 packages, eight required profiles and 124
+required native tests, with none failed or ignored. Independent implementation
+review is required before merge. This is a finite addition to the private
+storage observation, not new descriptor admission. Historical native binaries
+do not certify this change.
 
 Each selected application or metadata storage node returns the actual
 `pg_class.relchecks`, `relhasrules` and `relhastriggers` values as

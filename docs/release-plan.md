@@ -6118,3 +6118,55 @@ ordinary suites and independent implementation review are pending. Earlier
 120-test acceptance remains PR76-only. Existing profiles and all failures are
 preserved. Broader descriptor/closure/execution/performance/release gates and
 the overall goal remain open; standing scope exclusions remain in force.
+
+### Descriptor branch declarations: current paired ordinary verification
+
+Source 06ce5b026cba6a9c9dc35fb1957f9f3bec14bfcd, tree
+e86c183721e0c4f2e32b367a8a2d6d1150b62dc4, passes recorded roots 9–18
+at actual exit 0: diff hygiene, targeted formatting, repository boundaries,
+strict storage-test Clippy, paired packaging, fresh required profile setup and
+both majors' integration/private suites.
+
+Root 13 rebuilds four arm64 Linux images from 26 exact native/package inputs;
+all fourteen build/artifact commands pass. Package facts:
+logs/native-descriptor-fields-06ce5b0-packages-v1/facts.json,
+SHA256 af33cdf213409a93358034494e3ae5e79a0d85d4bee21145b95775707ab701b2.
+Root 14 prepares eight fresh profiles with all 571 commands successful.
+Profile facts:
+logs/native-descriptor-fields-06ce5b0-profiles-17-18-primary-no2pc-unpreloaded-ordered-v1/facts.json,
+SHA256 8c8d8d5a20f04348694a9b2fe89b4171772d0e1925539de6a54ad4030e2ddfbf.
+Supported primary and alternate-preload profiles retain ten native 2PC slots;
+there is no requirement to disable native prepared transactions. Existing
+profiles remain preserved without stop, restart or signal actions.
+
+Roots 15/17 each pass 59 integration tests (11/2/18/15/2/6/5 across the seven
+binaries); roots 16/18 each pass the three selected private catalog tests.
+The total is 124 passed, 0 failed, 0 ignored. Every run has thirty successful
+before/after binding readers, exact native inputs and unchanged container/start
+identities with zero restarts. Fixture binding facts and SHA256s are:
+
+- logs/native-descriptor-fields-15-pg17-integration-binding-v1/facts.json:
+  709d042809d93303e103ee77d6237e73649256ee85c5442fcb664af46f6fda63.
+- logs/native-descriptor-fields-16-pg17-private-binding-v1/facts.json:
+  037d4455473b3799c143896ae96bfd7060354ec4a5be184faca3e7842e269429.
+- logs/native-descriptor-fields-17-pg18-integration-binding-v1/facts.json:
+  57d42e3844a98d4e9672eb37c49290fa6c0d6cebda22236503314a8fa822eebd.
+- logs/native-descriptor-fields-18-pg18-private-binding-v1/facts.json:
+  1348ef49a2f58ba84730882feaa7db99e02c80098386d0a81acfa2f4afb5c534.
+
+Both new fixtures pass on both majors. Actual class hints and CHECK counts
+match the independent complete graph oracle through CREATE, NOT VALID checks,
+validation, DROP and ordinary VACUUM. The prepared writer retains actual target
+AX ownership; the reader waits without coordination fences or an unwanted
+catalog horizon. Both commit and rollback preserve a genuinely established RR
+data view while current declarations are refreshed. Earlier owned facts remain
+historical. Timeouts, lock assertions and 2PC configuration are not relaxed.
+
+Only three repository documentation paths change after tested source; all 26
+native/package inputs and the changed Rust fixture remain byte-identical.
+The passive root-04 reader's actual exit 1 is a line-bound assertion (157 lines,
+requested 158), preserved with raw streams; corrected reader root 05 passes.
+It is not a native test failure. Final hygiene/boundary/evidence checks and
+independent fresh implementation review remain merge requirements. Broader
+descriptor/constraint/type/provider/statement/execution/performance/release
+gates, issues 46/15 and the overall goal remain OPEN. Standing exclusions hold.

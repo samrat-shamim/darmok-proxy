@@ -34,7 +34,8 @@ admits no new descriptor/options path or transitive type closure.
 The current [raw relation option images](native-relation-options.md) extension
 is locally verified at 38f2548a9a812b6e7252002fa247788a9addcc4b with paired
 native packages and 120 required ordinary tests. Independent implementation
-review is required before merge. It
+review accepted the finite change at c46504ef7af35e9c0c3b1fc3d7be6385842f2d20;
+PR76 merged its exact tree at 6ae2912e4fed84d4fef1dcabad9ffd077eaebd21. It
 captures every selected graph node's class option carrier, preserves the
 existing opened-descriptor profile and moves copied graph selection into the
 same raw span as its additional class pass. The prior tests above do not
@@ -43,8 +44,9 @@ certify this changed native code.
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 The [descriptor branch declarations](native-descriptor-declarations.md)
 addition returns actual rule/trigger hints and the declared CHECK count through
-the existing class observation. Current builds, suites and independent review
-are pending; it admits no new descriptor path.
+the existing class observation. Paired PostgreSQL 17.11/18.6 packages and all
+124 required native tests pass at 06ce5b026cba6a9c9dc35fb1957f9f3bec14bfcd.
+Independent review is required before merge; it admits no new descriptor path.
 
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
