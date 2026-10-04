@@ -4,12 +4,16 @@ use darmok_catalog::{NativeCatalogStamp, decode_catalog_observation};
 use futures_util::{FutureExt, StreamExt};
 use std::time::Duration;
 use tokio_postgres::{Client, NoTls, error::SqlState};
-use tokio_postgres::{SimpleQueryEvent, TransactionState};
+use tokio_postgres::{CommandEvent, SimpleQueryEvent, TransactionState};
 
 #[path = "support/native_frames.rs"]
 mod native_frames;
 
 static TEST_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+// Database removal can require a durable checkpoint. Its filesystem sync cost
+// is independent of the module's lock/admission and immediate-read deadlines.
+const DATABASE_DROP_COMPLETION: Duration = Duration::from_secs(120);
 
 const FENCE_LOCKS: &str = "SELECT mode, granted FROM pg_catalog.pg_locks
     WHERE locktype = 'object' AND COALESCE(database, 0) = 0
@@ -65,50 +69,87 @@ async fn close(client: Client, driver: tokio::task::JoinHandle<Result<(), tokio_
         .unwrap();
 }
 
-// Epochs come from a distinct unheld backend, never combined with probe state.
-async fn observe(client: &Client) -> NativeCatalogStamp {
-    tokio::time::timeout(Duration::from_secs(20), async {
-        let mut events = client
-            .simple_query_events("SHOW darmok_server.catalog_request_v1")
-            .unwrap();
-        let mut text = None;
-        let mut descriptions = 0;
-        let mut tags = 0;
-        let mut ready = None;
-        while let Some(event) = events.next().await {
-            match event.unwrap() {
-                SimpleQueryEvent::RowDescription(columns) => {
-                    assert_eq!(columns.len(), 1);
-                    assert_eq!(columns[0].name(), "darmok_server.catalog_request_v1");
-                    assert_eq!(columns[0].type_oid(), 25);
-                    assert_eq!(columns[0].format(), 0);
-                    descriptions += 1;
-                }
-                SimpleQueryEvent::Row(row) => {
-                    assert!(text.is_none());
-                    assert_eq!(row.len(), 1);
-                    text = Some(row.get(0).unwrap().to_owned());
-                }
-                SimpleQueryEvent::CommandComplete(tag) => {
-                    assert_eq!(tag, "SHOW");
-                    tags += 1;
-                }
-                SimpleQueryEvent::ReadyForQuery(state) => ready = Some(state),
-                other => panic!("unexpected observation event: {other:?}"),
+// ErrorResponse precedes native abort cleanup. Observe ReadyForQuery before
+// returning either outcome to callers that inspect native locks afterward.
+async fn complete_drop(client: &Client, sql: &str) -> Result<(), tokio_postgres::Error> {
+    let mut events = client.command_events(sql)?;
+    let mut error = None;
+    let mut commands = 0_usize;
+    let mut ready = false;
+    while let Some(event) = events.next().await {
+        match event? {
+            CommandEvent::CommandComplete(tag) => {
+                assert_eq!(tag, "DROP DATABASE");
+                commands += 1;
             }
+            CommandEvent::BackendError(value) => {
+                assert!(error.is_none());
+                error = Some(value);
+            }
+            CommandEvent::ReadyForQuery(state) => {
+                assert!(!ready);
+                assert!(matches!(state, TransactionState::Idle));
+                ready = true;
+            }
+            other => panic!("unexpected database-drop event: {other:?}"),
         }
-        assert_eq!(descriptions, 1);
-        assert_eq!(tags, 1);
-        assert!(matches!(
-            ready,
-            Some(TransactionState::Idle | TransactionState::Transaction)
-        ));
-        decode_catalog_observation(&text.unwrap(), &[])
-            .unwrap()
-            .stamp()
-    })
-    .await
-    .expect("one-shot epoch observation did not complete")
+    }
+    assert!(ready, "database-drop completion was not observed");
+    assert_eq!(commands, usize::from(error.is_none()));
+    match error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+// Epochs come from a distinct unheld backend, never combined with probe state.
+// Staged wait fixtures start this receive operation before releasing their
+// native blockers; the caller bounds completion after the release.
+async fn receive_observation(client: &Client) -> NativeCatalogStamp {
+    let mut events = client
+        .simple_query_events("SHOW darmok_server.catalog_request_v1")
+        .unwrap();
+    let mut text = None;
+    let mut descriptions = 0;
+    let mut tags = 0;
+    let mut ready = None;
+    while let Some(event) = events.next().await {
+        match event.unwrap() {
+            SimpleQueryEvent::RowDescription(columns) => {
+                assert_eq!(columns.len(), 1);
+                assert_eq!(columns[0].name(), "darmok_server.catalog_request_v1");
+                assert_eq!(columns[0].type_oid(), 25);
+                assert_eq!(columns[0].format(), 0);
+                descriptions += 1;
+            }
+            SimpleQueryEvent::Row(row) => {
+                assert!(text.is_none());
+                assert_eq!(row.len(), 1);
+                text = Some(row.get(0).unwrap().to_owned());
+            }
+            SimpleQueryEvent::CommandComplete(tag) => {
+                assert_eq!(tag, "SHOW");
+                tags += 1;
+            }
+            SimpleQueryEvent::ReadyForQuery(state) => ready = Some(state),
+            other => panic!("unexpected observation event: {other:?}"),
+        }
+    }
+    assert_eq!(descriptions, 1);
+    assert_eq!(tags, 1);
+    assert!(matches!(
+        ready,
+        Some(TransactionState::Idle | TransactionState::Transaction)
+    ));
+    decode_catalog_observation(&text.unwrap(), &[])
+        .unwrap()
+        .stamp()
+}
+
+async fn observe(client: &Client) -> NativeCatalogStamp {
+    tokio::time::timeout(Duration::from_secs(20), receive_observation(client))
+        .await
+        .expect("one-shot epoch observation did not complete")
 }
 
 async fn hold_probe(client: &Client) {
@@ -371,7 +412,7 @@ async fn late_indexed_temp_publishers_allow_both_prepared_outcomes() {
                     .gate(&observer, second_pid, "RowExclusiveLock", true)
                     .await;
 
-                let mut reading = Box::pin(observe(&epochs));
+                let mut reading = Box::pin(receive_observation(&epochs));
                 tokio::select! {
                     result = &mut reading => panic!("observer escaped unfinished publications: {result:?}"),
                     () = locks.gate(&observer, epochs_pid, "ShareLock", false) => {}
@@ -1719,14 +1760,14 @@ async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
         let before = observe(&epochs).await;
         hold_probe(&reader).await;
         let drop_sql = format!("DROP DATABASE {database}");
-        let mut dropping = Box::pin(writer.batch_execute(&drop_sql));
+        let mut dropping = Box::pin(complete_drop(&writer, &drop_sql));
         tokio::select! {
             result = &mut dropping => panic!("database removal escaped the catalog fence: {result:?}"),
             () = wait_fence(&observer, writer_pid, "ExclusiveLock", false) => {}
         }
         close(temporary, temporary_driver).await;
         wait_fence(&observer, temp_pid, "ExclusiveLock", false).await;
-        let mut late_acquisition = Box::pin(observe(&late_reader));
+        let mut late_acquisition = Box::pin(receive_observation(&late_reader));
         tokio::select! {
             result = &mut late_acquisition => panic!("new reader bypassed shared-drop admission: {result:?}"),
             () = wait_reader_admission(&observer, late_pid, "single drop before completion") => {}
@@ -1734,7 +1775,7 @@ async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
 
         release_probe(&reader).await;
         reader.batch_execute("COMMIT").await.unwrap();
-        tokio::time::timeout(Duration::from_secs(20), &mut dropping)
+        tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut dropping)
             .await
             .unwrap()
             .unwrap();
@@ -1825,20 +1866,24 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     late_reader.batch_execute("BEGIN READ ONLY").await.unwrap();
     let before = observe(&epochs).await;
     hold_probe(&reader).await;
-    let mut first =
-        Box::pin(first_writer.batch_execute("DROP DATABASE darmok_publication_drop_first"));
+    let mut first = Box::pin(complete_drop(
+        &first_writer,
+        "DROP DATABASE darmok_publication_drop_first",
+    ));
     tokio::select! {
         result = &mut first => panic!("first drop escaped the held native test probe: {result:?}"),
         () = wait_fence(&observer, first_pid, "ExclusiveLock", false) => {}
     }
-    let mut second =
-        Box::pin(second_writer.batch_execute("DROP DATABASE darmok_publication_drop_busy"));
+    let mut second = Box::pin(complete_drop(
+        &second_writer,
+        "DROP DATABASE darmok_publication_drop_busy",
+    ));
     tokio::select! {
         result = &mut second => panic!("second drop escaped the held native test probe: {result:?}"),
         () = wait_fence(&observer, second_pid, "ExclusiveLock", false) => {}
     }
     close(temporary, temporary_driver).await;
-    let mut acquisition = Box::pin(observe(&late_reader));
+    let mut acquisition = Box::pin(receive_observation(&late_reader));
     tokio::select! {
         result = &mut acquisition => panic!("reader bypassed shared-drop admission: {result:?}"),
         () = wait_reader_admission(&observer, late_pid, "both drop intents pending") => {}
@@ -1846,7 +1891,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     release_probe(&reader).await;
     reader.batch_execute("COMMIT").await.unwrap();
     wait_shared_drop_barrier(&observer, second_pid).await;
-    tokio::time::timeout(Duration::from_secs(20), &mut first)
+    tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut first)
         .await
         .unwrap()
         .unwrap();
@@ -1858,7 +1903,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
     // intent. Its existing busy-database error clears that intent and wakes the
     // reader; their two replies still have no required ordering.
     barrier.batch_execute("ROLLBACK").await.unwrap();
-    let error = tokio::time::timeout(Duration::from_secs(20), &mut second)
+    let error = tokio::time::timeout(DATABASE_DROP_COMPLETION, &mut second)
         .await
         .unwrap()
         .unwrap_err();

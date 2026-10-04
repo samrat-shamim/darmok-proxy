@@ -212,12 +212,13 @@ async fn private_reference_ownership_snapshots_and_error_cleanup() {
     let backend = pid(&reader).await;
     let probe = Observer::new(&observer).await;
     let outcome = AssertUnwindSafe(tokio::time::timeout(Duration::from_secs(60), async {
-        sql(&reader, "BEGIN; SET darmok_catalog_probe.command='guard_hold'").await.unwrap();
+        sql(&reader, "BEGIN; SET darmok_server.catalog_request_v1='[[\"pg_catalog\",\"pg_class\"]]'").await.unwrap();
+        show(&reader, "darmok_server.catalog_request_v1").await;
+        sql(&reader, "SET darmok_catalog_probe.command='guard_hold'").await.unwrap();
         let held = status(&reader).await;
         assert_eq!(held["owned"], true);
         for name in ["first_snapshot", "before_snapshot", "after_snapshot"] { assert_eq!(held[name], false); }
         assert_eq!(probe.modes(&observer, backend).await, vec![(17487, "ShareLock".to_owned(), true)]);
-        show(&reader, "darmok_server.catalog_request_v1").await;
         assert_eq!(status(&reader).await["first_snapshot"], false);
         sql(&reader, "SET darmok_catalog_probe.command='guard_copy'; SET darmok_catalog_probe.command='guard_release'; SET darmok_catalog_probe.command='guard_hold'; SAVEPOINT child").await.unwrap();
         let error = sql(&reader, "SET darmok_catalog_probe.command='guard_stale_release'").await.unwrap_err();
@@ -275,7 +276,9 @@ async fn publishers_wait_before_raw_fences_and_prepared_metadata_can_finish() {
     let probe = Observer::new(&observer).await;
     let outcome = AssertUnwindSafe(tokio::time::timeout(Duration::from_secs(60), async {
         sql(&finisher, "CREATE TABLE guard_rows(id integer)").await.unwrap();
-        sql(&reader, "BEGIN; SET darmok_catalog_probe.command='guard_hold'").await.unwrap();
+        sql(&reader, "BEGIN; SET darmok_server.catalog_request_v1='[[\"pg_catalog\",\"pg_class\"]]'").await.unwrap();
+        show(&reader, "darmok_server.catalog_request_v1").await;
+        sql(&reader, "SET darmok_catalog_probe.command='guard_hold'").await.unwrap();
         let publishing = writer.batch_execute("BEGIN; CREATE FUNCTION guard_definition() RETURNS integer LANGUAGE SQL AS 'SELECT 7'; COMMIT");
         tokio::pin!(publishing);
         tokio::select! {
@@ -283,7 +286,7 @@ async fn publishers_wait_before_raw_fences_and_prepared_metadata_can_finish() {
             () = probe.wait(&observer, writer_pid, "RowExclusiveLock", false) => {}
         }
         assert!(probe.modes(&observer, writer_pid).await.iter().all(|(tag, _, _)| *tag == 17487));
-        show(&reader, "darmok_server.catalog_request_v1").await;
+        assert_eq!(status(&reader).await["first_snapshot"], false);
         sql(&reader, "SET darmok_catalog_probe.command='guard_release'; COMMIT").await.unwrap();
         tokio::time::timeout(DEADLINE, &mut publishing).await.unwrap().unwrap();
 
@@ -292,6 +295,7 @@ async fn publishers_wait_before_raw_fences_and_prepared_metadata_can_finish() {
             let modes = probe.prepared_modes(&observer).await;
             assert_eq!(modes, vec![(17487, "AccessShareLock".to_owned()), (17487, "RowExclusiveLock".to_owned())]);
             sql(&reader, "BEGIN").await.unwrap();
+            show(&reader, "darmok_server.catalog_request_v1").await;
             let holding = reader.batch_execute("SET darmok_catalog_probe.command='guard_hold'");
             tokio::pin!(holding);
             tokio::select! {
@@ -302,7 +306,7 @@ async fn publishers_wait_before_raw_fences_and_prepared_metadata_can_finish() {
             sql(&finisher, &format!("{ending} PREPARED '{gid}'")).await.unwrap();
             tokio::time::timeout(DEADLINE, &mut holding).await.unwrap().unwrap();
             assert_eq!(status(&reader).await["owned"], true);
-            show(&reader, "darmok_server.catalog_request_v1").await;
+            assert_eq!(status(&reader).await["first_snapshot"], false);
             sql(&reader, "SET darmok_catalog_probe.command='guard_release'; COMMIT").await.unwrap();
             assert!(probe.prepared_modes(&observer).await.is_empty());
             if ending == "COMMIT" { sql(&finisher, "DROP FUNCTION guard_prepared_definition()").await.unwrap(); }
@@ -409,18 +413,22 @@ async fn shared_drop_drains_before_intent_without_sleeping_under_a_guard() {
             .unwrap();
         sql(
             &reader,
-            "BEGIN; SET darmok_catalog_probe.command='guard_hold'",
+            "BEGIN; SET darmok_server.catalog_request_v1='[[\"pg_catalog\",\"pg_class\"]]'",
         )
         .await
         .unwrap();
+        show(&reader, "darmok_server.catalog_request_v1").await;
+        sql(&reader, "SET darmok_catalog_probe.command='guard_hold'")
+            .await
+            .unwrap();
         let dropping = dropper.batch_execute("DROP DATABASE guard_drop_before_intent");
         tokio::pin!(dropping);
         tokio::select! {
             result = &mut dropping => panic!("DROP escaped existing S: {result:?}"),
             () = probe.wait(&observer, dropper_pid, "RowExclusiveLock", false) => {}
         }
-        show(&reader, "darmok_server.catalog_request_v1").await;
         assert_eq!(status(&reader).await["owned"], true);
+        assert_eq!(status(&reader).await["first_snapshot"], false);
         sql(
             &reader,
             "SET darmok_catalog_probe.command='guard_release'; COMMIT",

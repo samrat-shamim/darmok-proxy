@@ -23,6 +23,13 @@ The next [transitive type definition investigation](native-transitive-type-closu
 records native edge/constraint/provider obligations and an open new-catalog
 descriptor bootstrap gate. It does not extend the accepted implementation profile.
 
+The current [catalog reference scopes](native-bootstrap-references.md)
+implementation separates initial seed acquisition from reader increments.
+Paired packages and required ordinary suites are locally verified at
+62deefe017e947bfb2dba454ea36fb9ea5f2f662 with unchanged native inputs from the
+7abbcfd build. Independent fresh review is a merge gate. This verification
+admits no new descriptor/options path or transitive type closure.
+
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
@@ -63,8 +70,11 @@ they cannot become false retry. Closing this attempt does not remove references
 borrowed or retained by earlier native transaction history. The historical SHOW
 reader has no new storage-lifetime claim.
 
-Initial scans/snapshot/descriptor increments close before complete physical
-acquisition. Globally current SI, installation checks, final fact descriptors
+The initial eight-reference seed is fully acquired before the six initial
+readers open with NoLock. Initial scans/snapshot/descriptor increments close,
+then the seed releases before complete physical graph acquisition. Source/final
+readers use that graph's exact AS through NoLock. Globally current SI,
+installation checks, final fact descriptors
 and mapping resolution occur after physical acquisition and before semantic S,
 under common native refresh reentry exclusion. S then owns the metadata point.
 A middle coherent observation supplies source carriers while retaining its
@@ -96,6 +106,9 @@ protect the invocation. Entered-invocation ERROR propagates, records the capture
 owning subid as abort-required, and never guesses a partial native grant.
 Matching native abort is required before reuse/commit/prepare. Native promotion,
 child abort and retention remain governed by the reviewed reference primitive.
+Cleanup detaches returned resource pointers before native release. Failed
+invocation storage remains under the current transaction/subtransaction context
+until native abort releases its resources; normal completion deletes it.
 
 The accepted original component performed two full three-heap observations and
 the fixed column/type extension performed two five-heap observations. The current

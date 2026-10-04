@@ -2,8 +2,8 @@
 
 Status: supported path investigation under the selected
 [stock runtime contract](native-runtime-contract.md). The new descriptor
-bootstrap implementation gate remains OPEN before collector C changes. Native
-cache/reference services are trusted; Darmok's own acquisitions, pre-open path
+bootstrap implementation gate remains OPEN before adding new collector paths.
+Native cache/reference services are trusted; Darmok's own acquisitions, pre-open path
 admission and exact guard sequence still require proof. This does not certify
 an implementation-ready collector, new runtime behavior or an execution lease.
 The accepted six-catalog and direct-payload components retain their original scope.
@@ -13,6 +13,13 @@ The [entry mechanism comparison](native-entry-boundary.md) records the selected
 stock-server/extension direction. Exhaustive native owner/registry/producer
 censuses are superseded acceptance premises. The functional pre-open
 requirements below remain in force.
+
+The [catalog reference scopes](native-bootstrap-references.md) separate
+explicit initial AS acquisition from the existing readers and follow each
+returned scan, snapshot and descriptor through matching cleanup. This change
+admits no new descriptor/options path. Current paired ordinary verification covers this
+finite implementation; independent fresh review is its merge gate. Broader
+supported-path and writer gates remain open.
 
 The [transitive type investigation](native-transitive-type-closure.md) adds
 `pg_range`, `pg_enum`, `pg_constraint` and constraint TOAST2832 to the intended

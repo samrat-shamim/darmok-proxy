@@ -5559,3 +5559,312 @@ product failures. No profile operation, native build, new stress/forced-error/
 interruption/recovery experiment, security or compiler work, hosted CI or release
 publication is introduced. Full engine, serving, performance and release gates,
 issues 46/15 and the overall goal remain OPEN.
+
+
+### Catalog reader reference scopes: implementation draft after PR74
+
+PR74 is squash-merged at public main
+fb4db00d94177db30237ca12d915cca584ca75da, with exact reviewed tree
+d3b88f9c2fba5f98ce6a5ce9338cd551b688700f and parent
+959101c43ba746538fd0252f59c84e4e4b05745b. Current merged readback is
+logs/native-runtime-contract-adadad1-merged-readback-v1/facts.json,
+SHA256 ea23bcb1d2095f00bd1254ff994d573cbde93642e5d4faf29af63bab95191bf7.
+Its independent architecture/documentation review found no required corrections;
+root07 rehashed all280 fixed members and16 companions with final/post/completion
+actual0. This records stock native services as trust dependencies while retaining
+Darmok's own functional requirements. It accepts no new collector runtime.
+
+The next implementation draft on feat/native-bootstrap-references addresses
+the initial preparation's reader increments crossing later explicit physical
+acquisitions. Both existing readers now use the same transient seed mechanism:
+six native AS references for four-heap SHOW, eight for six-heap storage.
+Successful seed acquisition precedes NoLock reader opens. Storage closes its
+initial readers/snapshot and releases the entire seed before full graph
+acquisition; source/final opens use that graph's exact AS. SHOW scopes its initial
+lifecycle wait before a seed, uses the no-CV second acquisition and closes the
+whole attempt before another initial wait. It requires an unused physical and
+semantic invocation boundary.
+
+Returned resource pointers detach before cleanup, preserving native abort for
+uncertain operations instead of attempting a second decrement. Invocation memory
+is a child of the native current transaction context: normal completion deletes
+it; failure preserves native resource backing storage until native abort/cleanup.
+Installation verification releases its syscache tuple before the separate
+namespace lookup. Three existing statement-guard fixtures now perform nonempty
+catalog discovery before Share and retain their real snapshot, publisher,
+prepared-completion and shared-drop assertions. No new forced-error fixture is
+added.
+
+Root03 at clean base fb4db00 actually exits0. The source-only primary at
+logs/native-bootstrap-references-primary-v1 binds ten selected cached source
+files directly to two already captured official archives,24 complete selected
+functions and12 paired differences (nine equal). Facts SHA256 is
+b926ccae45afa73284b6594ab7fb86bd0cbc8bddd63750eb93c7651c8affb544;
+the51-member nonself seal is
+a4293ce10797821cee887ed5864232a028ddc67ad8dd82f7ea35432a381d62f9.
+This is a limited API/reference/snapshot argument, not whole-file/call-graph
+semantic acceptance, a build or runtime result. Two broad passive search
+displays were truncated; no complete semantic reading is inferred from them.
+
+The preserved package-helper v1 draft was not invoked; it retained the older
+image-name prefix. The separate frozen v2 helper uses the new component's image
+names and a fresh packages-v2 output namespace. No failed native build or runtime
+result is claimed for that uninvoked draft.
+
+This checkpoint is planned/source and implementation draft only. Fresh
+PostgreSQL17.11/18.6 product/probe packages, affected existing required ordinary
+suites, current finite evidence and independent fresh review remain pending.
+The current NULL-options restrictions are unchanged. Supported options/path
+admission, complete transitive definitions, writer/guard coverage, immutable
+binding/planning, table execution, serving, performance and release, issues46/15
+and the overall goal remain OPEN. No existing native profile was changed or
+stopped; no new native stress, corruption, forced error, interruption, recovery,
+security/compiler/hosted-CI/account/support or publication work was performed.
+
+
+Root04 is preserved as a pre-command recorder rejection, actual1: its source
+readers successfully observed the intentionally dirty implementation draft at
+base fb4db00, and the frozen recorder correctly required a clean source. The
+requested git diff check did not execute. This is a root orchestration ordering
+error, not a native product, build or runtime failure. The next diff check uses
+a fresh namespace after committing the draft; this failed namespace is not
+reused or relabelled.
+
+Root05 diff and root06 repository boundaries at committed draft
+33f1d3e6d8ba06758af7aaccce4a6cbc37abd061 actually exit0. Root07's first
+PostgreSQL17 product build actually exits1, with nested make exit2, under
+logs/native-bootstrap-references-33f1d3e-packages-v2; the outer immutable
+receipt is logs/native-bootstrap-references-33f1d3e-07-packages. Strict compilation
+caught a local variable named text shadowing PostgreSQL's text typedef inside
+TextDatumGetCString's macro expansion. Renaming the local to version_text fixes
+the C name collision without changing catalog behavior. The failed invocation
+is preserved; no PostgreSQL18 build or runtime profile was reached, and no
+package acceptance is inferred. The corrected clean revision uses fresh output
+and image namespaces. A passive receipt display also used an absent stdout.txt
+pathname and exited2; its preceding receipt read succeeded, and it is not a
+native product result.
+
+Root08 diff and root09 boundaries at clean 315c0614283c2422ecf77cd7a44da30629993c10
+actually exit0. Root10 is preserved with actual130: all four PostgreSQL17/18
+product/probe builds exit0, but the superseded artifact check was cancelled at
+18-product-heap_storage.h after source review identified the cleanup disposition
+case below. Its original raw streams and partial receipts remain under
+logs/native-bootstrap-references-315c061-packages-v2 and the root10 folder.
+No package facts, runtime acceptance or started database profile is inferred.
+Only the owned package client's artifact inspection was signalled; no existing
+PostgreSQL verification profile was operated on. This is cancellation of a
+superseded package check, not a native error/interruption/recovery experiment.
+An initial process matcher printed an incorrect completion inference after a
+narrow prefix failed to match the actual interpreter name; the immediate recorded
+wait showed the command still live. Subsequent exact owned-process matching and
+the terminal root10 receipt determine the disposition. Source stayed clean at
+315c061 until that recorded command ended.
+
+Fresh source review found that the result-complete flag alone could delete the
+invocation context and omit abort-required if outer cleanup itself raised ERROR.
+Both readers now track successful resource cleanup independently with a volatile
+flag. Deleting invocation memory requires both result and cleanup completion;
+either failure preserves the native transaction-owned backing storage and records
+the captured subtransaction as abort-required. This changes no physical graph,
+lease, retry limit or successful protocol behavior. No forced cleanup-error
+fixture is introduced; current ordinary suites and independent source review
+must assess this disposition.
+
+The separately frozen package v3 helper batches the same artifact reads in one
+inspection container per image, reducing 52 short artifact containers to four.
+All native/public headers, README, server/probe artifacts, versions, absent-probe
+checks and product/test byte equality remain checked. Its fresh packages-v3
+namespace has no prior result. The startup/fixture v2 helpers consume that schema
+with fresh names; their separately preserved v1 drafts were never invoked.
+Two earlier passive inventory searches used absent guessed backend/packages
+paths and exited2; successful preceding reads keep their narrow scope. Those
+tool errors do not describe native product behavior.
+
+At clean 7abbcfd9fd385fc97c9dc58ab6859aa65835f647, root11 diff, root12 repository
+boundaries, root13 targeted rustfmt and root14 targeted Clippy actually exit0.
+Root15 builds and binds four PostgreSQL17.11/18.6 product/probe images with all14
+recorded commands exit0 and26 native inputs. Package facts under
+logs/native-bootstrap-references-7abbcfd-packages-v3 have SHA256
+77ce9d17ab7e79af6947bfac4e2387bd70d4948e2a68fad9aa590330ef48d84d.
+Packaged native bytes remain unchanged after this build.
+
+Root16 setup actually exits1 after four fully completed PostgreSQL17 entries.
+The first PostgreSQL18 fresh cluster took about59seconds through ordinary initdb
+and the entrypoint's checkpoint/startup, exceeding the helper's40-attempt window.
+Passive logs/state showed its later healthy, running state, no OOM and no restart;
+that failed profile remains unaccepted and unchanged. Root17 validates only the
+four completed17 entries and203 successful command receipts into a fresh aggregate
+scope, without changing or relabelling the failed setup. Its facts SHA256 is
+7c97aba775eda84b40fc59139276a446283e68ad5756b90bbc19cd4d59c4ea47.
+Root18 uses the separately frozen startup v3 helper with a monotonic180-second
+deadline and matching health-start period on four newly named18 profiles. All226
+commands exit0; facts SHA256 is
+71b310554d95d0c242bdd1acf80584446877750c0d598fa130a069910492387e.
+No existing profile was stopped, restarted or signalled; native durability and
+two-phase settings were not weakened. Each primary/ordered profile uses native10,
+and only the separate negative configuration uses0.
+
+Root19 PostgreSQL17 integration and root20 private-owner cases actually exit0:
+55 cases across seven binaries plus three private-owner cases, zero failures or
+ignored cases. Their30 before/after native artifact readers each exit0. Binding
+facts SHA256 are08533df4f6f93bd86ed0542ec427f326a31c25529fae1b8373b58f32db9e1637
+and f5c9dd5d119c5907948cce7553b404c17ec594260bb8223cd4ce10fd900c1bb9.
+Root21 PostgreSQL18 integration actually exits101: catalog discovery11 and builtin
+dispatch2 pass; publication17 pass and one concurrent shared-drop observation
+times out. The other four binaries and18 private-owner cases were not run.
+Failed binding facts SHA256 is
+f0ce617a5bfd1e6f5702ecf3c2ff85dc137070c2008ae7ff2ee76838711f6870.
+No successful whole18 suite or current mechanism acceptance is inferred.
+
+Root22 passively captures the failed18 profile's logs with actual0. Its native
+second DROP reaches the expected busy-database error at06:03:29.172UTC, after an
+ordinary14.140-second checkpoint. Together with the fixture's ordered awaits,
+this identifies the late observation, not its initial stamp read. The helper
+started an unconditional20-second observation timer before deliberately keeping
+that observation blocked across separately bounded release/drop stages. The
+timer could expire while the test intentionally prevented completion. The fix
+separates event parsing from timing: immediate observations retain their20-second
+deadline; all three existing intentionally staged observations use the receive
+operation and retain their caller's bounded completion deadline after release.
+No assertion or native expected outcome is removed, and no duration is simply
+increased. The failed native cohort is preserved; fresh required verification and
+independent review remain pending. A passive search used the helper-root cwd for
+the fixture source and exited2 after displaying the matching log lines; the next
+source read used the correct worktree. Earlier outcomes retain their scope.
+
+At 69a408ef17fffc2a13a33c76c9d5aac250d8d471, root23 diff, root24 targeted rustfmt
+and root25 targeted Clippy actually exit0. Root26 creates eight freshly named
+verification profiles, all451 commands exit0, binding the unchanged26 native
+inputs to the accepted7abbcfd package build. Its facts SHA256 is
+f284792825b9421c6e18f27bfaef3515ec7b172216fe1a2b49efddad0b06b519.
+The fixture v3 wrapper explicitly records separate source and native build heads
+and validates the actual current native inputs before and after runtime checks.
+
+Root27 PostgreSQL17 integration actually exits101: discovery11 and builtin2
+pass; publication17 pass and the concurrent shared-drop fixture fails at its
+first DROP completion deadline, line1855. This is a distinct, located outcome;
+the observation's unconditional timer has already been removed. The remaining
+four binaries, private-owner cases and all18 runtime cases were not started.
+Its failed binding facts SHA256 is
+7c2e9e4601b3ad4c803fc7abcf7aec9e47a979bfacc56473f0b1d3dbf817f46f.
+All30 before/after artifact readers exit0; no whole current runtime acceptance
+is inferred. This failed cohort remains preserved.
+
+Root28 passively captures that profile's native logs with actual0. The first
+DROP's ordinary checkpoint begins06:24:23.728UTC and completes06:24:44.552UTC:
+total20.825seconds, including19.726seconds of filesystem sync. The test's client
+EOF occurs at06:24:43.639UTC after its20-second deadline; the native checkpoint
+then completes normally. The native durability operation is not a metadata
+deadlock. The fixture's20-second durable utility budget was an unstated disk
+latency requirement, not a proxy semantic assertion. A named120-second database
+DROP completion budget now applies to the three existing DROP completion waits;
+lock/admission, immediate observations and released reader completion retain
+their existing20-second deadlines. Native fsync/checkpoint behavior, assertions,
+outcomes and the extension's bytes remain unchanged. This bounded functional
+verification policy is separate from the uncompleted performance gate. Fresh
+required verification and independent review remain pending; no new native fault,
+stress, interruption/recovery or profile lifecycle experiment is introduced.
+
+At 6db9794ef20dceec0ccc229b4b9a9998a777cbeb, root29 diff, root30 targeted
+rustfmt and root31 targeted Clippy actually exit0. Root32 creates eight fresh
+PostgreSQL17.11/18.6 verification profiles with all441 commands exit0, preserving
+the26 accepted7abbcfd native inputs. Its facts SHA256 is
+070efb6e847f20fdc187646db5710ad2dbac67d1bb28d4fdaefacf37c2a843e2.
+All primary/ordered profiles retain native max10, separate no2pc profiles use0,
+and restart counts remain0. Root33 PostgreSQL17 integration and root34 private
+owner cases actually exit0:55 plus3 passed, zero failed or ignored.
+
+Root35 PostgreSQL18 integration actually exits101: discovery11 and builtin2
+pass; publication17 pass and one concurrent shared-drop assertion fails at
+line1883, because the second writer's advisory reference is still visible.
+The remaining24 integration cases and3 private-owner cases were not started.
+Failed binding facts SHA256 is
+09776adad0697c7d95db64a6bb3cf9c9620ae93f7dc2434b738fc28a00261ff7.
+All30 before/after native readers exit0 and their native facts are unchanged.
+This is an assertion failure after the expected busy-database error, distinct
+from the earlier timing failures; no whole PostgreSQL18 acceptance is inferred.
+
+Root37 captures this failed profile's native logs passively with actual0; the
+stderr SHA256 is
+b096d6bd3e239185047092952cde7ecebe09d317a6b84f64585730dfc9ff8f9e.
+The checkpoint completes normally and the second DROP reports its expected
+busy-database error at06:51:18.000UTC. Selected paired PostgresMain source shows
+EmitErrorReport before AbortCurrentTransaction; the connector's batch_execute
+returns on the ErrorResponse without confirming ReadyForQuery. The probe's
+advisory reference is transaction-owned. Checking its release on receipt of the
+error therefore races native abort cleanup. The three existing staged DROP
+futures now use the existing command-event interface, preserve the exact DROP
+tag or one backend error, and require ReadyForQuery Idle before returning either
+outcome. The OBJECT_IN_USE and zero-advisory assertions remain. No extra query,
+sleep, weakened assertion or new timeout is introduced; native package bytes
+remain unchanged. Fresh required verification and independent review are pending.
+
+Outside-repository evidence binder drafts v1/v2 were created exclusively and
+read but never invoked. V2 distinguishes each of the eight exact per-profile
+fact records from successful command receipts; neither draft supplies a runtime
+result or an acceptance seal. Two passive searches in this turn guessed absent
+native source/probe paths and exited2; later file inventories identified the
+actual paths. These preserved tool errors do not describe native product failure.
+
+At 62deefe017e947bfb2dba454ea36fb9ea5f2f662, root38 diff, root39 targeted rustfmt,
+root40 targeted Clippy and root41 repository boundaries actually exit0. Root42
+creates eight fresh17.11/18.6 profiles with all529 commands exit0; facts SHA256 is
+783aa535ae4463ac3bc3d20f2042f5bbdf91948e477ec1a91b76b6569f4e70ad.
+The26 native inputs still exactly match the accepted7abbcfd package build.
+No failed or old native profile is reused as this verification cohort, and no
+existing profile is stopped, restarted or signalled.
+
+Root43/44 PostgreSQL17 integration/private and root45/46 PostgreSQL18
+integration/private all actually exit0. The full ordinary matrix is55 plus3
+per major:116 passed, zero failed or ignored. All four wrappers bind thirty
+successful before/after native artifact/identity readers and the unchanged26
+native inputs to the actual tested source and separate native build head.
+Their binding facts SHA256 values are, respectively:
+cf13267032f10aa824bb2933492206527595ab3fd50a37db494ef7d17002202a,
+c6cdf1ffb29aacbf22d317a4b4ef4d0df123e0b3344c5d779ab2097129ab4e08,
+6eaee20ce29ee7a7dd8b9772787a97b9e3cc5b7785e97c362433a00b1b24f7d4,
+and78ba4dd5f4e5f1a2875e7f19d524805add34d65e7efc84f4bf4c4d083b156333.
+Both publication suites pass all18 cases, retaining every busy-drop outcome,
+admission and zero-advisory assertion after actual ReadyForQuery completion.
+Primary/ordered native max10 and concurrent prepared transaction requirements
+remain unchanged; zero is still only the negative configuration.
+
+Integration command: cargo test --locked --offline -p darmok-postgres-tests
+--test server_catalog_publication --test server_statement_guards
+--test server_relation_guards --test server_heap_storage
+--test server_module_footprint --test server_builtin_dispatch
+--test catalog_discovery -- --include-ignored --test-threads=1.
+Private command: cargo test --locked --offline -p darmok-execute --lib
+native_backend::tests::native_catalog:: -- --ignored --test-threads=1.
+Each runs through the frozen fixture v3 wrapper under
+logs/native-bootstrap-references-62deefe-{43,44,45,46}-pg{17,18}-{integration,private};
+the matching -binding-v3 directories retain artifact and configuration binding.
+RUSTUP_HOME and CARGO_TARGET_DIR use the previously recorded isolated local
+toolchain/target; inherited native URLs are cleared and reconstructed privately
+from these fresh profiles. No credentials are recorded.
+
+Root47-drop-primary actually exits0. Its six bounded source spans compare both
+cached postgres.c files directly to the official17.11/18.6 archives before/after
+selection and bind the two connector early-error functions to tracked bytes.
+Facts SHA256 is
+2a00eb5b86299ec2577531d0ce265a5a37de91188e49807614c07e63ac24c98d;
+its14-member nonself seal is
+ca425821499b1c0f32d25f5cdb0d07571d64ba9a1fc4cb85d391488031a9d859.
+The complete selected spans were read. They establish the local error/abort/Ready
+ordering; they do not certify all of PostgresMain, every cleanup callee, security
+configuration or a whole native integrity/callback graph.
+
+Only repository status/evidence documentation changes after this tested revision.
+Native/package and the two changed Rust fixture bytes remain exactly those tested.
+The packaged README retains its build-time draft label; current verification is
+recorded by the repository reference-scope document and this ledger. Binder drafts
+v1/v2/v3 remain uninvoked and unchanged; fresh v4 binds the final documentation
+revision to the current package/profile/fixture/selected-source evidence without
+expanding historical review graphs. Independent review is required before merge.
+An initial documentation patch was rejected for an unmatched line before any
+mutation; the following patch used the actual line boundary. No execution result
+or failed evidence namespace was overwritten or relabelled.
+This completes local ordinary reference-scope verification only. New supported
+options/descriptor paths, writer coverage, transitive type collection, immutable
+binding/planning, table execution, serving, performance and release gates,
+issues46/15 and the overall goal remain OPEN. Standing exclusions remain.
