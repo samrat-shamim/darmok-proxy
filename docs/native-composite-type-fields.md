@@ -487,3 +487,43 @@ These are ordinary passing-path receipts. C2 cancellation/transport correctness
 still requires fresh independent source-review acceptance; no new forced-error
 or interruption experiment is performed. Every broader gate and the goal remain
 OPEN; native2PC remains required.
+
+### Finite composite component accepted after C2 review
+
+Independent review accepts clean `933cafdf3971e5b9c91ad129e69276a12808d3c6`,
+tree `08d9e1c8f68534b4fcf9836de055079af2469ba5`, with no required findings.
+C2 closes at this source; the historical cae76be report and its open finding stay
+unchanged. The review confirms retained submission and stream progress, exact
+Ready/tag validation, separate original/reused GID state and loud unresolved
+cleanup. Cancellation/transport conclusions are source-based, not observed
+interruption coverage. Existing waits, outcomes, counts and bounds remain.
+
+Review: `logs/review-native-composite-type-fields-933cafd-c2-v1`,461 fixed members
+plus16 completion companions. Report SHA256:
+`9fa858bc0209d06688739f10d355456e7da08f049d20fde79c033b97caedb8f0`;
+seal `42958a20f024a6d6a7854da485c60575f034bac286f35441e0892f819c22edc0`;
+completion `420c16ba5689b2f449761f2a2d2dffb21f8711a2111515ad4d4e01455b707e40`;
+observed completion
+`871cb800ac354f85ec928264fb9a75867ff1cd70dabd28f9f24746d17923468c`.
+Final14/post15/completion16/observer17 each actually exited0. Observer stdout
+SHA256 `95e4f4e3acc4b4a6ba1afaab5d25f96398bc36103c011137305490cc9af52ecc`.
+Own12's audit assumption incorrectly required successful Cargo stderr to be empty;
+that actual1 and helper remain preserved. Distinct corrected audit13c passed0.
+
+Root108 independently rehashes483 unique paths at actual0, facts SHA256
+`798d0b0edc6764420612cc1ed4122f25ab21138fbde88d7a8db818aced80bf78`.
+Root109 records the full report and raw observer/receipt at actual0; their complete
+contents were also read separately from the recorder's abbreviated display.
+The accepted current-source proof binds unchanged28 tested inputs to runtime
+6f3dd33 and the26 native inputs to build13ca94f, with only two unpackaged docs
+changed at reviewed933cafd. Its facts SHA256:
+`d3ff62832e103c1aebbde7c211196c47d5c0792560286c2c4ef6a70343351f8f`.
+The finite v6 receipt audit retains132 selected passes (66/major):96 unchanged
+targets plus36 current publication cases; superseded results remain excluded.
+
+This accepts copied composite declarations and their corrected ordinary fixtures.
+Direct passes remain9 per observation/27 across A/B/C. Full collector12/36 and
+bootstrap, range/enum/domain constraints, providers/expressions, negative/name
+candidates, statement/binding/execution, performance and release remain OPEN.
+Issues46/15 and the overall goal remain OPEN. Concurrent native PostgreSQL2PC
+remains required.

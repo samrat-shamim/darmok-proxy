@@ -6502,3 +6502,20 @@ the accepted earlier audit as a named leaf. Its exact hash and failure-path
 limit are in the [C2 ledger](native-composite-type-fields.md#submitted-prepare-survives-a-dropped-wait).
 Fresh independent C2 source review remains OPEN; ordinary passing paths do not
 certify cancellation/transport cleanup. Broader gates and the goal remain OPEN.
+
+### Finite composite component accepted
+
+Independent review accepts clean933cafd with no required findings and closes C2
+only there. The [accepted component ledger](native-composite-type-fields.md#finite-composite-component-accepted-after-c2-review)
+binds the461-member review, actual-zero final/post/completion/observer receipts,
+483-path root rehash and unchanged28-input current-source proof. Cancellation and
+transport cleanup conclusions are source-based; ordinary receipts establish132
+selected passing cases across PG17.11/18.6, not interruption coverage. Historical
+failed audits and runtime profiles remain preserved. Only two unpackaged docs
+changed after the tested source; native26 bytes still match build13ca94f.
+
+Copied composite declarations and their corrected fixtures are accepted. Full
+collector/bootstrap, range/enum/domain constraints, provider/expression,
+negative/name-candidate, statement/binding/execution, performance and release
+gates, issues46/15 and the overall goal remain OPEN. Direct passes remain9/27,
+with12/36 plus bootstrap unresolved. Concurrent native PostgreSQL2PC is required.
