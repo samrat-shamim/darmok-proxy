@@ -5246,3 +5246,74 @@ Startup/entry/bootstrap/provider/registry/reference/writer/sequence, full table
 execution, serving, performance and release gates, issues46/15 and the goal stay
 OPEN. Security, compiler PR4, hosted CI, new stress/recovery experiments and
 release publication remain excluded.
+
+
+### Entry census merged; native release and compiled builtin files observed
+
+PR #69 was normally squash-merged from independently accepted
+`8b33144d611dd0b1009f0971e5b8a4c499072dc0` to public main
+`3a748b06dcb3f7a0e360a9a194ac102dc472014e`, tree
+`3832badd270c843ad828f53161030c54aaac2a3b`, parent470e49d. Four docs change,
+357 other base entries and all22 native inputs remain unchanged. Independent
+review reproduces both archives, all ten literal queries and51 selected records
+with no required findings. Final18/post19/completion20 actually exit0, retaining
+418 fixed members and16 completion companions. Root10 rehashes440 paths and
+actually exits0; facts at
+`logs/review-native-entry-census-8b33144-v1-root-rehash-v1/facts.json` have SHA256
+`46a533e0245cca909104a8535035de422eadfd3e6a89a0af32fca250c58a4f4f`.
+Root16 verifies the exact merged tree/parent, public personal repository and
+generic description, no eligible open PR after filtering PR4 and issues46/15
+OPEN. Merged facts at `logs/native-entry-census-8b33144-merged-readback-v1/facts.json`
+have SHA256 `f01e08a16dabdac5d2589e6d1ce9cb77a7b2315b7e4a4c3fe472910afdb00453`.
+This accepted census closes no entry or implementation gate.
+
+The next isolated branch starts from that main. Its
+[release/header/executable observations](native-build-observations.md) bind the
+existing two primary test profiles' identities/start times/restart counts,
+PG_VERSION/PG_SHA256, version, configure declaration and selected public-file
+hashes. Root03 actually exits0: four HTTP-200 responses bind the official release
+archives/checksums;27 child readers are0. The release C/header corpora exactly
+match the earlier Git inventories at2,387/2,463 files and bytes; no extra generated
+C/header coverage is inferred. All five queries per major reproduce the earlier
+literal counts. Declared archive hashes are not complete executable provenance.
+
+Root04 actually exits1 because the uniform header set assumed pg_config_ext.h
+on18. Its native include Makefile omits that header;17 installs it. Corrected
+root05 exits0 with19 child readers0,11 installed header bodies and two native
+Makefiles. Selected headers declare170011/180006, contain the commented
+`#undef USE_ASSERT_CHECKING` and bind heap-handler OID3/declaration. Matching headers cannot prove all
+executable inputs or establish a production owner census.
+
+Root06 creates a temporary ELF-reader environment and exits0. Root07's unsupported
+installer --report option retains actual2. Separate corrected root08 exits0,
+captures two HTTP-200 PyPI artifacts and installs the exact pyelftools0.32 wheel
+locally with actual child0. The failed environment is preserved untouched.
+Root09's actual1 preserves the initial incorrect zero-arity assertion. Corrected
+root10 exits0 with eight child readers0 and passive captures of both executables
+and public fmgrtab headers. OID3 maps to heap_tableam_handler with declared one
+internal argument, strict true and retset false; the traced native call's arity
+is separately zero. Two RELATIVE pointer relocations per file resolve to the
+selected exported link-image function, not a runtime provider certificate.
+Builtin counts3023/3102 admit no other builtin rows. No provider is invoked.
+
+Commands use capture-native-build-corpus-v1.py, capture-native-build-headers-v2.py,
+prepare-native-elf-tool-v2.py and capture-native-builtin-dispatch-v2.py through the
+fixed root recorder. RUSTUP_HOME/CARGO_TARGET_DIR remain `.darmok-work/rustup` and
+`.darmok-work/native-values/target`. Primary facts/seal at
+`logs/native-build-corpus-primary-v1` have SHA256
+`26c7769e7c9cf1b0df45619f68de2a7610e371fa1935a52e83ff1e0bd3569416`
+and `8d8336ee283bfc9e98b57d97b06bb1b564c32a2445d0f0e51192cceff36afac0`.
+Header v2 facts/seal have SHA256
+`ca29b22c55246addc94c5f606783467f126804891da09bef7c03f79553d98474`
+and `d5b2f97df0adb22923a05da23818b7e93e2b6fc4415e4363c1a719d49ad432b6`.
+Builtin v2 facts/seal have SHA256
+`34d2f712c45128d45f2787bcae8fbc3dfcde77fc9ff992a7aa5dea6c66a6042c`
+and `69609503dd8916ca51c70791e8a7c7c005ee834fc080b152733c2b2477c12823`.
+Current repository/diff checks and independent review remain required before
+merge. All22 native inputs remain unchanged. No C/Rust/SQL/native build, new
+server/profile lifecycle, provider invocation or live-memory inspection is added.
+Concurrent native2PC remains required. Complete compiled-path/build/entry/
+bootstrap/provider/registry/reference/writer/sequence/table execution, serving,
+performance and release gates, issues46/15 and the goal remain OPEN. Security,
+compiler PR4, hosted CI, new stress/recovery experiments and release publication
+remain excluded.
