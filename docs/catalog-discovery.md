@@ -1,11 +1,12 @@
 # Snapshot-neutral catalog discovery
 
-Status: the original component has local PostgreSQL 17.11/18.6 receipts under
-the continuous private-owner profile below. The current
-[reference-scope change](native-bootstrap-references.md) is drafted and needs
-fresh packages, required fixtures and independent review. Historical receipts
-do not certify this changed native implementation. Revision and executed checks
-are recorded in [release-plan.md](release-plan.md).
+Status: implemented and locally verified on PostgreSQL 17.11/18.6 under the
+continuous private-owner profile below. The current
+[reference scopes](native-bootstrap-references.md) have paired package and
+ordinary-suite receipts at 62deefe017e947bfb2dba454ea36fb9ea5f2f662, bound to
+unchanged native inputs built at 7abbcfd9fd385fc97c9dc58ab6859aa65835f647.
+Independent fresh review is a merge gate. Revision and executed checks are
+recorded in [release-plan.md](release-plan.md).
 This component reads immutable native relation facts through the private
 `NativeScope`. It does not admit, prepare or execute table queries. A returned
 stamp is a historical observation, not an execution lease.

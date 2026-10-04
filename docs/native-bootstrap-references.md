@@ -1,8 +1,8 @@
 # Catalog reader reference scopes
 
-Status: source design for the existing finite builtin catalog profile;
-implementation drafted; current runtime verification pending. This is the local
-reference and acquisition argument under the
+Status: implemented for the existing finite builtin catalog profile and locally
+verified on PostgreSQL 17.11/18.6 at 62deefe017e947bfb2dba454ea36fb9ea5f2f662.
+This is the local reference and acquisition argument under the
 [stock runtime contract](native-runtime-contract.md). It admits no new catalog
 descriptor, options parser, arbitrary callback configuration or table executor.
 The NULL-options generalization and transitive collector remain open.
@@ -130,7 +130,37 @@ outer operations, not measured latency. The mechanism adds a bounded temporary
 request array and native attempt state outside raw/Share, and changes no protocol
 round trips. Current callers use six or eight requests; the existing 4096 native
 reference limit remains. No peak-memory, throughput or contention result is
-claimed before current verification.
+claimed by the ordinary functional checks.
+
+## Ordinary fixture completion
+
+The existing publication fixtures deliberately hold a native observation across
+several separately bounded stages. Their receive operation has no timer that
+starts before those deliberate blockers release; immediate observations keep
+their twenty-second deadline, and each staged caller bounds final reception
+after release. The three existing DROP completion waits use a separate
+120-second durable-utility budget because database removal can require a
+filesystem checkpoint. Lock/admission and released-reader deadlines remain
+twenty seconds. This is a functional verification policy, not a performance
+certificate.
+
+An ErrorResponse is not an abort-completion observation. The existing connector
+batch API can return its backend error before ReadyForQuery, while native abort
+still owns transaction references. The three staged DROP futures consume the
+existing command-event interface through ReadyForQuery Idle before returning
+either one exact DROP DATABASE tag or one backend error. They retain the
+OBJECT_IN_USE and zero-advisory-reference assertions, and add no query or sleep.
+Transport failure confirms no completion and fails the existing fixture.
+
+The six selected spans at logs/native-drop-completion-62deefe-primary-v1 bind
+the two native error/Ready paths directly to the official source archives and
+the connector's early-error return to its tracked source. Facts SHA256 is
+2a00eb5b86299ec2577531d0ce265a5a37de91188e49807614c07e63ac24c98d;
+the fourteen-member nonself seal is
+ca425821499b1c0f32d25f5cdb0d07571d64ba9a1fc4cb85d391488031a9d859.
+This is selected protocol ordering, not a whole PostgresMain or cleanup-call
+graph certificate. See [PG17 error and Ready paths](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/tcop/postgres.c)
+and [PG18 error and Ready paths](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/tcop/postgres.c).
 
 ## Selected native source
 
@@ -156,7 +186,32 @@ See paired [PG17 relation open/close](https://github.com/postgres/postgres/blob/
 [PG17 snapshot wrappers](https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/time/snapmgr.c)
 and [PG18 snapshot wrappers](https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/time/snapmgr.c).
 
-Current packages, affected required ordinary suites and independent fresh review
-are still required after implementation. Full supported-path, writer, immutable
+## Current verification
+
+Four product/probe images were built at 7abbcfd9fd385fc97c9dc58ab6859aa65835f647.
+All fourteen build/artifact commands passed, and all twenty-six native inputs
+remain identical in the tested revision. Eight fresh configurations at
+62deefe017e947bfb2dba454ea36fb9ea5f2f662 passed all 529 setup/artifact commands.
+Primary and reversed-preload-order profiles use max_prepared_transactions=10;
+zero is used only by the separate negative configuration. Unpreloaded profiles
+test the required missing-module behavior. No existing profile was restarted,
+stopped or signalled.
+
+| Native version | Seven integration binaries | Private-owner cases | Failed / ignored |
+| --- | ---: | ---: | ---: |
+| PostgreSQL 17.11 | 55 | 3 | 0 / 0 |
+| PostgreSQL 18.6 | 55 | 3 | 0 / 0 |
+
+The integration binaries are catalog_discovery, server_builtin_dispatch,
+server_catalog_publication, server_heap_storage, server_module_footprint,
+server_relation_guards and server_statement_guards. All ignored database cases
+were explicitly enabled. The private-owner filter was explicitly run with
+--ignored. Each of the four runtime commands has thirty successful before/after
+native artifact/identity readers. Full commands, revision-bound receipts and
+preserved earlier failures are recorded in [release-plan.md](release-plan.md).
+
+The packaged README retains its build-time draft status; these repository
+documents record verification of its unchanged native inputs. Independent fresh
+review remains a mandatory merge gate. Full supported-path, writer, immutable
 binding/planning, execution, serving, performance and release gates, issues 46/15
 and the goal remain open. Standing exclusions remain in force.

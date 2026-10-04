@@ -5805,3 +5805,66 @@ fact records from successful command receipts; neither draft supplies a runtime
 result or an acceptance seal. Two passive searches in this turn guessed absent
 native source/probe paths and exited2; later file inventories identified the
 actual paths. These preserved tool errors do not describe native product failure.
+
+At 62deefe017e947bfb2dba454ea36fb9ea5f2f662, root38 diff, root39 targeted rustfmt,
+root40 targeted Clippy and root41 repository boundaries actually exit0. Root42
+creates eight fresh17.11/18.6 profiles with all529 commands exit0; facts SHA256 is
+783aa535ae4463ac3bc3d20f2042f5bbdf91948e477ec1a91b76b6569f4e70ad.
+The26 native inputs still exactly match the accepted7abbcfd package build.
+No failed or old native profile is reused as this verification cohort, and no
+existing profile is stopped, restarted or signalled.
+
+Root43/44 PostgreSQL17 integration/private and root45/46 PostgreSQL18
+integration/private all actually exit0. The full ordinary matrix is55 plus3
+per major:116 passed, zero failed or ignored. All four wrappers bind thirty
+successful before/after native artifact/identity readers and the unchanged26
+native inputs to the actual tested source and separate native build head.
+Their binding facts SHA256 values are, respectively:
+cf13267032f10aa824bb2933492206527595ab3fd50a37db494ef7d17002202a,
+c6cdf1ffb29aacbf22d317a4b4ef4d0df123e0b3344c5d779ab2097129ab4e08,
+6eaee20ce29ee7a7dd8b9772787a97b9e3cc5b7785e97c362433a00b1b24f7d4,
+and78ba4dd5f4e5f1a2875e7f19d524805add34d65e7efc84f4bf4c4d083b156333.
+Both publication suites pass all18 cases, retaining every busy-drop outcome,
+admission and zero-advisory assertion after actual ReadyForQuery completion.
+Primary/ordered native max10 and concurrent prepared transaction requirements
+remain unchanged; zero is still only the negative configuration.
+
+Integration command: cargo test --locked --offline -p darmok-postgres-tests
+--test server_catalog_publication --test server_statement_guards
+--test server_relation_guards --test server_heap_storage
+--test server_module_footprint --test server_builtin_dispatch
+--test catalog_discovery -- --include-ignored --test-threads=1.
+Private command: cargo test --locked --offline -p darmok-execute --lib
+native_backend::tests::native_catalog:: -- --ignored --test-threads=1.
+Each runs through the frozen fixture v3 wrapper under
+logs/native-bootstrap-references-62deefe-{43,44,45,46}-pg{17,18}-{integration,private};
+the matching -binding-v3 directories retain artifact and configuration binding.
+RUSTUP_HOME and CARGO_TARGET_DIR use the previously recorded isolated local
+toolchain/target; inherited native URLs are cleared and reconstructed privately
+from these fresh profiles. No credentials are recorded.
+
+Root47-drop-primary actually exits0. Its six bounded source spans compare both
+cached postgres.c files directly to the official17.11/18.6 archives before/after
+selection and bind the two connector early-error functions to tracked bytes.
+Facts SHA256 is
+2a00eb5b86299ec2577531d0ce265a5a37de91188e49807614c07e63ac24c98d;
+its14-member nonself seal is
+ca425821499b1c0f32d25f5cdb0d07571d64ba9a1fc4cb85d391488031a9d859.
+The complete selected spans were read. They establish the local error/abort/Ready
+ordering; they do not certify all of PostgresMain, every cleanup callee, security
+configuration or a whole native integrity/callback graph.
+
+Only repository status/evidence documentation changes after this tested revision.
+Native/package and the two changed Rust fixture bytes remain exactly those tested.
+The packaged README retains its build-time draft label; current verification is
+recorded by the repository reference-scope document and this ledger. Binder drafts
+v1/v2/v3 remain uninvoked and unchanged; fresh v4 binds the final documentation
+revision to the current package/profile/fixture/selected-source evidence without
+expanding historical review graphs. Independent review is required before merge.
+An initial documentation patch was rejected for an unmatched line before any
+mutation; the following patch used the actual line boundary. No execution result
+or failed evidence namespace was overwritten or relabelled.
+This completes local ordinary reference-scope verification only. New supported
+options/descriptor paths, writer coverage, transitive type collection, immutable
+binding/planning, table execution, serving, performance and release gates,
+issues46/15 and the overall goal remain OPEN. Standing exclusions remain.

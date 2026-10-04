@@ -23,10 +23,12 @@ The next [transitive type definition investigation](native-transitive-type-closu
 records native edge/constraint/provider obligations and an open new-catalog
 descriptor bootstrap gate. It does not extend the accepted implementation profile.
 
-The current [catalog reference scopes](native-bootstrap-references.md) draft
-separates initial seed acquisition from reader increments. Fresh paired packages,
-required fixtures and independent review are pending for this changed code.
-The earlier component receipts do not certify the current revision.
+The current [catalog reference scopes](native-bootstrap-references.md)
+implementation separates initial seed acquisition from reader increments.
+Paired packages and required ordinary suites are locally verified at
+62deefe017e947bfb2dba454ea36fb9ea5f2f662 with unchanged native inputs from the
+7abbcfd build. Independent fresh review is a merge gate. This verification
+admits no new descriptor/options path or transitive type closure.
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
