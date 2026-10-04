@@ -14,6 +14,11 @@ bootstrap gate before native implementation. Issues46/15 and the overall
 release gates remain open. Concurrent native PostgreSQL two-phase transactions
 remain required; disabling them is not an alternative.
 
+The proposed [composite field stage](native-composite-type-fields.md) extends
+copied discovery through the existing attribute/class/type readers. It opens no
+application descriptor and has its own pre-implementation source gate. Its
+acceptance cannot close the new-descriptor or full-definition gates below.
+
 The [stock runtime contract](native-runtime-contract.md) defines the native API
 assumptions. New collector paths still require functional admission, project
 reference lifetimes and exact guards; an exhaustive native integrity census is

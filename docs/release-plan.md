@@ -6329,3 +6329,40 @@ confined to these nonpackaged documentation updates. Independent fresh
 implementation review is required before normal exact-head squash merge. The
 full collector/bootstrap/provider/statement/execution/serving/performance/release
 and goal gates remain open.
+
+### Declared type links merged; composite field source gate proposed
+
+PR78 merged normally at `a5cb93019284ec9f1e77a330fb5012d337981cc5` on
+2026-10-04T16:18:42Z. Its sole parent is
+`0b6aa8667dfb274fff8c5140813ac88a576af3ad`; merged tree
+`1953e986ab779b6b7ae353846aee42c3fb6d9c5c` equals independently reviewed clean
+`ea284b342358e4ecd9d17ea202b0cd0536410b0f`. The fresh finite implementation review
+found no required corrections and verified 128 actual passes. Report SHA256
+`461ab381039dba75a1eb5698e1ddd89ac47b357cdaa90729eeb72519388f4449`,
+2965-member nonself seal
+`6ba345f7dd616ce42ce6ac6ec2bc8ff31ce15a2d4eef17585776267742a9f50e`,
+16 completion companions; final/post/completion/observer each independently 0.
+Root45 rehashed 2987 unique paths and root46 separately verified observer30 and
+its raw streams. The preserved native101 and reviewer bookkeeping1 remain
+failures in their original records.
+
+Root47–53 checked the public personal repository and exact reviewed head,
+pushed only the feature branch, created PR78, normally squash-merged that head
+and fetched the merged object. The filtered noncompiler queue was empty;
+description remains “A MySQL-to-PostgreSQL compatibility proxy”. Root56 actual0
+verifies the unchanged source, exact merged parent/tree and 227 fixed members in
+`logs/native-type-links-ea284b3-merged-readback-v2`: facts SHA256
+`d620535fbded9faa98bf371b210f62f44385a439b04a07ba59d4f73c0b85613c`,
+seal `0fd0337e4fc2032f430f1a4502e66dae01518823724c68251550842f4b6e1631`.
+The fully read uninvoked readback-v1 draft's nonexistent receipt fields were
+corrected in a distinct v2 helper before invocation; neither old evidence nor
+profiles were reused or changed. Named previous leaves were not re-expanded.
+
+The next finite [composite field source contract](native-composite-type-fields.md)
+proposes a whole fixed attribute map, grouped selected composite traversal and
+one selected missing-carrier pass through the same six admitted readers. It
+distinguishes copied standalone/table definitions from physical descriptors,
+preserves root provenance and adds one measurable scan per observation. Its
+independent source gate must close before C changes. No new native execution,
+application descriptor, provider or complete type/statement admission is claimed;
+full collector/bootstrap/execution/performance/release and overall goal stay open.
