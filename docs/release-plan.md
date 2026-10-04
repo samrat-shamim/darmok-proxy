@@ -5629,3 +5629,17 @@ requested git diff check did not execute. This is a root orchestration ordering
 error, not a native product, build or runtime failure. The next diff check uses
 a fresh namespace after committing the draft; this failed namespace is not
 reused or relabelled.
+
+Root05 diff and root06 repository boundaries at committed draft
+33f1d3e6d8ba06758af7aaccce4a6cbc37abd061 actually exit0. Root07's first
+PostgreSQL17 product build actually exits1, with nested make exit2, under
+logs/native-bootstrap-references-33f1d3e-packages-v2; the outer immutable
+receipt is logs/native-bootstrap-references-33f1d3e-07-packages. Strict compilation
+caught a local variable named text shadowing PostgreSQL's text typedef inside
+TextDatumGetCString's macro expansion. Renaming the local to version_text fixes
+the C name collision without changing catalog behavior. The failed invocation
+is preserved; no PostgreSQL18 build or runtime profile was reached, and no
+package acceptance is inferred. The corrected clean revision uses fresh output
+and image namespaces. A passive receipt display also used an absent stdout.txt
+pathname and exited2; its preceding receipt read succeeded, and it is not a
+native product result.

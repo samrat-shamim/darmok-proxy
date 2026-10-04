@@ -265,10 +265,10 @@ darmok_catalog_verify_installation(void)
 							 &is_null);
 	if (!is_null)
 	{
-		char *text = TextDatumGetCString(version);
+		char *version_text = TextDatumGetCString(version);
 
-		version_matches = strcmp(text, "1.0") == 0;
-		pfree(text);
+		version_matches = strcmp(version_text, "1.0") == 0;
+		pfree(version_text);
 	}
 	/* Do not carry our extension tuple pin through another native lookup. */
 	ReleaseSysCache(tuple);
