@@ -374,7 +374,8 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 "\"check_xmin\":%s,\"tablespace_oid\":%u,\"stored_file_number\":%u,"
 							 "\"file_tablespace_oid\":%u,\"file_database_oid\":%u,"
 							 "\"file_number\":%u,\"file_proc_number\":%d,"
-							 "\"row_type_oid\":%u,\"declared_attribute_count\":%d}",
+							 "\"row_type_oid\":%u,\"declared_attribute_count\":%d,"
+							 "\"declared_check_count\":%d,\"rules_hint\":%s,\"triggers_hint\":%s}",
 							 (unsigned char) fact->kind, (unsigned char) fact->persistence,
 							 fact->access_method_oid, fact->toast_oid, fact->parent_oid,
 							 fact->mode_mask, fact->shared ? "true" : "false",
@@ -388,7 +389,9 @@ copy_storage(const DarmokHeapStorageView *view, void *opaque)
 							 fact->tablespace_oid, fact->stored_file_number,
 							 fact->file_tablespace_oid, fact->file_database_oid,
 							 fact->file_number, fact->file_proc_number,
-							 fact->row_type_oid, fact->declared_attribute_count);
+							 fact->row_type_oid, fact->declared_attribute_count,
+							 fact->declared_check_count, fact->rules_hint ? "true" : "false",
+							 fact->triggers_hint ? "true" : "false");
 		}
 		appendStringInfo(output, "],\"attribute_array_bytes\":" UINT64_FORMAT
 						 ",\"type_array_bytes\":" UINT64_FORMAT

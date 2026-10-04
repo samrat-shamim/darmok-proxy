@@ -41,6 +41,11 @@ same raw span as its additional class pass. The prior tests above do not
 certify this changed native code.
 
 `postgres/darmok_server/heap_storage.h` supplies one private C invocation.
+The [descriptor branch declarations](native-descriptor-declarations.md)
+addition returns actual rule/trigger hints and the declared CHECK count through
+the existing class observation. Current builds, suites and independent review
+are pending; it admits no new descriptor path.
+
 Counted exact UTF8 schema/relation names and native AS/RS/RX root modes are
 copied before acquisition. There is no search-path alias, folding, truncation,
 frontend handle or returned native token. Input bindings preserve duplicates;

@@ -6098,3 +6098,23 @@ full performance and release gates, issues 46/15 and the overall goal remain
 OPEN. Both use cases and concurrent native 2PC remain required. Standing
 security/compiler/hosted-CI/admin/release and new native experiment exclusions
 remain in force.
+
+### Descriptor branch declarations: finite implementation pending verification
+
+The next finite component exposes actual pg_class relchecks, relhasrules and
+relhastriggers through the existing storage facts and probe. CHECK counts are
+nonnegative selected declarations and participate in A/B/C definition equality.
+Rule/trigger hints retain actual final-observation bits without being promoted
+to invariants: ordinary maintenance may clear them. The bootstrap profile uses
+these shared fields instead of redundant private copies. No scan, lock,
+descriptor or provider path is added.
+
+Two ordinary fixtures cover independent complete graph oracles, CREATE/DROP,
+NOT VALID/validated CHECK counts, native maintenance, duplicates and unrelated
+objects, plus both prepared outcomes with first-unselected and real established
+RR data views. The latter uses an unrelated data sentinel so target DDL can
+prepare normally. Current paired native builds, eight required fresh profiles,
+ordinary suites and independent implementation review are pending. Earlier
+120-test acceptance remains PR76-only. Existing profiles and all failures are
+preserved. Broader descriptor/closure/execution/performance/release gates and
+the overall goal remain open; standing scope exclusions remain in force.

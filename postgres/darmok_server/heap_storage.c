@@ -98,9 +98,6 @@ typedef struct StorageClass
 	DarmokHeapStorageFact fact;
 	List *indexes;
 	Oid rewrite_oid;
-	int16 checks;
-	bool rules;
-	bool triggers;
 	bool row_security;
 	bool options_null;
 } StorageClass;
@@ -644,14 +641,14 @@ storage_read_fixed(StorageState *state, StorageObservation *observation)
 		fact->fact.stored_file_number = row->relfilenode;
 		fact->fact.row_type_oid = row->reltype;
 		fact->fact.declared_attribute_count = row->relnatts;
+		fact->fact.declared_check_count = row->relchecks;
 		fact->fact.shared = row->relisshared;
 		fact->fact.is_partition = row->relispartition;
 		fact->fact.has_indexes = row->relhasindex;
 		fact->fact.has_subclasses = row->relhassubclass;
+		fact->fact.rules_hint = row->relhasrules;
+		fact->fact.triggers_hint = row->relhastriggers;
 		fact->rewrite_oid = row->relrewrite;
-		fact->checks = row->relchecks;
-		fact->rules = row->relhasrules;
-		fact->triggers = row->relhastriggers;
 		fact->row_security = row->relrowsecurity;
 		if (storage_descriptor_profile_oid(row->oid))
 		{
@@ -930,6 +927,10 @@ storage_validate_fact(StorageState *state, StorageObservation *observation,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("native storage schema or shared relation identity is inconsistent")));
 	fact->schema_name = schema->name;
+	if (fact->declared_check_count < 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_CORRUPTED),
+				 errmsg("native storage has a negative declared CHECK count")));
 	if (fact->persistence != RELPERSISTENCE_PERMANENT &&
 		fact->persistence != RELPERSISTENCE_UNLOGGED &&
 		fact->persistence != RELPERSISTENCE_TEMP)
@@ -1121,7 +1122,8 @@ storage_validate_profiles(StorageObservation *observation)
 			fact->schema_oid != (toast ? PG_TOAST_NAMESPACE : PG_CATALOG_NAMESPACE) ||
 			fact->persistence != RELPERSISTENCE_PERMANENT || fact->shared ||
 			fact->is_partition || OidIsValid(fact->toast_oid) || OidIsValid(source->rewrite_oid) ||
-			source->checks != 0 || source->rules || source->triggers || source->row_security ||
+			fact->declared_check_count != 0 || fact->rules_hint || fact->triggers_hint ||
+			source->row_security ||
 			!source->options_null || fact->declared_attribute_count !=
 			(toast ? 3 : (oid == ClassOidIndexId ? 1 : 2)))
 			ereport(ERROR,
@@ -1652,6 +1654,7 @@ storage_definition_equal(const DarmokHeapStorageFact *a, const DarmokHeapStorage
 		a->stored_file_number == b->stored_file_number &&
 		a->row_type_oid == b->row_type_oid &&
 		a->declared_attribute_count == b->declared_attribute_count &&
+		a->declared_check_count == b->declared_check_count &&
 		a->file_tablespace_oid == b->file_tablespace_oid &&
 		a->file_database_oid == b->file_database_oid &&
 		a->file_proc_number == b->file_proc_number &&
@@ -1660,7 +1663,8 @@ storage_definition_equal(const DarmokHeapStorageFact *a, const DarmokHeapStorage
 		a->is_partition == b->is_partition &&
 		a->index_live == b->index_live && a->index_ready == b->index_ready &&
 		a->index_valid == b->index_valid && a->index_check_xmin == b->index_check_xmin;
-	/* relhasindex/relhassubclass are conservative hints, not definitions.
+	/* relhasindex/relhassubclass/relhasrules/relhastriggers are conservative
+	 * hints, not definitions. The final observation returns their actual bits.
 	 * Real mapped file numbers were resolved outside S under native refs.
 	 * Native relfilenumber replacement requires exclusive relation ownership. */
 }
