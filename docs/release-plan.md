@@ -5446,3 +5446,56 @@ failures. Product publication code and timeout limits are unchanged; no new
 forced-error or profile lifecycle scenario is introduced. Changed probe inputs
 require fresh current packages/profiles and all required paired suites before
 independent review and merge. All broader gates remain open.
+
+## Live builtin dispatch merged; entry mechanism alternatives
+
+PR #72 is squash-merged at main 3ed9cc3308e7808eda36da631224cc61b48c9bde,
+parent b36993884830f85adee325b9936203be7fbe3185. Its tree
+8bff6cbebfc4e3e91628b56bb538619014d74c8c equals independently accepted
+feature c737d50aa4e67fb7c8da7a89c4de6dd0c035bd58. Corrected verification
+passed 55 required ordinary native fixtures per major (110 total), zero failed or
+ignored, and the two changed Rust targets' Clippy, formatting, nine-package
+repository boundary and diff checks. Four product/probe images bind 26 native
+inputs with 62 successful package checks. Product layers reuse unchanged
+accepted bytes; current probe compiler output supplies strict PGXS flag evidence.
+Eight fresh profiles bind 95+278 successful provisioning actions and 76 successful
+before/after artifact/identity readers. Ordinary/ordered profiles keep native
+two-phase support 10; only the required negative profile uses 0.
+
+Independent implementation review has no required findings. The fixed report
+SHA256 is 79c3043154dcd31532da2506174a4d1299f147a71609c6aa1959da8d72d2b890
+at `logs/review-native-builtin-dispatch-c737d50-v1/report.md`. Its final/post/
+completion receipts each actually exit 0. Root 23 independently rehashes 2101
+fixed members plus 16 completion companions; its facts SHA256 is
+ca3f355944cd18235c8c219d1679fd7782db058d066b0462c9acf7a59d29987b.
+Previous native 101 and reviewer audit-assumption failures remain preserved.
+Neither the source-proved alternate hook chain nor a passing primary fixture
+is relabeled as execution of the corrected two-DROP fixture on the ordered
+profile. Merged readback verifies the exact tree, single parent, public personal
+repository, unchanged description, no eligible open PR after filtering PR 4 and
+issues 46/15 OPEN. Its facts SHA256 is
+b5e689803b6a0c1571c345f9858788ac2db4b65208f41c2bedea71b2a704c8ae
+at `logs/native-builtin-dispatch-c737d50-merged-readback-v1/facts.json`.
+
+The next isolated branch begins at that exact main and records
+[entry mechanism alternatives](native-entry-boundary.md). Current observers do
+not establish the private cache/owner/registry state needed before descriptor
+entry. The comparison specifies the construction obligations for stock
+PostgreSQL and the proposed responsibilities of a native inspection/provenance
+surface in a supplied server build. It analyzes the different installation,
+maintenance and runtime costs without adopting a new server footprint or
+claiming either mechanism is implemented. The footprint preference has been
+raised with the user; stock PostgreSQL plus the extension remains the working
+direction meanwhile. Concurrent native two-phase transactions remain required.
+
+Root 01 fetch and 02 worktree creation actually exit 0; the accepted component
+worktree stays frozen. Root 03 captures twelve archive-bound inputs, six full
+public headers and fourteen selected private declaration matches with actual 0
+at main 3ed9cc3. Its 29-member primary facts/seal SHA256 values are
+2105b34133eb6d3ae7a558fe684dce0d8ecdb2b2ada6863bf28c97eb2daf0e03 and
+abbc1ec19ac304fa8ea2e12d992f97c75b6719b044b7bbf5d7b0b0505180d6ea.
+This source comparison performs no native operation and does not assert an
+impossibility theorem about every native API. Current native input bytes remain
+unchanged; no fresh runtime certification follows from these documentation
+changes. All full engine, serving, performance and release gates, issues 46/15
+and the goal remain OPEN. Standing exclusions remain in force.
