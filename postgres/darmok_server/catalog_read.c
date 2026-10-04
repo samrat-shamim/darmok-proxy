@@ -126,7 +126,41 @@ typedef struct ReadState
 	bool first_snapshot_set;
 	DarmokCatalogStamp observed;
 	DarmokCatalogStamp stamp;
+	SubTransactionId subid;
+	volatile DarmokRelationAttempt seed;
 } ReadState;
+
+void
+darmok_catalog_seed_acquire(volatile DarmokRelationAttempt *attempt,
+							const Oid *heaps, int count)
+{
+	DarmokRelationRequest *requests;
+
+	if (heaps == NULL || count <= 0 || count > DARMOK_RELATION_REQUEST_LIMIT - 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("native catalog seed has an invalid heap count")));
+	requests = palloc(sizeof(DarmokRelationRequest) * (count + 2));
+	for (int i = 0; i < count; i++)
+		requests[i] = (DarmokRelationRequest) {
+			.relation_oid = heaps[i], .lock_mode = AccessShareLock
+		};
+	requests[count] = (DarmokRelationRequest) {
+		.relation_oid = ClassOidIndexId, .lock_mode = AccessShareLock
+	};
+	requests[count + 1] = (DarmokRelationRequest) {
+		.relation_oid = AttributeRelidNumIndexId, .lock_mode = AccessShareLock
+	};
+	PG_TRY();
+	{
+		darmok_relation_attempt_acquire(attempt, requests, count + 2);
+	}
+	PG_FINALLY();
+	{
+		pfree(requests);
+	}
+	PG_END_TRY();
+}
 
 void
 darmok_catalog_define_guc(void)
@@ -220,18 +254,28 @@ darmok_catalog_verify_installation(void)
 	Form_pg_extension extension;
 	bool is_null;
 	Datum version;
+	Oid namespace_oid;
+	bool version_matches = false;
 
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "darmok_server extension disappeared during catalog preparation");
 	extension = (Form_pg_extension) GETSTRUCT(tuple);
+	namespace_oid = extension->extnamespace;
 	version = SysCacheGetAttr(EXTENSIONOID, tuple, Anum_pg_extension_extversion,
 							 &is_null);
-	if (is_null || strcmp(TextDatumGetCString(version), "1.0") != 0 ||
-		extension->extnamespace != get_namespace_oid("darmok_server", false))
+	if (!is_null)
+	{
+		char *text = TextDatumGetCString(version);
+
+		version_matches = strcmp(text, "1.0") == 0;
+		pfree(text);
+	}
+	/* Do not carry our extension tuple pin through another native lookup. */
+	ReleaseSysCache(tuple);
+	if (!version_matches || namespace_oid != get_namespace_oid("darmok_server", false))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("catalog discovery requires darmok_server 1.0 in its fixed namespace")));
-	ReleaseSysCache(tuple);
 }
 
 static HTAB *
@@ -251,6 +295,8 @@ prepare_attempt(ReadState *state)
 {
 	int i;
 
+	if (state->count != 0 && !darmok_relation_attempt_owned(&state->seed))
+		elog(ERROR, "native catalog preparation requires its owned seed references");
 	/* A previously completed publication has delivered its invalidations before
 	 * dropping its transaction locks. All rebuild/cache/TOAST waits are here,
 	 * outside Share; the next raw acquisition must match that observation. */
@@ -261,7 +307,7 @@ prepare_attempt(ReadState *state)
 		return;
 	for (i = 0; i < FACT_HEAPS; i++)
 	{
-		state->heaps[i] = table_open(heap_oids[i], AccessShareLock);
+		state->heaps[i] = table_open(heap_oids[i], NoLock);
 		if (state->heaps[i]->rd_tableam != GetHeapamTableAmRoutine())
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -494,19 +540,26 @@ cleanup_attempt(ReadState *state)
 	for (i = 0; i < FACT_HEAPS; i++)
 		if (state->scans[i] != NULL)
 		{
-			heap_endscan(state->scans[i]);
+			TableScanDesc scan = state->scans[i];
+
 			state->scans[i] = NULL;
+			heap_endscan(scan);
 		}
 	if (state->snapshot != NULL)
 	{
-		UnregisterSnapshot(state->snapshot);
+		Snapshot snapshot = state->snapshot;
+
 		state->snapshot = NULL;
+		UnregisterSnapshot(snapshot);
+		InvalidateCatalogSnapshot();
 	}
 	for (i = 0; i < FACT_HEAPS; i++)
 		if (state->heaps[i] != NULL)
 		{
-			table_close(state->heaps[i], AccessShareLock);
+			Relation heap = state->heaps[i];
+
 			state->heaps[i] = NULL;
+			table_close(heap, NoLock);
 		}
 }
 
@@ -711,6 +764,7 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 {
 	MemoryContext parent = CurrentMemoryContext;
 	ReadState *state;
+	volatile bool finished = false;
 
 	if (context != PROCESS_UTILITY_TOPLEVEL)
 		ereport(ERROR,
@@ -720,9 +774,10 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("catalog discovery requires a UTF8 database")));
+	darmok_native_invocation_check();
 	state = palloc0(sizeof(ReadState));
 	state->first_snapshot_set = FirstSnapshotSet;
-	darmok_catalog_reader_start();
+	state->subid = GetCurrentSubTransactionId();
 	PG_TRY();
 	{
 		int attempt;
@@ -730,31 +785,52 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 		StringInfo response;
 		TupOutputState *output;
 
-		state->invocation = AllocSetContextCreate(parent, "darmok catalog invocation", ALLOCSET_DEFAULT_SIZES);
+		/* Failed native resources must outlive cleanup until their owning
+		 * transaction/subtransaction abort releases them. */
+		state->invocation = AllocSetContextCreate(CurTransactionContext,
+												 "darmok catalog invocation", ALLOCSET_DEFAULT_SIZES);
 		MemoryContextSwitchTo(state->invocation);
 		parse_request(state);
 		check_data_snapshot(state);
 		for (attempt = 0; attempt < READ_ATTEMPTS; attempt++)
 		{
+			/* Lifecycle waiting has no seed, reader, scan or snapshot alive. */
+			darmok_catalog_reader_start();
 			darmok_catalog_fence_acquire(&state->observed);
-			darmok_catalog_fence_release();
+			darmok_catalog_reader_finish();
 			state->attempt = AllocSetContextCreate(state->invocation, "darmok catalog attempt", ALLOCSET_DEFAULT_SIZES);
 			MemoryContextSwitchTo(state->attempt);
-			prepare_attempt(state);
+			if (state->count != 0)
+				darmok_catalog_seed_acquire(&state->seed, heap_oids, FACT_HEAPS);
+			darmok_native_refresh_start();
+			PG_TRY(_prepare);
+			{
+				prepare_attempt(state);
+			}
+			PG_FINALLY(_prepare);
+			{
+				darmok_native_refresh_finish();
+			}
+			PG_END_TRY(_prepare);
 			check_data_snapshot(state);
-			darmok_catalog_fence_acquire(&state->stamp);
-			if (darmok_catalog_stamp_equal(&state->observed, &state->stamp))
+			darmok_catalog_reader_start();
+			if (darmok_catalog_fence_try_acquire(&state->stamp) &&
+				darmok_catalog_stamp_equal(&state->observed, &state->stamp))
 			{
 				read_fixed_facts(state);
-				darmok_catalog_fence_release();
+				darmok_catalog_reader_finish();
 				cleanup_attempt(state);
+				if (darmok_relation_attempt_owned(&state->seed))
+					darmok_relation_attempt_release(&state->seed);
 				check_data_snapshot(state);
 				select_types(state);
 				complete = true;
 				break;
 			}
-			darmok_catalog_fence_release();
+			darmok_catalog_reader_finish();
 			cleanup_attempt(state);
+			if (darmok_relation_attempt_owned(&state->seed))
+				darmok_relation_attempt_release(&state->seed);
 			check_data_snapshot(state);
 			MemoryContextSwitchTo(state->invocation);
 			MemoryContextDelete(state->attempt);
@@ -778,15 +854,27 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 		end_tup_output(output);
 		check_data_snapshot(state);
 		SetQueryCompletion(completion, CMDTAG_SHOW, 0);
+		finished = true;
 	}
 	PG_FINALLY();
 	{
-		darmok_catalog_reader_finish();
-		cleanup_attempt(state);
-		MemoryContextSwitchTo(parent);
-		if (state->invocation != NULL)
-			MemoryContextDelete(state->invocation);
-		pfree(state);
+		PG_TRY(_cleanup);
+		{
+			darmok_catalog_reader_finish();
+			cleanup_attempt(state);
+			if (darmok_relation_attempt_owned(&state->seed))
+				darmok_relation_attempt_release(&state->seed);
+		}
+		PG_FINALLY(_cleanup);
+		{
+			if (!finished)
+				darmok_native_invocation_require_abort(state->subid);
+			MemoryContextSwitchTo(parent);
+			if (finished && state->invocation != NULL)
+				MemoryContextDelete(state->invocation);
+			pfree(state);
+		}
+		PG_END_TRY(_cleanup);
 	}
 	PG_END_TRY();
 }

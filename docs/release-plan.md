@@ -5559,3 +5559,73 @@ product failures. No profile operation, native build, new stress/forced-error/
 interruption/recovery experiment, security or compiler work, hosted CI or release
 publication is introduced. Full engine, serving, performance and release gates,
 issues 46/15 and the overall goal remain OPEN.
+
+
+### Catalog reader reference scopes: implementation draft after PR74
+
+PR74 is squash-merged at public main
+fb4db00d94177db30237ca12d915cca584ca75da, with exact reviewed tree
+d3b88f9c2fba5f98ce6a5ce9338cd551b688700f and parent
+959101c43ba746538fd0252f59c84e4e4b05745b. Current merged readback is
+logs/native-runtime-contract-adadad1-merged-readback-v1/facts.json,
+SHA256 ea23bcb1d2095f00bd1254ff994d573cbde93642e5d4faf29af63bab95191bf7.
+Its independent architecture/documentation review found no required corrections;
+root07 rehashed all280 fixed members and16 companions with final/post/completion
+actual0. This records stock native services as trust dependencies while retaining
+Darmok's own functional requirements. It accepts no new collector runtime.
+
+The next implementation draft on feat/native-bootstrap-references addresses
+the initial preparation's reader increments crossing later explicit physical
+acquisitions. Both existing readers now use the same transient seed mechanism:
+six native AS references for four-heap SHOW, eight for six-heap storage.
+Successful seed acquisition precedes NoLock reader opens. Storage closes its
+initial readers/snapshot and releases the entire seed before full graph
+acquisition; source/final opens use that graph's exact AS. SHOW scopes its initial
+lifecycle wait before a seed, uses the no-CV second acquisition and closes the
+whole attempt before another initial wait. It requires an unused physical and
+semantic invocation boundary.
+
+Returned resource pointers detach before cleanup, preserving native abort for
+uncertain operations instead of attempting a second decrement. Invocation memory
+is a child of the native current transaction context: normal completion deletes
+it; failure preserves native resource backing storage until native abort/cleanup.
+Installation verification releases its syscache tuple before the separate
+namespace lookup. Three existing statement-guard fixtures now perform nonempty
+catalog discovery before Share and retain their real snapshot, publisher,
+prepared-completion and shared-drop assertions. No new forced-error fixture is
+added.
+
+Root03 at clean base fb4db00 actually exits0. The source-only primary at
+logs/native-bootstrap-references-primary-v1 binds ten selected cached source
+files directly to two already captured official archives,24 complete selected
+functions and12 paired differences (nine equal). Facts SHA256 is
+b926ccae45afa73284b6594ab7fb86bd0cbc8bddd63750eb93c7651c8affb544;
+the51-member nonself seal is
+a4293ce10797821cee887ed5864232a028ddc67ad8dd82f7ea35432a381d62f9.
+This is a limited API/reference/snapshot argument, not whole-file/call-graph
+semantic acceptance, a build or runtime result. Two broad passive search
+displays were truncated; no complete semantic reading is inferred from them.
+
+The preserved package-helper v1 draft was not invoked; it retained the older
+image-name prefix. The separate frozen v2 helper uses the new component's image
+names and a fresh packages-v2 output namespace. No failed native build or runtime
+result is claimed for that uninvoked draft.
+
+This checkpoint is planned/source and implementation draft only. Fresh
+PostgreSQL17.11/18.6 product/probe packages, affected existing required ordinary
+suites, current finite evidence and independent fresh review remain pending.
+The current NULL-options restrictions are unchanged. Supported options/path
+admission, complete transitive definitions, writer/guard coverage, immutable
+binding/planning, table execution, serving, performance and release, issues46/15
+and the overall goal remain OPEN. No existing native profile was changed or
+stopped; no new native stress, corruption, forced error, interruption, recovery,
+security/compiler/hosted-CI/account/support or publication work was performed.
+
+
+Root04 is preserved as a pre-command recorder rejection, actual1: its source
+readers successfully observed the intentionally dirty implementation draft at
+base fb4db00, and the frozen recorder correctly required a clean source. The
+requested git diff check did not execute. This is a root orchestration ordering
+error, not a native product, build or runtime failure. The next diff check uses
+a fresh namespace after committing the draft; this failed namespace is not
+reused or relabelled.

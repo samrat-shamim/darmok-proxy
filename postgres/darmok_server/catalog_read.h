@@ -4,6 +4,7 @@
 
 #include "tcop/utility.h"
 #include "access/xact.h"
+#include "relation_guard.h"
 
 #define DARMOK_CATALOG_REQUEST "darmok_server.catalog_request_v1"
 
@@ -17,6 +18,10 @@ typedef struct DarmokCatalogStamp
 } DarmokCatalogStamp;
 
 /* Module-internal operations. None is a SQL function or a frontend handle. */
+/* Acquire explicit catalog and existing critical-index AS references before
+ * opening any project reader. This supplies no descriptor/path admission. */
+extern void darmok_catalog_seed_acquire(volatile DarmokRelationAttempt *attempt,
+										const Oid *heaps, int count);
 extern void darmok_catalog_reader_start(void);
 extern void darmok_catalog_fence_acquire(DarmokCatalogStamp *stamp);
 /* No lifecycle CV wait. false leaves neither raw nor gate references. Native

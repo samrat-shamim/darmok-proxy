@@ -234,6 +234,7 @@ typedef struct StorageState
 	StorageObservation initial;
 	StorageObservation source;
 	StorageObservation final;
+	volatile DarmokRelationAttempt seed;
 	volatile DarmokRelationAttempt physical;
 	volatile DarmokStatementGuard semantic;
 } StorageState;
@@ -346,8 +347,11 @@ storage_target_layout(Relation relation, int natts, AttrNumber number,
 }
 
 static void
-storage_prepare(StorageObservation *observation)
+storage_prepare(StorageState *state, StorageObservation *observation)
 {
+	if (!darmok_relation_attempt_owned(&state->seed) &&
+		!darmok_relation_attempt_owned(&state->physical))
+		elog(ERROR, "native storage preparation requires its owned physical references");
 	darmok_native_refresh_start();
 	PG_TRY();
 	{
@@ -360,7 +364,7 @@ storage_prepare(StorageObservation *observation)
 			elog(ERROR, "native storage requires completed native critical relcache initialization");
 		for (int i = 0; i < STORAGE_HEAPS; i++)
 		{
-			observation->heaps[i] = table_open(fact_heap_oids[i], AccessShareLock);
+			observation->heaps[i] = table_open(fact_heap_oids[i], NoLock);
 			if (observation->heaps[i]->rd_tableam != GetHeapamTableAmRoutine())
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -815,8 +819,10 @@ storage_end_scans(StorageObservation *observation)
 	for (int i = 0; i < STORAGE_HEAPS; i++)
 		if (observation->scans[i] != NULL)
 		{
-			heap_endscan(observation->scans[i]);
+			TableScanDesc scan = observation->scans[i];
+
 			observation->scans[i] = NULL;
+			heap_endscan(scan);
 		}
 }
 
@@ -826,27 +832,35 @@ storage_close_reader(StorageObservation *observation)
 	storage_end_scans(observation);
 	if (observation->snapshot != NULL)
 	{
-		UnregisterSnapshot(observation->snapshot);
+		Snapshot snapshot = observation->snapshot;
+
 		observation->snapshot = NULL;
+		UnregisterSnapshot(snapshot);
 		InvalidateCatalogSnapshot();
 	}
 	for (int i = 0; i < STORAGE_TOAST_HEAPS; i++)
 		if (observation->toast_heaps[i] != NULL)
 		{
-			table_close(observation->toast_heaps[i], NoLock);
+			Relation heap = observation->toast_heaps[i];
+
 			observation->toast_heaps[i] = NULL;
+			table_close(heap, NoLock);
 		}
 	for (int i = 0; i < STORAGE_CRITICAL_INDEXES; i++)
 		if (observation->critical_indexes[i] != NULL)
 		{
-			relation_close(observation->critical_indexes[i], NoLock);
+			Relation index = observation->critical_indexes[i];
+
 			observation->critical_indexes[i] = NULL;
+			relation_close(index, NoLock);
 		}
 	for (int i = 0; i < STORAGE_HEAPS; i++)
 		if (observation->heaps[i] != NULL)
 		{
-			table_close(observation->heaps[i], AccessShareLock);
+			Relation heap = observation->heaps[i];
+
 			observation->heaps[i] = NULL;
+			table_close(heap, NoLock);
 		}
 }
 
@@ -1815,6 +1829,8 @@ storage_unwind(StorageState *state)
 	storage_end_metadata(state);
 	if (darmok_relation_attempt_owned(&state->physical))
 		darmok_relation_attempt_release(&state->physical);
+	if (darmok_relation_attempt_owned(&state->seed))
+		darmok_relation_attempt_release(&state->seed);
 }
 
 static void
@@ -1842,16 +1858,20 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	StorageObservation *c = &state->final;
 
 	storage_observation_init(state, a);
-	storage_prepare(a);
+	darmok_catalog_seed_acquire(&state->seed, fact_heap_oids, STORAGE_HEAPS);
+	storage_context_check(state);
+	storage_prepare(state, a);
 	storage_context_check(state);
 	if (!storage_capture(state, a, before))
 		return false;
 	storage_close_reader(a); /* No A snapshot/descriptors through physical waits. */
 	storage_context_check(state);
+	darmok_relation_attempt_release(&state->seed);
+	storage_context_check(state);
 	storage_build_graph(state, a);
 	darmok_relation_attempt_acquire(&state->physical, a->references, a->reference_count);
 	storage_observation_init(state, b);
-	storage_prepare(b);
+	storage_prepare(state, b);
 	storage_resolve_maps(a);
 	storage_context_check(state);
 	if (!storage_capture(state, b, &a->stamp))
@@ -1864,7 +1884,7 @@ storage_attempt(StorageState *state, const DarmokCatalogStamp *before, int attem
 	storage_close_reader(b); /* Close horizon and increments before any later wait. */
 	storage_context_check(state);
 	storage_observation_init(state, c);
-	storage_prepare(c);
+	storage_prepare(state, c);
 	storage_context_check(state);
 	if (!darmok_statement_guard_acquire(&state->semantic))
 		return false;
@@ -2009,7 +2029,9 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("native storage requires a UTF8 database")));
-		state->invocation = AllocSetContextCreate(state->parent, "darmok heap storage invocation",
+		/* On ERROR keep any native resource backing storage until the owning
+		 * transaction/subtransaction abort performs native release. */
+		state->invocation = AllocSetContextCreate(CurTransactionContext, "darmok heap storage invocation",
 												ALLOCSET_DEFAULT_SIZES);
 		MemoryContextSwitchTo(state->invocation);
 		storage_copy_inputs(state, roots);
@@ -2047,7 +2069,7 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 				darmok_native_invocation_require_abort(state->subid);
 			storage_active = false;
 			MemoryContextSwitchTo(state->parent);
-			if (state->invocation != NULL)
+			if (completed && state->invocation != NULL)
 				MemoryContextDelete(state->invocation);
 			pfree(state);
 		}

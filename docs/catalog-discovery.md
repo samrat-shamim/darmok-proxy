@@ -1,8 +1,11 @@
 # Snapshot-neutral catalog discovery
 
-Status: **implemented and locally verified on PostgreSQL 17.11/18.6 under the
-continuous private-owner profile below**. Revision and executed checks are
-recorded in [release-plan.md](release-plan.md).
+Status: the original component has local PostgreSQL 17.11/18.6 receipts under
+the continuous private-owner profile below. The current
+[reference-scope change](native-bootstrap-references.md) is drafted and needs
+fresh packages, required fixtures and independent review. Historical receipts
+do not certify this changed native implementation. Revision and executed checks
+are recorded in [release-plan.md](release-plan.md).
 This component reads immutable native relation facts through the private
 `NativeScope`. It does not admit, prepare or execute table queries. A returned
 stamp is a historical observation, not an execution lease.
@@ -61,26 +64,31 @@ only disposal available. This adds no asynchronous rollback or reset.
 The one-shot reader uses the publication mechanism in
 [server-catalog-lease.md](server-catalog-lease.md):
 
-1. Acquire publication gate Share then global Share, observe global/private
-   generation, then release global and gate.
-2. Outside Share, consume native invalidations, refresh catalog snapshot state,
-   verify installation, open the four fixed heap catalogs with AccessShare and
-   allocate byte-key maps. All catalog descriptor, cache and TOAST waits occur
-   here. A prepared transaction may retain one of these locks.
-3. Reacquire gate Share then global Share and compare generations. If changed,
-   release both, clean up
-   and restart before any effects. Sixteen unsuccessful attempts produce a
-   native serialization error.
+1. With no seed, catalog reader, scan or snapshot alive, acquire publication
+   gate Share then global Share and observe global/private generation. End this
+   reader scope and release global and gate before physical acquisition.
+2. Acquire a transient seed with exact AccessShare references for the four
+   fixed heap catalogs and two existing critical class/attribute indexes.
+   Outside Share and reader bookkeeping, consume native invalidations, refresh
+   catalog snapshot state, verify installation, open the four readers with
+   NoLock and allocate byte-key maps. A prepared transaction may retain one of
+   the seed's native physical tags. No reader crosses that seed acquisition.
+3. Begin a new reader scope, try gate Share then global Share without a lifecycle
+   CV wait, and compare generations. Changed generation or shared-drop intent
+   ends the scope, closes all readers/snapshot and releases the complete seed
+   before restart or another initial lifecycle wait. Sixteen unsuccessful
+   attempts produce a native serialization error.
 4. Under unchanged Share, register one refreshed nonhistoric catalog snapshot
    and directly scan the builtin heaps `pg_namespace`, `pg_class`,
    `pg_attribute` and `pg_type`. Copy only fixed tuple prefixes. This span uses
    no index/syscache/TOAST lookup, SQL, SPI, user table AM/operator/receiver,
    invalidation dispatch or user relation/tuple/transaction-ID lock request.
-5. Release global Share then gate Share before ending scans, unregistering the
-   snapshot, closing
-   descriptors, selecting copied domain ancestors, serializing or emitting
-   output. Ordinary ERROR cleanup releases both first too. Shared-drop intent
-   waits hold neither lock, including after an admission-race recheck.
+5. Release global Share then gate Share before ending scans, unregistering and
+   invalidating the catalog snapshot, closing descriptors with NoLock and
+   releasing exact seed references. Select copied domain ancestors, serialize
+   and emit output afterward. Ordinary ERROR cleanup releases raw bookkeeping
+   first and requires matching native abort. Shared-drop lifecycle waits carry
+   neither a seed nor reader/scan/snapshot references, including after a race.
 
 No reader fence survives SHOW. A suspended native SHOW portal retains an old
 materialized observation; resuming it does not rediscover or renew a lease.
@@ -103,7 +111,9 @@ Moving invalidation processing outside Share is necessary but insufficient:
 an existing custom table-AM descriptor can invoke its handler during rebuild,
 and that handler can issue SQL and select the first data snapshot. Arbitrary
 backend histories, custom AMs and extension callbacks are not certified by this
-reader. It rejects historic/parallel or unsafe publication boundaries and
+reader. SHOW also requires an unused physical/semantic invocation boundary;
+it cannot execute through another live guard. It rejects historic/parallel or
+unsafe publication boundaries and
 checks that the native `FirstSnapshotSet` flag has not changed during discovery.
 A detected profile failure is an error requiring owner disposal; the module
 never resets or repairs native snapshot state. This check is not a universal
@@ -118,9 +128,10 @@ semantic admission and result validation remain required for statement execution
 ## Costs, bounds and fixtures
 
 A nonempty owner request has one SET/SHOW round trip. An uncontended successful
-native attempt has four short Share acquisitions (two gate and two global)
-and four full heap scans.
-Shared-drop admission retries can add acquisitions within either phase;
+native attempt has four short Share acquisitions (two gate and two global),
+six seed AccessShare acquisitions and four full heap scans. Its NoLock readers
+have their own descriptor and scan increments. Shared-drop admission retries
+can add acquisitions in the initial lifecycle phase;
 generation changes restart the attempt and add acquisitions and preparation.
 These counts are not a bound on a request that encounters contention. It copies
 all namespaces/types and only requested relations/columns, then selects domain

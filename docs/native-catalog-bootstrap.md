@@ -14,6 +14,12 @@ stock-server/extension direction. Exhaustive native owner/registry/producer
 censuses are superseded acceptance premises. The functional pre-open
 requirements below remain in force.
 
+The [catalog reference-scope draft](native-bootstrap-references.md) separates
+explicit initial AS acquisition from the existing readers and follows each
+returned scan, snapshot and descriptor through matching cleanup. It admits no
+new descriptor/options path and still requires current implementation review
+and ordinary verification. Broader supported-path and writer gates remain open.
+
 The [transitive type investigation](native-transitive-type-closure.md) adds
 `pg_range`, `pg_enum`, `pg_constraint` and constraint TOAST2832 to the intended
 metadata graph. Each new native descriptor must have a pre-open admission

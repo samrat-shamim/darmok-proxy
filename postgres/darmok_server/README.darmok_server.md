@@ -49,6 +49,15 @@ globally fresh catalog facts, supported callbacks or complete dependency closure
 Neutral statement preparation and application admission remain separate gates. See
 [`docs/native-relation-guards.md`](../../docs/native-relation-guards.md).
 
+Catalog preparation uses an exact transient AS seed before opening its initial
+readers with NoLock. The SHOW seed owns four heaps plus two critical indexes;
+the storage seed owns six heaps plus those indexes and releases before complete
+graph acquisition. Reader/scanner/snapshot increments close separately from
+physical counts. Failed invocation storage remains in its native transaction
+context until abort releases resources. This current draft requires fresh
+verification; previous native package receipts do not certify it. See
+[`docs/native-bootstrap-references.md`](../../docs/native-bootstrap-references.md).
+
 The nonrelocatable `darmok_server` namespace contains server mechanisms. The
 separate `darmok` namespace contains SQL compatibility functions. `darmok init`
 installs or validates both components in one owned transaction; `darmok verify`
