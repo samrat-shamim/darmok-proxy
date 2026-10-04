@@ -38,6 +38,15 @@ the actual `reloptions` text-array OID, varlena/by-reference representation and
 native integer alignment. Register one nonhistoric catalog snapshot and retain
 the existing raw publication span while collecting fixed facts.
 
+Successful descriptor preparation invalidates the native cached catalog
+snapshot after all installation/cache/descriptor work has finished, outside
+raw/S. Entry invalidation alone is insufficient: native extension identity
+lookup or a cache miss can recreate this ephemeral horizon. Preparation has
+not registered an observation snapshot yet, so discard that cached horizon
+before any later raw or semantic wait. PostgreSQL preserves active/registered
+caller data snapshots when it recomputes xmin. An ERROR continues through the
+existing mandatory abort boundary; it is not turned into a successful prepare.
+
 Construct the graph from those copied facts in that same span. Its work is
 bounded hashing, native allocation, sorting, fixed membership checks and the
 native current-temp namespace predicate; it opens no descriptor, parses no
@@ -87,6 +96,9 @@ successful A/B/C attempt, plus the existing selected metadata TOAST scans.
 Six descriptors are opened per observation. The extra scan adds one returned
 heap-scan reference per observation; physical seed/full-graph modes and counts
 are unchanged. No SQL/protocol round trip or options callback is added.
+Each successful preparation also discards its cached catalog snapshot once.
+The subsequent observation obtains its own fresh horizon; this can add native
+snapshot acquisition work without flushing tuple or relation caches.
 
 Graph selection/validation and payload source construction now also occupy
 the raw span. Their existing hashing, sorting and allocation work therefore
@@ -143,6 +155,17 @@ Its 16-member nonself seal is
 The ordinary writer bodies differ by major; the temp predicate bodies agree.
 This does not certify complete native files/call graphs, registry/provider
 construction or callback/error behavior outside the selected interfaces.
+
+The snapshot cleanup record is `logs/native-options-snapshot-primary-v1`.
+It compares four named native files with the official archives and captures
+ten complete selected function bodies. The four snapshot bodies agree across
+majors; extension identity lookup differs (a direct catalog scan in 17,
+EXTENSIONNAME syscache in 18). Facts SHA256 is
+`3fa2d1c3c96bc7c6a412b5851d98e6c75661290f55ff8a7ffcc882886eb47221`;
+the 18-member nonself seal is
+`82d173da48ecb1db73333a5af885d0dbcee7830c236ae2e3c667969403f00872`.
+This establishes the selected cached-snapshot cleanup semantics, not a new
+whole-kernel or registry certificate. Rebuild/runtime review of the fix is pending.
 
 Broader descriptor/options admission, writer coverage, transitive type and
 statement closure, binding/planning/execution, serving, full performance and

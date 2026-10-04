@@ -5985,3 +5985,52 @@ certifies the failed runtime. Corrected evidence needs a new namespace and
 must preserve the failed runtime and passive readers. No old kernel, registry
 or proof graph is recertified. Broader descriptor, writer, closure, execution,
 serving, full performance and release gates and issues 46/15 remain open.
+
+### Raw relation options: prepared semantic wait exposed an ephemeral horizon
+
+Corrected fixture source 1388ddd2e43584c24f95c2129e2fa4ec73e926a1, tree
+2a88dc0c82172e3afc017e5bbbaf2bac0e5e7adc, passed source checks 23–26 at exit 0.
+Its eight fresh profiles (root 27) and all 574 setup commands exited 0, using
+unchanged d6571f4 native build inputs. Profile facts SHA256 is
+7fbeab003506f4ea49e38ecb363678b2a5b54cdf7d4c8f2bdee67ede75206221.
+Root 28 PostgreSQL 17 integration exited 101: completed bins passed 11/2/18,
+storage passed 12 and failed one, and later bins/private/PG18 tests were not
+executed. The corrected fixture observed the real semantic S wait but found
+backend_xmin present for the first-unselected view. All thirty before/after
+binding readers exited 0 with unchanged identities. Binding facts SHA256 is
+2402de0a807e0f14cd383297bd1802f4810fcab207d0a6798322e385708bbc80.
+Keep this second failed ordinary run and its eight profile namespaces intact.
+
+The selected caller chain explains the leak. storage_prepare invalidated the
+cached native catalog snapshot at entry, then performed installation and
+native descriptor/cache work that can recreate it. The subsequent semantic
+wait occurs before C registers its own observation snapshot; conditional
+observation cleanup therefore cannot close this cached horizon. PostgreSQL 17
+get_extension_oid directly scans pg_extension through a native catalog
+snapshot; 18 uses EXTENSIONNAME syscache and can need a snapshot on a miss.
+The cached catalog snapshot independently occupies RegisteredSnapshots and
+protects PGPROC xmin. The selected native invalidation removes that cached
+entry and recomputes xmin, preserving active and registered caller snapshots.
+
+The fix makes successful metadata-only preparation end by invalidating that
+ephemeral catalog snapshot, outside raw/S and before any subsequent wait.
+It is a central preparation postcondition for A/B/C, not a special exception
+for this fixture or a barrier bypass. Failed native preparation still needs
+normal abort cleanup. The first-unselected and established-view assertions
+remain unchanged. No timeout is extended, no new descriptor or options parser
+is admitted, and concurrent native 2PC remains required. Native heap_storage.c
+and packaged documentation changed, so fresh paired builds and new required
+verification profiles are pending. Earlier binaries do not certify this fix.
+
+Passive root-28 snapshot ownership and selected caller readers exited 0.
+Snapshot primary capture also exited 0 and binds four named native files to
+the official archives plus ten complete selected function bodies, with an
+18-member nonself seal. Facts SHA256 is
+3fa2d1c3c96bc7c6a412b5851d98e6c75661290f55ff8a7ffcc882886eb47221;
+seal SHA256 is 82d173da48ecb1db73333a5af885d0dbcee7830c236ae2e3c667969403f00872.
+The four snapshot bodies agree by major, while extension lookup differs.
+Verifier v3 remains an uninvoked draft for the now-failed corrected source;
+it is not acceptance. Preserve v1/v2/v3 drafts and every failed receipt.
+No new native stress, forced error, interruption, recovery or existing-profile
+lifecycle experiment occurred. Broader descriptor, writer, closure, execution,
+serving, performance and release gates and issues 46/15 remain open.

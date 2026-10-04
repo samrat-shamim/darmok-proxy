@@ -391,6 +391,12 @@ storage_prepare(StorageState *state, StorageObservation *observation)
 		darmok_native_refresh_finish();
 	}
 	PG_END_TRY();
+	/* Installation/cache/descriptor work can recreate the native cached catalog
+	 * snapshot after the entry invalidation. Successful preparation owns no
+	 * observation snapshot yet: discard that ephemeral horizon before any later
+	 * raw or semantic wait. Native active/registered data snapshots are preserved.
+	 * An ERROR instead follows the existing mandatory native abort cleanup. */
+	InvalidateCatalogSnapshot();
 }
 
 static Oid
