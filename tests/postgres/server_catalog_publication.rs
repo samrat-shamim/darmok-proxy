@@ -66,49 +66,53 @@ async fn close(client: Client, driver: tokio::task::JoinHandle<Result<(), tokio_
 }
 
 // Epochs come from a distinct unheld backend, never combined with probe state.
-async fn observe(client: &Client) -> NativeCatalogStamp {
-    tokio::time::timeout(Duration::from_secs(20), async {
-        let mut events = client
-            .simple_query_events("SHOW darmok_server.catalog_request_v1")
-            .unwrap();
-        let mut text = None;
-        let mut descriptions = 0;
-        let mut tags = 0;
-        let mut ready = None;
-        while let Some(event) = events.next().await {
-            match event.unwrap() {
-                SimpleQueryEvent::RowDescription(columns) => {
-                    assert_eq!(columns.len(), 1);
-                    assert_eq!(columns[0].name(), "darmok_server.catalog_request_v1");
-                    assert_eq!(columns[0].type_oid(), 25);
-                    assert_eq!(columns[0].format(), 0);
-                    descriptions += 1;
-                }
-                SimpleQueryEvent::Row(row) => {
-                    assert!(text.is_none());
-                    assert_eq!(row.len(), 1);
-                    text = Some(row.get(0).unwrap().to_owned());
-                }
-                SimpleQueryEvent::CommandComplete(tag) => {
-                    assert_eq!(tag, "SHOW");
-                    tags += 1;
-                }
-                SimpleQueryEvent::ReadyForQuery(state) => ready = Some(state),
-                other => panic!("unexpected observation event: {other:?}"),
+// Staged wait fixtures start this receive operation before releasing their
+// native blockers; the caller bounds completion after the release.
+async fn receive_observation(client: &Client) -> NativeCatalogStamp {
+    let mut events = client
+        .simple_query_events("SHOW darmok_server.catalog_request_v1")
+        .unwrap();
+    let mut text = None;
+    let mut descriptions = 0;
+    let mut tags = 0;
+    let mut ready = None;
+    while let Some(event) = events.next().await {
+        match event.unwrap() {
+            SimpleQueryEvent::RowDescription(columns) => {
+                assert_eq!(columns.len(), 1);
+                assert_eq!(columns[0].name(), "darmok_server.catalog_request_v1");
+                assert_eq!(columns[0].type_oid(), 25);
+                assert_eq!(columns[0].format(), 0);
+                descriptions += 1;
             }
+            SimpleQueryEvent::Row(row) => {
+                assert!(text.is_none());
+                assert_eq!(row.len(), 1);
+                text = Some(row.get(0).unwrap().to_owned());
+            }
+            SimpleQueryEvent::CommandComplete(tag) => {
+                assert_eq!(tag, "SHOW");
+                tags += 1;
+            }
+            SimpleQueryEvent::ReadyForQuery(state) => ready = Some(state),
+            other => panic!("unexpected observation event: {other:?}"),
         }
-        assert_eq!(descriptions, 1);
-        assert_eq!(tags, 1);
-        assert!(matches!(
-            ready,
-            Some(TransactionState::Idle | TransactionState::Transaction)
-        ));
-        decode_catalog_observation(&text.unwrap(), &[])
-            .unwrap()
-            .stamp()
-    })
-    .await
-    .expect("one-shot epoch observation did not complete")
+    }
+    assert_eq!(descriptions, 1);
+    assert_eq!(tags, 1);
+    assert!(matches!(
+        ready,
+        Some(TransactionState::Idle | TransactionState::Transaction)
+    ));
+    decode_catalog_observation(&text.unwrap(), &[])
+        .unwrap()
+        .stamp()
+}
+
+async fn observe(client: &Client) -> NativeCatalogStamp {
+    tokio::time::timeout(Duration::from_secs(20), receive_observation(client))
+        .await
+        .expect("one-shot epoch observation did not complete")
 }
 
 async fn hold_probe(client: &Client) {
@@ -371,7 +375,7 @@ async fn late_indexed_temp_publishers_allow_both_prepared_outcomes() {
                     .gate(&observer, second_pid, "RowExclusiveLock", true)
                     .await;
 
-                let mut reading = Box::pin(observe(&epochs));
+                let mut reading = Box::pin(receive_observation(&epochs));
                 tokio::select! {
                     result = &mut reading => panic!("observer escaped unfinished publications: {result:?}"),
                     () = locks.gate(&observer, epochs_pid, "ShareLock", false) => {}
@@ -1726,7 +1730,7 @@ async fn database_removal_and_target_or_unrelated_temp_backend_exit_complete() {
         }
         close(temporary, temporary_driver).await;
         wait_fence(&observer, temp_pid, "ExclusiveLock", false).await;
-        let mut late_acquisition = Box::pin(observe(&late_reader));
+        let mut late_acquisition = Box::pin(receive_observation(&late_reader));
         tokio::select! {
             result = &mut late_acquisition => panic!("new reader bypassed shared-drop admission: {result:?}"),
             () = wait_reader_admission(&observer, late_pid, "single drop before completion") => {}
@@ -1838,7 +1842,7 @@ async fn concurrent_shared_drops_keep_reader_admission_closed_until_native_busy_
         () = wait_fence(&observer, second_pid, "ExclusiveLock", false) => {}
     }
     close(temporary, temporary_driver).await;
-    let mut acquisition = Box::pin(observe(&late_reader));
+    let mut acquisition = Box::pin(receive_observation(&late_reader));
     tokio::select! {
         result = &mut acquisition => panic!("reader bypassed shared-drop admission: {result:?}"),
         () = wait_reader_admission(&observer, late_pid, "both drop intents pending") => {}

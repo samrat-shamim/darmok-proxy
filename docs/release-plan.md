@@ -5679,3 +5679,55 @@ with fresh names; their separately preserved v1 drafts were never invoked.
 Two earlier passive inventory searches used absent guessed backend/packages
 paths and exited2; successful preceding reads keep their narrow scope. Those
 tool errors do not describe native product behavior.
+
+At clean 7abbcfd9fd385fc97c9dc58ab6859aa65835f647, root11 diff, root12 repository
+boundaries, root13 targeted rustfmt and root14 targeted Clippy actually exit0.
+Root15 builds and binds four PostgreSQL17.11/18.6 product/probe images with all14
+recorded commands exit0 and26 native inputs. Package facts under
+logs/native-bootstrap-references-7abbcfd-packages-v3 have SHA256
+77ce9d17ab7e79af6947bfac4e2387bd70d4948e2a68fad9aa590330ef48d84d.
+Packaged native bytes remain unchanged after this build.
+
+Root16 setup actually exits1 after four fully completed PostgreSQL17 entries.
+The first PostgreSQL18 fresh cluster took about59seconds through ordinary initdb
+and the entrypoint's checkpoint/startup, exceeding the helper's40-attempt window.
+Passive logs/state showed its later healthy, running state, no OOM and no restart;
+that failed profile remains unaccepted and unchanged. Root17 validates only the
+four completed17 entries and203 successful command receipts into a fresh aggregate
+scope, without changing or relabelling the failed setup. Its facts SHA256 is
+7c97aba775eda84b40fc59139276a446283e68ad5756b90bbc19cd4d59c4ea47.
+Root18 uses the separately frozen startup v3 helper with a monotonic180-second
+deadline and matching health-start period on four newly named18 profiles. All226
+commands exit0; facts SHA256 is
+71b310554d95d0c242bdd1acf80584446877750c0d598fa130a069910492387e.
+No existing profile was stopped, restarted or signalled; native durability and
+two-phase settings were not weakened. Each primary/ordered profile uses native10,
+and only the separate negative configuration uses0.
+
+Root19 PostgreSQL17 integration and root20 private-owner cases actually exit0:
+55 cases across seven binaries plus three private-owner cases, zero failures or
+ignored cases. Their30 before/after native artifact readers each exit0. Binding
+facts SHA256 are08533df4f6f93bd86ed0542ec427f326a31c25529fae1b8373b58f32db9e1637
+and f5c9dd5d119c5907948cce7553b404c17ec594260bb8223cd4ce10fd900c1bb9.
+Root21 PostgreSQL18 integration actually exits101: catalog discovery11 and builtin
+dispatch2 pass; publication17 pass and one concurrent shared-drop observation
+times out. The other four binaries and18 private-owner cases were not run.
+Failed binding facts SHA256 is
+f0ce617a5bfd1e6f5702ecf3c2ff85dc137070c2008ae7ff2ee76838711f6870.
+No successful whole18 suite or current mechanism acceptance is inferred.
+
+Root22 passively captures the failed18 profile's logs with actual0. Its native
+second DROP reaches the expected busy-database error at06:03:29.172UTC, after an
+ordinary14.140-second checkpoint. Together with the fixture's ordered awaits,
+this identifies the late observation, not its initial stamp read. The helper
+started an unconditional20-second observation timer before deliberately keeping
+that observation blocked across separately bounded release/drop stages. The
+timer could expire while the test intentionally prevented completion. The fix
+separates event parsing from timing: immediate observations retain their20-second
+deadline; all three existing intentionally staged observations use the receive
+operation and retain their caller's bounded completion deadline after release.
+No assertion or native expected outcome is removed, and no duration is simply
+increased. The failed native cohort is preserved; fresh required verification and
+independent review remain pending. A passive search used the helper-root cwd for
+the fixture source and exited2 after displaying the matching log lines; the next
+source read used the correct worktree. Earlier outcomes retain their scope.
