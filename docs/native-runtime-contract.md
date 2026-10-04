@@ -64,6 +64,20 @@ control history and confirmed native state. Setup and query connections remain
 separate; a setup DO manifest or another caller's Client cannot enter that
 history.
 
+The planned metadata bootstrap has a finite additional interface prerequisite:
+the six initial builtin catalog heaps and two initialized lookup indexes retain
+their original native descriptor, loader and options contracts. The
+[initial-base argument](native-type-payload-bootstrap.md#initial-admission-base-and-preservation)
+names that prerequisite separately from fresh defining checks. Ordinary
+application DDL/catalog writes, including prepared transactions, preserve it;
+modifying builtin catalog schema/loaders or substituting unsupported native
+paths is outside the admitted functional configuration. It is not inferred from
+a warm cache, caller flag or later observation. The proposed collector owns
+AS/RX on all eight seed objects before its first project reader open, then
+checks actual rows and freshly admits every new dependent descriptor. The finite
+source/design gate is accepted at 1f7c108; implementation and runtime gates
+remain OPEN, and older six-catalog acceptance retains its original scope.
+
 The paired init-file consumer replaces serialized transient reference counts
 with one intrinsic pin for nailed descriptors or zero otherwise. It reconstructs
 handler pointers and recalculates lock and storage addressing. PostgreSQL 18

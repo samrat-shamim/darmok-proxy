@@ -6519,3 +6519,59 @@ collector/bootstrap, range/enum/domain constraints, provider/expression,
 negative/name-candidate, statement/binding/execution, performance and release
 gates, issues46/15 and the overall goal remain OPEN. Direct passes remain9/27,
 with12/36 plus bootstrap unresolved. Concurrent native PostgreSQL2PC is required.
+
+PR79's normal exact-head squash merged at
+`e22f6fd6e01f841f2b1bbdec39e2576925d4b20b`, tree
+`8aa8e616d243efede143a0703d6a8d33472e861a`, parent a5cb930. Root119 verifies
+remote main, the exact accepted feature tree and the filtered open-PR inventory.
+Merged-readback facts SHA256:
+`d70378df10ed63fdcfb4cd443877fc76d564f86c9335bebebffb45f1dcabbb8b`.
+Root116's body comparison failed before merge because only the local newline was
+stripped; root117 proves the raw bodies were identical. The failure is preserved;
+root118 used exact raw equality and actually completed the normal squash.
+
+### Type metadata descriptor preparation proposal
+
+The [preparation proposal](native-type-payload-bootstrap.md) supplies the next
+source-review target before adding range, enum and domain-constraint readers.
+It uses separate discovery and fresh preparation profiles, complete supported
+heap/critical-btree options paths, and exact AS/RX metadata graph references.
+Every new physical wait precedes Share, without a project catalog horizon or
+reader alive. Native two-phase transactions remain required.
+
+The candidate's four six-pass preparation observations add 24 direct passes to
+the full definition collector's 36, before TOAST/cache work. This is a design
+count requiring independent source review and implementation, not a runtime or
+performance acceptance. Current native code and all required tests remain at
+the merged composite component; the new descriptor/source gate is OPEN.
+
+Independent source review at fec65d9 keeps that gate OPEN on high R1: initial
+six-reader opens preceded their fresh admission and complete AS/RX ownership.
+No runtime defect is established. The immutable report SHA256 is
+`3b8e7cd8565d9f3986c808c7cbdedb661bc23ce0face1ef138db3a94ac3bf432`;
+its actual-zero terminal records and 186 fixed members rehash through root08
+to 208 unique bounded paths, facts SHA256
+`939f99680eb0377739537ae61cbbdfb17751f1d1cfb3e4a13f5826864bb141e4`.
+Root09's guessed commands filename caused a reader-only actual1; corrected
+root10 reads the complete report/raw observer/receipt and preserves that failure.
+
+The proposed correction names the inherited native catalog/lookup base,
+separately classifies permitted transitions and requires AS/RX on all eight
+seed objects before any project cache preparation or reader open: 16 references
+instead of eight. The four preparation and three definition observations cost
+the candidate 60 direct passes. Added native contention/retention and all runtime
+results remain unmeasured. Fresh independent correction review is required
+before C; broader collector, provider, statement, execution, performance,
+release and overall goal gates remain OPEN.
+
+The finite source/design correction is accepted at clean1f7c108, closing R1 only
+there under the explicit inherited native interface configuration. Its
+[acceptance ledger](native-type-payload-bootstrap.md#finite-sourcedesign-mechanism-accepted)
+binds 323 fixed review members, 16 completion companions, actual-zero
+audit/final/post/completion/observer receipts and root20's 345-path rehash.
+Root21 reads the complete report/raw observer/receipt. Required findings are
+empty; fec65d9's original report and reviewer05/root09/root17 failures retain
+their outcomes. Current 28 native/test inputs remain unchanged. Implementation
+and ordinary runtime verification are the next gates; complete writers,
+providers, whole statements/execution, performance, release and the goal remain
+OPEN. Concurrent native PostgreSQL two-phase transactions remain required.

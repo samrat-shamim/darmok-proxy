@@ -49,6 +49,19 @@ and [PG18 conflict matrix](https://github.com/postgres/postgres/blob/REL_18_6/sr
 support the table. None of these modes freezes external provider libraries or
 establishes the private callback profile by itself.
 
+The [type metadata preparation proposal](native-type-payload-bootstrap.md)
+now gives that candidate a concrete separate-profile and exact AS/RX sequence.
+Its finite source/design correction is independently accepted at 1f7c108;
+collector implementation and runtime verification remain OPEN.
+
+The first proposal's independent review found R1: its initial AS-only opens
+preceded the fresh profile and complete guards. The revised
+[initial-base and preservation argument](native-type-payload-bootstrap.md#initial-admission-base-and-preservation)
+distinguishes inherited native bootstrap admission from fresh dependent checks
+and requires 16 exact AS/RX seed references before project preparation. That
+correction closes R1 at 1f7c108 within the stated inherited configuration.
+No new native result is claimed.
+
 All physical waits, including waits for locks retained by a prepared transaction,
 must occur before S. No catalog snapshot or reader descriptor increment may
 cross a new physical wait. Stronger catalog locks would add real waits for
@@ -101,11 +114,18 @@ before opening the path that depends on them.
 
 `RelationBuildDesc` loads class and attribute facts, selects table/index access
 information, parses options and conditionally loads other defining state.
-Fresh copied profile facts must establish the admitted native kind, namespace,
-persistence, handler and physical identity, exact positive attribute layout,
+Fresh copied profile facts must establish each new dependent descriptor's
+admitted native kind, namespace, persistence, handler and physical identity,
+exact positive attribute layout,
 default/missing/generated declarations and the flags that select additional
 descriptor paths. Compiled names/types/length/alignment are expectations to
 check against actual rows, not fabricated replacement catalog facts.
+
+The initial six-reader discovery is separately admitted by the named original
+builtin catalog interface and its closed permitted transitions in the new
+proposal. Later fresh checks cannot retrospectively admit those first opens.
+This finite bootstrap exception neither extends to newly selected descriptors
+nor substitutes native cached values for actual defining carriers.
 
 The [fixed descriptor declarations](native-descriptor-declarations.md)
 component now exposes the actual class CHECK count and rule/trigger hints from
@@ -378,8 +398,10 @@ and command identity, and compare all defining carriers and graph identities.
 The pure copying consumer runs once; S ends before callback-capable cleanup,
 physical release/retention and any row/data/XID wait.
 
-The transitive candidate still needs33 definition passes plus an unselected
-bootstrap sequence and TOAST scans. There is no accepted total pass count,
+The transitive candidate now needs36 definition passes; the separate preparation
+proposal adds24 bootstrap passes before TOAST/native cache work. This candidate
+count remains subject to source review and implementation. There is no accepted
+measured total pass count,
 peak memory, throughput or contention result. Complete ordinary paired
 fixtures, strict product/probe packages, existing required suites and a fresh
 implementation review are required after an adopted implementation. No new
