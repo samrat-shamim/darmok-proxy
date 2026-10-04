@@ -6170,3 +6170,33 @@ It is not a native test failure. Final hygiene/boundary/evidence checks and
 independent fresh implementation review remain merge requirements. Broader
 descriptor/constraint/type/provider/statement/execution/performance/release
 gates, issues 46/15 and the overall goal remain OPEN. Standing exclusions hold.
+
+
+### Declared type-link discovery source gate
+
+Base: PR77 merged at `0b6aa8667dfb274fff8c5140813ac88a576af3ad`, tree
+`d88a1d2383b679140079175c3ae7112ead05f30e`; frozen component readback is
+`logs/native-descriptor-fields-17a646c-merged-readback-v3/facts.json`, SHA256
+`d2fbe59f0f1f7fe254f30e98f22e93cda0cfa35dd3c9505a98bfd077e2446a8c`.
+That component's124/0/0 tests and accepted review certify its original scope.
+
+The next contract is `docs/native-declared-type-links.md`: root rowtype and live
+column seeds, recursive actual base/element/array-companion links, iterative
+selected membership and independent domain-chain validation, selected default
+carriers through a second tracked scan of the existing admitted type reader.
+It adds one direct scan per A/B/C observation (24 total), while leaving the
+metadata roots/physical modes unchanged. Whole fixed maps and selected queues
+use existing cumulative budgets, with an explicit4096 selected-type limit.
+The full type collector cost/sequence has been corrected for the existing class
+options pass and the required single raw span; its new descriptor gates stay open.
+
+Current passive readers07/08 at this clean base actually exited0. The primary
+record `logs/native-type-links-primary-v1` owns selected pinned17/18 type headers,
+facts SHA256 `14344de93dc3f19f6d54b0c061cfa574d4228f424d497d19dc55be21200762fa`
+and four-member nonself seal SHA256
+`cafbd4cc43aa510fbb8a495f56d87fcdf0d5bb5dc48d4d1a76ed01c54b2c2866`.
+No new C, Rust, packages or runtime results exist at this source checkpoint.
+Independent source acceptance is required before the proposed C changes; current
+paired packages/ordinary suites and fresh implementation review remain required
+afterward. Full composite/range/enum/domain-constraint/provider/statement,
+execution, serving, performance, release and overall goal gates remain open.

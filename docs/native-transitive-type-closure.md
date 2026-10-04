@@ -4,7 +4,10 @@ Status: source investigation and design gates, not an implementation-ready
 collector or statement-admission certificate. The existing
 [variable catalog payload component](native-variable-catalog-payloads.md)
 owns images for directly referenced types and selected columns. It does not
-follow type edges. The proposed extension below must close its new descriptor
+follow type edges. The next [declared type-link stage](native-declared-type-links.md)
+specifies discovery through the already admitted `pg_type` reader, before the
+additional catalog descriptors required by this full collector. The proposed
+extension below must close its new descriptor
 bootstrap gate before native implementation. Issues46/15 and the overall
 release gates remain open. Concurrent native PostgreSQL two-phase transactions
 remain required; disabling them is not an alternative.
@@ -136,12 +139,14 @@ execution lease. They cannot construct an immutable admitted plan.
 The collection candidate first scans fixed namespace/class/index/attribute/type/
 range maps, builds the selected structural graph using only copied bytes, then
 scans attribute/type/attrdef/enum/constraint rows for the selected images and
-sets. This is eleven full passes over nine catalog heaps per logical
-observation: attributes and types are each scanned twice. Both groups must use
-the same registered snapshot and unchanged publication/private/context identity.
-Between groups, pure graph construction occurs outside raw exclusion without
-descriptor calls, providers, SQL, output or native waits. A stamp change must
-discard the observation, not join old fixed maps to new images. C cannot use
+sets, followed by the existing selected class-options pass. This is twelve full
+passes over nine catalog heaps per logical observation: attributes, types and
+classes are each scanned twice. Both groups use the same registered snapshot,
+unchanged publication/private/context identity and one raw span. Between groups,
+pure graph construction uses only copied bytes, without descriptor calls,
+providers, SQL, output or native waits. There is no second fence acquisition with
+live readers. A stamp change discards the observation, rather than joining old
+fixed maps to new images. C cannot use
 an A/B selection as a shortcut that misses newly visible defining edges.
 
 This candidate avoids copying every unrelated large default/missing carrier
@@ -213,8 +218,9 @@ it. This document authorizes no provider or arbitrary extension callback.
 
 ## Cost and verification gates
 
-The candidate's A/B/C definition collection costs33 catalog passes before any
-additional bootstrap observations or TOAST scans, compared with the current18.
+The full candidate's A/B/C definition collection costs36 catalog passes before
+additional bootstrap observations or TOAST scans, compared with the current21.
+The separately proposed declared type-link stage would cost24 direct passes.
 Do not publish a total scan count until the bootstrap sequence is fixed. Account
 for its retained references, observations and native cache work separately.
 Whole attribute/type fixed maps increase memory; selected graphs and per-seed
