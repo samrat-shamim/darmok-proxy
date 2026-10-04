@@ -6519,3 +6519,28 @@ collector/bootstrap, range/enum/domain constraints, provider/expression,
 negative/name-candidate, statement/binding/execution, performance and release
 gates, issues46/15 and the overall goal remain OPEN. Direct passes remain9/27,
 with12/36 plus bootstrap unresolved. Concurrent native PostgreSQL2PC is required.
+
+PR79's normal exact-head squash merged at
+`e22f6fd6e01f841f2b1bbdec39e2576925d4b20b`, tree
+`8aa8e616d243efede143a0703d6a8d33472e861a`, parent a5cb930. Root119 verifies
+remote main, the exact accepted feature tree and the filtered open-PR inventory.
+Merged-readback facts SHA256:
+`d70378df10ed63fdcfb4cd443877fc76d564f86c9335bebebffb45f1dcabbb8b`.
+Root116's body comparison failed before merge because only the local newline was
+stripped; root117 proves the raw bodies were identical. The failure is preserved;
+root118 used exact raw equality and actually completed the normal squash.
+
+### Type metadata descriptor preparation proposal
+
+The [preparation proposal](native-type-payload-bootstrap.md) supplies the next
+source-review target before adding range, enum and domain-constraint readers.
+It uses separate discovery and fresh preparation profiles, complete supported
+heap/critical-btree options paths, and exact AS/RX metadata graph references.
+Every new physical wait precedes Share, without a project catalog horizon or
+reader alive. Native two-phase transactions remain required.
+
+The candidate's four six-pass preparation observations add 24 direct passes to
+the full definition collector's 36, before TOAST/cache work. This is a design
+count requiring independent source review and implementation, not a runtime or
+performance acceptance. Current native code and all required tests remain at
+the merged composite component; the new descriptor/source gate is OPEN.

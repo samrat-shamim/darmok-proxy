@@ -17,8 +17,9 @@ remain required; disabling them is not an alternative.
 
 The [composite field stage](native-composite-type-fields.md) extends
 copied discovery through the existing attribute/class/type readers. It opens no
-application descriptor; its independent source/design gate is accepted, while
-paired package/runtime verification and fresh implementation review remain open.
+application descriptor. Independent implementation review and paired ordinary
+verification accepted the finite component; PR79 merged at
+`e22f6fd6e01f841f2b1bbdec39e2576925d4b20b` with unchanged tested native inputs.
 Its acceptance cannot close the new-descriptor or full-definition gates below.
 
 The [stock runtime contract](native-runtime-contract.md) defines the native API
@@ -215,6 +216,12 @@ guard costs and follows global/local option and native rebuild paths. Its
 preferred complete-options direction remains conditional on functional
 registry/provider admission, project reference lifetimes and writer coverage;
 it closes no bootstrap or runtime gate.
+
+The [type metadata preparation proposal](native-type-payload-bootstrap.md)
+selects a concrete separate-profile sequence and complete supported options path
+for source review. Its AS/RX mode union and candidate 60 direct passes include
+bootstrap work; neither the new descriptor gate nor implementation is accepted
+at this draft.
 
 The bootstrap gate remains OPEN until paired source proof covers all admitted
 writers, invalidation rebuilds and cold paths, and explains which exact guards

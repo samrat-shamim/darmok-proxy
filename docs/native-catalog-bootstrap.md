@@ -49,6 +49,10 @@ and [PG18 conflict matrix](https://github.com/postgres/postgres/blob/REL_18_6/sr
 support the table. None of these modes freezes external provider libraries or
 establishes the private callback profile by itself.
 
+The [type metadata preparation proposal](native-type-payload-bootstrap.md)
+now gives that candidate a concrete separate-profile and exact AS/RX sequence.
+Independent source review remains required before new collector C changes.
+
 All physical waits, including waits for locks retained by a prepared transaction,
 must occur before S. No catalog snapshot or reader descriptor increment may
 cross a new physical wait. Stronger catalog locks would add real waits for
@@ -378,8 +382,10 @@ and command identity, and compare all defining carriers and graph identities.
 The pure copying consumer runs once; S ends before callback-capable cleanup,
 physical release/retention and any row/data/XID wait.
 
-The transitive candidate still needs33 definition passes plus an unselected
-bootstrap sequence and TOAST scans. There is no accepted total pass count,
+The transitive candidate now needs36 definition passes; the separate preparation
+proposal adds24 bootstrap passes before TOAST/native cache work. This candidate
+count remains subject to source review and implementation. There is no accepted
+measured total pass count,
 peak memory, throughput or contention result. Complete ordinary paired
 fixtures, strict product/probe packages, existing required suites and a fresh
 implementation review are required after an adopted implementation. No new
