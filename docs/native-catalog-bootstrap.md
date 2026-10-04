@@ -107,6 +107,13 @@ default/missing/generated declarations and the flags that select additional
 descriptor paths. Compiled names/types/length/alignment are expectations to
 check against actual rows, not fabricated replacement catalog facts.
 
+The [fixed descriptor declarations](native-descriptor-declarations.md)
+component now exposes the actual class CHECK count and rule/trigger hints from
+the existing observation. Its current verification is separately recorded;
+it adds no descriptor path. These inputs do not complete the pre-open profile:
+conservative hints are not complete rule/trigger definitions, and every new
+dependent branch still requires admission before it can open or rebuild.
+
 The tuple-descriptor implementation differs by major:18 populates compact
 attributes and handles virtual generation and native NOT NULL state differently.
 Catalog NOT NULL declarations must not be rejected merely because ordinary

@@ -26,6 +26,7 @@ typedef struct DarmokHeapStorageFact
 	Oid stored_file_number;
 	Oid row_type_oid;
 	int16 declared_attribute_count;
+	int16 declared_check_count;
 	Oid file_tablespace_oid;
 	Oid file_database_oid;
 	uint32 file_number;
@@ -37,6 +38,9 @@ typedef struct DarmokHeapStorageFact
 	bool is_partition;
 	bool has_indexes;
 	bool has_subclasses;
+	/* Native descriptor branch hints, not complete rule/trigger membership. */
+	bool rules_hint;
+	bool triggers_hint;
 	bool index_live;
 	bool index_ready;
 	bool index_valid;

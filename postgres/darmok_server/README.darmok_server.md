@@ -163,6 +163,13 @@ The metadata-TOAST descriptor
 path requires the continuous builtin bootstrap profile, freshly checked NULL
 options and initialized native critical catalog indexes before opening targets.
 
+Every selected storage fact also returns its actual native CHECK count and
+rule/trigger branch hints. The count participates in definition agreement;
+conservative hints remain actual observations and do not imply complete object
+absence or presence. These fixed fields add no scan or lock and admit no new
+descriptor path. Their contract and verification status are recorded in
+[`docs/native-descriptor-declarations.md`](../../docs/native-descriptor-declarations.md).
+
 All three scan costs, raw/normalized bytes, cumulative requested copy bytes,
 context allocation and TOAST heap/chunk counts are reported to the private
 consumer. Direct TOAST scans include unrelated values; these figures are not

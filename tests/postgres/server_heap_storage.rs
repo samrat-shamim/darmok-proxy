@@ -133,7 +133,7 @@ async fn pid(client: &Client) -> i32 {
 
 async fn oracle(client: &Client, root: u32) -> Vec<Value> {
     let rows = tokio::time::timeout(DEADLINE, client.query(
-        "WITH heaps AS (SELECT oid,0::oid AS parent_oid,0 AS phase FROM pg_catalog.pg_class WHERE oid=$1 UNION ALL SELECT t.oid,r.oid,2 FROM pg_catalog.pg_class r JOIN pg_catalog.pg_class t ON t.oid=r.reltoastrelid WHERE r.oid=$1), nodes AS (SELECT oid,parent_oid,phase FROM heaps UNION ALL SELECT i.indexrelid,h.oid,h.phase+1 FROM heaps h JOIN pg_catalog.pg_index i ON i.indrelid=h.oid WHERE i.indislive) SELECT pg_catalog.json_build_object('oid',c.oid::bigint,'schema_oid',n.oid::bigint,'schema',n.nspname,'name',c.relname,'kind',pg_catalog.ascii(c.relkind::text),'persistence',pg_catalog.ascii(c.relpersistence::text),'am',c.relam::bigint,'toast_oid',c.reltoastrelid::bigint,'parent_oid',x.parent_oid::bigint,'shared',c.relisshared,'is_partition',c.relispartition,'has_indexes',c.relhasindex,'has_subclasses',c.relhassubclass,'live',COALESCE(i.indislive,false),'ready',COALESCE(i.indisready,false),'valid',COALESCE(i.indisvalid,false),'check_xmin',COALESCE(i.indcheckxmin,false),'tablespace_oid',c.reltablespace::bigint,'stored_file_number',c.relfilenode::bigint,'row_type_oid',c.reltype::bigint,'declared_attribute_count',c.relnatts,'file_tablespace_oid',COALESCE(NULLIF(c.reltablespace,0),(SELECT dattablespace FROM pg_catalog.pg_database WHERE datname=current_database()))::bigint,'file_database_oid',(CASE WHEN c.relisshared THEN 0::oid ELSE (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) END)::bigint,'file_number',pg_catalog.pg_relation_filenode(c.oid::regclass)::bigint,'file_proc_number',CASE WHEN c.relpersistence='t' THEN substring(pg_catalog.pg_relation_filepath(c.oid::regclass) FROM '/t([0-9]+)_')::integer ELSE -1 END)::text FROM nodes x JOIN pg_catalog.pg_class c ON c.oid=x.oid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid=c.oid ORDER BY x.phase,c.oid", &[&root],
+        "WITH heaps AS (SELECT oid,0::oid AS parent_oid,0 AS phase FROM pg_catalog.pg_class WHERE oid=$1 UNION ALL SELECT t.oid,r.oid,2 FROM pg_catalog.pg_class r JOIN pg_catalog.pg_class t ON t.oid=r.reltoastrelid WHERE r.oid=$1), nodes AS (SELECT oid,parent_oid,phase FROM heaps UNION ALL SELECT i.indexrelid,h.oid,h.phase+1 FROM heaps h JOIN pg_catalog.pg_index i ON i.indrelid=h.oid WHERE i.indislive) SELECT pg_catalog.json_build_object('oid',c.oid::bigint,'schema_oid',n.oid::bigint,'schema',n.nspname,'name',c.relname,'kind',pg_catalog.ascii(c.relkind::text),'persistence',pg_catalog.ascii(c.relpersistence::text),'am',c.relam::bigint,'toast_oid',c.reltoastrelid::bigint,'parent_oid',x.parent_oid::bigint,'shared',c.relisshared,'is_partition',c.relispartition,'has_indexes',c.relhasindex,'has_subclasses',c.relhassubclass,'live',COALESCE(i.indislive,false),'ready',COALESCE(i.indisready,false),'valid',COALESCE(i.indisvalid,false),'check_xmin',COALESCE(i.indcheckxmin,false),'tablespace_oid',c.reltablespace::bigint,'stored_file_number',c.relfilenode::bigint,'row_type_oid',c.reltype::bigint,'declared_attribute_count',c.relnatts,'declared_check_count',c.relchecks,'rules_hint',c.relhasrules,'triggers_hint',c.relhastriggers,'file_tablespace_oid',COALESCE(NULLIF(c.reltablespace,0),(SELECT dattablespace FROM pg_catalog.pg_database WHERE datname=current_database()))::bigint,'file_database_oid',(CASE WHEN c.relisshared THEN 0::oid ELSE (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) END)::bigint,'file_number',pg_catalog.pg_relation_filenode(c.oid::regclass)::bigint,'file_proc_number',CASE WHEN c.relpersistence='t' THEN substring(pg_catalog.pg_relation_filepath(c.oid::regclass) FROM '/t([0-9]+)_')::integer ELSE -1 END)::text FROM nodes x JOIN pg_catalog.pg_class c ON c.oid=x.oid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid=c.oid ORDER BY x.phase,c.oid", &[&root],
     )).await.unwrap().unwrap();
     rows.into_iter()
         .map(|row| serde_json::from_str(&row.get::<_, String>(0)).unwrap())
@@ -651,6 +651,15 @@ fn fact_oids(state: &Value) -> Vec<u32> {
         .iter()
         .map(|fact| u32::try_from(fact["oid"].as_u64().unwrap()).unwrap())
         .collect()
+}
+
+fn storage_fact(state: &Value, oid: u32) -> &Value {
+    state["metadata"]["facts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|fact| fact["oid"] == oid)
+        .unwrap()
 }
 
 fn application_fact_oids(state: &Value) -> Vec<u32> {
@@ -1729,6 +1738,167 @@ async fn prepared_option_changes_preserve_read_views_through_both_outcomes() {
     sql(
         &observer,
         "DROP SCHEMA IF EXISTS storage_options_prepared CASCADE",
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(writer, wd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+#[ignore = "requires the native PostgreSQL primary profile"]
+async fn descriptor_branch_hints_and_check_counts_match_current_catalog_declarations() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (observer, od) = client().await;
+    let schema = "storage_descriptor_fields";
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,"CREATE SCHEMA storage_descriptor_fields; CREATE TABLE storage_descriptor_fields.sentinel(id integer); INSERT INTO storage_descriptor_fields.sentinel VALUES(1); CREATE TABLE storage_descriptor_fields.absent(id integer); CREATE TABLE storage_descriptor_fields.unrelated(id integer CHECK(id>0)); CREATE FUNCTION storage_descriptor_fields.pass() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; CREATE RULE unrelated_update AS ON UPDATE TO storage_descriptor_fields.unrelated DO INSTEAD NOTHING; CREATE TRIGGER unrelated_insert BEFORE INSERT ON storage_descriptor_fields.unrelated FOR EACH ROW EXECUTE FUNCTION storage_descriptor_fields.pass()").await.unwrap();
+        let absent = oid(&observer,schema,"absent").await;
+        let unrelated = oid(&observer,schema,"unrelated").await;
+        for established in [false,true] {
+            let name = if established { "established" } else { "first" };
+            let table = format!("{}.{}",quoted(schema),quoted(name));
+            sql(&observer,&format!("CREATE TABLE {table}(id integer,body text); INSERT INTO {table} VALUES(1,'value')")).await.unwrap();
+            let root = oid(&observer,schema,name).await;
+            let roots = json!([[schema,name,1],[schema,name,1],[schema,"absent",1]]);
+            let masks = BTreeMap::from([(root,2),(absent,2)]);
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            if established { sql(&reader,"SELECT id FROM storage_descriptor_fields.sentinel").await.unwrap(); }
+            let mut before = oracle(&observer,root).await;
+            before.extend(oracle(&observer,absent).await);
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_graph_modes(&observer,&initial,&before,&masks).await;
+            assert_eq!(storage_fact(&initial,root)["declared_check_count"],0);
+            assert_eq!(storage_fact(&initial,root)["rules_hint"],false);
+            assert_eq!(storage_fact(&initial,root)["triggers_hint"],false);
+            assert!(!application_fact_oids(&initial).contains(&unrelated));
+            sql(&observer,&format!("CREATE RULE suppress_update AS ON UPDATE TO {table} DO INSTEAD NOTHING; CREATE TRIGGER pass_insert BEFORE INSERT ON {table} FOR EACH ROW EXECUTE FUNCTION storage_descriptor_fields.pass(); ALTER TABLE {table} ADD CONSTRAINT positive CHECK(id>0) NOT VALID; ALTER TABLE {table} ADD CONSTRAINT body_present CHECK(body IS NOT NULL)")).await.unwrap();
+            let mut expected = oracle(&observer,root).await;
+            expected.extend(oracle(&observer,absent).await);
+            let declared = capture(&reader,&roots,false).await;
+            check_scope(&declared,established,false);
+            check_graph_modes(&observer,&declared,&expected,&masks).await;
+            assert_eq!(storage_fact(&declared,root)["declared_check_count"],2);
+            assert_eq!(storage_fact(&declared,root)["rules_hint"],true);
+            assert_eq!(storage_fact(&declared,root)["triggers_hint"],true);
+            assert_eq!(storage_fact(&declared,absent)["declared_check_count"],0);
+            assert_eq!(storage_fact(&declared,absent)["rules_hint"],false);
+            assert_eq!(storage_fact(&declared,absent)["triggers_hint"],false);
+            sql(&observer,&format!("ALTER TABLE {table} VALIDATE CONSTRAINT positive; DROP RULE suppress_update ON {table}; DROP TRIGGER pass_insert ON {table}; ALTER TABLE {table} DROP CONSTRAINT body_present")).await.unwrap();
+            let current = capture(&reader,&roots,false).await;
+            check_scope(&current,established,false);
+            let mut after_drop = oracle(&observer,root).await;
+            after_drop.extend(oracle(&observer,absent).await);
+            check_graph_modes(&observer,&current,&after_drop,&masks).await;
+            assert_eq!(storage_fact(&current,root)["declared_check_count"],1);
+            // DROP need not clear conservative hints; normal maintenance and
+            // the independent oracle, rather than inferred absence, decide them.
+            sql(&observer,&format!("ALTER TABLE {table} DROP CONSTRAINT positive")).await.unwrap();
+            sql(&observer,&format!("VACUUM {table}")).await.unwrap();
+            let maintained = capture(&reader,&roots,false).await;
+            check_scope(&maintained,established,false);
+            let mut after_maintenance = oracle(&observer,root).await;
+            after_maintenance.extend(oracle(&observer,absent).await);
+            check_graph_modes(&observer,&maintained,&after_maintenance,&masks).await;
+            assert_eq!(storage_fact(&maintained,root)["declared_check_count"],0);
+            assert_eq!(storage_fact(&initial,root)["declared_check_count"],0);
+            assert_eq!(storage_fact(&initial,root)["rules_hint"],false);
+            assert_eq!(storage_fact(&declared,root)["declared_check_count"],2);
+            assert_eq!(storage_fact(&declared,root)["rules_hint"],true);
+            assert_eq!(storage_fact(&declared,root)["triggers_hint"],true);
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+    })).catch_unwind().await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        "DROP SCHEMA IF EXISTS storage_descriptor_fields CASCADE",
+    )
+    .await
+    .unwrap();
+    close(reader, rd).await;
+    close(observer, od).await;
+    finish(outcome);
+}
+
+#[tokio::test]
+#[ignore = "requires the native PostgreSQL primary profile with two-phase transactions"]
+async fn prepared_descriptor_declarations_preserve_real_data_views_through_both_outcomes() {
+    let _serial = SERIAL.lock().await;
+    let (reader, rd) = client().await;
+    let (writer, wd) = client().await;
+    let (observer, od) = client().await;
+    let backend = pid(&reader).await;
+    let probe = Observer::new(&observer).await;
+    let schema = "storage_descriptor_prepared";
+    let gids = [
+        "storage_descriptor_first_commit",
+        "storage_descriptor_first_abort",
+        "storage_descriptor_rr_commit",
+        "storage_descriptor_rr_abort",
+    ];
+    let outcome = AssertUnwindSafe(tokio::time::timeout(CASE_DEADLINE, async {
+        sql(&observer,"CREATE SCHEMA storage_descriptor_prepared; CREATE TABLE storage_descriptor_prepared.sentinel(id integer); INSERT INTO storage_descriptor_prepared.sentinel VALUES(1); CREATE FUNCTION storage_descriptor_prepared.pass() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'").await.unwrap();
+        for (case,gid) in gids.iter().enumerate() {
+            let established = case>=2;
+            let ending = if case%2==0 { "COMMIT" } else { "ROLLBACK" };
+            let name = format!("target_{case}");
+            let table = format!("{}.{}",quoted(schema),quoted(&name));
+            sql(&observer,&format!("CREATE TABLE {table}(id integer,body text); INSERT INTO {table} VALUES(1,'value')")).await.unwrap();
+            let root = oid(&observer,schema,&name).await;
+            let roots = json!([[schema,name,1],[schema,name,1]]);
+            let before = oracle(&observer,root).await;
+            let before_data: i32 = observer.query_one("SELECT id FROM storage_descriptor_prepared.sentinel",&[]).await.unwrap().get(0);
+            sql(&reader,"BEGIN ISOLATION LEVEL REPEATABLE READ").await.unwrap();
+            // A real unrelated data read establishes RR without holding target
+            // AS through the writer's ordinary access-exclusive DDL.
+            if established { sql(&reader,"SELECT id FROM storage_descriptor_prepared.sentinel").await.unwrap(); }
+            let initial = capture(&reader,&roots,false).await;
+            check_scope(&initial,established,false);
+            check_graph(&observer,&initial,&before,2).await;
+            sql(&writer,&format!("BEGIN; CREATE RULE suppress_update AS ON UPDATE TO {table} DO INSTEAD NOTHING; CREATE TRIGGER pass_insert BEFORE INSERT ON {table} FOR EACH ROW EXECUTE FUNCTION storage_descriptor_prepared.pass(); ALTER TABLE {table} ADD CONSTRAINT positive CHECK(id>0) NOT VALID; ALTER TABLE {table} ADD CONSTRAINT body_present CHECK(body IS NOT NULL); UPDATE storage_descriptor_prepared.sentinel SET id=id+1; PREPARE TRANSACTION '{gid}'")).await.unwrap();
+            assert!(probe.modes(&observer,None,&[root]).await.iter().any(|row|row.2=="AccessExclusiveLock" && row.3));
+            let request = storage_command(&roots,false);
+            let waiting = command(&reader,&request);
+            tokio::pin!(waiting);
+            tokio::select! {
+                result = &mut waiting => panic!("prepared descriptor acquisition completed before native completion: {result:?}"),
+                () = probe.wait_physical(&observer,backend,root) => {},
+            }
+            probe.check_prepared_storage_wait(&observer,backend,established).await;
+            sql(&observer,&format!("{ending} PREPARED '{gid}'")).await.unwrap();
+            waiting.await.unwrap();
+            let expected = oracle(&observer,root).await;
+            let completed = status(&reader).await;
+            check_scope(&completed,established,false);
+            check_graph(&observer,&completed,&expected,2).await;
+            if ending=="COMMIT" {
+                assert_eq!(storage_fact(&completed,root)["declared_check_count"],2);
+                assert_eq!(storage_fact(&completed,root)["rules_hint"],true);
+                assert_eq!(storage_fact(&completed,root)["triggers_hint"],true);
+            } else { assert_eq!(expected,before); }
+            assert_eq!(storage_fact(&initial,root)["declared_check_count"],0);
+            assert_eq!(storage_fact(&initial,root)["rules_hint"],false);
+            assert_eq!(storage_fact(&initial,root)["triggers_hint"],false);
+            assert!(probe.modes(&observer,Some(backend),&fact_oids(&completed)).await.is_empty());
+            probe.no_coordination(&observer,backend).await;
+            let observed_data: i32 = reader.query_one("SELECT id FROM storage_descriptor_prepared.sentinel",&[]).await.unwrap().get(0);
+            let current_data: i32 = observer.query_one("SELECT id FROM storage_descriptor_prepared.sentinel",&[]).await.unwrap().get(0);
+            assert_eq!(current_data,before_data+i32::from(ending=="COMMIT"));
+            assert_eq!(observed_data,if established { before_data } else { current_data });
+            sql(&reader,"COMMIT").await.unwrap();
+        }
+    })).catch_unwind().await;
+    finish_targets(&observer, &gids).await;
+    sql(&reader, "ROLLBACK").await.unwrap();
+    sql(&writer, "ROLLBACK").await.unwrap();
+    sql(
+        &observer,
+        "DROP SCHEMA IF EXISTS storage_descriptor_prepared CASCADE",
     )
     .await
     .unwrap();
