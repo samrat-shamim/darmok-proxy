@@ -5643,3 +5643,39 @@ package acceptance is inferred. The corrected clean revision uses fresh output
 and image namespaces. A passive receipt display also used an absent stdout.txt
 pathname and exited2; its preceding receipt read succeeded, and it is not a
 native product result.
+
+Root08 diff and root09 boundaries at clean 315c0614283c2422ecf77cd7a44da30629993c10
+actually exit0. Root10 is preserved with actual130: all four PostgreSQL17/18
+product/probe builds exit0, but the superseded artifact check was cancelled at
+18-product-heap_storage.h after source review identified the cleanup disposition
+case below. Its original raw streams and partial receipts remain under
+logs/native-bootstrap-references-315c061-packages-v2 and the root10 folder.
+No package facts, runtime acceptance or started database profile is inferred.
+Only the owned package client's artifact inspection was signalled; no existing
+PostgreSQL verification profile was operated on. This is cancellation of a
+superseded package check, not a native error/interruption/recovery experiment.
+An initial process matcher printed an incorrect completion inference after a
+narrow prefix failed to match the actual interpreter name; the immediate recorded
+wait showed the command still live. Subsequent exact owned-process matching and
+the terminal root10 receipt determine the disposition. Source stayed clean at
+315c061 until that recorded command ended.
+
+Fresh source review found that the result-complete flag alone could delete the
+invocation context and omit abort-required if outer cleanup itself raised ERROR.
+Both readers now track successful resource cleanup independently with a volatile
+flag. Deleting invocation memory requires both result and cleanup completion;
+either failure preserves the native transaction-owned backing storage and records
+the captured subtransaction as abort-required. This changes no physical graph,
+lease, retry limit or successful protocol behavior. No forced cleanup-error
+fixture is introduced; current ordinary suites and independent source review
+must assess this disposition.
+
+The separately frozen package v3 helper batches the same artifact reads in one
+inspection container per image, reducing 52 short artifact containers to four.
+All native/public headers, README, server/probe artifacts, versions, absent-probe
+checks and product/test byte equality remain checked. Its fresh packages-v3
+namespace has no prior result. The startup/fixture v2 helpers consume that schema
+with fresh names; their separately preserved v1 drafts were never invoked.
+Two earlier passive inventory searches used absent guessed backend/packages
+paths and exited2; successful preceding reads keep their narrow scope. Those
+tool errors do not describe native product behavior.

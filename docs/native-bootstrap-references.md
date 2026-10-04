@@ -96,8 +96,11 @@ Entered invocation failure records the captured owning subtransaction as
 abort-required. Partial physical grants retain the reference primitive's native
 abort disposition. Matching native abort is required before reuse, commit or
 prepare. Nested FINALLY must preserve this disposition even if cleanup itself
-fails. Invocation storage lives under the native current transaction context;
-normal completion deletes it, while failure leaves it alive until the owning
+fails. Invocation storage lives under the native current transaction context.
+Successful result generation and successful resource cleanup are separate
+volatile dispositions. Both must complete before deleting invocation storage;
+a cleanup ERROR after result generation still requires abort and keeps its
+backing storage alive. Failure leaves it alive until the owning
 native transaction/subtransaction releases resources and reclaims that storage.
 It cannot be deleted early while an uncertain native resource may still point
 into it. No ERROR becomes a completed false retry.

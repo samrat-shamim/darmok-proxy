@@ -2001,6 +2001,7 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 {
 	StorageState *state;
 	volatile bool completed = false;
+	volatile bool cleanup_finished = false;
 
 	if (storage_active)
 		ereport(ERROR,
@@ -2062,14 +2063,15 @@ darmok_heap_storage_metadata(const DarmokHeapStorageRoot *roots, int count,
 		PG_TRY(_cleanup);
 		{
 			storage_unwind(state);
+			cleanup_finished = true;
 		}
 		PG_FINALLY(_cleanup);
 		{
-			if (!completed)
+			if (!completed || !cleanup_finished)
 				darmok_native_invocation_require_abort(state->subid);
 			storage_active = false;
 			MemoryContextSwitchTo(state->parent);
-			if (completed && state->invocation != NULL)
+			if (completed && cleanup_finished && state->invocation != NULL)
 				MemoryContextDelete(state->invocation);
 			pfree(state);
 		}

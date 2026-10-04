@@ -765,6 +765,7 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 	MemoryContext parent = CurrentMemoryContext;
 	ReadState *state;
 	volatile bool finished = false;
+	volatile bool cleanup_finished = false;
 
 	if (context != PROCESS_UTILITY_TOPLEVEL)
 		ereport(ERROR,
@@ -864,13 +865,14 @@ darmok_catalog_show(ProcessUtilityContext context, DestReceiver *dest,
 			cleanup_attempt(state);
 			if (darmok_relation_attempt_owned(&state->seed))
 				darmok_relation_attempt_release(&state->seed);
+			cleanup_finished = true;
 		}
 		PG_FINALLY(_cleanup);
 		{
-			if (!finished)
+			if (!finished || !cleanup_finished)
 				darmok_native_invocation_require_abort(state->subid);
 			MemoryContextSwitchTo(parent);
-			if (finished && state->invocation != NULL)
+			if (finished && cleanup_finished && state->invocation != NULL)
 				MemoryContextDelete(state->invocation);
 			pfree(state);
 		}
